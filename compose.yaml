@@ -4,10 +4,10 @@ services:
       context: .
       args:
         OPL_APP_REPOSITORY: ${OPL_APP_REPOSITORY:-https://github.com/gaofeng21cn/one-person-lab-app.git}
-        OPL_APP_REF: ${OPL_APP_REF:-bed767da48ec13ee521631be5c3f5c46862b5bca}
+        OPL_APP_REF: ${OPL_APP_REF:-804639a2025b5a4a1de745190675a50b3c4fd84a}
         OPL_BUN_VERSION: ${OPL_BUN_VERSION:-1.3.14}
         OPL_FRAMEWORK_REPOSITORY: ${OPL_FRAMEWORK_REPOSITORY:-https://github.com/gaofeng21cn/one-person-lab.git}
-        OPL_FRAMEWORK_REF: ${OPL_FRAMEWORK_REF:-6d18ff1b9aa77a4fc5a263eba82648d93cf62bb1}
+        OPL_FRAMEWORK_REF: ${OPL_FRAMEWORK_REF:-39a7047c7374ef073eec0a3a5635f71fb61063b7}
         OPL_CODEX_NPM_SPEC: ${OPL_CODEX_NPM_SPEC:-@openai/codex@0.147.0}
         OPL_SOURCE_REVISION: ${OPL_SOURCE_REVISION:-local-candidate}
     image: ${OPL_APP_IMAGE:-one-person-lab-app:headless-candidate}
