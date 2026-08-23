@@ -12,8 +12,8 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
     readFile(new URL("../../scripts/oci/build-plan.mjs", import.meta.url), "utf8")
   ]);
   assert.match(dockerfile, /node:22-bookworm-slim@sha256:[a-f0-9]{64}/);
-  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=98f9bfa714270550d3e1906a13bce2baf0fac822/);
-  assert.match(dockerfile, /ARG OPL_APP_REF=9ce9e2f9b42927d1d37d332da93b54bda65f74aa/);
+  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=6d18ff1b9aa77a4fc5a263eba82648d93cf62bb1/);
+  assert.match(dockerfile, /ARG OPL_APP_REF=bed767da48ec13ee521631be5c3f5c46862b5bca/);
   assert.match(dockerfile, /npm pack --workspaces --ignore-scripts/);
   assert.match(dockerfile, /npm install --global --prefix \/opt\/opl-framework --omit=dev \/tmp\/one-person-lab-\*\.tgz \/tmp\/opl-framework-\*\.tgz/);
   const productionDependencies = dockerfile.slice(
@@ -22,8 +22,8 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   );
   assert.match(productionDependencies, /COPY packages \.\/packages/);
   assert.match(productionDependencies, /npm ci --omit=dev/);
-  assert.match(compose, /OPL_FRAMEWORK_REF:-98f9bfa714270550d3e1906a13bce2baf0fac822/);
-  assert.match(compose, /OPL_APP_REF:-9ce9e2f9b42927d1d37d332da93b54bda65f74aa/);
+  assert.match(compose, /OPL_FRAMEWORK_REF:-6d18ff1b9aa77a4fc5a263eba82648d93cf62bb1/);
+  assert.match(compose, /OPL_APP_REF:-bed767da48ec13ee521631be5c3f5c46862b5bca/);
   const runtime = dockerfile.slice(dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime"));
   assert.match(runtime, /org\.opencontainers\.image\.revision="\$\{OPL_SOURCE_REVISION\}"/);
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/package\.json \.\/package\.json/);
