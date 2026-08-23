@@ -139,6 +139,9 @@ test("hosted lifecycle reuses bounded user state and validates both package vers
   assert.match(cleanup.run, /system temp directory/);
   assert.match(smoke, /OPL_DESKTOP_EXPECTED_VERSION/);
   assert.match(smoke, /windowState\.version/);
+  assert.match(smoke, /cwd: isolatedCwd/);
+  assert.match(smoke, /DSH_HOME: isolatedDshHome/);
+  assert.doesNotMatch(smoke, /cwd: root/);
   assert.match(smoke, /if \(ownsStateRoot\) fs\.rmSync/);
 });
 

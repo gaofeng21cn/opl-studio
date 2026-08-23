@@ -112,6 +112,9 @@ const stateRoot = configuredStateRoot
   ? path.resolve(configuredStateRoot)
   : fs.mkdtempSync(path.join(os.tmpdir(), "opl-desktop-live-smoke-"));
 fs.mkdirSync(stateRoot, { recursive: true });
+const isolatedCwd = path.join(stateRoot, "cwd");
+const isolatedDshHome = path.join(stateRoot, "dsh-home");
+fs.mkdirSync(isolatedCwd, { recursive: true });
 const lifecycleLog = path.join(stateRoot, `fake-app-server-lifecycle-${process.pid}.jsonl`);
 const expectedVersion = process.env.OPL_DESKTOP_EXPECTED_VERSION?.trim();
 const nativeAccessibilityRequired = process.env.OPL_DESKTOP_NATIVE_ACCESSIBILITY_QUALIFICATION === "1";
@@ -120,7 +123,7 @@ const oplBinary = process.platform === "win32"
   : "/usr/bin/true";
 
 const child = spawn(executable, ["--disable-gpu", "--enable-logging=stderr"], {
-  cwd: root,
+  cwd: isolatedCwd,
   env: {
     ...process.env,
     ...(nativeAccessibilityRequired && process.platform === "linux"
@@ -128,6 +131,7 @@ const child = spawn(executable, ["--disable-gpu", "--enable-logging=stderr"], {
       : {}),
     OPL_CODEX_BIN: process.execPath,
     CODEX_APP_SERVER_ARGS: fakeAppServer,
+    DSH_HOME: isolatedDshHome,
     FAKE_APP_SERVER_LIFECYCLE_LOG: lifecycleLog,
     OPL_APP_OPL_BIN: oplBinary,
     OPL_DESKTOP_ACCESSIBILITY_QUALIFICATION: "1",
