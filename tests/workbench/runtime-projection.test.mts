@@ -7,6 +7,7 @@ import {
   parseDomainDetailViewDescriptors,
   readManagedUpdateProjection
 } from "../../src/workbench/workbenchModel.ts";
+import { compactFastState } from "../../scripts/webui-host/opl-passthrough.mjs";
 
 test("runtime projection keeps component health, carriers, and only App-projected maintenance actions", () => {
   const model = deriveWorkbenchModelFromState({
@@ -541,6 +542,72 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
     latestVersion: "1.0.0",
     ownership: "opl_managed"
   }]);
+});
+
+test("Framework fast managed-update output survives Host compression and renderer parsing", () => {
+  const compressed = compactFastState({
+    app_state: {
+      managed_update: {
+        operation: "status",
+        update_channel: "stable",
+        components: [
+          ["opl_app", "OPL App", "currentness_not_checked"],
+          ["opl_base", "OPL Base", "current"],
+          ["opl_packages", "OPL Packages", "current"]
+        ].map(([componentId, label, state]) => ({
+          component_id: componentId,
+          lifecycle_owner: componentId === "opl_app" ? "one-person-lab-app" : "one-person-lab",
+          label,
+          state,
+          channel: "stable",
+          current: {
+            installed_version: componentId === "opl_base" ? "0.125.0" : "1.0.0",
+            latest_version: componentId === "opl_app" ? null : componentId === "opl_base" ? "0.125.0" : "cohort-1",
+            currentness: componentId === "opl_app" ? "unknown" : "current",
+            manual_guidance: null,
+            ...(componentId === "opl_base" ? {
+              dependency_catalog: {
+                flow_dependencies: [{
+                  dependency_id: "officecli",
+                  dependency_kind: "cli",
+                  activation: "task_routed",
+                  offline_bundle: "none",
+                  online_install_default: true,
+                  source: "installed_owner_descriptor",
+                  source_path: "/opt/opl-flow",
+                  owner: "opl-flow",
+                  bundle_id: "officecli",
+                  version_requirement: ">=1.0.0",
+                  install_source: "native",
+                  relationship: "required",
+                  lifecycle_owner: "opl_base",
+                  update_mode: "silent_managed",
+                  installed: true,
+                  observed_status: "ready",
+                  status: "ready",
+                  currentness: "current",
+                  version: "1.0.0",
+                  latest_version: "1.0.0",
+                  ownership: "opl_managed"
+                }]
+              }
+            } : {})
+          },
+          auto_apply: { mode: "prompt_only", eligible: false, app_background_safe: false },
+          plan: { summary: "No update required" }
+        }))
+      }
+    }
+  });
+
+  const projection = readManagedUpdateProjection(compressed);
+  assert.ok(projection);
+  assert.deepEqual(projection.components.map((component) => component.componentId), [
+    "opl_app", "opl_base", "opl_packages"
+  ]);
+  assert.equal(projection.components.find((component) => component.componentId === "opl_app")?.currentness, "unknown");
+  assert.equal(projection.components.find((component) => component.componentId === "opl_base")?.flowDependencies?.[0]?.dependencyId, "officecli");
+  assert.equal(projection.components.find((component) => component.componentId === "opl_base")?.flowDependencies?.[0]?.currentness, "current");
 });
 
 test("browser bridge normalization preserves App-projected Temporal runtime details", async () => {

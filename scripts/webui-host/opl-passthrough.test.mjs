@@ -304,6 +304,127 @@ test("initialize projection keeps launch readiness while omitting private runtim
   }
 });
 
+test("fast state preserves the compact managed-update projection without the kernel envelope", () => {
+  const compact = compactFastState({
+    app_state: {
+      managed_update: {
+        surface_id: "opl_managed_updater_kernel",
+        operation: "status",
+        operation_mode: "controlled_status",
+        update_channel: "stable",
+        authority_boundary: { can_write_domain_truth: false },
+        idempotency_lock: { lock_id: "private-lock" },
+        receipts: { receipt_store: "private-receipts" },
+        components: [
+          {
+            component_id: "opl_app",
+            lifecycle_owner: "one-person-lab-app",
+            label: "OPL App",
+            state: "currentness_not_checked",
+            channel: "stable",
+            current: {
+              installed_version: "1.0.0",
+              latest_version: null,
+              currentness: "unknown",
+              manual_guidance: "Check from the App owner",
+              private_current_payload: "omit"
+            },
+            auto_apply: { mode: "prompt_only", eligible: false, app_background_safe: false, private_auto_payload: "omit" },
+            plan: { summary: "App owner readback required", private_plan_payload: "omit" },
+            owner_route: "private"
+          },
+          {
+            component_id: "opl_base",
+            lifecycle_owner: "one-person-lab",
+            label: "OPL Base",
+            state: "current",
+            channel: "stable",
+            current: {
+              installed_version: "0.125.0",
+              latest_version: "0.125.0",
+              currentness: "current",
+              manual_guidance: null,
+              dependency_catalog: {
+                flow_dependencies: [{
+                  dependency_id: "officecli",
+                  dependency_kind: "cli",
+                  activation: "task_routed",
+                  offline_bundle: "none",
+                  online_install_default: true,
+                  source: "installed_owner_descriptor",
+                  source_path: "/opt/opl-flow",
+                  owner: "opl-flow",
+                  bundle_id: "officecli",
+                  version_requirement: ">=1.0.0",
+                  install_source: "native",
+                  relationship: "required",
+                  lifecycle_owner: "opl_base",
+                  update_mode: "silent_managed",
+                  installed: true,
+                  observed_status: "ready",
+                  status: "ready",
+                  currentness: "current",
+                  version: "1.0.0",
+                  latest_version: "1.0.0",
+                  ownership: "opl_managed",
+                  private_dependency_payload: "omit"
+                }]
+              }
+            },
+            auto_apply: { mode: "silent_managed", eligible: false, app_background_safe: true },
+            plan: { summary: "No update required" }
+          },
+          {
+            component_id: "opl_packages",
+            lifecycle_owner: "one-person-lab",
+            label: "OPL Packages",
+            state: "current",
+            channel: "stable",
+            current: { installed_version: "cohort-1", latest_version: "cohort-1", currentness: "current", manual_guidance: null },
+            auto_apply: { mode: "eligible_native_packages", eligible: true, app_background_safe: true },
+            plan: { summary: "No update required" }
+          }
+        ]
+      }
+    }
+  });
+
+  const managedUpdate = compact.app_state.managed_update;
+  assert.deepEqual(managedUpdate.components.map((component) => component.component_id), [
+    "opl_app", "opl_base", "opl_packages"
+  ]);
+  assert.equal(managedUpdate.operation, "status");
+  assert.equal(managedUpdate.update_channel, "stable");
+  assert.deepEqual(managedUpdate.components[1].current.dependency_catalog.flow_dependencies[0], {
+    dependency_id: "officecli",
+    dependency_kind: "cli",
+    activation: "task_routed",
+    offline_bundle: "none",
+    online_install_default: true,
+    source: "installed_owner_descriptor",
+    source_path: "/opt/opl-flow",
+    owner: "opl-flow",
+    bundle_id: "officecli",
+    version_requirement: ">=1.0.0",
+    install_source: "native",
+    relationship: "required",
+    lifecycle_owner: "opl_base",
+    update_mode: "silent_managed",
+    installed: true,
+    observed_status: "ready",
+    status: "ready",
+    currentness: "current",
+    version: "1.0.0",
+    latest_version: "1.0.0",
+    ownership: "opl_managed"
+  });
+  const serialized = JSON.stringify(managedUpdate);
+  for (const marker of ["surface_id", "operation_mode", "authority_boundary", "idempotency_lock", "receipts", "owner_route", "private_dependency_payload"]) {
+    assert.equal(serialized.includes(marker), false, `must omit ${marker}`);
+  }
+  assert.equal(Buffer.byteLength(serialized, "utf8") <= 32_768, true);
+});
+
 test("fast state keeps GUI package fields without copying deep runtime payloads", () => {
   const compact = compactFastState({
     version: "test",

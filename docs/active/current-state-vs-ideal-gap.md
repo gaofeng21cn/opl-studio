@@ -69,12 +69,12 @@ release admission, and is explicitly adopted.
 | Standard Agents | `explicit_owner_readiness_enforced` | Composer separates OPL-owned `standard_agent` packages from skills/plugins/connections and preserves real Codex routes. Unknown diagnostics remain selectable, while explicit `launch_allowed=false`, `operational_ready=false`, physical absence, or non-callability reject selection |
 | Active turn | `canonical_reopen_and_steer` | Active submissions use Codex `turn/steer`, and the DSH queue remains renderer-only state. Launch confirms the terminal turn through `thread/read(includeTurns=true)`; reopening a thread restores only the canonical `activeTurnId` before steer is enabled |
 | Settings | `canonical_functional_surface` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The current full functional cohort still requires one rebuilt local Preview and user acceptance |
-| Updates | `desktop_and_headless_callers_present_owner_projection_incomplete` | Electron Desktop and standalone Headless updater callers exist. Framework fast App state still needs the App/Base/Packages managed-update and Flow dependency projection required for an immediate owner-currentness view; Docker host-side update remains deliberately deferred rather than exposing the container runtime socket |
+| Updates | `desktop_and_headless_callers_present_owner_projection_consumed` | Electron Desktop and standalone Headless updater callers consume the Framework-owned App/Base/Packages managed-update projection. Studio preserves the compact projection and typed Flow dependency catalog through the fast Host path without adding an updater/currentness owner; Docker host-side update remains deliberately deferred rather than exposing the container runtime socket |
 | Run detail | `real_producer_consumer_e2e` | MAS has a canonical read-only producer backed by a real workspace and trajectory. Studio passes the selected resolved six-field identity into `runtime.detail`, does not invoke the producer when identity is unresolved, rejects mismatched producer identity, and renders the allowlisted result as eight structured sections |
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
 | Service recovery | `app_state_derived_action_closed_loop` | Runtime Overview derives one causal root and one safe action from the same App state/action projection. Mutating and read-only actions are revalidated against a fresh App state immediately before execution, respect the mutation guard, and always refresh App state afterward |
 | Local launcher | `implemented_candidate_path` | Isolated bundle; actions dry-run-only by default |
-| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The remaining user-facing baseline is managed-update/Flow producer currentness, generic capability/managed-companion consumption from `opl-glt.58`, and a rebuilt local Preview acceptance pass |
+| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state path is closed on current main; the remaining user-facing baseline is generic capability/managed-companion consumption from `opl-glt.58` and a rebuilt local Preview acceptance pass |
 | Validation | `distribution_and_core_functional_gates_green_preview_pending` | Default PR/main CI remains source-only, and carrier qualification remains manual. Source and hosted checks cover Settings, Runtime Overview, Agent/turn correctness, identity-scoped Runtime Detail, and service recovery; they do not replace the next locally installed Preview interaction and user acceptance |
 | Adoption and readiness | `false` | No active-shell adoption, release, clean-VM, domain, owner-acceptance, or production claim |
 
@@ -101,11 +101,20 @@ Runtime status is a first-level view backed by the App-projected runtime model.
 It must not expose internal diagnostic enums or invent a separate runtime state
 source.
 
+## Recently Closed
+
+The managed-update and Flow currentness slice is closed on current `main`:
+Framework owns the producer and currentness semantics, `opl-studio` preserves
+the compact `app_state.managed_update` projection in `compactFastState()`, and
+the existing Workbench parser and Settings view consume it. The Host boundary
+filters the kernel execution envelope and does not create a second updater or
+currentness authority. Focused Host, renderer, and live Framework readback
+evidence is recorded in the change verification.
+
 ## Current Gaps
 
 | Gap | Class | Owner route | Stop condition |
 | --- | --- | --- | --- |
-| Managed update and Flow currentness are incomplete in fast state | `functional_p0` | Framework/App-state producer owner, then Studio consumer | Project the already authoritative App/Base/Packages update status and typed Flow dependency catalog through the existing fast App state. Studio already parses managed-update state and must consume the Host projection without a second registry or updater authority |
 | Canonical capability and managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Fleet, Browser Automation, and future managed companions through typed slots/actions and a generic directory; do not hard-code a fixed brand capability list |
 | Current Preview has not passed this functional cohort | `acceptance_p0` | Studio product controller and user | After all functional bytes are canonical, rebuild and install the macOS Preview, run local interaction/readback checks, and leave it open for user acceptance |
 
@@ -175,12 +184,11 @@ carrier.
 
 ### Required Actions
 
-1. Project Host-derived managed-update and typed Flow dependency currentness
-   through fast App state, then consume the existing Studio parser and Settings UI.
-2. Consume Host-derived managed-companion,
+1. Preserve the closed managed-update/Flow projection boundary while consuming
+   Host-derived managed-companion,
    Channel Access, WeChat, Computer Use, and Fleet projections without adding a
    Studio registry, Package discovery path, or action authority.
-3. Run the full local candidate gates, rebuild the macOS Preview, and complete local interaction/readback
+2. Run the full local candidate gates, rebuild the macOS Preview, and complete local interaction/readback
    before asking for user acceptance.
 
 ### Verification Commands

@@ -30,6 +30,8 @@ is the command owner.
 | `npm run headless:install` / `headless:status` / `headless:stop` / `headless:start` / `headless:restart` / `headless:update` / `headless:rollback` / `headless:uninstall` | Current-user macOS/Linux native service lifecycle commands; platform support and public distribution remain separately admitted |
 | `npm run test:threads` | Standard Desktop/WebUI thread lifecycle, pagination, renderer, and Codex subagent projection tests |
 | `npm run test:webui-host` | DSH Host boot/profile/plugin inventory, authenticated DSH-tool MCP, persistent Codex ownership, shared Host core, HTTP/SSE, model/thread pagination, OPL projection, and read-only mutation guard |
+| `node --test scripts/webui-host/opl-passthrough.test.mjs` | Fast Host projection compression, managed-update envelope filtering, and bounded state transport |
+| `bun test tests/workbench/runtime-projection.test.mts` | Workbench consumption of the compressed Framework managed-update and Flow dependency projection |
 | `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
 | `npm run validate:client-conformance` | Fresh four-repository Host -> App -> Studio/AionUI compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |

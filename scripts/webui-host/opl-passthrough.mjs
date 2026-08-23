@@ -75,6 +75,55 @@ function compactStringArray(value, limit = 32) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string").slice(0, limit) : [];
 }
 
+const managedUpdateFlowDependencyFields = [
+  "dependency_id", "dependency_kind", "activation", "offline_bundle", "online_install_default",
+  "source", "source_path", "owner", "bundle_id", "version_requirement", "install_source",
+  "relationship", "lifecycle_owner", "update_mode", "installed", "observed_status",
+  "status", "currentness", "version", "latest_version", "ownership"
+];
+
+function compactManagedUpdateFlowDependency(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return selectedFields(value, managedUpdateFlowDependencyFields);
+}
+
+// Keep the Framework-owned update projection while excluding its execution envelope.
+function compactManagedUpdateProjection(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const components = Array.isArray(value.components)
+    ? value.components.slice(0, 16).flatMap((component) => {
+      if (!component || typeof component !== "object" || Array.isArray(component)) return [];
+      const current = component.current && typeof component.current === "object" && !Array.isArray(component.current)
+        ? component.current
+        : {};
+      const dependencyCatalog = current.dependency_catalog
+        && typeof current.dependency_catalog === "object"
+        && !Array.isArray(current.dependency_catalog)
+        ? current.dependency_catalog
+        : undefined;
+      const flowDependencies = Array.isArray(dependencyCatalog?.flow_dependencies)
+        ? dependencyCatalog.flow_dependencies.slice(0, 256).flatMap((dependency) => {
+          const compact = compactManagedUpdateFlowDependency(dependency);
+          return compact ? [compact] : [];
+        })
+        : undefined;
+      return [{
+        ...selectedFields(component, ["component_id", "lifecycle_owner", "label", "state", "channel"]),
+        current: {
+          ...selectedFields(current, ["installed_version", "latest_version", "currentness", "manual_guidance"]),
+          ...(flowDependencies ? { dependency_catalog: { flow_dependencies: flowDependencies } } : {})
+        },
+        auto_apply: selectedFields(component.auto_apply, ["mode", "eligible", "app_background_safe"]),
+        plan: selectedFields(component.plan, ["summary"])
+      }];
+    })
+    : [];
+  return {
+    ...selectedFields(value, ["operation", "update_channel"]),
+    components
+  };
+}
+
 const packageFields = [
   "package_id", "packageId", "agent_id", "module_id", "id",
   "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role",
@@ -558,6 +607,7 @@ function compactFastState(value) {
       surface_kind: appState.surface_kind,
       runtime_source: appState.runtime_source,
       meta: appState.meta,
+      managed_update: compactManagedUpdateProjection(appState.managed_update),
       core: compactCore(appState.core),
       provider: compactProvider(appState.provider),
       runtime_source_carriers: compactRuntimeSourceCarriers(appState.runtime_source_carriers),
