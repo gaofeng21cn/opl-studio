@@ -26,7 +26,7 @@ import {
 
 const { normalizeContributionReadback } = await import("../../src/bridge/oplBridge.ts");
 const { OplStudioDshSlotHost } = await import("../../src/composition/dshSlotHost.tsx");
-const { buildActivityLogSummary } = await import("../../src/composition/contributionComponents.tsx");
+const { buildServiceStatusSummary } = await import("../../src/composition/contributionComponents.tsx");
 const { resolveCodexModelOptions } = await import("../../src/workbench/modelPolicy.ts");
 
 const projectionState = {
@@ -125,38 +125,52 @@ describe("OPL Studio DSH contribution composition", () => {
   test("routes settings contributions by declared view semantics", () => {
     expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("resources");
     expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("resources");
+    expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("services");
     expect(settingsContributionDestination({ view: { viewId: "fleet", viewType: "activity_log", title: {}, dataRef: "fleet#state" } })).toBeNull();
     expect(settingsContributionDestination({ view: { viewId: "capability", viewType: "table", title: {}, dataRef: "capability#state" } })).toBe("capabilities");
   });
 
-  test("hides technical activity logs while grouping generic settings views dynamically", () => {
+  test("shows service status in Services while hiding technical activity logs", () => {
     const projection = readUiContributionsProjection({
       ui_contributions: {
         surface_kind: "opl_app_ui_contributions_projection.v1",
         entries: [
           {
-            contribution_key: "opl-fleet-agent:telemetry",
-            contribution_id: "telemetry",
+            contribution_key: "opl-fleet-agent:fleet.agent.telemetry-settings",
+            contribution_id: "fleet.agent.telemetry-settings",
             package_id: "opl-fleet-agent",
             slot: "settings.section",
             contribution_kind: "view",
             trust_tier: "declarative",
             scope: "root",
-            sort_order: 10,
-            view: { view_id: "fleet.telemetry", view_type: "activity_log", title_i18n: { "en-US": "Telemetry" }, data_ref: "fleet.telemetry#current" },
+            sort_order: 300,
+            view: { view_id: "fleet.agent.telemetry", view_type: "service_status", title_i18n: { "en-US": "Local Fleet Agent telemetry" }, data_ref: "fleet.agent.telemetry.v1#local" },
             commands: [],
             badges: []
           },
           {
-            contribution_key: "opl-fleet-agent:doctor",
-            contribution_id: "doctor",
+            contribution_key: "opl-fleet-agent:fleet.agent.doctor-settings",
+            contribution_id: "fleet.agent.doctor-settings",
             package_id: "opl-fleet-agent",
             slot: "settings.section",
             contribution_kind: "view",
             trust_tier: "declarative",
             scope: "root",
-            sort_order: 20,
-            view: { view_id: "fleet.doctor", view_type: "activity_log", title_i18n: { "en-US": "Doctor" }, data_ref: "fleet.doctor#current" },
+            sort_order: 310,
+            view: { view_id: "fleet.agent.doctor", view_type: "service_status", title_i18n: { "en-US": "Local Fleet Agent doctor" }, data_ref: "fleet.agent.doctor.v1#current" },
+            commands: [],
+            badges: []
+          },
+          {
+            contribution_key: "legacy-fleet-agent:activity",
+            contribution_id: "activity",
+            package_id: "legacy-fleet-agent",
+            slot: "settings.section",
+            contribution_kind: "view",
+            trust_tier: "declarative",
+            scope: "root",
+            sort_order: 320,
+            view: { view_id: "fleet.activity", view_type: "activity_log", title_i18n: { "en-US": "Fleet activity" }, data_ref: "fleet.activity#current" },
             commands: [],
             badges: []
           },
@@ -204,7 +218,10 @@ describe("OPL Studio DSH contribution composition", () => {
     });
     const fleetEntries = projection.entries.filter((entry) => entry.packageId === "opl-fleet-agent");
     expect(fleetEntries).toHaveLength(2);
-    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === null)).toBe(true);
+    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === "services")).toBe(true);
+
+    const activityEntry = projection.entries.find((entry) => entry.packageId === "legacy-fleet-agent");
+    expect(activityEntry && settingsContributionDestination(activityEntry)).toBeNull();
 
     const weixinEntry = projection.entries.find((entry) => entry.packageId === "opl-channel-weixin");
     expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("resources");
@@ -215,15 +232,15 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(groups[0]?.entries.map((entry) => entry.contributionId)).toEqual(["overview", "details"]);
   });
 
-  test("summarizes generic activity-log data without exposing operational payload fields by default", () => {
-    const summary = buildActivityLogSummary({
+  test("summarizes service status without exposing operational payload fields by default", () => {
+    const summary = buildServiceStatusSummary({
       freshness: { state: "fresh", last_observed_at: "2026-08-19T02:43:36.431Z" },
       native_carrier: { availability: "available", status: "ready" },
       node: { display_name: "Local development Mac", platform: "macOS" },
       observed_at: "2026-08-19T02:43:38.533Z",
       payload: {
         collection_status: "available",
-        active_conversation_count: 7,
+        doctor_state: "healthy",
         host_cpu_percent: 61.0465,
         checks: [
           { check_id: "provider", state: "pass" },
@@ -234,13 +251,16 @@ describe("OPL Studio DSH contribution composition", () => {
     }, "zh");
     expect(summary).toMatchObject({ state: "done", statusLabel: "运行正常" });
     expect(summary.fields).toEqual(expect.arrayContaining([
-      { id: "location", label: "本机", value: "Local development Mac · macOS" },
-      { id: "collection", label: "数据状态", value: "可用" },
-      { id: "active-conversations", label: "活跃对话", value: "7" },
+      { id: "native-carrier", label: "本机载体", value: "可用 · 已就绪" },
+      { id: "freshness", label: "新鲜度", value: "最新" },
+      { id: "node", label: "本机", value: "Local development Mac · macOS" },
+      { id: "collection", label: "数据采集", value: "可用" },
+      { id: "doctor", label: "诊断", value: "正常" },
       { id: "checks", label: "检查结果", value: "2 项通过，1 项暂不可用" }
     ]));
     expect(JSON.stringify(summary)).not.toContain("host_cpu_percent");
     expect(JSON.stringify(summary)).not.toContain("check_id");
+    expect(JSON.stringify(summary)).not.toContain("active_conversation_count");
   });
 
   test("registers each static list-slot occupant with a stable id", () => {

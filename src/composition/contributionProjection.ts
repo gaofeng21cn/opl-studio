@@ -116,6 +116,8 @@ export function settingsContributionDestination(
     case "channel_access":
     case "remote_companion_access":
       return "resources";
+    case "service_status":
+      return "services";
     case "activity_log":
       // An activity log is a technical read model, not an App-admitted Settings
       // destination. Keep it available to other typed renderers without

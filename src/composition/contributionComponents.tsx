@@ -199,16 +199,16 @@ function StructuredValue({ value, locale, depth = 0 }: {
   return <span className="opl-structured-scalar">{String(value)}</span>;
 }
 
-type ActivityLogSummaryField = {
+type ServiceStatusSummaryField = {
   id: string;
   label: string;
   value: string;
 };
 
-export type ActivityLogSummary = {
+export type ServiceStatusSummary = {
   state: StateDotState;
   statusLabel: string;
-  fields: ActivityLogSummaryField[];
+  fields: ServiceStatusSummaryField[];
 };
 
 function recordValue(value: unknown): Record<string, unknown> | null {
@@ -221,11 +221,7 @@ function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function numberValue(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function activityStatus(value: string | null): "healthy" | "attention" | "unavailable" | "unknown" {
+function serviceStatus(value: string | null): "healthy" | "attention" | "unavailable" | "unknown" {
   if (!value) return "unknown";
   const normalized = value.toLowerCase();
   if (["available", "ready", "fresh", "healthy", "current", "pass", "ok"].includes(normalized)) return "healthy";
@@ -234,8 +230,8 @@ function activityStatus(value: string | null): "healthy" | "attention" | "unavai
   return "unknown";
 }
 
-function activityStatusLabel(status: ActivityLogSummary["state"], locale: OplContributionSlotOwner["locale"]): string {
-  const labels: Record<ActivityLogSummary["state"], [string, string]> = {
+function serviceStatusLabel(status: ServiceStatusSummary["state"], locale: OplContributionSlotOwner["locale"]): string {
+  const labels: Record<ServiceStatusSummary["state"], [string, string]> = {
     done: ["运行正常", "Operating normally"],
     warning: ["需要关注", "Needs attention"],
     error: ["当前不可用", "Unavailable"],
@@ -244,7 +240,7 @@ function activityStatusLabel(status: ActivityLogSummary["state"], locale: OplCon
   return labels[status][locale === "zh" ? 0 : 1];
 }
 
-function presentationValue(value: string, locale: OplContributionSlotOwner["locale"]): string {
+function serviceStatusValue(value: string, locale: OplContributionSlotOwner["locale"]): string {
   const labels: Record<string, [string, string]> = {
     available: ["可用", "Available"],
     ready: ["已就绪", "Ready"],
@@ -252,6 +248,8 @@ function presentationValue(value: string, locale: OplContributionSlotOwner["loca
     healthy: ["正常", "Healthy"],
     current: ["当前", "Current"],
     pass: ["通过", "Pass"],
+    running: ["运行中", "Running"],
+    external_running: ["外部运行中", "Running externally"],
     unavailable: ["暂不可用", "Unavailable"],
     stale: ["可能过期", "May be stale"],
     attention: ["需要关注", "Needs attention"],
@@ -263,7 +261,7 @@ function presentationValue(value: string, locale: OplContributionSlotOwner["loca
   return labels[value.toLowerCase()]?.[locale === "zh" ? 0 : 1] ?? value.replaceAll("_", " ");
 }
 
-function formatActivityTimestamp(value: string | null, locale: OplContributionSlotOwner["locale"]): string | null {
+function formatServiceTimestamp(value: string | null, locale: OplContributionSlotOwner["locale"]): string | null {
   if (!value) return null;
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return null;
@@ -274,24 +272,31 @@ function formatActivityTimestamp(value: string | null, locale: OplContributionSl
 }
 
 /**
- * Activity-log providers may expose rich operational payloads. The ordinary
+ * Service-status providers may expose rich operational payloads. The ordinary
  * settings surface projects only broadly understood service status; raw data
  * remains available under the user-enabled developer-details control.
  */
-export function buildActivityLogSummary(value: unknown, locale: OplContributionSlotOwner["locale"]): ActivityLogSummary {
+export function buildServiceStatusSummary(value: unknown, locale: OplContributionSlotOwner["locale"]): ServiceStatusSummary {
   const result = recordValue(value) ?? {};
-  const nativeCarrier = recordValue(result.native_carrier);
+  const nativeCarrier = recordValue(result.native_carrier) ?? result;
   const freshness = recordValue(result.freshness);
   const node = recordValue(result.node);
-  const payload = recordValue(result.payload);
-  const checks = Array.isArray(payload?.checks) ? payload.checks.map(recordValue).filter((check): check is Record<string, unknown> => check !== null) : [];
+  const payload = recordValue(result.payload) ?? result;
+  const checks = Array.isArray(payload.checks) ? payload.checks.map(recordValue).filter((check): check is Record<string, unknown> => check !== null) : [];
+  const doctor = recordValue(result.doctor) ?? recordValue(payload.doctor);
+  const freshnessState = stringValue(freshness?.state)
+    ?? stringValue(freshness?.status)
+    ?? (freshness?.stale === true ? "stale" : freshness?.stale === false ? "fresh" : null);
+  const doctorState = stringValue(doctor?.state)
+    ?? stringValue(doctor?.status)
+    ?? stringValue(payload.doctor_state);
   const statusSignals = [
     stringValue(nativeCarrier?.availability),
-    stringValue(nativeCarrier?.status),
-    stringValue(freshness?.state),
-    stringValue(payload?.doctor_state),
-    stringValue(payload?.collection_status)
-  ].map(activityStatus);
+    stringValue(nativeCarrier?.status) ?? stringValue(nativeCarrier?.state),
+    freshnessState,
+    doctorState,
+    stringValue(payload.collection_status)
+  ].map(serviceStatus);
   const state: StateDotState = statusSignals.includes("unavailable")
     ? "error"
     : statusSignals.includes("attention")
@@ -299,35 +304,51 @@ export function buildActivityLogSummary(value: unknown, locale: OplContributionS
       : statusSignals.includes("healthy")
         ? "done"
         : "ongoing";
-  const fields: ActivityLogSummaryField[] = [];
+  const fields: ServiceStatusSummaryField[] = [];
+  const nativeCarrierAvailability = stringValue(nativeCarrier?.availability);
+  const nativeCarrierStatus = stringValue(nativeCarrier?.status) ?? stringValue(nativeCarrier?.state);
+  const nativeCarrierValues = [nativeCarrierAvailability, nativeCarrierStatus].filter((item): item is string => Boolean(item));
+  if (nativeCarrierValues.length) {
+    fields.push({
+      id: "native-carrier",
+      label: locale === "zh" ? "本机载体" : "Native carrier",
+      value: nativeCarrierValues.map((item) => serviceStatusValue(item, locale)).join(" · ")
+    });
+  }
+  if (freshnessState) {
+    fields.push({
+      id: "freshness",
+      label: locale === "zh" ? "新鲜度" : "Freshness",
+      value: serviceStatusValue(freshnessState, locale)
+    });
+  }
   const displayName = stringValue(node?.display_name);
   const platform = stringValue(node?.platform);
   if (displayName || platform) {
     fields.push({
-      id: "location",
+      id: "node",
       label: locale === "zh" ? "本机" : "This device",
       value: [displayName, platform].filter(Boolean).join(" · ")
     });
   }
-  const collectionStatus = stringValue(payload?.collection_status);
+  const collectionStatus = stringValue(payload.collection_status);
   if (collectionStatus) {
     fields.push({
       id: "collection",
-      label: locale === "zh" ? "数据状态" : "Data status",
-      value: presentationValue(collectionStatus, locale)
+      label: locale === "zh" ? "数据采集" : "Collection",
+      value: serviceStatusValue(collectionStatus, locale)
     });
   }
-  const activeConversationCount = numberValue(payload?.active_conversation_count);
-  if (activeConversationCount !== null) {
+  if (doctorState) {
     fields.push({
-      id: "active-conversations",
-      label: locale === "zh" ? "活跃对话" : "Active conversations",
-      value: String(activeConversationCount)
+      id: "doctor",
+      label: locale === "zh" ? "诊断" : "Doctor",
+      value: serviceStatusValue(doctorState, locale)
     });
   }
   if (checks.length) {
-    const passed = checks.filter((check) => activityStatus(stringValue(check.state)) === "healthy").length;
-    const unavailable = checks.filter((check) => activityStatus(stringValue(check.state)) === "unavailable").length;
+    const passed = checks.filter((check) => serviceStatus(stringValue(check.state)) === "healthy").length;
+    const unavailable = checks.filter((check) => serviceStatus(stringValue(check.state)) === "unavailable").length;
     const attention = checks.length - passed - unavailable;
     const fragments = [
       passed ? (locale === "zh" ? `${passed} 项通过` : `${passed} passed`) : null,
@@ -340,7 +361,7 @@ export function buildActivityLogSummary(value: unknown, locale: OplContributionS
       value: fragments.join(locale === "zh" ? "，" : ", ")
     });
   }
-  const observedAt = formatActivityTimestamp(stringValue(result.observed_at) ?? stringValue(freshness?.last_observed_at), locale);
+  const observedAt = formatServiceTimestamp(stringValue(result.observed_at) ?? stringValue(freshness?.last_observed_at), locale);
   if (observedAt) {
     fields.push({
       id: "updated",
@@ -348,24 +369,24 @@ export function buildActivityLogSummary(value: unknown, locale: OplContributionS
       value: observedAt
     });
   }
-  return { state, statusLabel: activityStatusLabel(state, locale), fields };
+  return { state, statusLabel: serviceStatusLabel(state, locale), fields };
 }
 
-function ActivityLogResult({ value, locale, developerDetails }: {
+function ServiceStatusResult({ value, locale, developerDetails }: {
   value: unknown;
   locale: OplContributionSlotOwner["locale"];
   developerDetails?: boolean;
 }) {
-  const summary = buildActivityLogSummary(value, locale);
-  return <div className="opl-activity-log-summary" data-testid="opl-activity-log-summary">
-    <p className="opl-activity-log-status"><StateDot state={summary.state} size={10} /><strong>{summary.statusLabel}</strong></p>
+  const summary = buildServiceStatusSummary(value, locale);
+  return <div className="opl-service-status-summary" data-testid="opl-service-status-summary">
+    <p className="opl-service-status-state"><StateDot state={summary.state} size={10} /><strong>{summary.statusLabel}</strong></p>
     {summary.fields.length ? (
       <dl className="opl-structured-fields">
         {summary.fields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
       </dl>
     ) : <p className="opl-structured-empty">{locale === "zh" ? "暂未提供可展示的服务状态" : "No service status is available"}</p>}
     {developerDetails ? (
-      <details className="opl-contribution-technical-details opl-activity-log-technical-details">
+      <details className="opl-contribution-technical-details opl-service-status-technical-details">
         <summary>{locale === "zh" ? "查看技术数据" : "View technical data"}</summary>
         <StructuredValue value={value} locale={locale} />
       </details>
@@ -440,9 +461,9 @@ function StructuredContributionView({ entry, owner }: {
       : (owner.locale === "zh" ? "任务详情当前不可用" : "Runtime detail is unavailable");
     return <p className="opl-contribution-fallback" role="status" title={runtimeDetail.diagnostic.message}><StateDot state="warning" size={10} />{unavailableLabel}</p>;
   }
-  if (entry.slot === "settings.section" && view.viewType === "activity_log") {
+  if (entry.slot === "settings.section" && view.viewType === "service_status") {
     return <div className="opl-contribution-result" data-view-type={view.viewType} data-testid={`opl-ui-contribution-result-${entry.contributionKey}`}>
-      <ActivityLogResult value={result} locale={owner.locale} developerDetails={owner.developerDetails} />
+      <ServiceStatusResult value={result} locale={owner.locale} developerDetails={owner.developerDetails} />
     </div>;
   }
   return (

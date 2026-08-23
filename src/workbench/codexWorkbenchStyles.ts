@@ -331,20 +331,20 @@ export const codexWorkbenchStyles = `
     padding: 2px 0;
   }
 
-  .opl-activity-log-summary {
+  .opl-service-status-summary {
     display: grid;
     gap: 8px;
   }
 
-  .opl-activity-log-status {
+  .opl-service-status-state {
     display: flex;
     align-items: center;
     gap: 7px;
     margin: 0;
   }
 
-  .opl-activity-log-technical-details > .opl-structured-fields,
-  .opl-activity-log-technical-details > .opl-structured-list {
+  .opl-service-status-technical-details > .opl-structured-fields,
+  .opl-service-status-technical-details > .opl-structured-list {
     margin-top: 8px;
   }
 
