@@ -135,9 +135,45 @@ npm run smoke:desktop-live
 This command launches the current-platform unpacked package, requires a real
 window and a passing Chromium accessibility-tree smoke, and verifies that
 quitting the App removes its Electron and Codex App Server processes. Its
+Electron process uses a smoke-owned working directory and `DSH_HOME`; the Codex
+test workspace remains the explicitly selected repository path. This prevents
+the package from resolving DSH profile modules through `~/.dsh` or an unrelated
+worktree. The packaged closure must contain the exact direct production
+dependencies required by the pinned Host, including `@deepseek-ai/dsh-llm`,
+`@deepseek-ai/dsh-session`, and `@deepseek-ai/dsh-timeout`; profile fallback
+is not packaging evidence. Its
 output is candidate evidence only. It does not establish an installer flow,
 clean-VM behavior, shared Runtime parity, native screen-reader behavior,
 active-shell adoption, or release readiness.
+
+## Installed Preview Acceptance
+
+An installed Preview pass is a separate live acceptance layer after package
+construction. Install only the isolated `cn.onepersonlab.opl.studio.preview`
+bundle through the App-owned atomic installer, then bind readback to the exact
+candidate commit and installed `app.asar` bytes. The Stable
+`/Applications/One Person Lab.app` bundle and running process must remain
+unchanged.
+
+The minimum installed pass verifies all of the following from
+`/Applications/One Person Lab Preview.app`:
+
+- the Electron main process, sandboxed renderer, pinned DSH Host plugins, and
+  persistent `codex app-server --stdio` child start from packaged resources;
+- App-owned Settings placement shows `service_status` under Installed Services,
+  keeps raw technical data collapsed until explicitly opened, and keeps
+  `activity_log` absent from ordinary Settings;
+- Framework-owned Gateway and managed-companion projections render their real
+  connected, unavailable, or unconfigured states without inferring success;
+- one real Codex turn reaches `completed`, `thread/read(includeTurns=true)`
+  returns the user and agent items, graceful quit removes the Preview App Server
+  child, and the same canonical thread is readable and visible after restart.
+
+This pass closes only the installed candidate cohort whose exact bytes were
+tested. Any later Host, renderer, dependency, bridge, or contract change that
+affects the installed path requires a fresh package and installed acceptance.
+It does not set `active_shell_adopted`, qualify an update feed, replace the
+Stable App, or establish release, clean-VM, owner, or production readiness.
 
 ## Daily Source Validation
 

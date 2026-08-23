@@ -68,14 +68,14 @@ release admission, and is explicitly adopted.
 | Conversation | `chat_first_with_on_demand_detail` | Primary surface is the DSH conversation; run status, roadmap/detail contributions, files, and results open on demand instead of becoming static home cards |
 | Standard Agents | `explicit_owner_readiness_enforced` | Composer separates OPL-owned `standard_agent` packages from skills/plugins/connections and preserves real Codex routes. Unknown diagnostics remain selectable, while explicit `launch_allowed=false`, `operational_ready=false`, physical absence, or non-callability reject selection |
 | Active turn | `canonical_reopen_and_steer` | Active submissions use Codex `turn/steer`, and the DSH queue remains renderer-only state. Launch confirms the terminal turn through `thread/read(includeTurns=true)`; reopening a thread restores only the canonical `activeTurnId` before steer is enabled |
-| Settings | `canonical_functional_surface` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The current full functional cohort still requires one rebuilt local Preview and user acceptance |
+| Settings | `canonical_functional_surface_installed_preview_verified` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The installed Preview for the current cohort passed local interaction and runtime readback; later functional bytes require a new acceptance pass |
 | Updates | `desktop_and_headless_callers_present_owner_projection_consumed` | Electron Desktop and standalone Headless updater callers consume the Framework-owned App/Base/Packages managed-update projection. Studio preserves the compact projection and typed Flow dependency catalog through the fast Host path without adding an updater/currentness owner; Docker host-side update remains deliberately deferred rather than exposing the container runtime socket |
 | Run detail | `real_producer_consumer_e2e` | MAS has a canonical read-only producer backed by a real workspace and trajectory. Studio passes the selected resolved six-field identity into `runtime.detail`, does not invoke the producer when identity is unresolved, rejects mismatched producer identity, and renders the allowlisted result as eight structured sections |
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
 | Service recovery | `app_state_derived_action_closed_loop` | Runtime Overview derives one causal root and one safe action from the same App state/action projection. Mutating and read-only actions are revalidated against a fresh App state immediately before execution, respect the mutation guard, and always refresh App state afterward |
 | Local launcher | `implemented_candidate_path` | Isolated bundle; actions dry-run-only by default |
-| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state and Fleet `service_status` paths are closed on current main; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` and a rebuilt local Preview acceptance pass |
-| Validation | `distribution_and_core_functional_gates_green_preview_pending` | Default PR/main CI remains source-only, and carrier qualification remains manual. Source and hosted checks cover Settings, Runtime Overview, Agent/turn correctness, identity-scoped Runtime Detail, and service recovery; they do not replace the next locally installed Preview interaction and user acceptance |
+| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state, Fleet `service_status`, and current installed Preview paths are closed; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` |
+| Validation | `distribution_core_and_installed_preview_gates_green` | Default PR/main CI remains source-only, and carrier qualification remains manual. The current candidate completed exact-commit three-carrier construction plus installed Preview Settings, Framework contribution, Gateway, real Codex turn, graceful restart, and canonical thread recovery readback. This does not replace a new installed pass after later runtime bytes change |
 | Adoption and readiness | `false` | No active-shell adoption, release, clean-VM, domain, owner-acceptance, or production claim |
 
 ## Sidebar Information Architecture
@@ -118,12 +118,27 @@ the bounded summary generically. `activity_log` remains destination-null and hid
 from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; this
 is source/candidate evidence, not active-shell adoption.
 
+The current installed Preview slice is closed for Studio candidate
+`8497f3b9c240cc7ad28f0e90e609e2cb5732409a`. A clean App-contract-driven
+`npm run package` qualified Desktop, standalone WebUI, and Docker; the App-owned
+atomic installer then installed the isolated
+`cn.onepersonlab.opl.studio.preview` bundle without replacing the Stable App.
+The installed `app.asar` SHA-256 is
+`96e71210efd39dc462c9d1c52b6c99c0a8396fc2c95c5bb40c4463881ef39cb9`.
+Installed-runtime readback proved packaged DSH Host startup, the persistent Codex
+App Server child, Fleet `service_status` summary and opt-in technical data,
+`activity_log` absence from ordinary Settings, OPL Gateway account projection, a
+completed real Codex turn, graceful process cleanup, and recovery of canonical
+thread `01a02e73-4242-70d3-8138-f7ba75545fc7` after restart. The App update
+surface still correctly reports no configured Preview update source, Weixin is
+not connected, and OPL Link is currently unavailable; none is promoted to a
+successful live connection. This installed acceptance is candidate evidence only.
+
 ## Current Gaps
 
 | Gap | Class | Owner route | Stop condition |
 | --- | --- | --- | --- |
 | Non-Fleet managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Browser Automation, and future managed companions through typed slots/actions and a generic directory; Fleet `service_status` is already closed and must not be reintroduced as a fixed brand allowlist |
-| Current Preview has not passed this functional cohort | `acceptance_p0` | Studio product controller and user | After all functional bytes are canonical, rebuild and install the macOS Preview, run local interaction/readback checks, and leave it open for user acceptance |
 
 Signing, notarization, public update feeds, public OCI publication, dedicated
 clean-VM certification, and the final AionUI cutover remain separate deferred
@@ -141,10 +156,10 @@ does not depend on Team mode.
 
 ### Goal
 
-For successor product development, finish the minimum user-facing functional
-baseline and produce a current locally installed macOS Preview for acceptance,
-while preserving the Codex-only thin-consumer boundary. Distribution and
-release qualification stay independent and deferred in this round.
+For successor product development, finish the remaining non-Fleet managed-companion
+user paths while preserving the Codex-only thin-consumer boundary. Rebuild and
+repeat installed Preview acceptance only after those functional bytes change.
+Distribution and release qualification stay independent and deferred in this round.
 Do not reproduce AionUI-only inherited surfaces, create a speculative
 multi-backend framework, or duplicate the renderer/host core for another
 carrier.
@@ -195,8 +210,9 @@ carrier.
    boundaries while consuming Host-derived managed-companion, Channel Access,
    WeChat, Computer Use, Browser Automation, and future projections without adding
    a Studio registry, Package discovery path, or action authority.
-2. Run the full local candidate gates, rebuild the macOS Preview, and complete local interaction/readback
-   before asking for user acceptance.
+2. After the remaining functional bytes are canonical, run the affected candidate
+   gates, rebuild the macOS Preview, and repeat installed interaction/runtime
+   readback before asking for acceptance of that new cohort.
 
 ### Verification Commands
 
