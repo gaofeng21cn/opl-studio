@@ -589,6 +589,7 @@ test("DSH rc2 controls resolve to the complete pinned source cohort and OPL-owne
     "@deepseek-ai/dsh-host-webserver@0.1.1-rc.2",
     "@deepseek-ai/dsh-invariants@0.1.1-rc.2",
     "@deepseek-ai/dsh-launch-environment@0.1.1-rc.2",
+    "@deepseek-ai/dsh-scope@0.1.1-rc.2",
     "@deepseek-ai/dsh-system-prompt@0.1.1-rc.2",
     "@deepseek-ai/dsh-tools@0.1.1-rc.2",
     "@deepseek-ai/dsh-typert-protocol@0.1.1-rc.2",
@@ -596,6 +597,7 @@ test("DSH rc2 controls resolve to the complete pinned source cohort and OPL-owne
   ]);
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-ui-slots"], "0.1.1-rc.2");
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-invariants"], "0.1.1-rc.2");
+  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-scope"], "0.1.1-rc.2");
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-web-react"], undefined);
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-ui-renderer"], undefined);
   assert.equal(fs.existsSync(path.join(root, "src/integrations/deepseek-harness/uiPrimitives.tsx")), false);

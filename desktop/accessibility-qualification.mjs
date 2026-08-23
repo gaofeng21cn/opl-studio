@@ -47,7 +47,14 @@ export function summarizeAccessibilityTree(nodes) {
   };
 }
 
-export async function captureDesktopAccessibility(webContents) {
+const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+export async function captureDesktopAccessibility(webContents, {
+  timeoutMs = 25_000,
+  intervalMs = 250
+} = {}) {
+  assert.ok(Number.isFinite(timeoutMs) && timeoutMs >= 0, "accessibility timeout must be non-negative");
+  assert.ok(Number.isFinite(intervalMs) && intervalMs > 0, "accessibility interval must be positive");
   const debug = webContents.debugger;
   let attachedHere = false;
   try {
@@ -56,10 +63,16 @@ export async function captureDesktopAccessibility(webContents) {
       attachedHere = true;
     }
     await debug.sendCommand("Accessibility.enable");
-    const tree = await debug.sendCommand("Accessibility.getFullAXTree");
-    const receipt = summarizeAccessibilityTree(tree?.nodes);
-    assert.equal(receipt.status, "passed", `Chromium AX tree smoke failed: ${JSON.stringify(receipt)}`);
-    return receipt;
+    const deadline = Date.now() + timeoutMs;
+    let receipt;
+    do {
+      const tree = await debug.sendCommand("Accessibility.getFullAXTree");
+      receipt = summarizeAccessibilityTree(tree?.nodes);
+      if (receipt.status === "passed") return receipt;
+      if (Date.now() >= deadline) break;
+      await delay(Math.min(intervalMs, Math.max(1, deadline - Date.now())));
+    } while (true);
+    assert.fail(`Chromium AX tree smoke failed: ${JSON.stringify(receipt)}`);
   } finally {
     if (attachedHere && debug.isAttached()) debug.detach();
   }

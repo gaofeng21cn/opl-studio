@@ -54,6 +54,31 @@ test("accessibility capture detaches Chromium debugging after success and failur
   debug.sendCommand = async (command) => command === "Accessibility.getFullAXTree"
     ? { nodes: [node("RootWebArea", "One Person Lab"), node("button", "")] }
     : {};
-  await assert.rejects(captureDesktopAccessibility({ debugger: debug }), /Chromium AX tree smoke failed/);
+  await assert.rejects(
+    captureDesktopAccessibility({ debugger: debug }, { timeoutMs: 0 }),
+    /Chromium AX tree smoke failed/
+  );
+  assert.equal(attached, false);
+});
+
+test("accessibility capture waits for the startup gate to expose named controls", async () => {
+  let attached = false;
+  let treeReads = 0;
+  const debug = {
+    isAttached: () => attached,
+    attach: () => { attached = true; },
+    detach: () => { attached = false; },
+    sendCommand: async (command) => {
+      if (command !== "Accessibility.getFullAXTree") return {};
+      treeReads += 1;
+      return treeReads === 1
+        ? { nodes: [node("RootWebArea", "One Person Lab")] }
+        : { nodes: [node("RootWebArea", "One Person Lab"), node("button", "Enter with limits")] };
+    }
+  };
+
+  const receipt = await captureDesktopAccessibility({ debugger: debug }, { timeoutMs: 50, intervalMs: 1 });
+  assert.equal(receipt.status, "passed");
+  assert.equal(treeReads, 2);
   assert.equal(attached, false);
 });

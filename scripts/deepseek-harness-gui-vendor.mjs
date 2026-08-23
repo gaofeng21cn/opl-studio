@@ -26,6 +26,7 @@ const applicationHostPackages = [
   "@deepseek-ai/dsh-host-webserver@0.1.1-rc.2",
   "@deepseek-ai/dsh-invariants@0.1.1-rc.2",
   "@deepseek-ai/dsh-launch-environment@0.1.1-rc.2",
+  "@deepseek-ai/dsh-scope@0.1.1-rc.2",
   "@deepseek-ai/dsh-system-prompt@0.1.1-rc.2",
   "@deepseek-ai/dsh-tools@0.1.1-rc.2",
   "@deepseek-ai/dsh-typert-protocol@0.1.1-rc.2"
