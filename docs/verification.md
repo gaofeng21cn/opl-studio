@@ -141,8 +141,8 @@ the package from resolving DSH profile modules through `~/.dsh` or an unrelated
 worktree. The packaged closure must contain the exact direct production
 dependencies required by the pinned Host, including `@deepseek-ai/dsh-llm`,
 `@deepseek-ai/dsh-session`, and `@deepseek-ai/dsh-timeout`; profile fallback
-is not packaging evidence. Its
-output is candidate evidence only. It does not establish an installer flow,
+is not packaging evidence. The smoke output is candidate evidence only. It
+does not establish an installer flow,
 clean-VM behavior, shared Runtime parity, native screen-reader behavior,
 active-shell adoption, or release readiness.
 
