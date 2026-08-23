@@ -917,8 +917,8 @@
     "external_cohort": {
       "framework_commit": "39a7047c7374ef073eec0a3a5635f71fb61063b7",
       "framework_tree": "7ea0c1b9e76f2586e7ff5b6f4739e910789ce1ae",
-      "app_commit": "350f6efd1dd0d0dd88ba62fd22dbfdd17ca50581",
-      "app_tree": "cd1bae0a3fea3ddf58c8bc8ac0686826517ee902",
+      "app_commit": "67816e19c85683a5d16feaa8fb816507e9ed4d26",
+      "app_tree": "da7b0d68dd2adbb54fd60b8225f2757a62fdf443",
       "aionui_commit": "8fc46f172998e905dcd94f65a1a0e52ef20e9478",
       "aionui_tree": "56cab213883b43e31d02fba9ff692c54d4377868"
     },
