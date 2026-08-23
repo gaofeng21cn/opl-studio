@@ -89,6 +89,13 @@ bunx cross-env VITEST_INCLUDE_DOM=1 vitest run --project dom \
 These gates establish renderer compatibility for the tested cohort. They do
 not adopt Studio, switch the active shell, or qualify a release artifact.
 
+The current service-status acceptance also requires the typed placement boundary:
+`service_status` contributions project to `settings.services.installed_services`,
+while `activity_log` remains destination-null and absent from ordinary Settings.
+Fleet telemetry and doctor are exercised through their descriptor-declared refs;
+their bounded summary may show local checks, but individual unavailable checks do
+not override a healthy top-level service state.
+
 ## DSH Upstream Upgrade Gate
 
 The upgrade owner is `src/composition/deepseekHarnessSourceManifest.json` plus

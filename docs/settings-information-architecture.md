@@ -29,19 +29,20 @@ Framework projection 负责，Studio 不建立第二份状态。
 “添加智能体”只消费 `install_from_manifest_url`。这个 action 必须由 App/Framework
 提供 `manifest_url`、`trust_tier`、`dry_run_supported` 和确认要求；Studio 不解析、
 下载、安装或维护第二份 Package registry。能力包、Skills、插件和连接模块进入
-能力或资源页面，由它们各自的 owner projection 提供；服务状态只消费 App 的运行时
-projection，不自动接收技术型 Package view。
+能力或资源页面，由它们各自的 owner projection 提供；只有 App 合同明确准入的
+`service_status` view 才能进入服务状态，技术型 `activity_log` 仍不会自动进入普通 Settings。
 
 ## Fleet Agent 关系边界
 
 `opl-fleet-agent` 是一个可选的 `capability_package` 集成适配器，由一个 Codex
-plugin carrier 安装。它可以提供 Fleet Agent 的遥测和诊断 read refs，作为已安装
-能力包的只读通告；这不等于独立 macOS Fleet Agent App 的安装、运行或生命周期控制。
+plugin carrier 安装。它通过 App 明确准入的 `service_status` typed view 提供本机
+Fleet Agent 遥测和诊断 read refs，并投影到“服务状态”；这不等于独立 macOS Fleet
+Agent App 的安装、运行或生命周期控制。
 
 `activity_log` 是技术型 read model，不是 Studio 可自行解释的 Settings 页面语义。
 因此 Studio 不会把这类贡献自动挂到“服务状态”，也不会在普通 Settings 中生成
-telemetry/doctor 两个区块。若 App 将来为某个贡献声明明确的用户任务和准入目的地，
-再由对应 placement contract 负责投影；当前 Fleet 只在能力包/包详情语境中可见。
+telemetry/doctor 两个区块。Fleet 的两个 `service_status` view 是 App 合同明确准入的
+例外；其他未声明准入的技术日志仍保持隐藏。
 
 Framework Package/贡献投影只证明适配器关系，不足以证明独立 macOS Fleet Agent
 App 的安装、进程状态或载体等价。若未来需要显示独立 App，必须由 App/Framework
@@ -49,9 +50,9 @@ App 的安装、进程状态或载体等价。若未来需要显示独立 App，
 
 ## 当前实现与剩余边界
 
-- 已实现：只有 App placement policy 明确准入的 view 语义才嵌入既有设置页；微信连接视图归入资源与
-  连接且不成为顶级设置项；`activity_log` 不自动进入服务状态或其他普通 Settings；
-  智能体页保留官方/全部筛选并提供 App-owned 的添加入口。
+- 已实现：只有 App placement policy 明确准入的 view 语义才嵌入既有设置页；`service_status` 进入服务
+  状态，Fleet telemetry/doctor 使用这一通用类型；微信连接视图归入资源与连接且不成为顶级设置项；
+  `activity_log` 继续隐藏；智能体页保留官方/全部筛选并提供 App-owned 的添加入口。
 - 保留：包生命周期动作、连接动作、运行服务动作仍只走 App action contract。
 - 未宣称：独立 Fleet App 的安装/运行资格、发布资格或载体替换；这些不是当前
   Studio projection 的证据。

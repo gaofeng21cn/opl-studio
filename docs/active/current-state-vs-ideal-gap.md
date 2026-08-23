@@ -74,7 +74,7 @@ release admission, and is explicitly adopted.
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
 | Service recovery | `app_state_derived_action_closed_loop` | Runtime Overview derives one causal root and one safe action from the same App state/action projection. Mutating and read-only actions are revalidated against a fresh App state immediately before execution, respect the mutation guard, and always refresh App state afterward |
 | Local launcher | `implemented_candidate_path` | Isolated bundle; actions dry-run-only by default |
-| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state path is closed on current main; the remaining user-facing baseline is generic capability/managed-companion consumption from `opl-glt.58` and a rebuilt local Preview acceptance pass |
+| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state and Fleet `service_status` paths are closed on current main; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` and a rebuilt local Preview acceptance pass |
 | Validation | `distribution_and_core_functional_gates_green_preview_pending` | Default PR/main CI remains source-only, and carrier qualification remains manual. Source and hosted checks cover Settings, Runtime Overview, Agent/turn correctness, identity-scoped Runtime Detail, and service recovery; they do not replace the next locally installed Preview interaction and user acceptance |
 | Adoption and readiness | `false` | No active-shell adoption, release, clean-VM, domain, owner-acceptance, or production claim |
 
@@ -111,11 +111,18 @@ filters the kernel execution envelope and does not create a second updater or
 currentness authority. Focused Host, renderer, and live Framework readback
 evidence is recorded in the change verification.
 
+The App-owned `service_status` placement slice is also closed on current `main`:
+App maps the typed view to `settings.services.installed_services`, Framework projects
+Fleet telemetry/doctor with projection callability preserved, and Studio/AionUI render
+the bounded summary generically. `activity_log` remains destination-null and hidden
+from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; this
+is source/candidate evidence, not active-shell adoption.
+
 ## Current Gaps
 
 | Gap | Class | Owner route | Stop condition |
 | --- | --- | --- | --- |
-| Canonical capability and managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Fleet, Browser Automation, and future managed companions through typed slots/actions and a generic directory; do not hard-code a fixed brand capability list |
+| Non-Fleet managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Browser Automation, and future managed companions through typed slots/actions and a generic directory; Fleet `service_status` is already closed and must not be reintroduced as a fixed brand allowlist |
 | Current Preview has not passed this functional cohort | `acceptance_p0` | Studio product controller and user | After all functional bytes are canonical, rebuild and install the macOS Preview, run local interaction/readback checks, and leave it open for user acceptance |
 
 Signing, notarization, public update feeds, public OCI publication, dedicated
@@ -184,10 +191,10 @@ carrier.
 
 ### Required Actions
 
-1. Preserve the closed managed-update/Flow projection boundary while consuming
-   Host-derived managed-companion,
-   Channel Access, WeChat, Computer Use, and Fleet projections without adding a
-   Studio registry, Package discovery path, or action authority.
+1. Preserve the closed managed-update/Flow and Fleet `service_status` projection
+   boundaries while consuming Host-derived managed-companion, Channel Access,
+   WeChat, Computer Use, Browser Automation, and future projections without adding
+   a Studio registry, Package discovery path, or action authority.
 2. Run the full local candidate gates, rebuild the macOS Preview, and complete local interaction/readback
    before asking for user acceptance.
 
