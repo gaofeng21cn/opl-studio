@@ -163,7 +163,7 @@
     "agent_package_lifecycle_display",
     "confirmation_interview_cards",
     "renderer_module_registry",
-    "runtime_status_panel",
+    "project_progress_panel",
     "files_results_panel",
     "agents_capabilities_panel",
     "runtime_detail_contributions",
@@ -342,8 +342,8 @@
       {
         "file": "src/workbench/App.tsx",
         "contains": [
-          "opl-runtime-status-panel",
-          "opl-agent-run-status",
+          "opl-project-progress-panel",
+          "opl-project-progress",
           "opl-runtime-contributions"
         ]
       },
@@ -661,16 +661,17 @@
         "settings"
       ],
       "right_context_modules": [
-        "run_status",
+        "project_progress",
         "files_results",
         "agents_capabilities"
       ],
-      "runtime_status_sources": [
-        "codex_app_server_current_thread",
-        "opl_app_state_active_project_lines"
+      "project_progress_sources": [
+        "codex_app_server_current_thread_workspace",
+        "opl_app_state_work_item_projection_v2"
       ],
       "runtime_detail_slot": "ui_contributions.runtime.detail",
       "files_input_policy": "user_selected_files_and_directories_only",
+      "files_workspace_policy": "canonical_thread_workspace_bounded_read_only",
       "results_policy": "owner_projected_artifacts_only_no_action_json",
       "package_lifecycle_surface": "settings",
       "product_identity": {
@@ -988,18 +989,18 @@
         "opl-artifact-preview-panel"
       ]
     },
-    "runtime_status": {
-      "capability": "runtime_status_panel",
-      "status_field": "runtime_status_panel_status",
+    "project_progress": {
+      "capability": "project_progress_panel",
+      "status_field": "project_progress_panel_status",
       "live_evidence": false,
       "layout_markers": [
-        "runtime-status-panel",
-        "runtime-current-agent",
-        "runtime-line-list"
+        "project-progress-panel",
+        "project-progress",
+        "project-progress-items"
       ],
       "renderer_testids": [
-        "opl-runtime-status-panel",
-        "opl-agent-run-status"
+        "opl-project-progress-panel",
+        "opl-project-progress"
       ]
     },
     "files_results": {
@@ -1007,11 +1008,14 @@
       "status_field": "files_results_panel_status",
       "live_evidence": false,
       "layout_markers": [
+        "workspace-files",
         "artifact-preview-tabs",
         "artifact-preview"
       ],
       "renderer_testids": [
         "opl-files-results-panel",
+        "opl-thread-workspace-files",
+        "opl-thread-workspace-preview",
         "opl-input-files-list",
         "opl-artifact-preview-panel"
       ]
@@ -1066,8 +1070,8 @@
     ],
     "runtime_testids": [
       "opl-context-tabs",
-      "opl-runtime-status-panel",
-      "opl-agent-run-status",
+      "opl-project-progress-panel",
+      "opl-project-progress",
       "opl-runtime-contributions",
       "opl-files-results-panel",
       "opl-input-files-list",
@@ -1090,13 +1094,13 @@
       "opl-skip-to-chat"
     ]
   },
-  "runtime_status_and_contribution_bridge": {
+  "project_progress_and_contribution_bridge": {
     "renderer_testids": [
-      "opl-runtime-status-panel",
-      "opl-agent-run-status",
+      "opl-project-progress-panel",
+      "opl-project-progress",
       "opl-runtime-contributions"
     ],
-    "detail_policy": "active_project_lines_plus_owner_ui_contributions",
+    "detail_policy": "workspace_matched_work_item_projection_v2_plus_owner_ui_contributions",
     "typed_receipt_fields": [
       "requestedMode",
       "status",
@@ -1218,9 +1222,8 @@
       "provider implementation details"
     ],
     "renderer_testids": [
-      "opl-runtime-status-panel",
-      "opl-agent-run-status",
-      "opl-active-project-line",
+      "opl-project-progress-panel",
+      "opl-project-progress",
       "opl-runtime-contributions"
     ]
   },

@@ -394,6 +394,125 @@ select {
   font: inherit;
 }
 
+.opl-dsh-context-panel .workspace-files,
+.opl-dsh-context-panel .workspace-file-layout {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.opl-dsh-context-panel .workspace-file-search {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.opl-dsh-context-panel .workspace-file-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.opl-dsh-context-panel .workspace-file-tree {
+  min-height: 128px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 4px 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+}
+
+.opl-dsh-context-panel .workspace-file-row,
+.opl-dsh-context-panel .workspace-file-search-result {
+  width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 0;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+}
+
+.opl-dsh-context-panel .workspace-file-row:hover,
+.opl-dsh-context-panel .workspace-file-search-result:hover,
+.opl-dsh-context-panel .workspace-file-row[data-selected="true"] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.opl-dsh-context-panel .workspace-file-row > span:not(.workspace-file-indent),
+.opl-dsh-context-panel .workspace-file-search-result > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opl-dsh-context-panel .workspace-file-indent {
+  width: 13px;
+  flex: none;
+}
+
+.opl-dsh-context-panel .workspace-file-search-result > span {
+  display: grid;
+}
+
+.opl-dsh-context-panel .workspace-file-search-result strong,
+.opl-dsh-context-panel .workspace-file-search-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opl-dsh-context-panel .workspace-file-preview {
+  min-height: 128px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+}
+
+.opl-dsh-context-panel .workspace-file-preview > header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+}
+
+.opl-dsh-context-panel .workspace-file-preview pre {
+  margin: 0;
+  padding: 10px;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  line-height: 17px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.opl-dsh-context-panel .workspace-file-error {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+}
+
 .opl-dsh-context-panel .runtime-current-agent {
   align-items: center;
   padding: 10px 0 12px;
@@ -465,6 +584,124 @@ select {
 
 .opl-dsh-context-panel .runtime-line dt {
   color: var(--dsw-alias-label-secondary);
+}
+
+.opl-dsh-context-panel .project-progress,
+.opl-dsh-context-panel .project-progress-items {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.opl-dsh-context-panel .project-progress-header > div,
+.opl-dsh-context-panel .project-progress-item > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.opl-dsh-context-panel .project-progress-header strong,
+.opl-dsh-context-panel .project-progress-header span,
+.opl-dsh-context-panel .project-progress-item > header strong,
+.opl-dsh-context-panel .project-progress-item > header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opl-dsh-context-panel .project-progress-header span,
+.opl-dsh-context-panel .project-progress-item > header span {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.opl-dsh-context-panel .project-progress-item {
+  min-width: 0;
+  display: grid;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+}
+
+.opl-dsh-context-panel .project-progress-item > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.opl-dsh-context-panel .project-progress-status {
+  max-width: 44%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 11px;
+}
+
+.opl-dsh-context-panel .project-progress-item dl {
+  display: grid;
+  gap: 7px;
+}
+
+.opl-dsh-context-panel .project-progress-item dl > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(96px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.opl-dsh-context-panel .project-progress-item dt,
+.opl-dsh-context-panel .project-progress-item dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.opl-dsh-context-panel .project-progress-item dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.opl-dsh-context-panel .project-progress-item dd,
+.opl-dsh-context-panel .project-progress-next span,
+.opl-dsh-context-panel .project-progress-next small {
+  overflow-wrap: anywhere;
+}
+
+.opl-dsh-context-panel .project-progress-item code {
+  padding: 2px 5px;
+}
+
+.opl-dsh-context-panel .project-progress-attention {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--dsw-alias-state-warning-secondary);
+}
+
+.opl-dsh-context-panel .project-progress-attention > span,
+.opl-dsh-context-panel .project-progress-next {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.opl-dsh-context-panel .project-progress-attention small,
+.opl-dsh-context-panel .project-progress-next small {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.opl-dsh-context-panel .project-progress-next {
+  padding-top: 9px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 .opl-dsh-context-panel .runtime-contributions {

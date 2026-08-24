@@ -216,6 +216,7 @@ export type WorkItemRuntimeItem = {
   domainId?: string;
   projectId: string;
   projectDisplayName: string;
+  workspacePath?: string;
   workItemId: string;
   domainWorkItemId?: string;
   workItemScopeId?: string;
@@ -227,6 +228,7 @@ export type WorkItemRuntimeItem = {
   statusReason?: string;
   currentStageId?: string;
   currentStageName?: string;
+  attemptId?: string;
   nextStageId?: string;
   nextStageName?: string;
   executionState: string;
@@ -263,7 +265,7 @@ export type WorkItemRuntimeProjection = {
     telemetryMissingCount: number;
   };
   agents: Array<{ id: string; label: string }>;
-  projects: Array<{ id: string; agentId: string; label: string }>;
+  projects: Array<{ id: string; agentId: string; label: string; workspacePath?: string }>;
   items: WorkItemRuntimeItem[];
 };
 
@@ -1024,7 +1026,8 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
     return [{
       id,
       agentId: asString(project.agent_id) ?? "unknown",
-      label: asString(project.display_name) ?? id
+      label: asString(project.display_name) ?? id,
+      ...(asString(project.workspace_path) ? { workspacePath: asString(project.workspace_path) as string } : {})
     }];
   });
   const items = asRecordArray(projection?.items).flatMap((item): WorkItemRuntimeItem[] => {
@@ -1047,6 +1050,8 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
     const domainWorkItemId = asString(identity?.domain_work_item_id);
     const workItemScopeId = asString(identity?.work_item_scope_id);
     const identityState = asString(identity?.identity_state);
+    const workspacePath = asString(identity?.workspace_path);
+    const attemptId = asString(execution?.attempt_id);
     const title = asString(identity?.work_item_display_name);
     if (!id || !agentId || !projectId || !workItemId || !title) return [];
     const domainDetailViews = parseDomainDetailViewDescriptors(item.domain_detail_views, id);
@@ -1058,6 +1063,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       ...(domainId ? { domainId } : {}),
       projectId,
       projectDisplayName: asString(identity?.project_display_name) ?? projectId,
+      ...(workspacePath ? { workspacePath } : {}),
       workItemId,
       ...(domainWorkItemId ? { domainWorkItemId } : {}),
       ...(workItemScopeId ? { workItemScopeId } : {}),
@@ -1075,6 +1081,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       ...(asString(lifecycle?.current_stage_display_name) ?? asString(execution?.current_stage_display_name)
         ? { currentStageName: (asString(lifecycle?.current_stage_display_name) ?? asString(execution?.current_stage_display_name)) as string }
         : {}),
+      ...(attemptId ? { attemptId } : {}),
       ...(asString(execution?.next_stage_id) ? { nextStageId: asString(execution?.next_stage_id) as string } : {}),
       ...(asString(execution?.next_stage_display_name) ? { nextStageName: asString(execution?.next_stage_display_name) as string } : {}),
       executionState: asString(execution?.state) ?? "unknown",

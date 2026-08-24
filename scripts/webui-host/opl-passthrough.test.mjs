@@ -723,7 +723,7 @@ test("fast state keeps a bounded work-item runtime projection without private ex
               project_id: "project:one",
               agent_id: "mas",
               display_name: "Research",
-              workspace_path: "/private/workspace"
+              workspace_path: "/workspace/research"
             }],
             items: [{
               item_id: "project:one:study-one",
@@ -732,6 +732,7 @@ test("fast state keeps a bounded work-item runtime projection without private ex
                 agent_display_name: "Med Auto Science",
                 project_id: "project:one",
                 project_display_name: "Research",
+                workspace_path: "/workspace/research",
                 work_item_id: "study-one",
                 domain_work_item_id: "study-one",
                 work_item_scope_id: "work-item:study-one",
@@ -748,6 +749,7 @@ test("fast state keeps a bounded work-item runtime projection without private ex
               visibility: { state: "visible", control_ref: "private://control" },
               execution: {
                 state: "idle",
+                attempt_id: "attempt:analysis:1",
                 current_stage_display_name: null,
                 next_stage_display_name: "Analysis",
                 workflow_id: "private-workflow",
@@ -780,15 +782,18 @@ test("fast state keeps a bounded work-item runtime projection without private ex
   assert.equal(projection.summary.telemetry_missing_count, 1);
   assert.equal(projection.agent_catalog[0].display_name, "Med Auto Science");
   assert.equal(projection.project_catalog[0].display_name, "Research");
+  assert.equal(projection.project_catalog[0].workspace_path, "/workspace/research");
   assert.equal(projection.items[0].identity.work_item_display_name, "Study one");
   assert.equal(projection.items[0].identity.domain_work_item_id, "study-one");
   assert.equal(projection.items[0].identity.work_item_scope_id, "work-item:study-one");
   assert.equal(projection.items[0].identity.identity_state, "resolved");
+  assert.equal(projection.items[0].identity.workspace_path, "/workspace/research");
+  assert.equal(projection.items[0].execution.attempt_id, "attempt:analysis:1");
   assert.equal(projection.items[0].telemetry.cumulative.total_tokens, null);
   assert.equal(projection.items[0].stage_map[0].display_names["zh-CN"], "分析");
   const serialized = JSON.stringify(projection);
   for (const marker of [
-    "private_counter", "private_launch_payload", "workspace_path", "work_item_root", "lifecycle_ref",
+    "private_counter", "private_launch_payload", "work_item_root", "lifecycle_ref",
     "control_ref", "workflow_id", "receipt_ref", "source_refs", "internal_receipt", "diagnostics"
   ]) {
     assert.equal(serialized.includes(marker), false, `must omit ${marker}`);

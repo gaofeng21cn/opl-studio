@@ -79,6 +79,23 @@ It does not promise universal compatibility: plugins that only register
 `dsh-base` session, LLM, Agent, or credential services require an explicit OPL
 adapter and authority decision.
 
+### DSH Version And Plugin Compatibility
+
+The pinned `0.1.1-rc.2` cohort is newer than `0.1.0-rc.6`, `0.1.0-rc.7`, and
+`0.1.0-rc.8`. The apparent incompatibility with plugins declaring ranges such
+as `^0.1.0-rc.8` is not a downgrade: npm prerelease range matching does not
+automatically admit a prerelease from a different patch tuple, so
+`0.1.1-rc.2` does not satisfy that range even though SemVer orders it later.
+
+Package metadata is only the first gate. A plugin is directly reusable when it
+registers a bounded `ctx.tools` capability or a renderer-only contribution
+without claiming session or model state. A plugin that expects DSH Session,
+LLM, Agent Runtime, credentials, or `dsh-base` cannot be installed unchanged,
+because Studio intentionally assigns persistent thread/turn ownership to
+`opl-codex-native` and Codex App Server. Such a plugin needs a small explicit
+adapter that consumes Studio's existing owner APIs, or it remains unsupported.
+Changing its peer range alone would hide the real authority conflict.
+
 ## Client Composition Boundary
 
 Both the current AionUI shell and this DSH-derived Native candidate consume the
@@ -119,6 +136,15 @@ must not discover or install OPL Packages, establish another Package
 registry/currentness source, receive release-operation, or own task, Package,
 product, state, action, session, or runtime truth. Cordis itself is not forbidden
 in a GUI; a second independent graph or authority plane is.
+
+The on-demand details column follows that rule. `opl.app.client-contributions`
+publishes three ordered first-party Detail tools in the same Client Cordis
+composition: Project progress, Files and results, and Agents and capabilities.
+Project progress filters Framework's `work-item-projection.v2` by the canonical
+Codex thread workspace and displays only explicit lifecycle, current Stage,
+current Attempt, attention, and next-action fields. It never treats the first
+pending Stage as current. The separate Runtime page remains the cross-project
+and infrastructure control surface.
 
 DSH Application Host and GUI source reuse remains Studio-only. AionUI can consume the same
 Host-derived Client Cordis inputs through its own thin renderer adapter without

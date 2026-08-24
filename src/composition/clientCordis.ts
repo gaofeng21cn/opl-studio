@@ -11,6 +11,19 @@ import {
 export const OPL_CLIENT_CONTRIBUTIONS_SERVICE = "opl.app.client-contributions";
 export const OPL_CLIENT_CONTRIBUTIONS_UPDATED_EVENT = "opl/app-client-contributions/updated";
 
+export type OplStudioDetailTab = {
+  id: "opl-project-progress-panel" | "opl-files-results-panel" | "opl-agents-capabilities-panel";
+  order: number;
+  icon: "progress" | "files" | "capabilities";
+  labels: { zh: string; en: string };
+};
+
+export const OPL_STUDIO_DETAIL_TABS: readonly OplStudioDetailTab[] = Object.freeze([
+  Object.freeze({ id: "opl-project-progress-panel", order: 10, icon: "progress", labels: Object.freeze({ zh: "项目进度", en: "Project progress" }) }),
+  Object.freeze({ id: "opl-files-results-panel", order: 20, icon: "files", labels: Object.freeze({ zh: "文件与结果", en: "Files & results" }) }),
+  Object.freeze({ id: "opl-agents-capabilities-panel", order: 30, icon: "capabilities", labels: Object.freeze({ zh: "智能体与能力", en: "Agents & capabilities" }) })
+]);
+
 export type OplClientCompositionPolicy = {
   abi: "opl_app_client_contributions.v1";
   projectionSchema: "opl_app_ui_contributions_projection.v1";
@@ -24,6 +37,7 @@ export type OplClientCompositionPolicy = {
 
 export type OplClientContributionsService = {
   readonly policy: OplClientCompositionPolicy;
+  readonly detailsTabs: readonly OplStudioDetailTab[];
   updateHostState(state: unknown): OplUiContributionsProjection;
   readProjection(): OplUiContributionsProjection;
   readSlot(slot: OplUiContributionSlot): readonly OplUiContribution[];
@@ -150,6 +164,7 @@ function createContributionsService(
 
   return Object.freeze({
     policy,
+    detailsTabs: OPL_STUDIO_DETAIL_TABS,
     updateHostState(state: unknown) {
       const parsed = readUiContributionsProjection(state);
       const next: OplUiContributionsProjection = {

@@ -183,7 +183,7 @@ test("work-item runtime projection preserves user status semantics and unknown t
               telemetry_missing_count: 2
             },
             agent_catalog: [{ agent_id: "mas", display_name: "Med Auto Science" }],
-            project_catalog: [{ project_id: "project:one", agent_id: "mas", display_name: "Research" }],
+            project_catalog: [{ project_id: "project:one", agent_id: "mas", display_name: "Research", workspace_path: "/workspace/research" }],
             items: [{
               item_id: "project:one:study-one",
               identity: {
@@ -191,6 +191,7 @@ test("work-item runtime projection preserves user status semantics and unknown t
                 agent_display_name: "Med Auto Science",
                 project_id: "project:one",
                 project_display_name: "Research",
+                workspace_path: "/workspace/research",
                 work_item_id: "study-one",
                 domain_work_item_id: "study-one",
                 work_item_scope_id: "work-item:study-one",
@@ -202,6 +203,7 @@ test("work-item runtime projection preserves user status semantics and unknown t
               visibility: { state: "visible" },
               execution: {
                 state: "idle",
+                attempt_id: "attempt:analysis:1",
                 next_stage_id: "analysis",
                 next_stage_display_name: "Analysis",
                 quality_budget: { elapsed_ms: null, tokens_used: null }
@@ -245,6 +247,9 @@ test("work-item runtime projection preserves user status semantics and unknown t
   assert.equal(model.workItemRuntime?.items[0]?.domainWorkItemId, "study-one");
   assert.equal(model.workItemRuntime?.items[0]?.workItemScopeId, "work-item:study-one");
   assert.equal(model.workItemRuntime?.items[0]?.identityState, "resolved");
+  assert.equal(model.workItemRuntime?.projects[0]?.workspacePath, "/workspace/research");
+  assert.equal(model.workItemRuntime?.items[0]?.workspacePath, "/workspace/research");
+  assert.equal(model.workItemRuntime?.items[0]?.attemptId, "attempt:analysis:1");
   assert.equal(model.workItemRuntime?.items[0]?.nextStageName, "Analysis");
   assert.equal(model.workItemRuntime?.items[0]?.totalTokens, null);
   assert.equal(model.workItemRuntime?.items[0]?.stages[0]?.displayNameI18n.zh, "分析");

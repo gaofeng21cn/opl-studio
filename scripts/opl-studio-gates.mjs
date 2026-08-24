@@ -4,7 +4,7 @@ import path from "node:path";
 export const root = path.resolve(new URL("..", import.meta.url).pathname);
 
 export const requiredDeliverySurfaceKeys = [
-  "runtime_status",
+  "project_progress",
   "files_results",
   "agents_capabilities",
   "runtime_contributions",
@@ -14,7 +14,9 @@ export const requiredDeliverySurfaceKeys = [
 
 export const rendererSourcePaths = [
   "src/workbench/App.tsx",
+  "src/workbench/ProjectProgressPanel.tsx",
   "src/workbench/SettingsPanel.tsx",
+  "src/workbench/WorkspaceFilesPanel.tsx",
   "src/workbench/codexWorkbenchStyles.ts",
   "src/workbench/threads/ThreadDetailPopover.tsx",
   "src/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",

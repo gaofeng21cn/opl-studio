@@ -122,14 +122,13 @@ import type {
 import { groupSettingsContributions, settingsContributionDestination } from "../composition/contributionProjection";
 import { createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
+import type { OplStudioDetailTab } from "../composition/clientCordis";
 import { CodexServerRequestPanel } from "./CodexServerRequestPanel";
+import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
+import { ProjectProgressPanel } from "./ProjectProgressPanel";
+import { selectProjectProgress } from "./projectProgress";
 
-const contextTabs = [
-  "opl-runtime-status-panel",
-  "opl-files-results-panel",
-  "opl-agents-capabilities-panel"
-] as const;
-type ContextTabId = (typeof contextTabs)[number];
+type ContextTabId = OplStudioDetailTab["id"];
 
 type StartupReadStatus = "loading" | "ready" | "error" | "timeout";
 
@@ -778,6 +777,7 @@ function eventCompletedText(event: unknown): string {
 }
 
 type AppProps = {
+  detailTabs: readonly OplStudioDetailTab[];
   renderShell: RenderOplStudioShell;
   renderContributionSlot?: RenderOplContributionSlot;
   onHostStateChange?: (state: unknown) => void;
@@ -785,6 +785,7 @@ type AppProps = {
 };
 
 export function App({
+  detailTabs,
   renderShell,
   renderContributionSlot,
   onHostStateChange,
@@ -883,17 +884,12 @@ export function App({
   const [composerSubmissionError, setComposerSubmissionError] = useState("");
   const [threadInputFiles, setThreadInputFiles] = useState<Record<string, WorkbenchArtifactRef[]>>({});
   const [pendingInputFiles, setPendingInputFiles] = useState<WorkbenchArtifactRef[]>([]);
-  const [activeContextTab, setActiveContextTab] = useState<ContextTabId>("opl-runtime-status-panel");
+  const [activeContextTab, setActiveContextTab] = useState<ContextTabId>(detailTabs[0]?.id ?? "opl-project-progress-panel");
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const [startupGateOpen, setStartupGateOpen] = useState(false);
   const t = uiCopy[settings.locale];
-  const contextTabLabels: Record<ContextTabId, string> = {
-    "opl-runtime-status-panel": settings.locale === "zh" ? "运行状态" : "Run status",
-    "opl-files-results-panel": settings.locale === "zh" ? "文件与结果" : "Files & results",
-    "opl-agents-capabilities-panel": settings.locale === "zh" ? "智能体与能力" : "Agents & capabilities"
-  };
   const normalizedCapabilityQuery = capabilityQuery.trim().toLowerCase();
   const capabilityGroups = [
     {
@@ -948,6 +944,12 @@ export function App({
     ?? visibleThreadProjects.find((project) => !project.projectless && project.threads.some((thread) => thread.id === codexThreadId))
     ?? visibleThreadProjects.find((project) => !project.projectless);
   const currentProject = selectedProject?.label ?? settings.defaultWorkspace ?? "Current project";
+  const projectProgressWorkspace = currentSession?.workspace
+    ?? (codexThreadId ? "" : selectedProject?.workspace ?? "");
+  const projectProgress = useMemo(
+    () => selectProjectProgress(projectProgressWorkspace, model.workItemRuntime, settings.locale),
+    [model.workItemRuntime, projectProgressWorkspace, settings.locale]
+  );
   const defaultWorkItemId = model.activeProjectLines.find((line) => line.status === "running")?.activeRunId
     ?? model.activeProjectLines[0]?.activeRunId
     ?? undefined;
@@ -2464,41 +2466,32 @@ export function App({
   const studioDetails = (
     <aside className="opl-dsh-context-panel" aria-label="On-demand context panel">
       <nav data-testid="opl-context-tabs" className="environment-menu">
-        {contextTabs.map((id) => (
-          <button key={id} type="button" data-active={activeContextTab === id} onClick={() => requestDetails(id)}>
-            {id === "opl-runtime-status-panel" ? <Activity aria-hidden="true" size={14} /> : id === "opl-files-results-panel" ? <Files aria-hidden="true" size={14} /> : <Puzzle aria-hidden="true" size={14} />}
-            {contextTabLabels[id]}
+        {[...detailTabs].sort((left, right) => left.order - right.order).map((tab) => (
+          <button key={tab.id} type="button" data-active={activeContextTab === tab.id} onClick={() => requestDetails(tab.id)}>
+            {tab.icon === "progress" ? <Activity aria-hidden="true" size={14} /> : tab.icon === "files" ? <Files aria-hidden="true" size={14} /> : <Puzzle aria-hidden="true" size={14} />}
+            {tab.labels[settings.locale]}
           </button>
         ))}
       </nav>
       <div className="context-scroll">
-        <section data-testid="opl-runtime-status-panel" className="context-block runtime-status-panel" hidden={activeContextTab !== "opl-runtime-status-panel"}>
+        <section data-testid="opl-project-progress-panel" className="context-block project-progress-panel" hidden={activeContextTab !== "opl-project-progress-panel"}>
           <div className="context-list-head">
-            <strong>{settings.locale === "zh" ? "当前运行" : "Current run"}</strong>
+            <strong>{settings.locale === "zh" ? "当前项目" : "Current project"}</strong>
             <button type="button" aria-label={t.refresh} title={t.refresh} onClick={() => void loadState(settings.runtimeProfile)}><RefreshCw aria-hidden="true" size={14} /></button>
           </div>
-          <div className="runtime-current-agent" data-testid="opl-agent-run-status" data-status={runDetail.status.state}>
-            <span className="runtime-status-dot" aria-hidden="true" />
-            <div><strong>{runDetail.status.agentLabel}</strong><span>{activeTurnId ? currentAgentStatus : threadRuntimeStatusLabel(runDetail.status.sourceStatus, settings.locale)}</span></div>
-          </div>
-          {runDetail.status.activeLines.length ? (
-            <div className="runtime-line-list">
-              {runDetail.status.activeLines.map((line, index) => (
-                <article className="runtime-line" key={`${line.activeRunId ?? "project"}-${index}`} data-testid="opl-active-project-line">
-                  <header><strong>{line.activeRunId ?? (settings.locale === "zh" ? `任务 ${index + 1}` : `Task ${index + 1}`)}</strong><Pill>{line.status}</Pill></header>
-                  <p>{line.nextVisibleStep}</p>
-                  <dl>
-                    <div><dt>{settings.locale === "zh" ? "进展" : "Progress"}</dt><dd>{line.progressDeltaClassification}</dd></div>
-                    <div><dt>{settings.locale === "zh" ? "交付变化" : "Deliverable delta"}</dt><dd>{line.deliverableProgressDelta}</dd></div>
-                    {line.platformRepairDelta !== "none" ? <div><dt>{settings.locale === "zh" ? "平台状态" : "Platform"}</dt><dd>{line.platformRepairDelta}</dd></div> : null}
-                    <div><dt>{settings.locale === "zh" ? "下一步" : "Next"}</dt><dd>{line.nextForcedDelta}</dd></div>
-                  </dl>
-                </article>
-              ))}
-            </div>
-          ) : <p className="context-empty">{settings.locale === "zh" ? "当前没有活跃任务。" : "No active work is reported."}</p>}
+          <ProjectProgressPanel locale={settings.locale} progress={projectProgress} refreshing={stateStatus === "loading"} />
         </section>
         <section data-testid="opl-files-results-panel" className="context-block artifact-preview-tabs" hidden={activeContextTab !== "opl-files-results-panel"}>
+          <div className="context-section">
+            <h3>{settings.locale === "zh" ? "工作区文件" : "Workspace files"}</h3>
+            <WorkspaceFilesPanel
+              threadId={codexThreadId}
+              locale={settings.locale}
+              listWorkspace={bridge.listThreadWorkspace}
+              readFile={bridge.readThreadWorkspaceFile}
+              searchWorkspace={bridge.searchThreadWorkspace}
+            />
+          </div>
           <div className="context-section" data-testid="opl-input-files-list">
             <h3>{settings.locale === "zh" ? "输入文件" : "Input files"}</h3>
             {sidebarSources.length ? sidebarSources.map((source) => <div className="context-ref-row" key={source.id}><strong>{source.label}</strong><span>{source.summary}</span></div>) : <p className="context-empty">{settings.locale === "zh" ? "暂无输入文件" : "No input files"}</p>}
@@ -2567,7 +2560,7 @@ export function App({
             </>
           ) : null}
         </section>
-        <section data-testid="opl-runtime-contributions" className="context-block runtime-contributions" hidden={activeContextTab !== "opl-runtime-status-panel"}>
+        <section data-testid="opl-runtime-contributions" className="context-block runtime-contributions" hidden={activeContextTab !== "opl-project-progress-panel"}>
           <h3>{settings.locale === "zh" ? "研究与任务模块" : "Research and task modules"}</h3>
           {runDetail.runtimeDetails.some((module) => module.state === "ready")
             ? renderContributionSlot?.("runtime.detail", contributionOwner)
@@ -2772,7 +2765,7 @@ export function App({
       onRunServiceRecovery={(action) => { void runServiceRecoveryAction(action); }}
       onOpenWorkItem={(item) => {
         setSelectedRuntimeWorkItemId(item.workItemId);
-        requestDetails("opl-runtime-status-panel");
+        requestDetails("opl-project-progress-panel");
       }}
       readDomainDetailView={readDomainDetailView}
     />,

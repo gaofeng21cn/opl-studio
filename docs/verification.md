@@ -31,7 +31,10 @@ is the command owner.
 | `npm run test:threads` | Standard Desktop/WebUI thread lifecycle, pagination, renderer, and Codex subagent projection tests |
 | `npm run test:webui-host` | DSH Host boot/profile/plugin inventory, authenticated DSH-tool MCP, persistent Codex ownership, shared Host core, HTTP/SSE, model/thread pagination, OPL projection, and read-only mutation guard |
 | `node --test scripts/webui-host/opl-passthrough.test.mjs` | Fast Host projection compression, managed-update envelope filtering, and bounded state transport |
+| `node --test scripts/webui-host/thread-workspace-service.test.mjs` | Canonical thread-workspace list/read/search behavior, bounds, UTF-8 handling, and traversal/symlink containment |
 | `bun test tests/workbench/runtime-projection.test.mts` | Workbench consumption of the compressed Framework managed-update and Flow dependency projection |
+| `bun test tests/workbench/project-progress.test.mts` | Exact workspace-to-project matching and explicit Stage/Attempt/attention/next-action projection without inferred current Stage |
+| `node --test tests/renderer/thread-renderer-source.test.mjs` | Renderer source contract, including the three Client Cordis Detail tools and their bounded UI paths |
 | `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
 | `npm run validate:client-conformance` | Fresh four-repository Host -> App -> Studio/AionUI compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |

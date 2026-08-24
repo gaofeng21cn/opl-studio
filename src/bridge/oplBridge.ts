@@ -319,6 +319,38 @@ export type CodexPickedInput = {
   path: string;
 };
 
+export type ThreadWorkspaceEntry = {
+  name: string;
+  relativePath: string;
+  kind: "file" | "directory" | "symlink";
+  sizeBytes?: number;
+};
+
+export type ThreadWorkspaceListing = {
+  schema: "opl_thread_workspace_listing.v1";
+  threadId: string;
+  relativePath: string;
+  entries: ThreadWorkspaceEntry[];
+  truncated: boolean;
+};
+
+export type ThreadWorkspaceFile = {
+  schema: "opl_thread_workspace_file.v1";
+  threadId: string;
+  relativePath: string;
+  name: string;
+  content: string;
+  sizeBytes: number;
+};
+
+export type ThreadWorkspaceSearch = {
+  schema: "opl_thread_workspace_search.v1";
+  threadId: string;
+  query: string;
+  entries: ThreadWorkspaceEntry[];
+  truncated: boolean;
+};
+
 export type CodexSkillCapability = {
   name: string;
   path: string;
@@ -487,7 +519,7 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "searchThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;
@@ -556,6 +588,9 @@ export type OplBridge = CodexThreadAdapterBridge & {
   respondToServerRequest(request: { id: string | number; response: { result?: unknown; error?: { code: number; message: string } } }): Promise<{ id: string | number; accepted: boolean }>;
   pickFiles(): Promise<CodexPickedInput[]>;
   pickDirectory(): Promise<CodexPickedInput[]>;
+  listThreadWorkspace(request: { threadId: string; relativePath?: string }): Promise<ThreadWorkspaceListing>;
+  readThreadWorkspaceFile(request: { threadId: string; relativePath: string }): Promise<ThreadWorkspaceFile>;
+  searchThreadWorkspace(request: { threadId: string; query: string }): Promise<ThreadWorkspaceSearch>;
   setLogDirectory(request: { path: string }): Promise<AppLogDirectoryUpdateResult>;
   sendMessage(request: CodexMessageRequest): Promise<CodexMessageResponse>;
   steerTurn(request: ThreadSteerRequest): Promise<ThreadSteerResult>;
@@ -1719,6 +1754,24 @@ export function createBrowserBridge(): OplBridge {
     pickDirectory() {
       const promise = candidate?.pickDirectory?.() ?? Promise.resolve([]);
       return Promise.resolve(promise).then(normalizePickedInputs);
+    },
+    listThreadWorkspace(request) {
+      if (!candidate?.listThreadWorkspace) {
+        return Promise.reject(new Error("Thread workspace browsing is unavailable in this host"));
+      }
+      return candidate.listThreadWorkspace(request);
+    },
+    readThreadWorkspaceFile(request) {
+      if (!candidate?.readThreadWorkspaceFile) {
+        return Promise.reject(new Error("Thread workspace file preview is unavailable in this host"));
+      }
+      return candidate.readThreadWorkspaceFile(request);
+    },
+    searchThreadWorkspace(request) {
+      if (!candidate?.searchThreadWorkspace) {
+        return Promise.reject(new Error("Thread workspace search is unavailable in this host"));
+      }
+      return candidate.searchThreadWorkspace(request);
     },
     setLogDirectory(request) {
       return candidate?.setLogDirectory?.(request) ?? Promise.resolve(unsupportedLogDirectoryUpdate());

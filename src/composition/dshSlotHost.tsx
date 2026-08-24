@@ -301,7 +301,7 @@ function OplStudioRoot({
     slotHost.clearProjection();
   }, [contributions]);
 
-  return <App renderShell={(surface) => <StudioFrame surface={surface} renderSlot={renderSlot} />} renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)} onHostStateChange={updateHostState} onHostStateDispose={clearHostState} />;
+  return <App detailTabs={contributions.detailsTabs} renderShell={(surface) => <StudioFrame surface={surface} renderSlot={renderSlot} />} renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)} onHostStateChange={updateHostState} onHostStateDispose={clearHostState} />;
 }
 
 function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; width: number; renderSlot: any }) {

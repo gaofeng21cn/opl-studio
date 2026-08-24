@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   OPL_CLIENT_CONTRIBUTIONS_SERVICE,
   OPL_CLIENT_CONTRIBUTIONS_UPDATED_EVENT,
+  OPL_STUDIO_DETAIL_TABS,
   createOplStudioClientCordisComposition,
   readOplClientCompositionPolicy
 } from "../../src/composition/clientCordis.ts";
@@ -134,6 +135,12 @@ describe("OPL Studio Client Cordis conformance", () => {
 
     expect(composition.ctx[OPL_CLIENT_CONTRIBUTIONS_SERVICE]).toBe(composition.contributions);
     expect(OPL_CLIENT_CONTRIBUTIONS_UPDATED_EVENT).toBe("opl/app-client-contributions/updated");
+    expect(composition.contributions.detailsTabs).toBe(OPL_STUDIO_DETAIL_TABS);
+    expect(composition.contributions.detailsTabs.map((tab) => tab.id)).toEqual([
+      "opl-project-progress-panel",
+      "opl-files-results-panel",
+      "opl-agents-capabilities-panel"
+    ]);
     expect(composition.contributions.readProjection()).toEqual({ surfaceKind: "unavailable", entries: [] });
 
     composition.contributions.updateHostState(hostState);

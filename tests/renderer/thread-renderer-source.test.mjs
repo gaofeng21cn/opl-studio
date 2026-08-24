@@ -37,6 +37,10 @@ const appServerTransport = read("scripts/webui-host/app-server-transport.mjs");
 const detail = read("src/workbench/threads/ThreadDetailPopover.tsx");
 const lifecycle = read("src/workbench/threads/ThreadLifecycleConfirmationDialog.tsx");
 const composerPalette = read("src/workbench/ComposerCapabilityPalette.tsx");
+const projectProgress = read("src/workbench/projectProgress.ts");
+const projectProgressPanel = read("src/workbench/ProjectProgressPanel.tsx");
+const workspaceFilesPanel = read("src/workbench/WorkspaceFilesPanel.tsx");
+const clientCordis = read("src/composition/clientCordis.ts");
 const settings = read("src/workbench/settingsModel.ts");
 const gatewayCache = read("src/workbench/gatewayAccountCache.ts");
 const gatewayLoginHost = read("scripts/webui-host/gateway-account-login.mjs");
@@ -549,6 +553,28 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(composerPalette, /if \(!open\) \{\s*setQuery\(""\)/s);
   assert.match(composerPalette, /catalog\.plugins/);
   assert.match(composerPalette, /catalog\.apps/);
+});
+
+test("DSH details tools project the current OPL project and a contained read-only workspace", () => {
+  assert.match(clientCordis, /OPL_STUDIO_DETAIL_TABS/);
+  assert.match(clientCordis, /项目进度/);
+  assert.match(app, /const projectProgressWorkspace = currentSession\?\.workspace/);
+  assert.match(app, /\?\? \(codexThreadId \? "" : selectedProject\?\.workspace \?\? ""\)/);
+  assert.match(app, /selectProjectProgress\(projectProgressWorkspace/);
+  assert.match(projectProgress, /normalizeProjectProgressWorkspace\(project\.workspacePath\) === workspace/);
+  assert.match(projectProgress, /const currentStageId = nonEmpty\(item\.currentStageId\)/);
+  assert.match(projectProgressPanel, /item\.currentStage \?/);
+  assert.match(projectProgressPanel, /item\.attempt \?/);
+  for (const method of ["listThreadWorkspace", "readThreadWorkspaceFile", "searchThreadWorkspace"]) {
+    assert.match(desktopPreload, new RegExp(`${method}:`));
+    assert.match(hostCore, new RegExp(`case "${method}"`));
+    assert.match(bridge, new RegExp(`${method}\\(`));
+  }
+  for (const route of ["/api/threads/workspace/list", "/api/threads/workspace/read", "/api/threads/workspace/search"]) {
+    assert.ok(webTransport.includes(route), `missing WebUI workspace route ${route}`);
+  }
+  assert.match(workspaceFilesPanel, /relativePath/);
+  assert.doesNotMatch(workspaceFilesPanel, /rename|writeFile|git status|terminal/i);
 });
 
 test("DSH QueueDock owns queued follow-ups and steers the exact active Codex turn", () => {

@@ -519,7 +519,7 @@ function compactWorkItem(value) {
     ...selectedFields(value, ["item_id"]),
     identity: selectedFields(value.identity, [
       "agent_id", "agent_display_name", "domain_id", "project_id", "project_display_name",
-      "work_item_id", "domain_work_item_id", "work_item_scope_id", "identity_state",
+      "workspace_path", "work_item_id", "domain_work_item_id", "work_item_scope_id", "identity_state",
       "work_item_display_name", "work_item_kind", "source_kind"
     ]),
     lifecycle: selectedFields(value.lifecycle, [
@@ -530,7 +530,7 @@ function compactWorkItem(value) {
     execution: execution ? {
       ...selectedFields(execution, [
         "state", "current_stage_id", "current_stage_display_name", "next_stage_id",
-        "next_stage_display_name", "started_at", "updated_at", "running_proof_status"
+        "next_stage_display_name", "attempt_id", "started_at", "updated_at", "running_proof_status"
       ]),
       review_chain: selectedFields(execution.review_chain, [
         "stage_run_count", "total_attempt_count", "total_repair_rounds", "total_tokens_observed",
@@ -582,7 +582,7 @@ function compactWorkItemProjection(value) {
       : [],
     project_catalog: Array.isArray(value.project_catalog)
       ? value.project_catalog.slice(0, 256).map((project) => selectedFields(project, [
-          "project_id", "agent_id", "agent_display_name", "domain_id", "display_name", "binding_status"
+          "project_id", "agent_id", "agent_display_name", "domain_id", "display_name", "workspace_path", "binding_status"
         ]) ?? {})
       : [],
     items: Array.isArray(value.items) ? value.items.slice(0, 512).map(compactWorkItem) : []

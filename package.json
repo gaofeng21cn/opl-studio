@@ -124,7 +124,7 @@
     "validate:client-conformance": "bun run scripts/validate-client-conformance.mjs",
     "test:storage-migration": "bun test tests/workbench/storage-migration.test.mts",
     "test:thread-directory-projection": "bun test tests/workbench/thread-directory-projection.test.mts",
-    "test:webui-host": "node --test scripts/webui-host/host-core.test.mjs scripts/webui-host/thread-adapter.test.mjs scripts/webui-host/http-host.test.mjs scripts/webui-host/dsh-tool-mcp.test.mjs scripts/webui-host/opl-passthrough.test.mjs scripts/webui-host/gateway-account-login.test.mjs scripts/webui-host/native-app-updater.test.mjs",
+    "test:webui-host": "node --test scripts/webui-host/host-core.test.mjs scripts/webui-host/thread-adapter.test.mjs scripts/webui-host/thread-workspace-service.test.mjs scripts/webui-host/http-host.test.mjs scripts/webui-host/dsh-tool-mcp.test.mjs scripts/webui-host/opl-passthrough.test.mjs scripts/webui-host/gateway-account-login.test.mjs scripts/webui-host/native-app-updater.test.mjs",
     "test:threads": "npm run test:thread-directory-projection && npm run test:webui-host && node --test tests/renderer/thread-renderer-source.test.mjs",
     "test:source": "npm run typecheck && npm run test:desktop && npm run test:headless && npm run test:oci && npm run test:gateway-account-projection && npm run test:package-projection && npm run test:runtime-projection && npm run test:ui-contributions && npm run test:client-cordis && npm run test:storage-migration && npm run test:threads && npm run validate:candidate",
     "validate:candidate": "node scripts/validate-opl-studio-candidate.mjs",

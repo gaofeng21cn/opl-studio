@@ -47,7 +47,7 @@ release admission, and is explicitly adopted.
 | Product completion obligation | `true` | Minimum-complete Native gaps enter the App development backlog without blocking the current AionUI release |
 | DSH Application Host | `pinned_rc2_application_host_implemented` | `opl-studio` profile, Web overlay, profile home, plugin inventory, startup/shutdown ordering, and Host service tree are implemented from DSH `v0.1.1-rc.2`; `dsh-base` is explicitly excluded |
 | Codex native plugin | `persistent_codex_owner_implemented` | `opl-codex-native` owns the App Server process, canonical threads/turns, approvals, and live events; launch-time MCP settings do not mutate global Codex config |
-| DSH plugin bridge | `ctx_tools_to_codex_mcp_implemented` | Tools registered in DSH `ctx.tools` are listed/called through authenticated stateful loopback MCP with dynamic list-change notifications; plugins requiring excluded DSH product-runtime services need an explicit adapter |
+| DSH plugin bridge | `ctx_tools_to_codex_mcp_implemented` | Tools registered in DSH `ctx.tools` are listed/called through authenticated stateful loopback MCP with dynamic list-change notifications; `0.1.1-rc.2` is newer than the `0.1.0-rc.6/7/8` cohorts, but npm prerelease ranges and plugins that require excluded DSH Session/LLM/Agent/credential owners still need explicit compatibility and authority admission |
 | Framework bridge | `public_contract_consumer_implemented` | `opl-framework-bridge` consumes App state/action, authentication, and channel callbacks; Framework remains the runtime/Package composition owner |
 | DSH GUI baseline | `pinned_source_reuse_implemented` | App frame, navigation, workspace/session tree, conversation, composer, Agent preset, model selection, Settings, theme, and queue are reused byte-identically from the pinned MIT upstream source; OPL keeps no parallel visual system |
 | Product brand | `one_person_lab_only` | `OPL Studio` remains an internal repo/codename and is not a user-facing product brand or logo |
@@ -65,7 +65,9 @@ release admission, and is explicitly adopted.
 | Private cross-thread layer | `removed_non_goal` | No proposal/dispatch/wait protocol, host queue, ledger, or bilateral receipt remains. The DSH Tool MCP is an in-process plugin capability bridge, not a second thread coordinator |
 | Client composition | `host_derived_client_cordis` | AionUI and Native consume the same App Client Contribution ABI, product profile, and slot policy. Native's Client Cordis occupants derive only from the Framework Host projection; no shell discovers Packages or owns another graph |
 | OPL state/actions | `canonical_producer_consumer_conformance` | Framework Cordis composition, Package graph, and public App state/action producer are canonical; Native has one bounded consumer bridge and no second registry, currentness, session, state, or action authority |
-| Conversation | `chat_first_with_on_demand_detail` | Primary surface is the DSH conversation; run status, roadmap/detail contributions, files, and results open on demand instead of becoming static home cards |
+| Conversation | `chat_first_with_thread_scoped_detail_tools` | Primary surface is the DSH conversation. The same Client Cordis exposes Project progress, Files and results, and Agents and capabilities as ordered on-demand Detail tools instead of static home cards |
+| Project progress Detail tool | `workspace_exact_work_item_projection` | Matches the canonical Codex thread workspace to Framework `work-item-projection.v2`; displays only explicit lifecycle, current Stage, current Attempt, attention, blocker text, and next action. It never guesses a project for an existing workspace-less thread or treats a pending Stage as current |
+| Files and results Detail tool | `canonical_thread_workspace_read_only` | Lists, searches, and previews bounded UTF-8 text files below the canonical thread workspace, then keeps existing input-file and result/artifact views in the same tab. No edit, create, rename, move, delete, Git, terminal, or second workspace owner is introduced |
 | Standard Agents | `explicit_owner_readiness_enforced` | Composer separates OPL-owned `standard_agent` packages from skills/plugins/connections and preserves real Codex routes. Unknown diagnostics remain selectable, while explicit `launch_allowed=false`, `operational_ready=false`, physical absence, or non-callability reject selection |
 | Active turn | `canonical_reopen_and_steer` | Active submissions use Codex `turn/steer`, and the DSH queue remains renderer-only state. Launch confirms the terminal turn through `thread/read(includeTurns=true)`; reopening a thread restores only the canonical `activeTurnId` before steer is enabled |
 | Settings | `canonical_functional_surface_installed_preview_verified` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The installed Preview for the current cohort passed local interaction and runtime readback; later functional bytes require a new acceptance pass |
@@ -103,6 +105,16 @@ It must not expose internal diagnostic enums or invent a separate runtime state
 source.
 
 ## Recently Closed
+
+The conversation Detail-tool slice is closed in source. The first-party Client
+Cordis registry now owns the ordered `Project progress`, `Files and results`,
+and `Agents and capabilities` tabs. Project progress is an exact workspace
+projection of Framework-owned `work-item-projection.v2`; Files and results uses
+the Codex thread adapter's canonical workspace through a bounded read-only Host
+service. The standalone Runtime page remains the cross-project and
+infrastructure overview. Installed Preview acceptance must be repeated for the
+new renderer and Host bytes before this source result is described as installed
+runtime evidence.
 
 The managed-update and Flow currentness slice is closed on current `main`:
 Framework owns the producer and currentness semantics, `opl-studio` preserves

@@ -91,6 +91,9 @@ export function installWebTransport(): void {
     respondToServerRequest: (request) => postJson("/api/codex/respond-request", request),
     pickFiles: () => Promise.reject(new WebTransportError("native_picker_unavailable", "The local WebUI cannot expose native file paths")),
     pickDirectory: () => Promise.reject(new WebTransportError("native_picker_unavailable", "The local WebUI cannot expose native folder paths")),
+    listThreadWorkspace: (request) => postJson("/api/threads/workspace/list", request),
+    readThreadWorkspaceFile: (request) => postJson("/api/threads/workspace/read", request),
+    searchThreadWorkspace: (request) => postJson("/api/threads/workspace/search", request),
     setLogDirectory: () => Promise.resolve({
       schema: "opl_app_log_directory_update.v1",
       owner: "one-person-lab-app_native_host",

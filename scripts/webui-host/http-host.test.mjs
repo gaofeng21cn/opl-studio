@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import test from "node:test";
 import { CodexAppServerTransport } from "./app-server-transport.mjs";
 import { createWebUiHost } from "./http-host.mjs";
@@ -19,12 +19,13 @@ async function post(baseUrl, route, value) {
 
 test("loopback HTTP host exposes standard thread lifecycle, subagent projection, SSE, and OPL passthrough", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-http-test-"));
+  await writeFile(path.join(directory, "workspace-note.md"), "# Workspace note\n", "utf8");
   const appServerLog = path.join(directory, "app-server.jsonl");
   const transport = new CodexAppServerTransport({
     command: process.execPath,
     args: [fixture],
     cwd: directory,
-    env: { ...process.env, FAKE_APP_SERVER_LOG: appServerLog, FAKE_APP_SERVER_PENDING_APPROVAL: "1" },
+    env: { ...process.env, FAKE_APP_SERVER_LOG: appServerLog, FAKE_APP_SERVER_PENDING_APPROVAL: "1", FAKE_WORKSPACE: directory },
     requestTimeoutMs: 2_000,
     turnTimeoutMs: 2_000
   });
@@ -144,6 +145,17 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
     read.body.turns[0].items.map((item) => item.type),
     ["collabAgentToolCall", "subAgentActivity"]
   );
+  const workspaceListing = await post(baseUrl, "/api/threads/workspace/list", { threadId: "thread-idle" });
+  assert.equal(workspaceListing.status, 200);
+  assert.equal(workspaceListing.body.entries.some((entry) => entry.relativePath === "workspace-note.md"), true);
+  const workspaceFile = await post(baseUrl, "/api/threads/workspace/read", { threadId: "thread-idle", relativePath: "workspace-note.md" });
+  assert.equal(workspaceFile.status, 200);
+  assert.equal(workspaceFile.body.content, "# Workspace note\n");
+  const workspaceSearch = await post(baseUrl, "/api/threads/workspace/search", { threadId: "thread-idle", query: "workspace-note" });
+  assert.deepEqual(workspaceSearch.body.entries.map((entry) => entry.relativePath), ["workspace-note.md"]);
+  const traversal = await post(baseUrl, "/api/threads/workspace/read", { threadId: "thread-idle", relativePath: "../outside.txt" });
+  assert.equal(traversal.status, 400);
+  assert.equal(traversal.body.error.code, "invalid_workspace_path");
   const resumed = await post(baseUrl, "/api/threads/resume", { threadId: "thread-unloaded" });
   assert.equal(resumed.body.state, "idle");
   const forked = await post(baseUrl, "/api/threads/fork", { threadId: "thread-idle", throughTurnId: "turn-1" });

@@ -53,8 +53,11 @@ const requiredFiles = [
   "src/types/use-sync-external-store.d.ts",
   "src/renderer-shell.html",
   "src/workbench/App.tsx",
+  "src/workbench/ProjectProgressPanel.tsx",
+  "src/workbench/WorkspaceFilesPanel.tsx",
   "src/workbench/codexWorkbenchStyles.ts",
   "src/workbench/modelPolicy.ts",
+  "src/workbench/projectProgress.ts",
   "src/workbench/workbenchModel.ts",
   "src/workbench/settingsModel.ts",
   "src/workbench/gatewayAccountCache.ts",
@@ -94,6 +97,9 @@ const requiredFiles = [
   "scripts/webui-host/http-host.mjs",
   "scripts/webui-host/thread-adapter.mjs",
   "scripts/webui-host/thread-adapter.test.mjs",
+  "scripts/webui-host/thread-workspace-service.mjs",
+  "scripts/webui-host/thread-workspace-service.test.mjs",
+  "tests/workbench/project-progress.test.mts",
   "tests/renderer/thread-renderer-source.test.mjs"
 ];
 
@@ -123,8 +129,8 @@ const requiredScripts = [
 
 const requiredTestIds = [
   "opl-context-tabs",
-  "opl-runtime-status-panel",
-  "opl-agent-run-status",
+  "opl-project-progress-panel",
+  "opl-project-progress",
   "opl-runtime-contributions",
   "opl-files-results-panel",
   "opl-input-files-list",
@@ -665,8 +671,9 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(alignment && typeof alignment === "object", "candidate evidence must define the App-owned product layout contract");
   assert(alignment.reference_product === "DeepSeek Harness Web client", "product layout contract must bind the DSH GUI baseline");
   assert(JSON.stringify(alignment.left_rail_items) === JSON.stringify(["projects", "conversations", "search", "settings"]), "left rail must contain only projects, conversations, search, and Settings");
-  assert(JSON.stringify(alignment.right_context_modules) === JSON.stringify(["run_status", "files_results", "agents_capabilities"]), "right context must contain only run status, files and results, and agents and capabilities");
-  assert(alignment.runtime_status_sources?.includes("codex_app_server_current_thread") && alignment.runtime_status_sources.includes("opl_app_state_active_project_lines"), "run status must consume current thread and active project lines");
+  assert(JSON.stringify(alignment.right_context_modules) === JSON.stringify(["project_progress", "files_results", "agents_capabilities"]), "right context must contain only project progress, files and results, and agents and capabilities");
+  assert(alignment.project_progress_sources?.includes("codex_app_server_current_thread_workspace") && alignment.project_progress_sources.includes("opl_app_state_work_item_projection_v2"), "project progress must join the canonical thread workspace to the Framework work-item projection");
+  assert(alignment.files_workspace_policy === "canonical_thread_workspace_bounded_read_only", "files and results must keep workspace browsing below the canonical thread workspace");
   assert(alignment.runtime_detail_slot === "ui_contributions.runtime.detail", "hypotheses and roadmaps must use runtime.detail contribution readback");
   assert(alignment.files_input_policy === "user_selected_files_and_directories_only" && alignment.results_policy === "owner_projected_artifacts_only_no_action_json", "files and results must preserve their real owner boundaries");
   assert(alignment.package_lifecycle_surface === "settings", "Agent Package lifecycle must remain in Settings");
@@ -758,7 +765,7 @@ for (const capability of [
   "artifact_preview_mvp",
   "source_visual_smoke",
   "artifact_preview_tabs",
-  "runtime_status_panel",
+  "project_progress_panel",
   "files_results_panel",
   "agents_capabilities_panel",
   "runtime_detail_contributions",

@@ -3,6 +3,7 @@ import { createNativeAppUpdaterFromEnvironment } from "./native-app-updater.mjs"
 import { OplCodexNative } from "./opl-codex-native.mjs";
 import { OplFrameworkBridge } from "./opl-framework-bridge.mjs";
 import { ThreadAdapterError } from "./thread-adapter.mjs";
+import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
 
 function unavailablePlatformCapability(capability) {
   return async () => {
@@ -85,6 +86,7 @@ export class OplHostCore extends EventEmitter {
     platform = defaultPlatformServices(),
     nativeUpdater = defaultNativeUpdater(),
     carrierDiagnostics,
+    threadWorkspace,
     env = process.env
   } = {}, legacyOptions) {
     super();
@@ -93,6 +95,7 @@ export class OplHostCore extends EventEmitter {
     this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex });
     this.transport = this.codex.transport;
     this.threads = this.codex.threads;
+    this.threadWorkspace = threadWorkspace ?? createThreadWorkspaceService({ threads: this.threads });
     this.opl = this.framework.opl;
     this.gatewayAccountLogin = this.framework.gatewayAccountLogin;
     this.codexApiKeyConfiguration = this.framework.codexApiKeyConfiguration;
@@ -168,6 +171,9 @@ export class OplHostCore extends EventEmitter {
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
       case "pickFiles": return this.platform.pickFiles(payload);
       case "pickDirectory": return this.platform.pickDirectory(payload);
+      case "listThreadWorkspace": return this.threadWorkspace.list(payload);
+      case "readThreadWorkspaceFile": return this.threadWorkspace.read(payload);
+      case "searchThreadWorkspace": return this.threadWorkspace.search(payload);
       case "setLogDirectory": return this.carrierDiagnostics.setLogDirectory?.(payload)
         ?? unsupportedLogDirectoryUpdate();
       case "sendMessage": return this.transport.sendMessage(payload);
