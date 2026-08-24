@@ -106,15 +106,15 @@ source.
 
 ## Recently Closed
 
-The conversation Detail-tool slice is closed in source. The first-party Client
-Cordis registry now owns the ordered `Project progress`, `Files and results`,
+The conversation Detail-tool slice is closed in the installed Preview. The
+first-party Client Cordis registry now owns the ordered `Project progress`, `Files and results`,
 and `Agents and capabilities` tabs. Project progress is an exact workspace
 projection of Framework-owned `work-item-projection.v2`; Files and results uses
 the Codex thread adapter's canonical workspace through a bounded read-only Host
 service. The standalone Runtime page remains the cross-project and
-infrastructure overview. Installed Preview acceptance must be repeated for the
-new renderer and Host bytes before this source result is described as installed
-runtime evidence.
+infrastructure overview. Installed readback proved one-click project refresh,
+the three capability groups, bounded workspace search and preview, and zero-width
+visual closure of the DSH Detail column.
 
 The managed-update and Flow currentness slice is closed on current `main`:
 Framework owns the producer and currentness semantics, `opl-studio` preserves
@@ -131,22 +131,20 @@ the bounded summary generically. `activity_log` remains destination-null and hid
 from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; this
 is source/candidate evidence, not active-shell adoption.
 
-The prior installed Preview slice was closed for Studio candidate
-`8497f3b9c240cc7ad28f0e90e609e2cb5732409a`. A clean App-contract-driven
+The current installed Preview slice is closed for Studio candidate
+`71ce9b4e347dd2921f9ffa8da27d0cadf11c3624`. A clean App-contract-driven
 `npm run package` qualified Desktop, standalone WebUI, and Docker; the App-owned
-atomic installer then installed the isolated
-`cn.onepersonlab.opl.studio.preview` bundle without replacing the Stable App.
-The installed `app.asar` SHA-256 is
-`96e71210efd39dc462c9d1c52b6c99c0a8396fc2c95c5bb40c4463881ef39cb9`.
-Installed-runtime readback proved packaged DSH Host startup, the persistent Codex
-App Server child, Fleet `service_status` summary and opt-in technical data,
-`activity_log` absence from ordinary Settings, OPL Gateway account projection, a
-completed real Codex turn, graceful process cleanup, and recovery of canonical
-thread `01a02e73-4242-70d3-8138-f7ba75545fc7` after restart. That acceptance is
-historical after the later UI-shell bytes. The new installed Preview cohort binds
-to `app.asar` SHA-256
-`1d29195a991abe50e6d2355d02095dbe52f9de68d2134fd10325f2962e433c13`, but its full
-live turn/restart acceptance remains open. The App update
+atomic installer installed the isolated `cn.onepersonlab.opl.studio.preview`
+bundle without replacing the Stable App. The installed `app.asar` SHA-256 is
+`c7250fc6e6a56b1672a54ff2584124ff5b5efe33d45a12a4e96975b7b505f0a7`.
+Installed-runtime readback proved packaged DSH Host startup and the persistent
+Codex App Server child; recovery of canonical thread
+`01a0332a-2f3d-7e31-b05b-1e18085dea22` with reply
+`OPL Studio Preview 验收通过。`; text-only product identity without the OPL
+pseudo-logo or custom conversation header; a 360 px Detail column that closes to
+zero layout width; one-click projection of the four NF-PitNET work items; search
+and preview of root `workspace.yaml`; rejection of `../package.json` and
+`/etc/passwd`; and Skills, Plugins, and Apps capability groups. The App update
 surface still correctly reports no configured Preview update source, Weixin is
 not connected, and OPL Link is currently unavailable; none is promoted to a
 successful live connection. This installed acceptance is candidate evidence only.

@@ -176,6 +176,19 @@ The minimum installed pass verifies all of the following from
   returns the user and agent items, graceful quit removes the Preview App Server
   child, and the same canonical thread is readable and visible after restart.
 
+The current installed receipt is bound to candidate
+`71ce9b4e347dd2921f9ffa8da27d0cadf11c3624` and installed `app.asar` SHA-256
+`c7250fc6e6a56b1672a54ff2584124ff5b5efe33d45a12a4e96975b7b505f0a7`.
+Live Preview readback additionally verified the ordered Project progress, Files
+and results, and Agents and capabilities shortcuts; automatic refresh from an
+initially unavailable project projection; four exact NF-PitNET work items; a
+360 px Detail column and zero-width closed layout column; root `workspace.yaml`
+search and preview; explicit rejection of `../package.json` and `/etc/passwd`;
+the Skills, Plugins, and Apps groups; text-only product identity; and recovery
+of canonical thread `01a0332a-2f3d-7e31-b05b-1e18085dea22` with its completed
+reply. Browser console readback contained no errors or warnings during this
+interaction pass.
+
 This pass closes only the installed candidate cohort whose exact bytes were
 tested. Any later Host, renderer, dependency, bridge, or contract change that
 affects the installed path requires a fresh package and installed acceptance.
