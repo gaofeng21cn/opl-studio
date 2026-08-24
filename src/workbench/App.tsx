@@ -1892,6 +1892,9 @@ export function App({
 
   function requestDetails(tab: ContextTabId) {
     setActiveContextTab(tab);
+    if (tab === "opl-project-progress-panel" && stateStatus === "error") {
+      void loadState(settings.runtimeProfile);
+    }
     if (tab === "opl-agents-capabilities-panel" && (capabilityStatus === "idle" || capabilityStatus === "error")) {
       void loadCapabilities();
     }

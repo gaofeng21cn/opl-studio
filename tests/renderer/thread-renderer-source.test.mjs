@@ -566,6 +566,8 @@ test("DSH details tools project the current OPL project and a contained read-onl
   assert.match(app, /const projectProgressWorkspace = currentSession\?\.workspace/);
   assert.match(app, /\?\? \(codexThreadId \? "" : selectedProject\?\.workspace \?\? ""\)/);
   assert.match(app, /selectProjectProgress\(projectProgressWorkspace/);
+  assert.match(app, /tab === "opl-project-progress-panel" && stateStatus === "error"/);
+  assert.match(app, /void loadState\(settings\.runtimeProfile\)/);
   assert.match(projectProgress, /normalizeProjectProgressWorkspace\(project\.workspacePath\) === workspace/);
   assert.match(projectProgress, /const currentStageId = nonEmpty\(item\.currentStageId\)/);
   assert.match(projectProgressPanel, /item\.currentStage \?/);
