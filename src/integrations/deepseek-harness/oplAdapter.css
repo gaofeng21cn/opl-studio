@@ -21,6 +21,17 @@ body {
   letter-spacing: 0;
 }
 
+/* The native DSH wide sidebar starts its logo row at the window's content
+   edge. Give the product title a little breathing room below macOS traffic
+   lights while leaving the compact rail geometry untouched. */
+.opl-dsh-sidebar-shell {
+  display: contents;
+}
+
+.opl-dsh-sidebar-shell:not([data-collapsed]) > div:first-child {
+  padding-top: 18px;
+}
+
 html[data-opl-host="desktop"] .opl-studio-dsh-root::before {
   content: "";
   position: fixed;

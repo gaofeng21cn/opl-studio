@@ -306,7 +306,18 @@ function OplStudioRoot({
 
 function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; width: number; renderSlot: any }) {
   const studio = useStudio();
-  return <SidebarRoot collapsed={collapsed} width={width} startSession={studio.startSession} toggleSidebar={studio.toggleSidebar} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={renderSlot} />;
+  return (
+    <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined}>
+      <SidebarRoot
+        collapsed={collapsed}
+        width={width}
+        startSession={studio.startSession}
+        toggleSidebar={studio.toggleSidebar}
+        t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
+        renderSlot={renderSlot}
+      />
+    </div>
+  );
 }
 
 function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandSidebar(): void }) {

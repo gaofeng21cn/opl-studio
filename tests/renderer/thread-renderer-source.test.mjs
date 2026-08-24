@@ -462,6 +462,12 @@ test("desktop exposes a drag region before the DSH application mounts", () => {
   assert.doesNotMatch(adapterStyles, /padding-top: 28px/);
 });
 
+test("wide DSH sidebar gives the product title a deliberate top inset", () => {
+  assert.match(slotHost, /className="opl-dsh-sidebar-shell" data-collapsed=\{collapsed \|\| undefined\}/);
+  assert.match(adapterStyles, /\.opl-dsh-sidebar-shell \{\s*display: contents;\s*\}/s);
+  assert.match(adapterStyles, /\.opl-dsh-sidebar-shell:not\(\[data-collapsed\]\) > div:first-child \{\s*padding-top: 18px;\s*\}/s);
+});
+
 test("App update restart follows the carrier result instead of a host-name special case", () => {
   assert.match(app, /nativeAppUpdate\?\.supported === true && nativeAppUpdate\.restartRequired === true/);
   assert.doesNotMatch(app, /nativeAppUpdate\?\.host === "native"/);
