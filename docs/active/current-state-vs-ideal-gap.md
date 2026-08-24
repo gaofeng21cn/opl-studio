@@ -106,15 +106,18 @@ source.
 
 ## Recently Closed
 
-The conversation Detail-tool slice is closed in the installed Preview. The
-first-party Client Cordis registry now owns the ordered `Project progress`, `Files and results`,
-and `Agents and capabilities` tabs. Project progress is an exact workspace
-projection of Framework-owned `work-item-projection.v2`; Files and results uses
-the Codex thread adapter's canonical workspace through a bounded read-only Host
-service. The standalone Runtime page remains the cross-project and
-infrastructure overview. Installed readback proved one-click project refresh,
-the three capability groups, bounded workspace search and preview, and zero-width
-visual closure of the DSH Detail column.
+The conversation task-inspector slice is closed in the installed Preview. A
+single floating `Task details` entry opens a secondary menu for the ordered
+`Project progress`, `Files and results`, and `Agents and capabilities` Client
+Cordis tabs; the entry exposes its text label automatically on wide windows.
+Project progress is an exact workspace projection of Framework-owned
+`work-item-projection.v2`; Files and results uses the Codex thread adapter's
+canonical workspace through a bounded read-only Host service. The standalone
+Runtime page remains the cross-project and infrastructure overview. On wide
+windows the open inspector reserves conversation space instead of overlaying
+messages or the composer; on narrow windows it becomes a full-viewport modal.
+Files and results uses one-at-a-time Workspace, Inputs, and Results navigation
+with drill-in previews rather than a permanent three-section stack.
 
 The managed-update and Flow currentness slice is closed on current `main`:
 Framework owns the producer and currentness semantics, `opl-studio` preserves
@@ -132,22 +135,21 @@ from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; 
 is source/candidate evidence, not active-shell adoption.
 
 The current installed Preview slice is closed for Studio candidate
-`71ce9b4e347dd2921f9ffa8da27d0cadf11c3624`. A clean App-contract-driven
+`40ea6e795702eb71c399bd1f5d2de296e2d58d0d`. A clean App-contract-driven
 `npm run package` qualified Desktop, standalone WebUI, and Docker; the App-owned
 atomic installer installed the isolated `cn.onepersonlab.opl.studio.preview`
 bundle without replacing the Stable App. The installed `app.asar` SHA-256 is
-`c7250fc6e6a56b1672a54ff2584124ff5b5efe33d45a12a4e96975b7b505f0a7`.
+`fb62035d13c08056b4fb748db90e53c20ff3401ea5346c3ab8678270f7d33996`.
 Installed-runtime readback proved packaged DSH Host startup and the persistent
-Codex App Server child; recovery of canonical thread
-`01a0332a-2f3d-7e31-b05b-1e18085dea22` with reply
-`OPL Studio Preview 验收通过。`; text-only product identity without the OPL
-pseudo-logo or custom conversation header; a 360 px Detail column that closes to
-zero layout width; one-click projection of the four NF-PitNET work items; search
-and preview of root `workspace.yaml`; rejection of `../package.json` and
-`/etc/passwd`; and Skills, Plugins, and Apps capability groups. The App update
-surface still correctly reports no configured Preview update source, Weixin is
-not connected, and OPL Link is currently unavailable; none is promoted to a
-successful live connection. This installed acceptance is candidate evidence only.
+Codex App Server child; the floating entry, three-item secondary menu, and wide
+automatic label; a 417.6 px inspector with long conversation messages and the
+composer ending before its left edge; successful top, middle, and bottom hit
+tests for all three inspector tabs; exclusive Workspace, Inputs, and Results
+views; search and preview of `AGENTS.md`; and a 760 x 900 full-viewport modal
+whose Escape path restores focus to the floating entry. Browser console and
+page-error readback were empty. The running Stable App kept the same PID during
+install and acceptance. This installed acceptance is candidate evidence only;
+it does not change active-shell adoption or release authority.
 
 ## Current Gaps
 

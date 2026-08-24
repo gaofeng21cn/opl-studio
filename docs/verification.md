@@ -175,19 +175,31 @@ The minimum installed pass verifies all of the following from
 - one real Codex turn reaches `completed`, `thread/read(includeTurns=true)`
   returns the user and agent items, graceful quit removes the Preview App Server
   child, and the same canonical thread is readable and visible after restart.
+- the default conversation exposes one floating Task details entry, whose wide
+  form includes a text label and whose secondary menu selects Project progress,
+  Files and results, or Agents and capabilities without opening a permanent
+  third column;
+- on wide windows the open inspector reserves enough conversation space that
+  long messages and the composer end before the panel, and each tab is clickable
+  across its full height; on narrow windows the inspector is a full-viewport
+  modal whose Escape path restores focus to the floating entry;
+- Files and results shows exactly one of Workspace, Inputs, or Results at a time,
+  and workspace or artifact content opens as a drill-in preview with a back path.
 
 The current installed receipt is bound to candidate
-`71ce9b4e347dd2921f9ffa8da27d0cadf11c3624` and installed `app.asar` SHA-256
-`c7250fc6e6a56b1672a54ff2584124ff5b5efe33d45a12a4e96975b7b505f0a7`.
-Live Preview readback additionally verified the ordered Project progress, Files
-and results, and Agents and capabilities shortcuts; automatic refresh from an
-initially unavailable project projection; four exact NF-PitNET work items; a
-360 px Detail column and zero-width closed layout column; root `workspace.yaml`
-search and preview; explicit rejection of `../package.json` and `/etc/passwd`;
-the Skills, Plugins, and Apps groups; text-only product identity; and recovery
-of canonical thread `01a0332a-2f3d-7e31-b05b-1e18085dea22` with its completed
-reply. Browser console readback contained no errors or warnings during this
-interaction pass.
+`40ea6e795702eb71c399bd1f5d2de296e2d58d0d` and installed `app.asar` SHA-256
+`fb62035d13c08056b4fb748db90e53c20ff3401ea5346c3ab8678270f7d33996`.
+Live Preview readback verified the wide floating label and three-item secondary
+menu; a 417.6 px panel whose left edge remained beyond both the composer and all
+messages in a long canonical conversation; successful 15%, 50%, and 85% height
+hit points on every primary tab; exclusive Workspace, Inputs, and Results views;
+search and drill-in preview of `AGENTS.md`; and a 760 x 900 full-viewport dialog
+with Escape focus restoration. The packaged `codex app-server --stdio` child
+started from the installed app, the Stable App retained its pre-install PID, and
+browser console/page-error readback remained empty. The selected task had no
+result artifacts, so this installed pass proves Results empty-state composition;
+artifact drill-in remains covered by the renderer acceptance gate rather than
+being overstated as installed live evidence.
 
 This pass closes only the installed candidate cohort whose exact bytes were
 tested. Any later Host, renderer, dependency, bridge, or contract change that
