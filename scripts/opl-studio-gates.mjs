@@ -13,6 +13,7 @@ export const requiredDeliverySurfaceKeys = [
 ];
 
 export const rendererSourcePaths = [
+  "src/composition/dshSlotHost.tsx",
   "src/workbench/App.tsx",
   "src/workbench/ProjectProgressPanel.tsx",
   "src/workbench/SettingsPanel.tsx",

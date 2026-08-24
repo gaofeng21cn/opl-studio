@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Check,
+  ChevronLeft,
   CircleEllipsis,
   Clock3,
   Download,
@@ -129,6 +130,7 @@ import { ProjectProgressPanel } from "./ProjectProgressPanel";
 import { selectProjectProgress } from "./projectProgress";
 
 type ContextTabId = OplStudioDetailTab["id"];
+type FilesDetailView = "workspace" | "inputs" | "results";
 
 type StartupReadStatus = "loading" | "ready" | "error" | "timeout";
 
@@ -885,6 +887,8 @@ export function App({
   const [threadInputFiles, setThreadInputFiles] = useState<Record<string, WorkbenchArtifactRef[]>>({});
   const [pendingInputFiles, setPendingInputFiles] = useState<WorkbenchArtifactRef[]>([]);
   const [activeContextTab, setActiveContextTab] = useState<ContextTabId>(detailTabs[0]?.id ?? "opl-project-progress-panel");
+  const [activeFilesView, setActiveFilesView] = useState<FilesDetailView>("workspace");
+  const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
@@ -1906,6 +1910,7 @@ export function App({
   }
 
   function runDryRun(actionId: string, payload: Record<string, unknown> = {}) {
+    setActiveFilesView("results");
     requestDetails("opl-files-results-panel");
     void bridge
       .executeAction({ actionId, payload, dryRun: true })
@@ -1924,6 +1929,7 @@ export function App({
   ) {
     setContributionActionBusy(true);
     setContributionActionConfirmation(null);
+    setActiveFilesView("results");
     requestDetails("opl-files-results-panel");
     try {
       const actionRequest = createOplContributionActionRequest(entry, command, confirmed);
@@ -2472,14 +2478,6 @@ export function App({
 
   const studioDetails = (
     <aside className="opl-dsh-context-panel" aria-label="On-demand context panel">
-      <nav data-testid="opl-context-tabs" className="environment-menu">
-        {[...detailTabs].sort((left, right) => left.order - right.order).map((tab) => (
-          <button key={tab.id} type="button" data-active={activeContextTab === tab.id} onClick={() => requestDetails(tab.id)}>
-            {tab.icon === "progress" ? <Activity aria-hidden="true" size={14} /> : tab.icon === "files" ? <Files aria-hidden="true" size={14} /> : <Puzzle aria-hidden="true" size={14} />}
-            {tab.labels[settings.locale]}
-          </button>
-        ))}
-      </nav>
       <div className="context-scroll">
         <section data-testid="opl-project-progress-panel" className="context-block project-progress-panel" hidden={activeContextTab !== "opl-project-progress-panel"}>
           <div className="context-list-head">
@@ -2488,9 +2486,13 @@ export function App({
           </div>
           <ProjectProgressPanel locale={settings.locale} progress={projectProgress} refreshing={stateStatus === "loading"} />
         </section>
-        <section data-testid="opl-files-results-panel" className="context-block artifact-preview-tabs" hidden={activeContextTab !== "opl-files-results-panel"}>
-          <div className="context-section">
-            <h3>{settings.locale === "zh" ? "工作区文件" : "Workspace files"}</h3>
+        <section data-testid="opl-files-results-panel" className="context-block opl-files-surface" hidden={activeContextTab !== "opl-files-results-panel"}>
+          <nav className="opl-files-section-nav" aria-label={settings.locale === "zh" ? "文件与结果" : "Files and results"}>
+            <button type="button" data-active={activeFilesView === "workspace" || undefined} onClick={() => { setActiveFilesView("workspace"); setArtifactPreviewOpen(false); }}><Folder aria-hidden="true" size={14} /><span>{settings.locale === "zh" ? "工作区" : "Workspace"}</span></button>
+            <button type="button" data-active={activeFilesView === "inputs" || undefined} onClick={() => { setActiveFilesView("inputs"); setArtifactPreviewOpen(false); }}><FileText aria-hidden="true" size={14} /><span>{settings.locale === "zh" ? "输入" : "Inputs"}</span></button>
+            <button type="button" data-active={activeFilesView === "results" || undefined} onClick={() => setActiveFilesView("results")}><Files aria-hidden="true" size={14} /><span>{settings.locale === "zh" ? "结果" : "Results"}</span></button>
+          </nav>
+          {activeFilesView === "workspace" ? (
             <WorkspaceFilesPanel
               threadId={codexThreadId}
               locale={settings.locale}
@@ -2498,43 +2500,41 @@ export function App({
               readFile={bridge.readThreadWorkspaceFile}
               searchWorkspace={bridge.searchThreadWorkspace}
             />
-          </div>
-          <div className="context-section" data-testid="opl-input-files-list">
-            <h3>{settings.locale === "zh" ? "输入文件" : "Input files"}</h3>
-            {sidebarSources.length ? sidebarSources.map((source) => <div className="context-ref-row" key={source.id}><strong>{source.label}</strong><span>{source.summary}</span></div>) : <p className="context-empty">{settings.locale === "zh" ? "暂无输入文件" : "No input files"}</p>}
-          </div>
-          <div className="context-section" data-testid="opl-artifact-preview-tabs">
-            <h3>{settings.locale === "zh" ? "结果" : "Results"}</h3>
-          <div role="tablist" aria-label="Artifact previews">
-            {previewItems.slice(0, 3).map((preview) => (
-              <button
-                key={preview.id}
-                role="tab"
-                aria-selected={preview.id === selectedPreview?.id}
-                data-testid="opl-artifact-preview-tab"
-                type="button"
-                onClick={() => setSelectedPreviewId(preview.id)}
-              >
-                {preview.title}
-              </button>
-            ))}
-          </div>
-          <div
-            role="tabpanel"
-            data-testid="opl-artifact-preview-panel"
-            className="artifact-preview"
-            data-preview-kind={selectedPreview?.rendererModuleId}
-          >
-            {selectedPreview ? (
-              <>
-                <span data-testid="opl-selected-artifact-preview" hidden />
-                <ArtifactPreviewCard preview={selectedPreview} />
-              </>
-            ) : <p className="context-empty">{settings.locale === "zh" ? "暂无产物" : "No artifacts"}</p>}
-          </div>
-          {selectedPreview && exportAction ? <button data-testid="opl-export-action" type="button" onClick={() => runDryRun(exportAction.id, { source: "artifact-panel" })}><Download aria-hidden="true" size={14} /><span data-testid="opl-export-action-dry-run">{t.previewExport}</span></button> : null}
-          {lastDryRun ? <output data-testid="opl-runtime-action-receipt">{lastDryRun}</output> : null}
-          </div>
+          ) : null}
+          {activeFilesView === "inputs" ? (
+            <div className="opl-files-list" data-testid="opl-input-files-list">
+              {sidebarSources.length ? sidebarSources.map((source) => <div className="context-ref-row" key={source.id}><strong>{source.label}</strong><span>{source.summary}</span></div>) : <p className="context-empty">{settings.locale === "zh" ? "暂无输入文件" : "No input files"}</p>}
+            </div>
+          ) : null}
+          {activeFilesView === "results" ? (
+            <div className="opl-files-results" data-testid="opl-artifact-preview-tabs">
+              {artifactPreviewOpen && selectedPreview ? (
+                <>
+                  <header className="opl-files-drilldown-header">
+                    <button type="button" aria-label={settings.locale === "zh" ? "返回结果列表" : "Back to results"} title={settings.locale === "zh" ? "返回结果列表" : "Back to results"} onClick={() => setArtifactPreviewOpen(false)}><ChevronLeft aria-hidden="true" size={16} /></button>
+                    <strong>{selectedPreview.title}</strong>
+                  </header>
+                  <div role="region" aria-label={selectedPreview.title} data-testid="opl-artifact-preview-panel" className="artifact-preview" data-preview-kind={selectedPreview.rendererModuleId}>
+                    <span data-testid="opl-selected-artifact-preview" hidden />
+                    <ArtifactPreviewCard preview={selectedPreview} />
+                  </div>
+                  {exportAction ? <button data-testid="opl-export-action" type="button" onClick={() => runDryRun(exportAction.id, { source: "artifact-panel" })}><Download aria-hidden="true" size={14} /><span data-testid="opl-export-action-dry-run">{t.previewExport}</span></button> : null}
+                </>
+              ) : (
+                <div className="opl-file-result-list">
+                  {previewItems.length ? previewItems.map((preview) => (
+                    <button
+                      key={preview.id}
+                      data-testid="opl-artifact-preview-tab"
+                      type="button"
+                      onClick={() => { setSelectedPreviewId(preview.id); setArtifactPreviewOpen(true); }}
+                    ><FileText aria-hidden="true" size={15} /><span><strong>{preview.title}</strong><small>{preview.previewKind}</small></span><ArrowRight aria-hidden="true" size={14} /></button>
+                  )) : <p className="context-empty">{settings.locale === "zh" ? "暂无产物" : "No artifacts"}</p>}
+                </div>
+              )}
+              {lastDryRun ? <output data-testid="opl-runtime-action-receipt">{lastDryRun}</output> : null}
+            </div>
+          ) : null}
         </section>
         <section data-testid="opl-agents-capabilities-panel" className="context-block" aria-label="Agents and capabilities" hidden={activeContextTab !== "opl-agents-capabilities-panel"}>
           <div className="context-list-head">

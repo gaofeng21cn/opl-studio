@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, File, Folder, LoaderCircle, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, File, Folder, LoaderCircle, Search } from "lucide-react";
 import type {
   ThreadWorkspaceEntry,
   ThreadWorkspaceFile,
@@ -20,11 +20,11 @@ function parentPath(relativePath: string): string {
   return boundary < 0 ? "" : relativePath.slice(0, boundary);
 }
 
-function entriesForDirectory(
-  listings: ReadonlyMap<string, ThreadWorkspaceListing>,
-  relativePath: string
-): readonly ThreadWorkspaceEntry[] {
-  return listings.get(relativePath)?.entries ?? [];
+function fileSize(sizeBytes?: number): string {
+  if (sizeBytes === undefined) return "";
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${Math.round(sizeBytes / 1024)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function WorkspaceFilesPanel({
@@ -35,8 +35,7 @@ export function WorkspaceFilesPanel({
   searchWorkspace
 }: WorkspaceFilesPanelProps) {
   const [listings, setListings] = useState<Map<string, ThreadWorkspaceListing>>(() => new Map());
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [selectedPath, setSelectedPath] = useState("");
+  const [currentDirectory, setCurrentDirectory] = useState("");
   const [preview, setPreview] = useState<ThreadWorkspaceFile | null>(null);
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ThreadWorkspaceSearch | null>(null);
@@ -45,8 +44,7 @@ export function WorkspaceFilesPanel({
 
   useEffect(() => {
     setListings(new Map());
-    setExpanded(new Set());
-    setSelectedPath("");
+    setCurrentDirectory("");
     setPreview(null);
     setQuery("");
     setSearchResult(null);
@@ -97,20 +95,23 @@ export function WorkspaceFilesPanel({
         search: "快速打开文件",
         empty: "当前对话没有可浏览的工作区。",
         noMatches: "没有匹配的文件",
-        previewEmpty: "选择文本文件以预览",
-        truncated: "结果已达到显示上限"
+        truncated: "结果已达到显示上限",
+        workspace: "工作区",
+        back: "返回上一级",
+        backToFiles: "返回文件列表"
       }
     : {
         search: "Quick open a file",
         empty: "This task has no browsable workspace.",
         noMatches: "No matching files",
-        previewEmpty: "Select a text file to preview",
-        truncated: "Results reached the display limit"
+        truncated: "Results reached the display limit",
+        workspace: "Workspace",
+        back: "Back one level",
+        backToFiles: "Back to files"
       };
 
   async function openFile(entry: ThreadWorkspaceEntry) {
     if (!threadId || entry.kind !== "file") return;
-    setSelectedPath(entry.relativePath);
     setError("");
     setLoadingPath(entry.relativePath);
     try {
@@ -123,23 +124,20 @@ export function WorkspaceFilesPanel({
     }
   }
 
-  async function toggleDirectory(entry: ThreadWorkspaceEntry) {
+  async function openDirectory(entry: ThreadWorkspaceEntry) {
     if (!threadId || entry.kind !== "directory") return;
-    if (expanded.has(entry.relativePath)) {
-      setExpanded((current) => {
-        const next = new Set(current);
-        next.delete(entry.relativePath);
-        return next;
-      });
+    setPreview(null);
+    setQuery("");
+    setError("");
+    if (listings.has(entry.relativePath)) {
+      setCurrentDirectory(entry.relativePath);
       return;
     }
-    setExpanded((current) => new Set(current).add(entry.relativePath));
-    if (listings.has(entry.relativePath)) return;
     setLoadingPath(entry.relativePath);
-    setError("");
     try {
       const listing = await listWorkspace({ threadId, relativePath: entry.relativePath });
       setListings((current) => new Map(current).set(entry.relativePath, listing));
+      setCurrentDirectory(entry.relativePath);
     } catch (reason) {
       setError(String(reason instanceof Error ? reason.message : reason));
     } finally {
@@ -147,63 +145,55 @@ export function WorkspaceFilesPanel({
     }
   }
 
-  function renderEntries(relativePath: string, depth: number) {
-    return entriesForDirectory(listings, relativePath).map((entry) => {
-      const isDirectory = entry.kind === "directory";
-      const isExpanded = isDirectory && expanded.has(entry.relativePath);
-      return (
-        <div key={entry.relativePath}>
-          <button
-            className="workspace-file-row"
-            data-selected={selectedPath === entry.relativePath || undefined}
-            type="button"
-            style={{ paddingInlineStart: `${8 + depth * 16}px` }}
-            onClick={() => isDirectory ? void toggleDirectory(entry) : void openFile(entry)}
-            disabled={entry.kind === "symlink"}
-            title={entry.relativePath}
-          >
-            {isDirectory
-              ? (isExpanded ? <ChevronDown aria-hidden="true" size={13} /> : <ChevronRight aria-hidden="true" size={13} />)
-              : <span className="workspace-file-indent" />}
-            {isDirectory ? <Folder aria-hidden="true" size={14} /> : <File aria-hidden="true" size={14} />}
-            <span>{entry.name}</span>
-            {loadingPath === entry.relativePath ? <LoaderCircle className="spin" aria-hidden="true" size={12} /> : null}
-          </button>
-          {isExpanded ? renderEntries(entry.relativePath, depth + 1) : null}
-        </div>
-      );
-    });
-  }
-
+  const currentEntries = listings.get(currentDirectory)?.entries ?? [];
   const visibleSearchEntries = useMemo(() => searchResult?.entries ?? [], [searchResult]);
 
   if (!threadId) return <p className="context-empty">{copy.empty}</p>;
 
   return (
     <section className="workspace-files" data-testid="opl-thread-workspace-files">
-      <label className="workspace-file-search">
-        <Search aria-hidden="true" size={14} />
-        <input value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={copy.search} />
-        {loadingPath === "search" ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : null}
-      </label>
-      {error ? <p className="workspace-file-error" role="alert">{error}</p> : null}
-      <div className="workspace-file-layout">
-        <div className="workspace-file-tree" role="tree" aria-label={copy.search}>
-          {query.trim()
-            ? visibleSearchEntries.map((entry) => (
-                <button key={entry.relativePath} className="workspace-file-search-result" type="button" onClick={() => entry.kind === "file" ? void openFile(entry) : void toggleDirectory(entry)}>
-                  {entry.kind === "directory" ? <Folder aria-hidden="true" size={14} /> : <File aria-hidden="true" size={14} />}
-                  <span><strong>{entry.name}</strong><small>{parentPath(entry.relativePath)}</small></span>
-                </button>
-              ))
-            : renderEntries("", 0)}
-          {query.trim() && searchResult && !visibleSearchEntries.length ? <p className="context-empty">{copy.noMatches}</p> : null}
-          {searchResult?.truncated ? <p className="context-empty">{copy.truncated}</p> : null}
-        </div>
+      {preview ? (
         <div className="workspace-file-preview" data-testid="opl-thread-workspace-preview">
-          {preview ? <><header><File aria-hidden="true" size={14} /><strong>{preview.name}</strong></header><pre>{preview.content}</pre></> : <p className="context-empty">{copy.previewEmpty}</p>}
+          <header>
+            <button type="button" aria-label={copy.backToFiles} title={copy.backToFiles} onClick={() => setPreview(null)}><ChevronLeft aria-hidden="true" size={16} /></button>
+            <File aria-hidden="true" size={14} />
+            <strong>{preview.name}</strong>
+            <small>{fileSize(preview.sizeBytes)}</small>
+          </header>
+          <pre>{preview.content}</pre>
         </div>
-      </div>
+      ) : (
+        <>
+          <header className="workspace-file-directory-head">
+            {currentDirectory ? <button type="button" aria-label={copy.back} title={copy.back} onClick={() => setCurrentDirectory(parentPath(currentDirectory))}><ChevronLeft aria-hidden="true" size={16} /></button> : <Folder aria-hidden="true" size={15} />}
+            <strong>{currentDirectory ? currentDirectory.split("/").at(-1) : copy.workspace}</strong>
+          </header>
+          <label className="workspace-file-search">
+            <Search aria-hidden="true" size={14} />
+            <input value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={copy.search} />
+            {loadingPath === "search" ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : null}
+          </label>
+          {error ? <p className="workspace-file-error" role="alert">{error}</p> : null}
+          <div className="workspace-file-list">
+            {(query.trim() ? visibleSearchEntries : currentEntries).map((entry) => (
+              <button
+                key={entry.relativePath}
+                className="workspace-file-row"
+                type="button"
+                onClick={() => entry.kind === "directory" ? void openDirectory(entry) : void openFile(entry)}
+                disabled={entry.kind === "symlink"}
+                title={entry.relativePath}
+              >
+                {entry.kind === "directory" ? <Folder aria-hidden="true" size={15} /> : <File aria-hidden="true" size={15} />}
+                <span><strong>{entry.name}</strong>{query.trim() ? <small>{parentPath(entry.relativePath)}</small> : null}</span>
+                {loadingPath === entry.relativePath ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : entry.kind === "directory" ? <ChevronRight aria-hidden="true" size={14} /> : entry.sizeBytes !== undefined ? <small>{fileSize(entry.sizeBytes)}</small> : null}
+              </button>
+            ))}
+            {query.trim() && searchResult && !visibleSearchEntries.length ? <p className="context-empty">{copy.noMatches}</p> : null}
+            {searchResult?.truncated ? <p className="context-empty">{copy.truncated}</p> : null}
+          </div>
+        </>
+      )}
     </section>
   );
 }

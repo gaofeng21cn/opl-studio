@@ -558,11 +558,19 @@ test("search, composer attachments, and Agent permissions route to real renderer
 test("DSH details tools project the current OPL project and a contained read-only workspace", () => {
   assert.match(clientCordis, /OPL_STUDIO_DETAIL_TABS/);
   assert.match(clientCordis, /项目进度/);
-  assert.match(slotHost, /data-testid="opl-detail-tool-shortcuts"/);
-  assert.match(slotHost, /data-detail-tab=\{tab\.id\}/);
+  assert.match(slotHost, /data-testid="opl-context-inspector-trigger"/);
+  assert.match(slotHost, /<Menu[\s\S]*items=\{detailMenuItems\}[\s\S]*studio\.openDetailTab\(tab\.id\)/);
+  assert.match(slotHost, /data-testid="opl-context-inspector"/);
+  assert.match(slotHost, /data-testid="opl-context-tabs"/);
   assert.match(slotHost, /studio\.openDetailTab\(tab\.id\)/);
-  assert.match(slotHost, /className="opl-dsh-details-close"/);
-  assert.match(adapterStyles, /\.opl-detail-tool-shortcuts \{[^}]*position: absolute;[^}]*top: 34px;[^}]*right: 16px;/s);
+  assert.match(slotHost, /function DetailsSlot\(\): null \{ return null; \}/);
+  assert.doesNotMatch(slotHost, /DetailToolShortcuts/);
+  assert.match(adapterStyles, /\.opl-context-inspector-trigger-wrap \{[^}]*position: absolute;[^}]*top: 34px;[^}]*right: 16px;/s);
+  assert.match(adapterStyles, /\.opl-context-inspector \{[^}]*position: absolute;[^}]*width: clamp\(340px, 29vw, 420px\);/s);
+  assert.match(adapterStyles, /\.opl-context-inspector-tabs > button \{[^}]*height: 36px;/s);
+  assert.match(adapterStyles, /\.opl-dsh-thread \{[^}]*flex: 1 0 auto;/s);
+  assert.match(adapterStyles, /\.opl-studio-dsh-root\[data-inspector-open="true"\] > :first-child \{[^}]*padding-right: clamp\(356px, calc\(29vw \+ 16px\), 436px\);/s);
+  assert.doesNotMatch(adapterStyles, /data-inspector-open="true"\][^{]*\.opl-dsh-conversation-shell \{[^}]*padding-right:/s);
   assert.match(app, /const projectProgressWorkspace = currentSession\?\.workspace/);
   assert.match(app, /\?\? \(codexThreadId \? "" : selectedProject\?\.workspace \?\? ""\)/);
   assert.match(app, /selectProjectProgress\(projectProgressWorkspace/);
@@ -581,6 +589,13 @@ test("DSH details tools project the current OPL project and a contained read-onl
     assert.ok(webTransport.includes(route), `missing WebUI workspace route ${route}`);
   }
   assert.match(workspaceFilesPanel, /relativePath/);
+  assert.match(app, /className="opl-files-section-nav"/);
+  assert.match(app, /setActiveFilesView\("workspace"\)/);
+  assert.match(app, /setArtifactPreviewOpen\(true\)/);
+  assert.match(workspaceFilesPanel, /className="workspace-file-directory-head"/);
+  assert.match(workspaceFilesPanel, /setCurrentDirectory\(parentPath\(currentDirectory\)\)/);
+  assert.match(workspaceFilesPanel, /setPreview\(null\)/);
+  assert.doesNotMatch(workspaceFilesPanel, /workspace-file-layout|renderEntries|expanded/);
   assert.doesNotMatch(workspaceFilesPanel, /rename|writeFile|git status|terminal/i);
 });
 
@@ -723,7 +738,7 @@ test("primary canvas hides its scrollbar without disabling scrolling", () => {
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.composer-palette \{[^}]*position: fixed;[^}]*inset: 54px 0 0 56px;/s);
 });
 
-test("DSH AppFrame owns bounded sidebar/details resize and responsive collapse", () => {
+test("DSH AppFrame keeps its upstream layout contract while Studio's inspector stays off the details track", () => {
   assert.match(appFrame, /computeColumns\(viewport, sidebarPreference/);
   assert.match(appFrame, /const narrow = viewport < SIDEBAR_AUTO_COLLAPSE/);
   assert.match(appFrame, /actions\.setSidebar\(sidebarBase\.current \+ dx\)/);
@@ -732,6 +747,10 @@ test("DSH AppFrame owns bounded sidebar/details resize and responsive collapse",
   assert.match(appFrame, /<DragHandle side="details"/);
   assert.match(appFrameStyles, /grid-template-rows: 100%/);
   assert.match(appFrameStyles, /transition: grid-template-columns/);
+  assert.match(slotHost, /useState\(\{ sidebar: 280, details: 0, narrow: false, narrowExpanded: false \}\)/);
+  assert.match(slotHost, /setDetails: \(\) => undefined/);
+  assert.match(slotHost, /openDetails: \(\) => setInspectorOpen\(true\)/);
+  assert.match(slotHost, /data-inspector-open=\{inspectorOpen \|\| undefined\}/);
   assert.doesNotMatch(app, /data-testid="opl-sidebar-resizer"/);
 });
 
@@ -752,11 +771,15 @@ test("OPL overlays and DSH resize handles expose complete keyboard accessibility
     "composer must capture the trigger before moving focus to search"
   );
 
-  assert.match(slotHost, /className="opl-mobile-details-overlay"\s*role="dialog"\s*aria-modal="true"\s*aria-labelledby=/);
+  assert.match(slotHost, /className="opl-context-inspector"/);
+  assert.match(slotHost, /role=\{studio\.narrow \? "dialog" : "complementary"\}/);
+  assert.match(slotHost, /aria-modal=\{studio\.narrow \|\| undefined\}/);
+  assert.match(slotHost, /if \(!studio\.narrow \|\| event\.key !== "Tab"\) return/);
   assert.match(slotHost, /className=\{wide \? undefined : "visually-hidden"\}/);
   assert.match(slotHost, /focusableElements\(detailsDialogRef\.current\)/);
   assert.match(slotHost, /closeButtonRef\.current\?\.focus/);
-  assert.match(slotHost, /previousFocus\.focus\(\)/);
+  assert.match(slotHost, /previousFocus !== document\.body && previousFocus\?\.isConnected/);
+  assert.match(slotHost, /opl-context-inspector-trigger/);
 
   assert.match(slotHost, /function useSettingsDialogFocus/);
   assert.match(slotHost, /document\.addEventListener\("keydown", trapFocus, true\)/);
@@ -770,7 +793,7 @@ test("OPL overlays and DSH resize handles expose complete keyboard accessibility
   assert.match(slotHost, /event\.key === "ArrowLeft"/);
   assert.match(slotHost, /event\.key === "ArrowRight"/);
   assert.match(slotHost, /actions\.setSidebar/);
-  assert.match(slotHost, /actions\.setDetails/);
+  assert.doesNotMatch(slotHost, /actions\.setDetails/);
   assert.doesNotMatch(appFrame, /role="separator"|aria-valuenow|onKeyDown/);
   for (const source of [settingsPanel, composerPalette, slotHost]) assert.match(source, /getClientRects\(\)\.length > 0/);
 });

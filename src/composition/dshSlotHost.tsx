@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, Puzzle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, PanelRight, Puzzle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { Menu, OnboardingSurface, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   SlotCore,
@@ -193,27 +193,28 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
 
 function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; renderSlot: any }) {
   const [panels, setPanels] = useState({ sidebar: 280, details: 0, narrow: false, narrowExpanded: false });
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const frameRootRef = useRef<HTMLElement | null>(null);
   const actions = useMemo(() => ({
     setSidebar: (px: number) => setPanels((current) => ({ ...current, sidebar: Math.min(420, Math.max(264, px)) })),
-    setDetails: (px: number) => setPanels((current) => ({ ...current, details: Math.min(520, Math.max(300, px)) })),
+    setDetails: () => undefined,
     toggleSidebar: () => setPanels((current) => current.narrow ? { ...current, narrowExpanded: !current.narrowExpanded } : { ...current, sidebar: current.sidebar === 0 ? 280 : 0 }),
     setNarrow: (narrow: boolean) => setPanels((current) => current.narrow === narrow ? current : { ...current, narrow, narrowExpanded: false }),
-    openDetails: () => setPanels((current) => ({ ...current, details: current.details || 360 })),
-    closeDetails: () => setPanels((current) => ({ ...current, details: 0 }))
+    openDetails: () => setInspectorOpen(true),
+    closeDetails: () => setInspectorOpen(false)
   }), []);
   const sessions = { phase: "ready", current: "opl-current", byId: { "opl-current": { blank: false, cwd: surface.workspacePath } } };
   const value = useMemo(() => ({
     ...surface,
     narrow: panels.narrow,
-    detailsOpen: panels.details > 0,
+    detailsOpen: inspectorOpen,
     openPrimaryView: (view: OplStudioSurface["primaryView"]) => {
       if (view === "runtime") actions.closeDetails();
       surface.openPrimaryView(view);
     },
     toggleSidebar: actions.toggleSidebar,
     closeDetails: actions.closeDetails
-  }), [actions, panels.details, panels.narrow, surface]);
+  }), [actions, inspectorOpen, panels.narrow, surface]);
   const lastDetailsRequest = useRef(surface.detailsRequestRevision);
   useEffect(() => {
     if (lastDetailsRequest.current === surface.detailsRequestRevision) return;
@@ -225,19 +226,14 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
     if (!root) return;
     const frame = root.firstElementChild;
     if (!(frame instanceof HTMLElement)) return;
-    const handles = Array.from(frame.children).filter((child): child is HTMLElement =>
-      child instanceof HTMLElement && (child.dataset.side === "sidebar" || child.dataset.side === "details")
-    );
+    const handles = Array.from(frame.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.dataset.side === "sidebar");
     const cleanups = handles.map((handle) => {
-      const side = handle.dataset.side === "details" ? "details" : "sidebar";
-      const min = side === "sidebar" ? 264 : 300;
-      const max = side === "sidebar" ? 420 : 520;
-      const value = side === "sidebar" ? panels.sidebar : panels.details;
+      const min = 264;
+      const max = 420;
+      const value = panels.sidebar;
       handle.setAttribute("role", "separator");
       handle.setAttribute("aria-orientation", "vertical");
-      handle.setAttribute("aria-label", surface.locale === "zh"
-        ? (side === "sidebar" ? "调整项目侧栏宽度" : "调整任务详情宽度")
-        : (side === "sidebar" ? "Resize project sidebar" : "Resize task details"));
+      handle.setAttribute("aria-label", surface.locale === "zh" ? "调整项目侧栏宽度" : "Resize project sidebar");
       handle.setAttribute("aria-valuemin", String(min));
       handle.setAttribute("aria-valuemax", String(max));
       handle.setAttribute("aria-valuenow", String(value));
@@ -247,21 +243,20 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
         let next: number | null = null;
         if (event.key === "Home") next = min;
         else if (event.key === "End") next = max;
-        else if (event.key === "ArrowLeft") next = value + (side === "details" ? 16 : -16);
-        else if (event.key === "ArrowRight") next = value + (side === "details" ? -16 : 16);
+        else if (event.key === "ArrowLeft") next = value - 16;
+        else if (event.key === "ArrowRight") next = value + 16;
         if (next === null) return;
         event.preventDefault();
-        if (side === "sidebar") actions.setSidebar(next);
-        else actions.setDetails(next);
+        actions.setSidebar(next);
       };
       handle.addEventListener("keydown", onKeyDown);
       return () => handle.removeEventListener("keydown", onKeyDown);
     });
     return () => cleanups.forEach((cleanup) => cleanup());
-  }, [actions, panels.details, panels.narrow, panels.sidebar, surface.locale]);
+  }, [actions, panels.narrow, panels.sidebar, surface.locale]);
   return (
     <StudioContext.Provider value={value}>
-      <main ref={frameRootRef} data-testid="opl-studio-root" className="opl-studio-dsh-root codex-sidebar-chat with-rail without-inspector">
+      <main ref={frameRootRef} data-testid="opl-studio-root" data-inspector-open={inspectorOpen || undefined} className="opl-studio-dsh-root codex-sidebar-chat with-rail without-inspector">
         <AppFrame
           useStore={(selector: (state: typeof panels) => unknown) => selector(panels)}
           useSessions={(selector: (state: typeof sessions) => unknown) => selector(sessions)}
@@ -479,28 +474,7 @@ function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const input = { draft: studio.prompt, imageIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
   return <div className="opl-dsh-conversation-shell">
     <ConversationRoot sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />
-    <DetailToolShortcuts />
   </div>;
-}
-
-function DetailToolShortcuts() {
-  const studio = useStudio();
-  return <nav className="opl-detail-tool-shortcuts" data-testid="opl-detail-tool-shortcuts" aria-label={studio.locale === "zh" ? "任务详情快捷入口" : "Task detail shortcuts"}>
-    {[...studio.detailTabs].sort((left, right) => left.order - right.order).map((tab) => {
-      const label = tab.labels[studio.locale];
-      return <button
-        key={tab.id}
-        type="button"
-        data-detail-tab={tab.id}
-        data-active={studio.detailsOpen && studio.activeDetailTabId === tab.id || undefined}
-        aria-label={label}
-        title={label}
-        onClick={() => studio.openDetailTab(tab.id)}
-      >
-        {tab.icon === "progress" ? <Activity aria-hidden="true" size={16} /> : tab.icon === "files" ? <Files aria-hidden="true" size={16} /> : <Puzzle aria-hidden="true" size={16} />}
-      </button>;
-    })}
-  </nav>;
 }
 
 function ConversationHeaderSlot(): null { return null; }
@@ -629,37 +603,71 @@ function QueueDockSlot() {
   />;
 }
 
-function DetailsSlot() {
-  const studio = useStudio();
-  if (studio.narrow) return null;
-  return <div className="opl-dsh-details">
-    <button className="opl-dsh-details-close" type="button" aria-label={studio.locale === "zh" ? "关闭任务详情" : "Close task details"} title={studio.locale === "zh" ? "关闭任务详情" : "Close task details"} onClick={studio.closeDetails}><X aria-hidden="true" size={16} /></button>
-    {studio.details}
-  </div>;
-}
+function DetailsSlot(): null { return null; }
 
 function ShellOverlaySlot() {
   const studio = useStudio();
+  const [menuOpen, setMenuOpen] = useState(false);
   const detailsDialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const detailsOpen = studio.narrow && studio.detailsOpen;
+  const detailsOpen = studio.primaryView === "conversation" && studio.detailsOpen;
+  const detailTabs = useMemo(() => [...studio.detailTabs].sort((left, right) => left.order - right.order), [studio.detailTabs]);
+  const detailMenuItems: MenuEntry[] = detailTabs.map((tab) => ({
+    id: tab.id,
+    label: tab.labels[studio.locale],
+    icon: tab.icon === "progress" ? <Activity aria-hidden="true" size={16} /> : tab.icon === "files" ? <Files aria-hidden="true" size={16} /> : <Puzzle aria-hidden="true" size={16} />
+  }));
   useEffect(() => {
     if (!detailsOpen) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeButtonRef.current?.focus({ preventScroll: true });
     return () => {
-      if (previousFocus?.isConnected) previousFocus.focus();
+      requestAnimationFrame(() => {
+        if (previousFocus !== document.body && previousFocus?.isConnected) previousFocus.focus();
+        else document.querySelector<HTMLButtonElement>('[data-testid="opl-context-inspector-trigger"]')?.focus();
+      });
     };
   }, [detailsOpen]);
   return <>
     {studio.overlay}
+    {studio.primaryView === "conversation" && !detailsOpen ? (
+      <div className="opl-context-inspector-trigger-wrap">
+        <Menu
+          open={menuOpen}
+          portal
+          align="end"
+          side="bottom"
+          compact
+          items={detailMenuItems}
+          selectedId={studio.activeDetailTabId}
+          onClose={() => setMenuOpen(false)}
+          onSelect={(id) => {
+            setMenuOpen(false);
+            const tab = detailTabs.find((candidate) => candidate.id === id);
+            if (tab) studio.openDetailTab(tab.id);
+          }}
+          anchor={<button
+            type="button"
+            className="opl-context-inspector-trigger"
+            data-testid="opl-context-inspector-trigger"
+            aria-label={studio.locale === "zh" ? "打开任务详情" : "Open task details"}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            title={studio.locale === "zh" ? "任务详情" : "Task details"}
+            onClick={() => setMenuOpen((open) => !open)}
+          ><PanelRight aria-hidden="true" size={16} /><span>{studio.locale === "zh" ? "任务详情" : "Task details"}</span><ChevronDown aria-hidden="true" size={14} /></button>}
+        />
+      </div>
+    ) : null}
     {detailsOpen ? (
       <section
         ref={detailsDialogRef}
-        className="opl-mobile-details-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="opl-mobile-details-title"
+        className="opl-context-inspector"
+        data-testid="opl-context-inspector"
+        data-narrow={studio.narrow || undefined}
+        role={studio.narrow ? "dialog" : "complementary"}
+        aria-modal={studio.narrow || undefined}
+        aria-labelledby="opl-context-inspector-title"
         tabIndex={-1}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
@@ -668,7 +676,7 @@ function ShellOverlaySlot() {
             studio.closeDetails();
             return;
           }
-          if (event.key !== "Tab") return;
+          if (!studio.narrow || event.key !== "Tab") return;
           const focusable = focusableElements(detailsDialogRef.current);
           if (focusable.length === 0) {
             event.preventDefault();
@@ -690,10 +698,18 @@ function ShellOverlaySlot() {
         }}
       >
         <header>
-          <strong id="opl-mobile-details-title">{studio.locale === "zh" ? "任务详情" : "Task details"}</strong>
-          <button ref={closeButtonRef} type="button" aria-label={studio.locale === "zh" ? "关闭详情" : "Close details"} onClick={studio.closeDetails}><X aria-hidden="true" size={18} /></button>
+          <strong id="opl-context-inspector-title" className="visually-hidden">{studio.locale === "zh" ? "任务详情" : "Task details"}</strong>
+          <nav className="opl-context-inspector-tabs" data-testid="opl-context-tabs" aria-label={studio.locale === "zh" ? "任务详情分区" : "Task detail sections"}>
+            {detailTabs.map((tab) => (
+              <button key={tab.id} type="button" data-active={studio.activeDetailTabId === tab.id || undefined} aria-label={tab.labels[studio.locale]} onClick={() => studio.openDetailTab(tab.id)}>
+                {tab.icon === "progress" ? <Activity aria-hidden="true" size={15} /> : tab.icon === "files" ? <Files aria-hidden="true" size={15} /> : <Puzzle aria-hidden="true" size={15} />}
+                <span>{tab.labels[studio.locale]}</span>
+              </button>
+            ))}
+          </nav>
+          <button ref={closeButtonRef} className="opl-context-inspector-close" type="button" aria-label={studio.locale === "zh" ? "关闭详情" : "Close details"} title={studio.locale === "zh" ? "关闭详情" : "Close details"} onClick={studio.closeDetails}><X aria-hidden="true" size={16} /></button>
         </header>
-        <div className="opl-mobile-details-body">{studio.details}</div>
+        <div className="opl-context-inspector-body">{studio.details}</div>
       </section>
     ) : null}
   </>;
