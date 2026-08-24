@@ -47,7 +47,6 @@ export type OplStudioSurface = {
     selection: AgentPackageSelectionIntent | null;
   }>;
   selectedAgentPresetId: string;
-  conversationHeader: ReactNode;
   conversationBody: ReactNode;
   primaryView: OplStudioPrimaryView;
   runtimeOverview: ReactNode;

@@ -160,6 +160,8 @@ The minimum installed pass verifies all of the following from
 
 - the Electron main process, sandboxed renderer, pinned DSH Host plugins, and
   persistent `codex app-server --stdio` child start from packaged resources;
+- desktop shows no OPL pseudo-logo or custom conversation header, retains DSH's
+  native hero/timeline placement, and exposes a top drag region before mount;
 - App-owned Settings placement shows `service_status` under Installed Services,
   keeps raw technical data collapsed until explicitly opened, and keeps
   `activity_log` absent from ordinary Settings;

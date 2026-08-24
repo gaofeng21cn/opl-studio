@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Folder, LoaderCircle, PanelRight, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Folder, LoaderCircle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { Menu, OnboardingSurface, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   SlotCore,
@@ -151,7 +151,6 @@ type StudioContextValue = OplStudioSurface & {
   narrow: boolean;
   detailsOpen: boolean;
   toggleSidebar(): void;
-  toggleDetails(): void;
   closeDetails(): void;
 };
 
@@ -213,7 +212,6 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
       surface.openPrimaryView(view);
     },
     toggleSidebar: actions.toggleSidebar,
-    toggleDetails: () => setPanels((current) => ({ ...current, details: current.details === 0 ? 360 : 0 })),
     closeDetails: actions.closeDetails
   }), [actions, panels.details, panels.narrow, surface]);
   const lastDetailsRequest = useRef(surface.detailsRequestRevision);
@@ -471,32 +469,10 @@ function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   return <ConversationRoot sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />;
 }
 
-function ConversationHeaderSlot() {
-  const studio = useStudio();
-  const label = studio.locale === "zh" ? "打开详细信息" : "Open details";
-  return <div className="opl-dsh-conversation-header">{studio.conversationHeader}<button type="button" aria-label={label} title={label} onClick={studio.toggleDetails}><PanelRight aria-hidden="true" size={16} /></button></div>;
-}
+function ConversationHeaderSlot(): null { return null; }
 
 function ConversationBodySlot() { return <>{useStudio().conversationBody}</>; }
-function OplBrandMarkSlot({ size, className }: { size: number; className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={className}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: size,
-        height: size,
-        fontSize: Math.max(8, Math.round(size * 0.36)),
-        fontWeight: 700
-      }}
-    >
-      OPL
-    </span>
-  );
-}
+function OplBrandMarkSlot(): null { return null; }
 function OplBrandNameSlot() { return <>One Person Lab</>; }
 function EmptyAttachmentSlot() { return null; }
 function HeroActionsSlot() {

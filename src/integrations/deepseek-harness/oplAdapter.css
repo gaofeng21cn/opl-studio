@@ -21,11 +21,6 @@ body {
   letter-spacing: 0;
 }
 
-html[data-opl-host="desktop"] .opl-studio-dsh-root {
-  box-sizing: border-box;
-  padding-top: 28px;
-}
-
 html[data-opl-host="desktop"] .opl-studio-dsh-root::before {
   content: "";
   position: fixed;
@@ -35,6 +30,10 @@ html[data-opl-host="desktop"] .opl-studio-dsh-root::before {
   left: 80px;
   height: 28px;
   -webkit-app-region: drag;
+}
+
+html[data-opl-host="desktop"] body > [data-opl-desktop-drag] {
+  display: block;
 }
 
 button,
@@ -152,33 +151,10 @@ select {
 }
 
 .opl-studio-dsh-root svg[viewBox="0 0 182 24"],
-.opl-studio-dsh-root svg[viewBox="0 0 23.16 17.04"] {
+.opl-studio-dsh-root svg[viewBox="0 0 23.16 17.04"],
+.opl-studio-dsh-root [data-slot="sidebar.brand.mark"],
+.opl-studio-dsh-root [data-slot="conversation.hero.brand.mark"] {
   display: none;
-}
-
-.opl-studio-dsh-root [data-slot="sidebar.brand.mark"] {
-  display: none;
-}
-
-.opl-studio-dsh-root button:has([data-slot="sidebar.brand.mark"]) > svg {
-  display: inline !important;
-}
-
-.opl-studio-dsh-root div:has(> span > [data-slot="conversation.hero.brand.mark"]) {
-  grid-template-columns: auto auto;
-  column-gap: 7px;
-}
-
-.opl-studio-dsh-root div:has(> span > [data-slot="conversation.hero.brand.mark"]) > span:has(> [data-slot="conversation.hero.brand.mark"]) {
-  display: none;
-}
-
-.opl-studio-dsh-root div:has(> span > [data-slot="conversation.hero.brand.mark"]) > span:has(> [data-slot="conversation.hero.brand.mark"]) + span {
-  grid-column: 1;
-}
-
-.opl-studio-dsh-root div:has(> span > [data-slot="conversation.hero.brand.mark"]) > span:has(> [data-slot="conversation.hero.brand.mark"]) + span + span {
-  grid-column: 2;
 }
 
 .opl-studio-dsh-root button:has(> svg[viewBox="0 0 182 24"])::after {
@@ -199,55 +175,14 @@ select {
   display: inline !important;
 }
 
-.opl-dsh-conversation-header button,
 .opl-dsh-context-panel button {
   border: 0;
   background: transparent;
   color: inherit;
 }
 
-.opl-dsh-conversation-header button:hover,
 .opl-dsh-context-panel button:hover {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.opl-dsh-conversation-header {
-  flex: none;
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-}
-
-.opl-dsh-conversation-header h1 {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  margin: 0;
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 22px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.opl-dsh-conversation-header button {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border-radius: 50%;
-}
-
-.opl-dsh-conversation-header > button:last-child {
-  width: 30px;
-  padding: 0;
-  border-radius: 50%;
-  color: var(--dsw-alias-label-secondary);
 }
 
 .opl-dsh-thread {
@@ -613,6 +548,5 @@ select {
 }
 
 @media (max-width: 640px) {
-  .opl-dsh-conversation-header { padding-inline: 12px; }
   .opl-dsh-thread { width: min(100% - 24px, 748px); }
 }

@@ -69,6 +69,7 @@ release admission, and is explicitly adopted.
 | Standard Agents | `explicit_owner_readiness_enforced` | Composer separates OPL-owned `standard_agent` packages from skills/plugins/connections and preserves real Codex routes. Unknown diagnostics remain selectable, while explicit `launch_allowed=false`, `operational_ready=false`, physical absence, or non-callability reject selection |
 | Active turn | `canonical_reopen_and_steer` | Active submissions use Codex `turn/steer`, and the DSH queue remains renderer-only state. Launch confirms the terminal turn through `thread/read(includeTurns=true)`; reopening a thread restores only the canonical `activeTurnId` before steer is enabled |
 | Settings | `canonical_functional_surface_installed_preview_verified` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The installed Preview for the current cohort passed local interaction and runtime readback; later functional bytes require a new acceptance pass |
+| UI shell | `dsh_native_brand_and_drag_baseline` | Product identity is text-only `One Person Lab`; the upstream DSH mark and custom conversation header are suppressed. Desktop keeps one 28 px drag strip from boot through mounted-shell phases. This is a candidate UI baseline and does not adopt the active shell |
 | Updates | `desktop_and_headless_callers_present_owner_projection_consumed` | Electron Desktop and standalone Headless updater callers consume the Framework-owned App/Base/Packages managed-update projection. Studio preserves the compact projection and typed Flow dependency catalog through the fast Host path without adding an updater/currentness owner; Docker host-side update remains deliberately deferred rather than exposing the container runtime socket |
 | Run detail | `real_producer_consumer_e2e` | MAS has a canonical read-only producer backed by a real workspace and trajectory. Studio passes the selected resolved six-field identity into `runtime.detail`, does not invoke the producer when identity is unresolved, rejects mismatched producer identity, and renders the allowlisted result as eight structured sections |
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
@@ -118,7 +119,7 @@ the bounded summary generically. `activity_log` remains destination-null and hid
 from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; this
 is source/candidate evidence, not active-shell adoption.
 
-The current installed Preview slice is closed for Studio candidate
+The prior installed Preview slice was closed for Studio candidate
 `8497f3b9c240cc7ad28f0e90e609e2cb5732409a`. A clean App-contract-driven
 `npm run package` qualified Desktop, standalone WebUI, and Docker; the App-owned
 atomic installer then installed the isolated
@@ -129,7 +130,11 @@ Installed-runtime readback proved packaged DSH Host startup, the persistent Code
 App Server child, Fleet `service_status` summary and opt-in technical data,
 `activity_log` absence from ordinary Settings, OPL Gateway account projection, a
 completed real Codex turn, graceful process cleanup, and recovery of canonical
-thread `01a02e73-4242-70d3-8138-f7ba75545fc7` after restart. The App update
+thread `01a02e73-4242-70d3-8138-f7ba75545fc7` after restart. That acceptance is
+historical after the later UI-shell bytes. The new installed Preview cohort binds
+to `app.asar` SHA-256
+`1d29195a991abe50e6d2355d02095dbe52f9de68d2134fd10325f2962e433c13`, but its full
+live turn/restart acceptance remains open. The App update
 surface still correctly reports no configured Preview update source, Weixin is
 not connected, and OPL Link is currently unavailable; none is promoted to a
 successful live connection. This installed acceptance is candidate evidence only.

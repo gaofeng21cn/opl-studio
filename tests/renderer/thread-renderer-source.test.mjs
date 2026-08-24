@@ -26,6 +26,7 @@ const conversationStyles = read("src/vendor/deepseek-harness/packages/client/ui-
 const settingsRoot = read("src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.tsx");
 const desktopMain = read("desktop/main.mjs");
 const desktopPreload = read("desktop/preload.cjs");
+const rendererShell = read("src/renderer-shell.html");
 const hostCore = read("scripts/webui-host/host-core.mjs");
 const dshHost = read("scripts/webui-host/dsh/host.mjs");
 const dshProfile = read("scripts/webui-host/dsh/cordis.yml");
@@ -447,10 +448,18 @@ test("Web host exposes the product brand while keeping Studio as an internal cli
   assert.match(webHostTransport, /name: "opl-studio-webui"/);
   assert.match(webHostTransport, /title: "One Person Lab"/);
   assert.doesNotMatch(webHostTransport, /title: "OPL Studio WebUI"/);
-  assert.match(adapterStyles, /\[data-slot="sidebar\.brand\.mark"\] \{\s*display: none;/s);
-  assert.match(adapterStyles, /button:has\(\[data-slot="sidebar\.brand\.mark"\]\) > svg \{\s*display: inline !important;/s);
-  assert.match(adapterStyles, /conversation\.hero\.brand\.mark[^}]*grid-template-columns: auto auto/s);
-  assert.match(adapterStyles, /conversation\.hero\.brand\.mark[^}]*display: none/s);
+  assert.match(
+    adapterStyles,
+    /\[data-slot="sidebar\.brand\.mark"],\s*\n\.opl-studio-dsh-root \[data-slot="conversation\.hero\.brand\.mark"\] \{\s*display: none;/s,
+  );
+  assert.doesNotMatch(adapterStyles, /content: "OPL"/);
+});
+
+test("desktop exposes a drag region before the DSH application mounts", () => {
+  assert.match(rendererShell, /\[data-opl-desktop-drag\][^}]*position: fixed;[\s\S]*-webkit-app-region: drag/s);
+  assert.match(rendererShell, /<div data-opl-desktop-drag hidden><\/div>/);
+  assert.match(adapterStyles, /html\[data-opl-host="desktop"\] body > \[data-opl-desktop-drag\] \{\s*display: block;/s);
+  assert.doesNotMatch(adapterStyles, /padding-top: 28px/);
 });
 
 test("App update restart follows the carrier result instead of a host-name special case", () => {
@@ -550,7 +559,7 @@ test("desktop visual shell uses vendored DeepSeek Harness roots and theme tokens
     assert.ok(theme.includes(marker), `missing DeepSeek Harness visual token: ${marker}`);
   }
   assert.match(adapterStyles, /\.opl-studio-dsh-root \{/);
-  assert.match(adapterStyles, /\.opl-dsh-conversation-header \{/);
+  assert.doesNotMatch(adapterStyles, /\.opl-dsh-conversation-header \{/);
   assert.match(adapterStyles, /\.opl-dsh-context-panel \{/);
   assert.doesNotMatch(adapterStyles, /\.opl-dsh-workspace-rail|\.opl-dsh-hero-actions|composer-model-controls/);
   assert.match(adapterStyles, /letter-spacing: 0/);
@@ -622,8 +631,8 @@ test("DSH rc2 controls resolve to the complete pinned source cohort and OPL-owne
   for (const slot of ["sidebar.brand.mark", "sidebar.brand.name", "conversation.hero.brand.mark", "conversation.input.attachments"]) {
     assert.ok(slotHost.includes(`register({ name: "${slot}", registrant: "opl-studio" }`));
   }
-  assert.match(slotHost, /function OplBrandMarkSlot/);
-  assert.match(slotHost, />\s*OPL\s*<\/span>/);
+  assert.match(slotHost, /function OplBrandMarkSlot\(\): null \{ return null; \}/);
+  assert.ok(!slotHost.includes(">\n      OPL\n    </span>"));
   assert.match(slotHost, /function OplBrandNameSlot\(\) \{ return <>One Person Lab<\/>; \}/);
   assert.match(slotHost, /function EmptyAttachmentSlot\(\) \{ return null; \}/);
   assert.match(slotHost, /useHostDescription=\{\(selector: any\) => selector\(undefined\)\}/);

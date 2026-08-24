@@ -10,10 +10,19 @@
       height: 100%;
       margin: 0;
     }
+    [data-opl-desktop-drag] {
+      position: fixed;
+      inset: 0 0 auto;
+      height: 28px;
+      z-index: 2147483647;
+      -webkit-app-region: drag;
+      background: var(--dsw-alias-bg-base, #fff);
+    }
   </style>
   <title>One Person Lab</title>
 </head>
 <body>
+  <div data-opl-desktop-drag hidden></div>
   <div id="root"></div>
 </body>
 </html>

@@ -432,6 +432,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const alignment = evidence.default_home_layout?.primary_visual_reference;
   const visualStyle = evidence.default_home_layout?.visual_style_reference;
   const slotHost = read("src/composition/dshSlotHost.tsx");
+  const rendererShell = read("src/renderer-shell.html");
   const appSource = read("src/workbench/App.tsx");
   const mainSource = read("src/main.tsx");
   const themeSource = read("src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css");
@@ -495,7 +496,9 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
     assert(slotHost.includes(`register({ name: "${slot}", registrant: "opl-studio" }`), `missing rc2 OPL slot occupant ${slot}`);
   }
   assert(slotHost.includes("function OplBrandNameSlot() { return <>One Person Lab</>; }"), "rc2 brand name slot must render One Person Lab text");
-  assert(slotHost.includes("OPL\n    </span>"), "rc2 brand mark slot must render OPL text");
+  assert(slotHost.includes("function OplBrandMarkSlot(): null { return null; }"), "rc2 product identity must suppress the upstream mark without inventing an OPL logo");
+  assert(!slotHost.includes(">\n      OPL\n    </span>"), "product identity must not render OPL as a pseudo logo");
+  assert(rendererShell.includes('[data-opl-desktop-drag]') && rendererShell.includes('-webkit-app-region: drag'), "desktop shell must expose a boot-phase window drag region");
   assert(slotHost.includes("function EmptyAttachmentSlot() { return null; }"), "rc2 attachment slot must remain an empty adapter");
   assert(slotHost.includes("useHostDescription={(selector: any) => selector(undefined)}"), "workspace host description must remain unavailable without a new App ABI field");
   assert(runtimeShim.includes("export function abbreviateHomePath") && runtimeShim.includes("isWindowsStylePath"), "runtime shim must provide POSIX home abbreviation with Windows fail-open");

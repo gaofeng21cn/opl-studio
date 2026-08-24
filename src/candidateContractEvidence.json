@@ -690,7 +690,8 @@
         "on_demand_dsh_details_column",
         "settings_locale_surface",
         "text_only_opl_product_identity"
-      ]
+      ],
+      "desktop_window_drag_region": "boot_and_mounted_shell_top_strip"
     },
     "primary_visual_reference": {
       "reference_product": "DeepSeek Harness",

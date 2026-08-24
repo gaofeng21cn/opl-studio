@@ -2755,7 +2755,6 @@ export function App({
       })
     ],
     selectedAgentPresetId: selectedAgent?.packageId ?? "opl-daily-work",
-    conversationHeader: <><Folder aria-hidden="true" size={15} /><h1>{localizedSessionTitle(currentSession?.title || t.newTaskTitle, settings.locale)}</h1><button type="button" aria-label={t.conversationMenu} disabled={!currentSession} onClick={() => setThreadDetail(currentSession ?? null)}><CircleEllipsis aria-hidden="true" size={16} /></button></>,
     conversationBody: studioConversationBody,
     primaryView,
     runtimeOverview: <RuntimeOverviewPage
