@@ -558,6 +558,11 @@ test("search, composer attachments, and Agent permissions route to real renderer
 test("DSH details tools project the current OPL project and a contained read-only workspace", () => {
   assert.match(clientCordis, /OPL_STUDIO_DETAIL_TABS/);
   assert.match(clientCordis, /项目进度/);
+  assert.match(slotHost, /data-testid="opl-detail-tool-shortcuts"/);
+  assert.match(slotHost, /data-detail-tab=\{tab\.id\}/);
+  assert.match(slotHost, /studio\.openDetailTab\(tab\.id\)/);
+  assert.match(slotHost, /className="opl-dsh-details-close"/);
+  assert.match(adapterStyles, /\.opl-detail-tool-shortcuts \{[^}]*position: absolute;[^}]*top: 34px;[^}]*right: 16px;/s);
   assert.match(app, /const projectProgressWorkspace = currentSession\?\.workspace/);
   assert.match(app, /\?\? \(codexThreadId \? "" : selectedProject\?\.workspace \?\? ""\)/);
   assert.match(app, /selectProjectProgress\(projectProgressWorkspace/);

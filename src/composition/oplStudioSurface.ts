@@ -4,6 +4,7 @@ import type { AgentPackageSelectionIntent, WorkbenchProjectGroup } from "../work
 import type { ResolvedCodexModelOption } from "../workbench/modelPolicy";
 import type { OplInitializeReadback } from "../bridge/oplBridge";
 import type { OplContributionSlotOwner, OplUiContributionsProjection } from "./contributionProjection";
+import type { OplStudioDetailTab } from "./clientCordis";
 
 export type OplSetupOperationResult = {
   status: "completed" | "cancelled" | "error";
@@ -54,6 +55,9 @@ export type OplStudioSurface = {
   composerAccessory: ReactNode;
   composerOverlay: ReactNode;
   details: ReactNode;
+  detailTabs: readonly OplStudioDetailTab[];
+  activeDetailTabId: OplStudioDetailTab["id"];
+  openDetailTab(tabId: OplStudioDetailTab["id"]): void;
   renderSettings(destination: SettingsDestinationId, renderContribution?: RenderSettingsContribution): ReactNode;
   initializationStatus: "loading" | "ready" | "error";
   initialization: OplInitializeReadback | null;

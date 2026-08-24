@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Folder, LoaderCircle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, Puzzle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { Menu, OnboardingSurface, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   SlotCore,
@@ -477,7 +477,30 @@ function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { blank: studio.conversationBlank, cwd: studio.workspacePath } } };
   const workspaces = { phase: "ready", items: [{ workspaceId: "opl-workspace", title: studio.projectTitle, sessionIds: [sessionId] }] };
   const input = { draft: studio.prompt, imageIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
-  return <ConversationRoot sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />;
+  return <div className="opl-dsh-conversation-shell">
+    <ConversationRoot sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />
+    <DetailToolShortcuts />
+  </div>;
+}
+
+function DetailToolShortcuts() {
+  const studio = useStudio();
+  return <nav className="opl-detail-tool-shortcuts" data-testid="opl-detail-tool-shortcuts" aria-label={studio.locale === "zh" ? "任务详情快捷入口" : "Task detail shortcuts"}>
+    {[...studio.detailTabs].sort((left, right) => left.order - right.order).map((tab) => {
+      const label = tab.labels[studio.locale];
+      return <button
+        key={tab.id}
+        type="button"
+        data-detail-tab={tab.id}
+        data-active={studio.detailsOpen && studio.activeDetailTabId === tab.id || undefined}
+        aria-label={label}
+        title={label}
+        onClick={() => studio.openDetailTab(tab.id)}
+      >
+        {tab.icon === "progress" ? <Activity aria-hidden="true" size={16} /> : tab.icon === "files" ? <Files aria-hidden="true" size={16} /> : <Puzzle aria-hidden="true" size={16} />}
+      </button>;
+    })}
+  </nav>;
 }
 
 function ConversationHeaderSlot(): null { return null; }
@@ -609,7 +632,10 @@ function QueueDockSlot() {
 function DetailsSlot() {
   const studio = useStudio();
   if (studio.narrow) return null;
-  return <div className="opl-dsh-details">{studio.details}</div>;
+  return <div className="opl-dsh-details">
+    <button className="opl-dsh-details-close" type="button" aria-label={studio.locale === "zh" ? "关闭任务详情" : "Close task details"} title={studio.locale === "zh" ? "关闭任务详情" : "Close task details"} onClick={studio.closeDetails}><X aria-hidden="true" size={16} /></button>
+    {studio.details}
+  </div>;
 }
 
 function ShellOverlaySlot() {
