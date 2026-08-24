@@ -73,10 +73,12 @@ export function WorkspaceFilesPanel({
     }
     let active = true;
     const timer = window.setTimeout(() => {
+      setError("");
       setLoadingPath("search");
       void searchWorkspace({ threadId, query: query.trim() }).then((result) => {
         if (!active) return;
         setSearchResult(result);
+        setError("");
         setLoadingPath(null);
       }, (reason) => {
         if (!active) return;

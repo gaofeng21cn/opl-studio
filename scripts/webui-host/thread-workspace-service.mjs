@@ -400,6 +400,7 @@ export function createThreadWorkspaceService({
       }
       children.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
 
+      const directories = [];
       for (const entry of children) {
         const childRelativePath = entryRelativePath(parentRelativePath, entry.name);
         const kind = entryType(entry);
@@ -420,12 +421,16 @@ export function createThreadWorkspaceService({
           const projected = await projectDirectoryEntry(directoryPath, parentRelativePath, entry);
           if (projected) state.matches.push(projected);
         }
-        if (kind === "directory") {
-          await walk(resolved, childRelativePath);
-          if (state.scanned >= MAX_SEARCH_SCANNED_ENTRIES) {
-            state.truncated = true;
-            break;
-          }
+        if (kind === "directory") directories.push({ path: resolved, relativePath: childRelativePath });
+      }
+
+      // Match every child in the current directory before descending. A large
+      // early directory must not hide nearby files by exhausting the scan cap.
+      for (const child of directories) {
+        await walk(child.path, child.relativePath);
+        if (state.scanned >= MAX_SEARCH_SCANNED_ENTRIES) {
+          state.truncated = true;
+          break;
         }
       }
     }

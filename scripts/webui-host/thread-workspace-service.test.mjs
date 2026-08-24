@@ -172,6 +172,24 @@ test("searches recursively, ignores heavy directories, and returns relative matc
   assert.deepEqual(ignored.entries, []);
 });
 
+test("finds files beside an early directory that exhausts the recursive scan budget", async (t) => {
+  const paths = await fixture();
+  t.after(() => removeFixture(paths));
+  const noisyDirectory = path.join(paths.workspace, "000-noisy");
+  await mkdir(noisyDirectory);
+  await Promise.all(Array.from({ length: 5_000 }, (_, index) => (
+    writeFile(path.join(noisyDirectory, `entry-${String(index).padStart(4, "0")}.txt`), "x", "utf8")
+  )));
+  await writeFile(path.join(paths.workspace, "workspace.yaml"), "name: current\n", "utf8");
+
+  const { service } = serviceFor(paths.workspace);
+  const result = await service.search({ threadId: "thread-1", query: "workspace.yaml" });
+  assert.deepEqual(result.entries, [
+    { name: "workspace.yaml", relativePath: "workspace.yaml", kind: "file", sizeBytes: 14 }
+  ]);
+  assert.equal(result.truncated, true);
+});
+
 test("caps search results and marks the response truncated", async (t) => {
   const paths = await fixture();
   t.after(() => removeFixture(paths));
