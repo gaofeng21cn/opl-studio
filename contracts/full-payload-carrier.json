@@ -5,7 +5,7 @@
   "product_name": "One Person Lab Preview",
   "bundle_id": "cn.onepersonlab.opl.studio.preview",
   "standard_artifact_template": "one-person-lab-preview-${version}-${os}-${arch}.${ext}",
-  "full_artifact_template": "one-person-lab-studio-full-${version}-mac-arm64.dmg",
+  "full_artifact_template": "one-person-lab-preview-full-${version}-${arch}.dmg",
   "full_package_kind": "opl_studio_full_first_install_macos_arm64",
   "release_repository": "gaofeng21cn/opl-studio",
   "release_channel": "preview",
