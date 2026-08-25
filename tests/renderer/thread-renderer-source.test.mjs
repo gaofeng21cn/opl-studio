@@ -221,7 +221,7 @@ test("starting a new task clears the previous thread identity and errors", () =>
   assert.match(startNewChat, /setThreadActionError\(""\)/);
 });
 
-test("standard Agent selection binds only to a newly created Codex thread", async () => {
+test("standard Agent selection starts a thread or adds turn context without rebinding an existing thread", async () => {
   const requests = [];
   let threadSequence = 0;
   let turnSequence = 0;
@@ -230,6 +230,7 @@ test("standard Agent selection binds only to a newly created Codex thread", asyn
   transport.request = async (method, params) => {
     requests.push({ method, params });
     if (method === "thread/start") return { thread: { id: `thread-${++threadSequence}` } };
+    if (method === "thread/resume") return { thread: { id: params.threadId } };
     if (method === "turn/start") {
       const turnId = `turn-${++turnSequence}`;
       turnByThread.set(params.threadId, turnId);
@@ -284,6 +285,21 @@ test("standard Agent selection binds only to a newly created Codex thread", asyn
     }),
     (error) => error?.code === "invalid_request" && /cannot be rebound/.test(error.message)
   );
+
+  const existing = await transport.sendMessage({
+    prompt: "Invoke the selected Agent for this turn",
+    inputs: [],
+    threadId: first.threadId,
+    turnAgentSelection: selection
+  });
+  assert.equal(existing.threadId, first.threadId);
+  const existingTurnStart = requests.filter((request) => request.method === "turn/start").at(-1);
+  assert.deepEqual(existingTurnStart.params.additionalContext, {
+    "opl.standard_agent_selection": {
+      kind: "application",
+      value: JSON.stringify(selection)
+    }
+  });
 
   const second = await transport.sendMessage({ prompt: "Start another task", inputs: [] });
   assert.equal(second.threadId, "thread-2");
@@ -535,7 +551,9 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(app, /function openComposerPalette\(\)/);
   assert.doesNotMatch(app, /openComposerPalette\("capabilities"\)|composerPaletteMode/);
   assert.match(app, /\.\.\.pendingSelections\.map\(\(selection\) => selection\.input\)/);
-  assert.match(app, /\.\.\.\(codexThreadId \? \[\] : selectedAgentInputs\(\)\)/);
+  assert.match(app, /\.\.\.selectedAgentInputs\(\)/);
+  assert.match(app, /agentSelection: codexThreadId \? undefined : selectedAgentSnapshot\(\)/);
+  assert.match(app, /turnAgentSelection: codexThreadId \? selectedAgentSnapshot\(\) : undefined/);
   assert.match(app, /permissions: settings\.agentPermissions/);
   assert.match(app, /setComposerSelections\(pendingSelections\)/);
   assert.match(settings, /agentPermissions: ":danger-full-access"/);
@@ -927,7 +945,7 @@ test("ordinary startup waits for four truthful readiness reads before exposing t
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.startup-readiness \{/s);
 });
 
-test("composer separates OPL standard agents from Skills, connections, and other modules", () => {
+test("composer places dynamic OPL standard agents before Skills and keeps other capabilities separate", () => {
   assert.match(app, /agentPresets: \[/);
   assert.match(app, /id: "opl-daily-work"/);
   assert.match(app, /standardAgentSeatPresentationZh/);
@@ -941,7 +959,21 @@ test("composer separates OPL standard agents from Skills, connections, and other
   assert.match(app, /`\$\{formalName\} · \$\{description\}`/);
   assert.match(slotHost, /<AgentPresetSeat/);
   assert.match(slotHost, /name: "conversation\.hero\.agentPreset"/);
-  assert.doesNotMatch(composerPalette, /standardAgents|OPL 标准智能体|data-testid="opl-standard-agents"/);
+  assert.match(composerPalette, /standardAgents/);
+  assert.match(composerPalette, /data-testid="opl-standard-agents"/);
+  assert.match(composerPalette, /data-testid="opl-capability-shortcuts"/);
+  assert.match(composerPalette, /onSelectOplCapability/);
+  assert.match(composerPalette, /onSelectAgent/);
+  assert.match(composerPalette, /copy\.agents/);
+  assert.match(app, /oplCapabilityOptions/);
+  assert.match(app, /function codexSkillMatchesRef/);
+  assert.match(app, /normalizedName\.split\(\":\"\)\.at\(-1\)/);
+  assert.match(app, /item\.displayNameI18n\.zh/);
+  assert.match(app, /A package owns one shortcut/);
+  assert.match(app, /\.find\(\(candidate\): candidate is CodexSkillCapability/);
+  assert.match(composerPalette, /data-testid="opl-capability-shortcuts"/);
+  assert.match(app, /endsWith\(`:\$\{normalizedRef\}`\)/);
+  assert.match(composerPalette, /agents\.length[\s\S]*skills\.length/);
   assert.match(composerPalette, /其他模块/);
   assert.match(styles, /\.composer-palette \{[^}]*max-height: min\(520px, calc\(50dvh - 64px\)\);/s);
 });

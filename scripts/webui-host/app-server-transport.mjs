@@ -730,12 +730,13 @@ export class CodexAppServerTransport extends EventEmitter {
     });
   }
 
-  async sendMessage({ prompt, inputs, threadId, agentSelection, additionalInstructions, model, reasoningEffort, permissions = DEFAULT_PERMISSION_PROFILE, cwd }) {
+  async sendMessage({ prompt, inputs, threadId, agentSelection, turnAgentSelection, additionalInstructions, model, reasoningEffort, permissions = DEFAULT_PERMISSION_PROFILE, cwd }) {
     const workingDirectory = cwd ?? this.cwd;
     const threadPermission = threadPermissionOverrides(permissions, workingDirectory);
     const turnPermission = turnPermissionOverrides(permissions, workingDirectory);
     let activeThreadId = threadId;
     const selection = normalizeAgentSelection(agentSelection);
+    const turnSelection = normalizeAgentSelection(turnAgentSelection);
     if (activeThreadId && selection) {
       throw new AppServerTransportError("invalid_request", "An existing conversation cannot be rebound to another Agent");
     }
@@ -758,7 +759,7 @@ export class CodexAppServerTransport extends EventEmitter {
       ...turnPermission,
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { effort: reasoningEffort } : {}),
-      ...(selection ? { additionalContext: agentSelectionContext(selection) } : {})
+      ...((selection || turnSelection) ? { additionalContext: agentSelectionContext(selection || turnSelection) } : {})
     });
     const turnId = startedTurn.turn?.id;
     if (!turnId) {

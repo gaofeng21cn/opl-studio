@@ -107,6 +107,8 @@ import type { ThreadLifecycleAction } from "./threads/ThreadLifecycleConfirmatio
 import { assistantDisplayMarkdown } from "./messageDisplay";
 import {
   ComposerCapabilityPalette,
+  type ComposerAgentOption,
+  type ComposerOplCapabilityOption,
   type ComposerSelection
 } from "./ComposerCapabilityPalette";
 import {
@@ -635,6 +637,13 @@ function createIntroMessages(): ChatMessage[] {
   return [];
 }
 
+function codexSkillMatchesRef(skillName: string, skillRef: string): boolean {
+  const normalizedName = skillName.toLowerCase();
+  const normalizedRef = skillRef.toLowerCase();
+  if (normalizedName === normalizedRef || normalizedName.endsWith(`:${normalizedRef}`) || normalizedRef.endsWith(`:${normalizedName}`)) return true;
+  return normalizedName.split(":").at(-1) === normalizedRef.split(":").at(-1);
+}
+
 type ChatMessage = WorkbenchThreadMessage;
 
 type ComposerSubmitMode = "queue" | "steer";
@@ -895,6 +904,50 @@ export function App({
   const [startupGateOpen, setStartupGateOpen] = useState(false);
   const t = uiCopy[settings.locale];
   const normalizedCapabilityQuery = capabilityQuery.trim().toLowerCase();
+  const standardAgentOptions = useMemo<ComposerAgentOption[]>(() => model.packageLifecycle
+    .filter((item) => (
+      item.packageRole === "standard_agent"
+      && item.official
+      && item.readiness.selectable
+      && item.homeShortcuts.some((shortcut) => Boolean(shortcut.route))
+    ))
+    .sort((left, right) => (
+      (standardAgentSeatPresentationZh[left.packageId]?.order ?? Number.MAX_SAFE_INTEGER)
+      - (standardAgentSeatPresentationZh[right.packageId]?.order ?? Number.MAX_SAFE_INTEGER)
+      || left.label.localeCompare(right.label)
+    ))
+    .map((agent) => {
+      const description = (settings.locale === "zh" ? agent.descriptionI18n.zh : agent.descriptionI18n.en) ?? agent.description;
+      const formalName = agent.displayNameI18n.en ?? agent.label;
+      return {
+        id: agent.packageId,
+        name: settings.locale === "zh"
+          ? standardAgentSeatPresentationZh[agent.packageId]?.name ?? agent.displayNameI18n.zh ?? agent.label
+          : formalName,
+        description: settings.locale === "zh" && description
+          ? `${formalName} · ${description}`
+          : description,
+        selection: agentPackageSelectionIntent(agent)
+      };
+    }), [model.packageLifecycle, settings.locale]);
+  const oplCapabilityOptions = useMemo<ComposerOplCapabilityOption[]>(() => model.packageLifecycle
+    .filter((item) => item.official && item.packageId.startsWith("opl-") && item.packageRole !== "standard_agent")
+    .flatMap((item) => {
+      // A package owns one shortcut; its remaining required Skills stay available in the generic Skills group.
+      const skill = item.requiredSkillIds
+        .map((skillId) => capabilityCatalog.skills.find((candidate) => candidate.enabled && codexSkillMatchesRef(candidate.name, skillId)))
+        .find((candidate): candidate is CodexSkillCapability => Boolean(candidate));
+      if (!skill) return [];
+      const displayName = settings.locale === "zh"
+        ? item.displayNameI18n.zh ?? item.label
+        : item.displayNameI18n.en ?? item.label;
+      return [{
+        id: item.packageId,
+        name: displayName,
+        description: (settings.locale === "zh" ? item.descriptionI18n.zh : item.descriptionI18n.en) ?? item.description,
+        skill
+      }];
+    }), [capabilityCatalog.skills, model.packageLifecycle, settings.locale]);
   const capabilityGroups = [
     {
       id: "skills",
@@ -2121,9 +2174,9 @@ export function App({
 
   function selectedAgentInputs(): CodexComposerInput[] {
     if (!selectedAgent?.route) return [];
-    const requested = new Set([...selectedAgent.requiredSkillIds, selectedAgent.route.codexVisibleEntry].map((value) => value.toLowerCase()));
+    const requested = [...selectedAgent.requiredSkillIds, selectedAgent.route.codexVisibleEntry];
     return capabilityCatalog.skills
-      .filter((skill) => skill.enabled && requested.has(skill.name.toLowerCase()))
+      .filter((skill) => skill.enabled && requested.some((skillRef) => codexSkillMatchesRef(skill.name, skillRef)))
       .map((skill) => ({ type: "skill" as const, name: skill.name, path: skill.path }));
   }
 
@@ -2160,6 +2213,7 @@ export function App({
     setMessages(pendingMessages);
     updatePrompt("");
     setComposerSelections([]);
+    setSelectedAgent(null);
     setPendingInputFiles(pendingSelections.filter((selection) => selection.kind !== "skill").map(composerSelectionArtifact));
     setComposerPaletteOpen(false);
     setSendState("running");
@@ -2168,11 +2222,12 @@ export function App({
         prompt: text,
         inputs: [
           ...pendingSelections.map((selection) => selection.input),
-          ...(codexThreadId ? [] : selectedAgentInputs())
+          ...selectedAgentInputs()
         ].filter((input, index, inputs) => inputs.findIndex((candidate) => candidate.type === input.type && "path" in candidate && "path" in input && candidate.path === input.path) === index),
         threadId: codexThreadId,
         cwd: selectedProject?.workspace,
         agentSelection: codexThreadId ? undefined : selectedAgentSnapshot(),
+        turnAgentSelection: codexThreadId ? selectedAgentSnapshot() : undefined,
         additionalInstructions: codexThreadId ? undefined : additionalConversationInstructions,
         model: resolvedModel.id,
         reasoningEffort: resolvedReasoning,
@@ -2472,10 +2527,21 @@ export function App({
       status={capabilityStatus}
       error={capabilityError}
       selections={composerSelections}
+      standardAgents={standardAgentOptions}
+      oplCapabilities={oplCapabilityOptions}
+      selectedAgentId={selectedAgent?.packageId}
       onClose={() => setComposerPaletteOpen(false)}
       onPickFiles={() => void pickComposerFiles()}
       onPickDirectory={() => void pickComposerDirectory()}
       onToggleSkill={toggleComposerSkill}
+      onSelectOplCapability={(capability) => {
+        toggleComposerSkill(capability.skill);
+        setComposerPaletteOpen(false);
+      }}
+      onSelectAgent={(agent) => {
+        setSelectedAgent(agent.selection);
+        setComposerPaletteOpen(false);
+      }}
       contributions={hasContribution("composer.palette") ? renderContributionSlot?.("composer.palette", contributionOwner) : null}
     />
   );

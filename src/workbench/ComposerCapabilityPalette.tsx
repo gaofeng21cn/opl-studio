@@ -1,4 +1,4 @@
-import { Check, FilePlus2, FolderPlus, Plug, Search, Sparkles, X } from "lucide-react";
+import { Bot, Check, FilePlus2, FolderPlus, Plug, Search, Sparkles, X } from "lucide-react";
 import { Button, Input } from "@deepseek-ai/dsh-client-ui-primitives";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
@@ -6,6 +6,7 @@ import type {
   CodexComposerInput,
   CodexSkillCapability
 } from "../bridge/oplBridge";
+import type { AgentPackageSelectionIntent } from "./workbenchModel";
 
 function focusableElements(root: HTMLElement | null): HTMLElement[] {
   if (!root) return [];
@@ -22,6 +23,20 @@ export type ComposerSelection = {
   input: CodexComposerInput;
 };
 
+export type ComposerAgentOption = {
+  id: string;
+  name: string;
+  description: string;
+  selection: AgentPackageSelectionIntent;
+};
+
+export type ComposerOplCapabilityOption = {
+  id: string;
+  name: string;
+  description: string;
+  skill: CodexSkillCapability;
+};
+
 type ComposerCapabilityPaletteProps = {
   open: boolean;
   locale: "zh" | "en";
@@ -29,11 +44,16 @@ type ComposerCapabilityPaletteProps = {
   status: "idle" | "loading" | "ready" | "error";
   error?: string;
   selections: ComposerSelection[];
+  standardAgents: ComposerAgentOption[];
+  oplCapabilities: ComposerOplCapabilityOption[];
+  selectedAgentId?: string;
   contributions?: ReactNode;
   onClose(): void;
   onPickFiles(): void;
   onPickDirectory(): void;
   onToggleSkill(skill: CodexSkillCapability): void;
+  onSelectOplCapability(capability: ComposerOplCapabilityOption): void;
+  onSelectAgent(agent: ComposerAgentOption): void;
 };
 
 export function ComposerCapabilityPalette({
@@ -43,22 +63,29 @@ export function ComposerCapabilityPalette({
   status,
   error,
   selections,
+  standardAgents,
+  oplCapabilities,
+  selectedAgentId,
   contributions,
   onClose,
   onPickFiles,
   onPickDirectory,
-  onToggleSkill
+  onToggleSkill,
+  onSelectOplCapability,
+  onSelectAgent
 }: ComposerCapabilityPaletteProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
   const copy = locale === "zh" ? {
     title: "添加到对话",
-    search: "搜索文件、Skill 和连接",
+    search: "搜索文件、智能体、Skill 和连接",
     local: "本地输入",
     files: "添加文件",
     filesHelp: "图片和文件",
     folder: "添加文件夹",
     folderHelp: "将文件夹作为上下文",
+    agents: "OPL 智能体",
+    oplCapabilities: "OPL 能力",
     skills: "Skills",
     connections: "应用与连接",
     loaded: "已加载",
@@ -66,12 +93,14 @@ export function ComposerCapabilityPalette({
     empty: "没有匹配的能力"
   } : {
     title: "Add to conversation",
-    search: "Search files, Skills, and connections",
+    search: "Search files, Agents, Skills, and connections",
     local: "Local input",
     files: "Add files",
     filesHelp: "Images and files",
     folder: "Add folder",
     folderHelp: "Use a folder as context",
+    agents: "OPL agents",
+    oplCapabilities: "OPL capabilities",
     skills: "Skills",
     connections: "Apps and connections",
     loaded: "Loaded",
@@ -144,6 +173,14 @@ export function ComposerCapabilityPalette({
       return matches;
     });
   }, [catalog.skills, normalizedQuery]);
+  const agents = useMemo(() => standardAgents.filter((agent) =>
+    [agent.name, agent.description, agent.selection.packageId, agent.selection.route?.codexVisibleEntry ?? ""]
+      .some((value) => value.toLocaleLowerCase().includes(normalizedQuery))
+  ), [normalizedQuery, standardAgents]);
+  const visibleOplCapabilities = useMemo(() => oplCapabilities.filter((capability) =>
+    [capability.name, capability.description, capability.id]
+      .some((value) => value.toLocaleLowerCase().includes(normalizedQuery))
+  ), [normalizedQuery, oplCapabilities]);
   const connections = useMemo(() => [...catalog.plugins, ...catalog.apps]
     .filter((item, index, items) => item.enabled && items.findIndex((candidate) => candidate.id === item.id) === index)
     .filter((item) => [item.name, item.description].some((value) => value.toLocaleLowerCase().includes(normalizedQuery))), [catalog.apps, catalog.plugins, normalizedQuery]);
@@ -186,6 +223,36 @@ export function ComposerCapabilityPalette({
           </section>
         ) : null}
         {status === "loading" ? <p className="composer-palette-state">{copy.loading}</p> : null}
+        {agents.length ? (
+          <section data-testid="opl-standard-agents">
+            <strong className="composer-palette-group">{copy.agents}</strong>
+            {agents.map((agent) => {
+              const selected = selectedAgentId === agent.id;
+              return (
+                <Button key={agent.id} variant="ghost" className="composer-palette-row" aria-pressed={selected} onClick={() => onSelectAgent(agent)}>
+                  <span className="composer-palette-icon"><Bot aria-hidden="true" size={16} /></span>
+                  <span><strong>{agent.name}</strong><small>{agent.description}</small></span>
+                  {selected ? <Check aria-hidden="true" size={15} /> : null}
+                </Button>
+              );
+            })}
+          </section>
+        ) : null}
+        {visibleOplCapabilities.length ? (
+          <section data-testid="opl-capability-shortcuts">
+            <strong className="composer-palette-group">{copy.oplCapabilities}</strong>
+            {visibleOplCapabilities.map((capability) => {
+              const selected = selections.some((item) => item.kind === "skill" && item.input.path === capability.skill.path);
+              return (
+                <Button key={capability.id} variant="ghost" className="composer-palette-row" aria-pressed={selected} onClick={() => onSelectOplCapability(capability)}>
+                  <span className="composer-palette-icon"><Sparkles aria-hidden="true" size={16} /></span>
+                  <span><strong>{capability.name}</strong><small>{capability.description}</small></span>
+                  {selected ? <Check aria-hidden="true" size={15} /> : null}
+                </Button>
+              );
+            })}
+          </section>
+        ) : null}
         {skills.length ? (
           <section>
             <strong className="composer-palette-group">{copy.skills}</strong>
@@ -222,7 +289,7 @@ export function ComposerCapabilityPalette({
           </section>
         ) : null}
         {status === "error" ? <p className="composer-palette-state error">{error}</p> : null}
-        {status !== "loading" && !localVisible && !skills.length && !connections.length ? <p className="composer-palette-state">{copy.empty}</p> : null}
+        {status !== "loading" && !localVisible && !agents.length && !visibleOplCapabilities.length && !skills.length && !connections.length ? <p className="composer-palette-state">{copy.empty}</p> : null}
       </div>
     </div>
   );

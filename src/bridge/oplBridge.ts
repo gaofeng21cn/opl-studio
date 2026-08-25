@@ -295,6 +295,7 @@ export type CodexMessageRequest = {
   threadId?: string;
   cwd?: string;
   agentSelection?: CodexAgentSelectionSnapshot;
+  turnAgentSelection?: CodexAgentSelectionSnapshot;
   additionalInstructions?: string;
   model?: string;
   reasoningEffort?: string;
