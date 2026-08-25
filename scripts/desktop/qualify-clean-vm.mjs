@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluatePage, waitForPageReady } from "./cdp.mjs";
+import { capturePageScreenshot, evaluatePage, waitForPageReady } from "./cdp.mjs";
 import {
   PREVIEW_PRODUCT,
   loadPreviewSmokeInputs,
@@ -54,7 +54,7 @@ export function parseArgs(argv) {
     if (arg === "--vm-name") { cleanOptions.vmName = takeValue(arg, index); index += 1; continue; }
     if (arg === "--out") { cleanOptions.outPath = path.resolve(takeValue(arg, index)); index += 1; continue; }
     if (["--require-gateway-setup", "--require-codex-turn"].includes(arg)) { smokeArgv.push(arg); continue; }
-    if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path"].includes(arg)) {
+    if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path", "--screenshots-dir"].includes(arg)) {
       const value = takeValue(arg, index);
       index += 1;
       smokeArgv.push(arg, value);
@@ -174,7 +174,15 @@ async function qualifyCleanVm(options) {
     const smoke = await runPreviewSmoke({
       evaluate: (expression) => evaluatePage({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
       waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
-      options,
+      options: {
+        ...options,
+        captureScreenshot: options.screenshotsDir
+          ? async (name) => {
+            await mkdir(options.screenshotsDir, { recursive: true });
+            await writeFile(path.join(options.screenshotsDir, `${name}.png`), await capturePageScreenshot({ port: options.cdpPort, timeoutMs: options.timeoutMs }));
+          }
+          : null
+      },
       credentials: smokeInputs.credentials,
       turnRequest: smokeInputs.turnRequest,
       identity

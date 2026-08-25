@@ -2,7 +2,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { evaluatePage, waitForPageReady } from "./cdp.mjs";
+import { capturePageScreenshot, evaluatePage, waitForPageReady } from "./cdp.mjs";
 
 export const PREVIEW_PRODUCT = Object.freeze({
   productName: "One Person Lab Preview",
@@ -90,6 +90,7 @@ export function parsePreviewSmokeArgs(argv, { env = process.env } = {}) {
     codexTurnPrompt: env.OPL_STUDIO_CODEX_TURN_PROMPT || null,
     timeoutMs: Number(env.OPL_STUDIO_SMOKE_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS)),
     outPath: env.OPL_STUDIO_SMOKE_OUT?.trim() || null,
+    screenshotsDir: env.OPL_STUDIO_SCREENSHOTS_DIR?.trim() || null,
     appPath: env.OPL_STUDIO_APP_PATH?.trim() || null,
     requireGatewaySetup: env.OPL_STUDIO_REQUIRE_GATEWAY_SETUP === "1",
     requireCodexTurn: env.OPL_STUDIO_REQUIRE_CODEX_TURN === "1"
@@ -110,6 +111,7 @@ export function parsePreviewSmokeArgs(argv, { env = process.env } = {}) {
     else if (arg === "--codex-turn-prompt") options.codexTurnPrompt = value;
     else if (arg === "--timeout-ms") options.timeoutMs = Number(value);
     else if (arg === "--out") options.outPath = path.resolve(value);
+    else if (arg === "--screenshots-dir") options.screenshotsDir = path.resolve(value);
     else if (arg === "--app-path") options.appPath = path.resolve(value);
     else throw new Error(`unsupported argument: ${arg}`);
   }
@@ -170,8 +172,8 @@ function readbackSummary(state, secretValues) {
   };
 }
 
-async function runUiInteractions({ evaluate, timeoutMs }) {
-  return evaluate(`(async()=>{
+async function runUiInteractions({ evaluate, capture, timeoutMs }) {
+  const result = await evaluate(`(async()=>{
     const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
     const click=(selector)=>{const node=document.querySelector(selector); if(!node) return false; node.click(); return true;};
     const clickButton=(label)=>{const node=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()===label || button.getAttribute("aria-label")===label); if(!node) return false; node.click(); return true;};
@@ -217,6 +219,21 @@ async function runUiInteractions({ evaluate, timeoutMs }) {
     }
     return result;
   })()`);
+  if (typeof capture === "function") {
+    await capture("conversation");
+    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="设置"||node.innerText.trim()==="Settings"); button?.click(); return !!button;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await capture("settings");
+    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关于"||node.innerText.trim()==="About"); button?.click(); return !!button;})()`);
+    await capture("about");
+    await evaluate(`(()=>{const close=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关闭"||node.innerText.trim()==="Close"||node.getAttribute("aria-label")==="关闭"||node.getAttribute("aria-label")==="Close"); close?.click(); return !!close;})()`);
+    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.getAttribute("aria-label")==="运行状态"||node.getAttribute("aria-label")==="Run status"||node.innerText.trim()==="运行状态"||node.innerText.trim()==="Run status"); button?.click(); return !!button;})()`);
+    await capture("runtime");
+    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="新建任务"||node.innerText.trim()==="New task"||node.innerText.trim()==="新建会话"||node.innerText.trim()==="New session"); button?.click(); return !!button;})()`);
+    await evaluate(`(()=>{const node=document.querySelector('[data-testid="opl-context-inspector-trigger"]'); node?.click(); return !!node;})()`);
+    await capture("inspector");
+  }
+  return result;
 }
 
 async function waitForGatewayState({ evaluate, timeoutMs }) {
@@ -313,7 +330,11 @@ export async function runPreviewSmoke({
         status: state?.readback?.exitCode === 0 || state?.readback?.status === 0 ? "passed" : "partial"
       };
     }
-    checks.ui = await runUiInteractions({ evaluate, timeoutMs: smokeOptions.timeoutMs });
+    checks.ui = await runUiInteractions({
+      evaluate,
+      capture: options.captureScreenshot,
+      timeoutMs: smokeOptions.timeoutMs
+    });
     checks.gateway = await runGatewayHook({ evaluate, credentials, timeoutMs: smokeOptions.timeoutMs });
     checks.codexTurn = await runCodexTurnHook({ evaluate, request: turnRequest });
   } catch (error) {
@@ -409,7 +430,15 @@ if (isMain) {
   const receipt = await runPreviewSmoke({
     evaluate: (expression) => evaluatePage({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
     waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
-    options,
+    options: {
+      ...options,
+      captureScreenshot: options.screenshotsDir
+        ? async (name) => {
+          await mkdir(options.screenshotsDir, { recursive: true });
+          await writeFile(path.join(options.screenshotsDir, `${name}.png`), await capturePageScreenshot({ port: options.cdpPort, timeoutMs: options.timeoutMs }));
+        }
+        : null
+    },
     credentials: inputs.credentials,
     turnRequest: inputs.turnRequest,
     identity

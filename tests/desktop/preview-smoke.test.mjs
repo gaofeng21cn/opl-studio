@@ -14,12 +14,14 @@ test("Preview smoke maps Standard and Full to the real bridge profiles", () => {
     "--carrier", "webui",
     "--cdp-port", "9333",
     "--runtime-profiles", "standard,full",
+    "--screenshots-dir", "out/screenshots",
     "--require-gateway-setup",
     "--require-codex-turn"
   ]);
   assert.equal(options.carrier, "webui");
   assert.equal(options.cdpPort, 9333);
   assert.deepEqual(options.runtimeProfiles, ["standard", "full"]);
+  assert.match(options.screenshotsDir, /out\/screenshots$/);
   assert.equal(options.requireGatewaySetup, true);
   assert.equal(options.requireCodexTurn, true);
 });

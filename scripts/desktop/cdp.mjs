@@ -93,3 +93,57 @@ export async function evaluatePage({ port, expression, timeoutMs = 30_000 } = {}
     close();
   }
 }
+
+export async function capturePageScreenshot({ port, timeoutMs = 30_000 } = {}) {
+  const target = await waitForPageTarget({ port, timeoutMs });
+  const socket = new WebSocket(target.webSocketDebuggerUrl);
+  const pending = new Map();
+  let nextId = 0;
+  const close = () => {
+    for (const entry of pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(new Error("CDP socket closed"));
+    }
+    pending.clear();
+    try { socket.close(); } catch {}
+  };
+  socket.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    const settle = pending.get(message.id);
+    if (!settle) return;
+    pending.delete(message.id);
+    clearTimeout(settle.timer);
+    if (message.error) settle.reject(new Error(JSON.stringify(message.error)));
+    else settle.resolve(message.result);
+  };
+  socket.onerror = () => close();
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timed out opening CDP socket")), timeoutMs);
+    socket.onopen = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+  });
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const id = ++nextId;
+      const timer = setTimeout(() => {
+        if (!pending.has(id)) return;
+        pending.delete(id);
+        reject(new Error("timed out capturing CDP screenshot"));
+      }, timeoutMs);
+      pending.set(id, { resolve, reject, timer });
+      socket.send(JSON.stringify({
+        id,
+        method: "Page.captureScreenshot",
+        params: { format: "png", fromSurface: true, captureBeyondViewport: false }
+      }));
+    });
+    if (typeof result?.data !== "string" || result.data.length === 0) {
+      throw new Error("CDP screenshot did not return image data");
+    }
+    return Buffer.from(result.data, "base64");
+  } finally {
+    close();
+  }
+}

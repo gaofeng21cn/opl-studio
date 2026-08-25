@@ -46,10 +46,12 @@ test("clean VM preserves explicit smoke and receipt paths", () => {
     "--attach",
     "--cdp-port", "9334",
     "--out", "out/custom-clean-vm.json",
+    "--screenshots-dir", "out/screenshots",
     "--runtime-profiles", "standard"
   ]);
   assert.equal(options.attach, true);
   assert.equal(options.cdpPort, 9334);
   assert.equal(options.outPath, path.resolve(root, "out/custom-clean-vm.json"));
+  assert.equal(options.screenshotsDir, path.resolve(root, "out/screenshots"));
   assert.deepEqual(options.runtimeProfiles, ["standard"]);
 });
