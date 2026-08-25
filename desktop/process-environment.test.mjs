@@ -50,3 +50,23 @@ test("Finder launches prefer the Homebrew Framework OPL over an older Node-versi
 
   assert.equal(resolved.OPL_APP_OPL_BIN, homebrewOpl);
 });
+
+test("Finder launches resolve Framework-managed Codex and OPL toolchain Node", () => {
+  const homeDir = "/Users/opl";
+  const managedCodex = path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current", "bin", "codex");
+  const managedNode = path.join(homeDir, ".opl", "toolchain", "node-v22.21.1-darwin-arm64", "bin", "node");
+  const managedOpl = path.join(homeDir, ".opl", "toolchain", "node-v22.21.1-darwin-arm64", "bin", "opl");
+  const resolved = resolveDesktopRuntimeEnvironment({
+    env: { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" },
+    homeDir,
+    readDirectory: (directory) => directory.endsWith(path.join(".opl", "toolchain"))
+      ? [{ name: "node-v22.21.1-darwin-arm64", isDirectory: () => true }]
+      : [],
+    executable: (candidate) => [managedCodex, managedNode, managedOpl].includes(candidate)
+  });
+
+  assert.equal(resolved.OPL_CODEX_BIN, managedCodex);
+  assert.equal(resolved.OPL_APP_OPL_BIN, managedOpl);
+  assert.ok(resolved.PATH.split(path.delimiter).includes(path.dirname(managedCodex)));
+  assert.ok(resolved.PATH.split(path.delimiter).includes(path.dirname(managedNode)));
+});

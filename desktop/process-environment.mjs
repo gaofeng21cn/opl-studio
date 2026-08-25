@@ -24,6 +24,23 @@ function nodeVersionBins(homeDir, readDirectory) {
   }
 }
 
+function managedRuntimeBins(homeDir, readDirectory) {
+  const bins = [
+    path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current", "bin")
+  ];
+  const toolchainRoot = path.join(homeDir, ".opl", "toolchain");
+  try {
+    const toolchains = readDirectory(toolchainRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+    bins.push(...toolchains.map((name) => path.join(toolchainRoot, name, "bin")));
+  } catch {
+    // The managed toolchain is optional on clean machines.
+  }
+  return bins;
+}
+
 function findExecutable(name, directories, executable) {
   const candidates = process.platform === "win32" ? [`${name}.exe`, `${name}.cmd`, name] : [name];
   for (const directory of directories) {
@@ -60,6 +77,7 @@ export function resolveDesktopRuntimeEnvironment({
     "/opt/homebrew/bin",
     "/usr/local/bin",
     ...nodeVersionBins(homeDir, readDirectory),
+    ...managedRuntimeBins(homeDir, readDirectory),
     "/Applications/ChatGPT.app/Contents/Resources"
   ]);
   const resolved = { ...env, PATH: searchDirectories.join(path.delimiter) };
