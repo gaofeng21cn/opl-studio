@@ -70,3 +70,56 @@ test("Finder launches resolve Framework-managed Codex and OPL toolchain Node", (
   assert.ok(resolved.PATH.split(path.delimiter).includes(path.dirname(managedCodex)));
   assert.ok(resolved.PATH.split(path.delimiter).includes(path.dirname(managedNode)));
 });
+
+test("Full packaged resources provide Framework OPL without becoming a Codex source", () => {
+  const resourcesPath = "/Applications/One Person Lab Preview.app/Contents/Resources";
+  const packagedOpl = path.join(
+    resourcesPath,
+    "opl-studio-full-runtime",
+    "runtime",
+    "current",
+    "bin",
+    "opl"
+  );
+  const packagedCodex = path.join(
+    resourcesPath,
+    "opl-studio-full-runtime",
+    "runtime",
+    "current",
+    "bin",
+    "codex"
+  );
+  const resolved = resolveDesktopRuntimeEnvironment({
+    env: { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" },
+    homeDir: "/Users/opl",
+    resourcesPath,
+    readDirectory: () => [],
+    executable: (candidate) => candidate === packagedOpl || candidate === packagedCodex
+  });
+
+  assert.equal(resolved.OPL_APP_OPL_BIN, packagedOpl);
+  assert.equal(resolved.OPL_CODEX_BIN, undefined);
+  assert.equal(resolved.PATH.split(path.delimiter).includes(path.dirname(packagedOpl)), false);
+});
+
+test("explicit Codex remains authoritative when Full packaged resources are present", () => {
+  const resourcesPath = "/Applications/One Person Lab Preview.app/Contents/Resources";
+  const packagedOpl = path.join(
+    resourcesPath,
+    "opl-studio-full-runtime",
+    "runtime",
+    "current",
+    "bin",
+    "opl"
+  );
+  const resolved = resolveDesktopRuntimeEnvironment({
+    env: { PATH: "/usr/bin", OPL_CODEX_BIN: "/exact/external/codex" },
+    homeDir: "/Users/opl",
+    resourcesPath,
+    readDirectory: () => [],
+    executable: (candidate) => candidate === packagedOpl
+  });
+
+  assert.equal(resolved.OPL_CODEX_BIN, "/exact/external/codex");
+  assert.equal(resolved.OPL_APP_OPL_BIN, packagedOpl);
+});
