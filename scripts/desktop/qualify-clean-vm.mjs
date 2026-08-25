@@ -23,6 +23,10 @@ function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+export function parseInstalledIdentityOutput(value) {
+  return JSON.parse(String(value).replace(/\r?\n/g, ""));
+}
+
 export function parseArgs(argv) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const cleanOptions = {
@@ -142,7 +146,7 @@ async function qualifyCleanVm(options) {
         `printf '{"version":"' && plutil -extract CFBundleShortVersionString raw -o - ${JSON.stringify(`${guestApp}/Contents/Info.plist`)} && printf '\",\"productName\":\"' && (plutil -extract CFBundleDisplayName raw -o - ${JSON.stringify(`${guestApp}/Contents/Info.plist`)} || plutil -extract CFBundleName raw -o - ${JSON.stringify(`${guestApp}/Contents/Info.plist`)} ) && printf '\",\"bundleId\":\"' && plutil -extract CFBundleIdentifier raw -o - ${JSON.stringify(`${guestApp}/Contents/Info.plist`)} && printf '\"}'`
       ].join(" && "));
       let installIdentity;
-      try { installIdentity = JSON.parse(install.stdout.trim()); } catch { installIdentity = null; }
+      try { installIdentity = parseInstalledIdentityOutput(install.stdout); } catch { installIdentity = null; }
       checks.install = {
         passed: installIdentity?.productName === productName && installIdentity?.bundleId === bundleId,
         version: installIdentity?.version ?? null,

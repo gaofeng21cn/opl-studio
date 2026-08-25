@@ -7,6 +7,17 @@ import {
   redactSecrets,
   runPreviewSmoke
 } from "../../scripts/desktop/preview-smoke.mjs";
+import { parseInstalledIdentityOutput } from "../../scripts/desktop/qualify-clean-vm.mjs";
+
+test("clean VM parses plutil raw values without embedding line breaks in JSON strings", () => {
+  assert.deepEqual(parseInstalledIdentityOutput(
+    '{"version":"0.1.1\n","productName":"One Person Lab Preview\n","bundleId":"cn.onepersonlab.opl.studio.preview\n"}'
+  ), {
+    version: "0.1.1",
+    productName: "One Person Lab Preview",
+    bundleId: "cn.onepersonlab.opl.studio.preview"
+  });
+});
 
 test("Preview smoke maps Standard and Full to the real bridge profiles", () => {
   assert.deepEqual(parseRuntimeProfiles("standard,fast,full,standard"), ["standard", "full"]);
