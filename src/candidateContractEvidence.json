@@ -75,7 +75,7 @@
       "codex_app_server",
       "dsh_cordis_tree"
     ],
-    "upstream_upgrade_contract": "update_one_pinned_ref_and_package_cohort_then_regenerate_vendor_manifest_replay_profile_patches_and_run_host_mcp_renderer_candidate_gates",
+    "upstream_upgrade_contract": "read_manifest_binding_run_read_only_dsh_preflight_update_one_pinned_ref_and_package_cohort_regenerate_vendor_manifest_replay_profile_patches_then_run_host_mcp_renderer_candidate_gates_and_preview_acceptance",
     "active_shell_adopted": false,
     "release_ready": false
   },

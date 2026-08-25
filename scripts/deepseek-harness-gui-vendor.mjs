@@ -3,50 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readDshBinding } from "./dsh-upstream.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const vendorRoot = path.join(root, "src", "vendor", "deepseek-harness");
 const manifestPath = path.join(root, "src", "composition", "deepseekHarnessSourceManifest.json");
-const upstreamRepo = "https://github.com/deepseek-ai/deepseek-harness";
-const upstreamRef = "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e";
-const applicationHostPackages = [
-  "@deepseek-ai/cordis@4.0.1",
-  "@deepseek-ai/cordis-plugin-group@1.0.1",
-  "@deepseek-ai/cordis-plugin-include@1.0.6",
-  "@deepseek-ai/cordis-plugin-loader@1.0.2",
-  "@deepseek-ai/dsh-app-boot@0.1.1-rc.2",
-  "@deepseek-ai/dsh-brand@0.1.1-rc.2",
-  "@deepseek-ai/dsh-client-modules@0.1.1-rc.2",
-  "@deepseek-ai/dsh-client-ui-primitives@0.1.1-rc.2",
-  "@deepseek-ai/dsh-client-ui-slots@0.1.1-rc.2",
-  "@deepseek-ai/dsh-client-web@0.1.1-rc.2",
-  "@deepseek-ai/dsh-home-paths@0.1.1-rc.2",
-  "@deepseek-ai/dsh-host-frontend-static@0.1.1-rc.2",
-  "@deepseek-ai/dsh-host-plugin-inventory@0.1.1-rc.2",
-  "@deepseek-ai/dsh-host-webserver@0.1.1-rc.2",
-  "@deepseek-ai/dsh-invariants@0.1.1-rc.2",
-  "@deepseek-ai/dsh-launch-environment@0.1.1-rc.2",
-  "@deepseek-ai/dsh-llm@0.1.1-rc.2",
-  "@deepseek-ai/dsh-scope@0.1.1-rc.2",
-  "@deepseek-ai/dsh-session@0.1.1-rc.2",
-  "@deepseek-ai/dsh-system-prompt@0.1.1-rc.2",
-  "@deepseek-ai/dsh-timeout@0.1.1-rc.2",
-  "@deepseek-ai/dsh-tools@0.1.1-rc.2",
-  "@deepseek-ai/dsh-typert-protocol@0.1.1-rc.2"
-];
-const packageRoots = [
-  "packages/client/ui-layout/src",
-  "packages/client/ui-sidebar/src",
-  "packages/client/ui-conversation/src",
-  "packages/client/ui-input-trigger/src",
-  "packages/client/ui-model-selection/src",
-  "packages/client/ui-agent-preset/src",
-  "packages/client/ui-workspace/src",
-  "packages/client/ui-settings-general/src",
-  "packages/client/ui-theme/src",
-  "packages/client/ui-primitives/src",
-  "packages/client/ui-renderer/src"
-];
 
 function fail(message) {
   throw new Error(message);
@@ -82,11 +43,7 @@ function sourceArgument() {
 }
 
 function expectedInventory() {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  if (manifest.upstream.repo !== upstreamRepo || manifest.upstream.ref !== upstreamRef) {
-    fail("DeepSeek Harness manifest does not match the pinned upstream identity");
-  }
-  return manifest;
+  return readDshBinding({ repositoryRoot: root }).manifest;
 }
 
 function verifyLocal(manifest) {
@@ -107,7 +64,7 @@ function verifyLocal(manifest) {
 
 function verifyAgainstSource(sourceRoot, manifest) {
   const head = runGit(sourceRoot, ["rev-parse", "HEAD"]);
-  if (head !== upstreamRef) fail(`DeepSeek Harness source HEAD ${head} does not match ${upstreamRef}`);
+  if (head !== manifest.upstream.ref) fail(`DeepSeek Harness source HEAD ${head} does not match ${manifest.upstream.ref}`);
   for (const entry of manifest.files) {
     const upstreamPath = entry.path === "LICENSE" ? "LICENSE" : entry.path;
     const sourcePath = path.join(sourceRoot, upstreamPath);
@@ -118,12 +75,14 @@ function verifyAgainstSource(sourceRoot, manifest) {
 
 function sync(sourceRoot) {
   if (!sourceRoot) fail("sync requires --source <deepseek-harness checkout>");
+  const binding = readDshBinding({ repositoryRoot: root, validatePackages: false, validateProfile: false });
+  const currentManifest = binding.manifest;
   const resolvedSource = path.resolve(sourceRoot);
   const head = runGit(resolvedSource, ["rev-parse", "HEAD"]);
-  if (head !== upstreamRef) fail(`DeepSeek Harness source HEAD ${head} does not match ${upstreamRef}`);
+  if (head !== binding.ref) fail(`DeepSeek Harness source HEAD ${head} does not match ${binding.ref}`);
 
   fs.rmSync(vendorRoot, { recursive: true, force: true });
-  for (const packageRoot of packageRoots) {
+  for (const packageRoot of binding.packageRoots) {
     const source = path.join(resolvedSource, packageRoot);
     if (!fs.existsSync(source)) fail(`DeepSeek Harness package source missing: ${packageRoot}`);
     fs.cpSync(source, path.join(vendorRoot, packageRoot), { recursive: true, force: true, preserveTimestamps: false });
@@ -137,10 +96,10 @@ function sync(sourceRoot) {
   const manifest = {
     schema_version: 1,
     upstream: {
-      repo: upstreamRepo,
-      ref: upstreamRef,
-      branch_at_intake: "dsh-v0.1.1-rc.2",
-      source_package_version: "0.1.1-rc.2",
+      repo: binding.repo,
+      ref: binding.ref,
+      branch_at_intake: currentManifest.upstream.branch_at_intake,
+      source_package_version: binding.version,
       license: "MIT"
     },
     application_host: {
@@ -148,7 +107,7 @@ function sync(sourceRoot) {
       profile: "opl-studio",
       profile_source: "scripts/webui-host/dsh/cordis.yml",
       web_overlay: "scripts/webui-host/dsh/web.patch.yml",
-      package_cohort: applicationHostPackages,
+      package_cohort: binding.packageCohort,
       loaded_dsh_services: [
         "system-prompt_without_harness_identity_or_runtime_context",
         "tools_native_registry",
@@ -176,7 +135,7 @@ function sync(sourceRoot) {
       local_root: "src/vendor/deepseek-harness",
       byte_identical: true,
       byte_identical_to_pinned_ref: true,
-      package_roots: packageRoots,
+      package_roots: binding.packageRoots,
       file_count: files.length
     },
     opl_delta_roots: [
@@ -196,7 +155,7 @@ function sync(sourceRoot) {
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   verifyLocal(manifest);
   verifyAgainstSource(resolvedSource, manifest);
-  console.log(JSON.stringify({ status: "deepseek_harness_gui_synced", ref: upstreamRef, files: files.length }, null, 2));
+  console.log(JSON.stringify({ status: "deepseek_harness_gui_synced", ref: binding.ref, files: files.length }, null, 2));
 }
 
 function check() {
@@ -204,7 +163,7 @@ function check() {
   verifyLocal(manifest);
   const sourceRoot = sourceArgument();
   if (sourceRoot) verifyAgainstSource(path.resolve(sourceRoot), manifest);
-  console.log(JSON.stringify({ status: "deepseek_harness_gui_byte_parity_verified", ref: upstreamRef, files: manifest.files.length }, null, 2));
+  console.log(JSON.stringify({ status: "deepseek_harness_gui_byte_parity_verified", ref: manifest.upstream.ref, files: manifest.files.length }, null, 2));
 }
 
 const command = process.argv[2];

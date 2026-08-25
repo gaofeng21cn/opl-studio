@@ -18,6 +18,16 @@ OPL Cloud`. Studio is the App-facing Application Host and plugin host inside
 that model. It does not become Base, take over Framework runtime/Package truth,
 install or publish Packages, or own Cloud services.
 
+The DSH binding is intentionally upgradeable but pinned. `npm run dsh:status`
+shows the current upstream ref and cohort. Before an upgrade, run:
+
+```bash
+npm run dsh:preflight -- --source <clean-deepseek-harness-checkout>
+```
+
+This produces a read-only upgrade plan before any source or dependency write;
+it is not compatibility or Preview acceptance.
+
 AionUI remains the active release shell. Selecting or launching Studio is a
 local development choice only; it does not change the release adapter, updater
 channel, App product truth, installed App, or current platform support. AionUI

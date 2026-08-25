@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { CodexAppServerTransport } from "../../scripts/webui-host/app-server-transport.mjs";
+import { readDshBinding } from "../../scripts/dsh-upstream.mjs";
 import { abbreviateHomePath } from "../../src/integrations/deepseek-harness/runtimeShim.ts";
 import { assistantDisplayMarkdown } from "../../src/workbench/messageDisplay.ts";
 
@@ -56,6 +57,7 @@ const candidateEvidence = JSON.parse(read("src/candidateContractEvidence.json"))
 const packageJson = JSON.parse(read("package.json"));
 const tsconfig = JSON.parse(read("tsconfig.json"));
 const typecheckConfig = JSON.parse(read("tsconfig.typecheck.json"));
+const dshBinding = readDshBinding({ repositoryRoot: root });
 
 test("renderer consumes one standard Codex thread adapter", () => {
   assert.match(app, /from "\.\.\/threads\/types"/);
@@ -666,51 +668,25 @@ test("desktop visual shell uses vendored DeepSeek Harness roots and theme tokens
   assert.match(styles, /\[data-streamdown="code-block"\]/);
 });
 
-test("DSH rc2 controls resolve to the complete pinned source cohort and OPL-owned slots", () => {
+test("DSH controls resolve to the complete pinned source cohort and OPL-owned slots", () => {
   const primitiveAlias = ["src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
   assert.deepEqual(tsconfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
   assert.deepEqual(typecheckConfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
-  assert.equal(sourceManifest.upstream.ref, "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e");
-  assert.equal(sourceManifest.upstream.source_package_version, "0.1.1-rc.2");
-  assert.equal(sourceManifest.snapshot.file_count, 277);
-  assert.equal(sourceManifest.files.length, 277);
+  assert.match(sourceManifest.upstream.ref, /^[0-9a-f]{40}$/);
+  assert.match(sourceManifest.upstream.source_package_version, /^\d+\.\d+\.\d+/);
+  assert.equal(sourceManifest.snapshot.file_count, sourceManifest.files.length);
   assert.equal(sourceManifest.snapshot.byte_identical_to_pinned_ref, true);
   assert.ok(sourceManifest.snapshot.package_roots.includes("packages/client/ui-primitives/src"));
   assert.ok(sourceManifest.snapshot.package_roots.includes("packages/client/ui-renderer/src"));
-  assert.equal(candidateEvidence.reused_oss_module_policy.vendored_file_count, 277);
+  assert.equal(candidateEvidence.reused_oss_module_policy.vendored_file_count, sourceManifest.snapshot.file_count);
   assert.equal(candidateEvidence.reused_oss_module_policy.byte_identical_to_pinned_ref, true);
   assert.deepEqual(candidateEvidence.reused_oss_module_policy.direct_reuse_modules, [
-    "@deepseek-ai/cordis@4.0.1",
-    "@deepseek-ai/cordis-plugin-group@1.0.1",
-    "@deepseek-ai/cordis-plugin-include@1.0.6",
-    "@deepseek-ai/cordis-plugin-loader@1.0.2",
-    "@deepseek-ai/dsh-app-boot@0.1.1-rc.2",
-    "@deepseek-ai/dsh-brand@0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-modules@0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-primitives@0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-slots@0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-web@0.1.1-rc.2",
-    "@deepseek-ai/dsh-home-paths@0.1.1-rc.2",
-    "@deepseek-ai/dsh-host-frontend-static@0.1.1-rc.2",
-    "@deepseek-ai/dsh-host-plugin-inventory@0.1.1-rc.2",
-    "@deepseek-ai/dsh-host-webserver@0.1.1-rc.2",
-    "@deepseek-ai/dsh-invariants@0.1.1-rc.2",
-    "@deepseek-ai/dsh-launch-environment@0.1.1-rc.2",
-    "@deepseek-ai/dsh-llm@0.1.1-rc.2",
-    "@deepseek-ai/dsh-scope@0.1.1-rc.2",
-    "@deepseek-ai/dsh-session@0.1.1-rc.2",
-    "@deepseek-ai/dsh-system-prompt@0.1.1-rc.2",
-    "@deepseek-ai/dsh-timeout@0.1.1-rc.2",
-    "@deepseek-ai/dsh-tools@0.1.1-rc.2",
-    "@deepseek-ai/dsh-typert-protocol@0.1.1-rc.2",
+    ...dshBinding.packageCohort,
     "use-sync-external-store@1.2.0"
   ]);
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-ui-slots"], "0.1.1-rc.2");
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-invariants"], "0.1.1-rc.2");
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-llm"], "0.1.1-rc.2");
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-scope"], "0.1.1-rc.2");
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-session"], "0.1.1-rc.2");
-  assert.equal(packageJson.dependencies["@deepseek-ai/dsh-timeout"], "0.1.1-rc.2");
+  for (const { name, version } of dshBinding.packageSpecs) {
+    assert.equal(packageJson.dependencies[name], version);
+  }
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-web-react"], undefined);
   assert.equal(packageJson.dependencies["@deepseek-ai/dsh-client-ui-renderer"], undefined);
   assert.equal(fs.existsSync(path.join(root, "src/integrations/deepseek-harness/uiPrimitives.tsx")), false);

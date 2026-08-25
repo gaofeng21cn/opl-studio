@@ -39,6 +39,9 @@ is the command owner.
 | `npm run validate:client-conformance` | Fresh four-repository Host -> App -> Studio/AionUI compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |
 | `npm run verify:dsh-gui` | Byte parity of the pinned DSH `v0.1.1-rc.2` GUI source manifest |
+| `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
+| `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
+| `npm run test:dsh-upgrade` | No-write DSH status/preflight command and scoped-package binding tests |
 | `npm run validate:state-model` | Runtime-backed App-state projection mapping; requires a real `opl` CLI/state source and is not part of default PR/main source CI |
 | `npm run smoke:webui` | Local WebUI host/renderer smoke |
 | `npm run smoke:visual` | Source-level visual smoke |
@@ -101,13 +104,31 @@ not override a healthy top-level service state.
 
 ## DSH Upstream Upgrade Gate
 
-The upgrade owner is `src/composition/deepseekHarnessSourceManifest.json` plus
-the exact dependencies in `package.json`. A DSH upgrade must update one pinned
-source ref and package cohort, regenerate the vendored GUI manifest from that
-checkout, replay the `opl-studio` profile and Web/profile/bundle patches, then
-run `verify:dsh-gui`, typecheck, WebUI Host/MCP tests, headless tests, renderer
-source tests, and the candidate validator. Passing only package installation or
-GUI byte parity does not prove Host/plugin compatibility.
+The upgrade owner is `src/composition/deepseekHarnessSourceManifest.json`. The
+repository now reads the DSH ref, package version, package cohort, GUI roots,
+and file inventory from that manifest through `scripts/dsh-upstream.mjs`; the
+vendor checker and candidate validator no longer carry a second hard-coded
+cohort.
+
+Use the read-only binding check before touching an upgrade:
+
+```bash
+npm run dsh:status
+npm run dsh:preflight -- --source /absolute/path/to/clean/deepseek-harness \
+  --version <target-dsh-version> --branch <target-branch>
+```
+
+`dsh:preflight` verifies the source checkout identity and emits the exact
+write-set, package-version policy, required validation commands, and manual
+authority/Preview acceptance steps. It never edits the repository and does not
+call an upgrade complete.
+
+When a target cohort is approved, update the manifest/package cohort together,
+run `npm run vendor:dsh-gui -- --source <checkout>`, then replay the
+`opl-studio` profile and Web/profile/bundle patches. Run `verify:dsh-gui`,
+typecheck, WebUI Host/MCP tests, headless tests, renderer source tests, and the
+candidate validator. Passing only package installation or GUI byte parity does
+not prove Host/plugin compatibility.
 
 ## Rendered WebUI Acceptance
 
