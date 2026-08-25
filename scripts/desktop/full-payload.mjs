@@ -31,7 +31,7 @@ export function fullBuildEnvironment({ appRoot, studioRoot = root } = {}) {
     ...process.env,
     OPL_APP_REPO_ROOT: path.resolve(appRoot),
     OPL_FULL_GUI_ROOT: path.resolve(studioRoot),
-    OPL_FULL_CARRIER_PROFILE: carrier.carrier_id,
+    OPL_FULL_CARRIER_ID: carrier.carrier_id,
   };
 }
 
