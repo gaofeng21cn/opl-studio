@@ -1,0 +1,35 @@
+{
+  "schema": "opl_app_full_payload_carrier.v1",
+  "authority_owner": "one-person-lab-app",
+  "carrier_id": "opl-studio",
+  "product_name": "One Person Lab Preview",
+  "bundle_id": "cn.onepersonlab.opl.studio.preview",
+  "standard_artifact_template": "one-person-lab-preview-${version}-${os}-${arch}.${ext}",
+  "full_artifact_template": "one-person-lab-studio-full-${version}-mac-arm64.dmg",
+  "full_package_kind": "opl_studio_full_first_install_macos_arm64",
+  "release_repository": "gaofeng21cn/opl-studio",
+  "release_channel": "preview",
+  "full_append_policy": {
+    "same_tag": true,
+    "standard_assets_immutable": true,
+    "updater_metadata_unchanged": true,
+    "second_tag_or_release_for_full": false,
+    "full_assets_additive_only": true
+  },
+  "runtime_boundary": {
+    "materialization_owner": "one-person-lab-app",
+    "truth_owner": "one-person-lab-framework",
+    "codex_runtime_owner": "opl-codex-native",
+    "aionui_runtime_required": false,
+    "aioncore_runtime_required": false,
+    "framework_managed_codex_payload_in_app_bundle_allowed": false,
+    "studio_carrier_payload": ["renderer", "host", "app_state_action_bridge"]
+  },
+  "handoff": {
+    "app_builder": "OPL_APP_REPO_ROOT/scripts/build-full-first-install-package.ts",
+    "studio_root_env": "OPL_FULL_GUI_ROOT",
+    "profile_env": "OPL_FULL_CARRIER_PROFILE",
+    "profile_value": "opl-studio",
+    "required_source_identity": ["studio_commit", "studio_tree", "app_commit"]
+  }
+}

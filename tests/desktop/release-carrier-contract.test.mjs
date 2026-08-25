@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 test("Studio declares one branded preview carrier for the App-owned desktop release kernel", async () => {
   const carrier = JSON.parse(await readFile(path.join(root, "contracts/desktop-release-carrier.json"), "utf8"));
+  const full = JSON.parse(await readFile(path.join(root, "contracts/full-payload-carrier.json"), "utf8"));
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
   const builder = parseYaml(await readFile(path.join(root, "electron-builder.yml"), "utf8"));
 
@@ -52,4 +53,11 @@ test("Studio declares one branded preview carrier for the App-owned desktop rele
     carrier.commands.qualify_public_release,
     "node scripts/desktop/macos-distribution.mjs --require-release-trust --require-public-feed"
   );
+  assert.equal(carrier.full_payload_contract, "contracts/full-payload-carrier.json");
+  assert.equal(carrier.full_package_kind, full.full_package_kind);
+  assert.equal(carrier.full_artifact_name_template, full.full_artifact_template);
+  assert.equal(full.runtime_boundary.codex_runtime_owner, "opl-codex-native");
+  assert.equal(full.runtime_boundary.framework_managed_codex_payload_in_app_bundle_allowed, false);
+  assert.equal(full.full_append_policy.same_tag, true);
+  assert.equal(full.full_append_policy.standard_assets_immutable, true);
 });

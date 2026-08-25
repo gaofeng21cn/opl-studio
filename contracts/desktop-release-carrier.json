@@ -20,5 +20,11 @@
   "carrier_specific_payload": [
     "studio_renderer",
     "app_state_action_bridge"
-  ]
+  ],
+  "full_payload_contract": "contracts/full-payload-carrier.json",
+  "full_artifact_name_template": "one-person-lab-studio-full-${version}-mac-arm64.dmg",
+  "full_package_kind": "opl_studio_full_first_install_macos_arm64",
+  "full_builder": "OPL_APP_REPO_ROOT/scripts/build-full-first-install-package.ts",
+  "full_builder_entry": "npm run build:full",
+  "full_qualification_entry": "npm run qualify:full"
 }
