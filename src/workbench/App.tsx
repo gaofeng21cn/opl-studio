@@ -932,7 +932,7 @@ export function App({
       };
     }), [model.packageLifecycle, settings.locale]);
   const oplCapabilityOptions = useMemo<ComposerOplCapabilityOption[]>(() => model.packageLifecycle
-    .filter((item) => item.official && item.packageId.startsWith("opl-") && item.packageRole !== "standard_agent")
+    .filter((item) => item.official && item.packageId !== "missing_bridge" && item.packageRole !== "standard_agent")
     .flatMap((item) => {
       // A package owns one shortcut; its remaining required Skills stay available in the generic Skills group.
       const skill = item.requiredSkillIds
@@ -949,7 +949,31 @@ export function App({
         skill
       }];
     }), [capabilityCatalog.skills, model.packageLifecycle, settings.locale]);
+  const oplModuleItems = useMemo(() => {
+    const packageItems = model.packageLifecycle
+      .filter((item) => item.official && item.packageId !== "missing_bridge")
+      .map((item) => ({
+        id: `package:${item.packageId}`,
+        name: settings.locale === "zh" ? item.displayNameI18n.zh ?? item.label : item.displayNameI18n.en ?? item.label,
+        detail: (settings.locale === "zh" ? item.descriptionI18n.zh : item.descriptionI18n.en) ?? item.description,
+        active: item.readiness.callable !== false && item.activated !== false
+      }));
+    const dependencyItems = model.packageLifecycle.flatMap((owner) => owner.dependencies.map((dependency) => ({
+      id: `dependency:${dependency.packageId}`,
+      name: dependency.packageId,
+      detail: settings.locale === "zh" ? `${owner.label} 的必需能力包` : `Required by ${owner.label}`,
+      active: dependency.present !== false && dependency.callable !== false
+    })));
+    return [...packageItems, ...dependencyItems].filter((item, index, items) => (
+      items.findIndex((candidate) => candidate.id === item.id) === index
+    ));
+  }, [model.packageLifecycle, settings.locale]);
   const capabilityGroups = [
+    {
+      id: "opl-modules",
+      label: settings.locale === "zh" ? "OPL 模块" : "OPL modules",
+      items: oplModuleItems
+    },
     {
       id: "skills",
       label: settings.locale === "zh" ? "技能" : "Skills",
@@ -2634,7 +2658,7 @@ export function App({
               {capabilityGroups.map((group) => (
                 <div className="capability-group" key={group.id}>
                   <header><strong>{group.label}</strong><span>{group.items.filter((item) => item.active).length}/{group.items.length}</span></header>
-                  {group.filteredItems.length ? group.filteredItems.slice(0, normalizedCapabilityQuery ? 20 : 5).map((item) => <div className="capability-row" key={`${group.id}:${item.id}`} data-active={item.active}><span className="runtime-status-dot" aria-hidden="true" /><div><strong>{item.name}</strong>{item.detail ? <span>{item.detail}</span> : null}</div></div>) : <p className="context-empty">{settings.locale === "zh" ? "没有匹配项" : "No matches"}</p>}
+                  {group.filteredItems.length ? (group.id === "opl-modules" || normalizedCapabilityQuery ? group.filteredItems : group.filteredItems.slice(0, 5)).map((item) => <div className="capability-row" key={`${group.id}:${item.id}`} data-active={item.active}><span className="runtime-status-dot" aria-hidden="true" /><div><strong>{item.name}</strong>{item.detail ? <span>{item.detail}</span> : null}</div></div>) : <p className="context-empty">{settings.locale === "zh" ? "没有匹配项" : "No matches"}</p>}
                 </div>
               ))}
               </div>

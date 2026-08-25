@@ -164,6 +164,20 @@ test("current Package directory entries replace retired private lifecycle fields
                 status: "visible",
                 codex_visible: true
               },
+              dependency_readiness: {
+                status: "ready",
+                required_count: 1,
+                present_count: 1,
+                callable_count: 1,
+                checks: [{
+                  package_id: "future.scholar-skills",
+                  required: true,
+                  present: true,
+                  callable: true,
+                  status: "callable",
+                  reasons: []
+                }]
+              },
               actions: {
                 available: ["update"],
                 recommended: null
@@ -234,6 +248,14 @@ test("current Package directory entries replace retired private lifecycle fields
   assert.equal(item.actions[2]?.kind, "other");
   assert.equal(item.actions[2]?.semantic, "prepare");
   assert.equal(item.actions[2]?.surface, "composer");
+  assert.deepEqual(item.dependencies, [{
+    packageId: "future.scholar-skills",
+    required: true,
+    present: true,
+    callable: true,
+    status: "callable",
+    reasons: []
+  }]);
   assert.equal(item.actions[2]?.status, "available");
   assert.equal(item.refs.find((ref) => ref.label === "Source")?.ref, "future-agent@example");
   assert.equal(item.refs.some((ref) => ref.label === "Manifest"), false);

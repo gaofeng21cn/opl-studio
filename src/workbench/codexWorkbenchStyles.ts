@@ -475,6 +475,24 @@ export const codexWorkbenchStyles = `
     font-weight: var(--opl-weight-semibold);
   }
 
+  /* Contributions are declarative App-owned content, so their internal
+     headings must stay inside the Studio typography boundary instead of
+     inheriting browser defaults (for example h3 = 1.17em / 700). */
+  .opl-contribution :where(h1, h2, h3, h4, h5, h6) {
+    margin: 8px 0 0;
+    color: var(--opl-text);
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
+    letter-spacing: 0;
+  }
+
+  .opl-contribution :where(p) {
+    margin: 0;
+    font-size: var(--opl-text-body);
+    line-height: var(--opl-leading-normal);
+  }
+
   .opl-contribution-technical-details {
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);

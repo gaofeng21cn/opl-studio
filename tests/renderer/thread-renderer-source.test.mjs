@@ -12,6 +12,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 const app = read("src/workbench/App.tsx");
 const main = read("src/main.tsx");
 const bridge = read("src/bridge/oplBridge.ts");
+const passthrough = read("scripts/webui-host/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
 const model = read("src/workbench/workbenchModel.ts");
 const runtimePage = read("src/workbench/RuntimeOverviewPage.tsx");
@@ -992,6 +993,19 @@ test("composer places dynamic OPL standard agents before Skills and keeps other 
   assert.match(composerPalette, /agents\.length[\s\S]*skills\.length/);
   assert.match(composerPalette, /其他模块/);
   assert.match(styles, /\.composer-palette \{[^}]*max-height: min\(520px, calc\(50dvh - 64px\)\);/s);
+});
+
+test("capability surfaces project dynamic OPL packages and dependency checks", () => {
+  assert.match(app, /id: "opl-modules"/);
+  assert.match(app, /model\.packageLifecycle\s*\.filter\(\(item\) => item\.official && item\.packageId !== "missing_bridge"\)/s);
+  assert.match(app, /model\.packageLifecycle\.flatMap\(\(owner\) => owner\.dependencies\.map/);
+  assert.match(app, /group\.id === "opl-modules" \|\| normalizedCapabilityQuery/);
+  assert.doesNotMatch(app, /item\.packageId\.startsWith\("opl-"\)/);
+  assert.match(settingsPanel, /owner\.dependencies\.map\(\(dependency\)/);
+  assert.match(settingsPanel, /packageDependencyPresentationStatus/);
+  assert.match(passthrough, /dependency_readiness/);
+  assert.match(model, /function packageDependencies\(/);
+  assert.match(styles, /\.opl-contribution :where\(h1, h2, h3, h4, h5, h6\)/);
 });
 
 test("desktop uses DSH columns and mobile keeps full-height thread dialogs", () => {

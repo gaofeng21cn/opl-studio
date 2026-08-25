@@ -259,6 +259,14 @@ function compactPackageRecord(value) {
   const installedReadiness = selectedFields(value?.installed_readiness, [
     "installed", "physical_status", "callability"
   ]);
+  const dependencyReadiness = selectedFields(value?.dependency_readiness, [
+    "status", "required_count", "present_count", "callable_count"
+  ]);
+  const dependencyChecks = Array.isArray(value?.dependency_readiness?.checks)
+    ? value.dependency_readiness.checks.map((check) => selectedFields(check, [
+      "package_id", "required", "present", "callable", "status", "reasons"
+    ])).filter(Boolean)
+    : undefined;
   const presence = selectedFields(value?.presence, [
     "registered", "installed", "present", "callable", "status", "reason"
   ]);
@@ -292,6 +300,9 @@ function compactPackageRecord(value) {
     ...(capabilityMetadata ? { capability_metadata: capabilityMetadata } : {}),
     ...(installedCarrierReadback ? { installed_carrier_readback: installedCarrierReadback } : {}),
     ...(installedReadiness ? { installed_readiness: installedReadiness } : {}),
+    ...(dependencyReadiness
+      ? { dependency_readiness: { ...dependencyReadiness, ...(dependencyChecks ? { checks: dependencyChecks } : {}) } }
+      : {}),
     ...(presence ? { presence } : {}),
     ...(capabilityExposure ? { capability_exposure: capabilityExposure } : {}),
     ...(actions ? { actions } : {}),

@@ -562,6 +562,21 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
               package_id: "future.agent",
               status: "available",
               presence: { registered: true, installed: true, present: true, callable: true, status: "present" },
+              dependency_readiness: {
+                status: "ready",
+                required_count: 1,
+                present_count: 1,
+                callable_count: 1,
+                checks: [{
+                  package_id: "future.scholar-skills",
+                  required: true,
+                  present: true,
+                  callable: true,
+                  status: "callable",
+                  reasons: [],
+                  private_dependency_payload: "private"
+                }]
+              },
               actions: { available: ["update"], recommended: null },
               owner_route_readback: { payload: "x".repeat(20_000) }
             }
@@ -612,6 +627,20 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
   assert.equal("package_lock_file" in state.agent_packages.directory.files, false);
   assert.equal("lifecycle_ledger_file" in state.agent_packages.directory.files, false);
   assert.equal(state.agent_packages.status_index.packages["future.agent"].status, "available");
+  assert.deepEqual(state.agent_packages.status_index.packages["future.agent"].dependency_readiness, {
+    status: "ready",
+    required_count: 1,
+    present_count: 1,
+    callable_count: 1,
+    checks: [{
+      package_id: "future.scholar-skills",
+      required: true,
+      present: true,
+      callable: true,
+      status: "callable",
+      reasons: []
+    }]
+  });
   assert.equal("owner_route_readback" in state.agent_packages.status_index.packages["future.agent"], false);
   assert.deepEqual(state.agent_packages.status_index.home_shortcut_preferences[0], {
     package_id: "future.agent",

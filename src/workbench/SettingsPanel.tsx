@@ -27,6 +27,7 @@ import type {
   OplInitializeReadback
 } from "../bridge/oplBridge";
 import type {
+  AgentPackageDependencyRef,
   AgentPackageLifecycleRef,
   ManagedUpdateComponentRef,
   ManagedUpdateProjection,
@@ -637,6 +638,12 @@ export function agentPackagePresentationStatus(item: AgentPackageLifecycleRef): 
   return "checking";
 }
 
+export function packageDependencyPresentationStatus(dependency: AgentPackageDependencyRef): string {
+  if (dependency.present === false || dependency.callable === false) return "unavailable";
+  if (["ready", "available", "callable", "current", "operational"].includes(dependency.status.toLowerCase())) return "ready";
+  return "checking";
+}
+
 export function isAgentCatalogPackage(item: Pick<AgentPackageLifecycleRef, "packageRole">): boolean {
   return item.packageRole === "standard_agent" || item.packageRole === "workflow_profile";
 }
@@ -1012,11 +1019,24 @@ function CapabilityDirectory({
     detail: packageRoleLabel(item.packageRole, locale),
     technical: item.sourceRef
   }));
+  const dependencyPackages = packageLifecycle.flatMap((owner) => owner.dependencies.map((dependency) => ({
+    id: dependency.packageId,
+    name: dependency.packageId,
+    description: locale === "zh"
+      ? `${owner.label} 的必需能力包`
+      : `Required capability package for ${owner.label}`,
+    status: packageDependencyPresentationStatus(dependency),
+    detail: locale === "zh" ? "动态依赖" : "Dynamic dependency",
+    technical: `${owner.sourceRef}#dependency_readiness.checks`
+  })));
+  const capabilityPackageItems = [...capabilityPackages, ...dependencyPackages].filter((item, index, items) => (
+    items.findIndex((candidate) => candidate.id === item.id) === index
+  ));
   const groups = [
     {
       id: "capability-packages",
       label: locale === "zh" ? "能力模块" : "Capability packages",
-      items: capabilityPackages
+      items: capabilityPackageItems
     },
     {
       id: "skills",

@@ -125,6 +125,25 @@ test("capability catalog keeps projected capability package roles out of the age
   assert.equal(presentation.isCapabilityCatalogPackage({ packageId: "missing_bridge", packageRole: "capability_package" }), false);
 });
 
+test("capability package dependencies keep their dynamic status in the capability catalog", () => {
+  assert.equal(presentation.packageDependencyPresentationStatus({
+    packageId: "mas-scholar-skills",
+    required: true,
+    present: true,
+    callable: true,
+    status: "ready",
+    reasons: []
+  }), "ready");
+  assert.equal(presentation.packageDependencyPresentationStatus({
+    packageId: "future-capability",
+    required: true,
+    present: false,
+    callable: false,
+    status: "missing",
+    reasons: ["not_installed"]
+  }), "unavailable");
+});
+
 test("storage absence is neutral and does not turn missing measurements into user action", () => {
   assert.equal(presentation.storagePresentationStatus({
     status: "attention_required",

@@ -380,6 +380,15 @@ export type AgentPackageReadinessRef = {
   selectable: boolean;
 };
 
+export type AgentPackageDependencyRef = {
+  packageId: string;
+  required: boolean | null;
+  present: boolean | null;
+  callable: boolean | null;
+  status: string;
+  reasons: string[];
+};
+
 export type AgentPackageLifecycleRef = {
   id: string;
   packageId: string;
@@ -394,6 +403,7 @@ export type AgentPackageLifecycleRef = {
   sessionRoutingSummaryI18n: AgentPackageLocalizedText;
   requiredSkillIds: string[];
   optionalSkillRefs: string[];
+  dependencies: AgentPackageDependencyRef[];
   installed: boolean | null;
   activated: boolean | null;
   readiness: AgentPackageReadinessRef;
@@ -734,6 +744,7 @@ export const initialWorkbenchModel: WorkbenchModel = {
       sessionRoutingSummaryI18n: {},
       requiredSkillIds: [],
       optionalSkillRefs: [],
+      dependencies: [],
       installed: null,
       activated: null,
       readiness: {
@@ -1796,6 +1807,22 @@ function packageCapabilityMetadata(record: Record<string, unknown>): {
   };
 }
 
+function packageDependencies(record: Record<string, unknown>): AgentPackageDependencyRef[] {
+  const readiness = asRecord(record.dependency_readiness);
+  return asRecordArray(readiness?.checks).flatMap((check) => {
+    const packageId = asString(check.package_id);
+    if (!packageId) return [];
+    return [{
+      packageId,
+      required: asOptionalBoolean(check.required),
+      present: asOptionalBoolean(check.present),
+      callable: asOptionalBoolean(check.callable),
+      status: asString(check.status) ?? "unknown",
+      reasons: asStringArray(check.reasons)
+    } satisfies AgentPackageDependencyRef];
+  });
+}
+
 function packageReadiness(record: Record<string, unknown>, installed: boolean | null): AgentPackageReadinessRef {
   const readiness = asRecord(record.readiness);
   const presence = asRecord(record.presence);
@@ -2093,6 +2120,7 @@ function packageLifecycleItem(
   const installed = asOptionalBoolean(record.installed ?? asRecord(record.installed_readiness)?.installed);
   const readiness = packageReadiness(record, installed);
   const capabilityMetadata = packageCapabilityMetadata(record);
+  const dependencies = packageDependencies(record);
   const packageCurrentness = asRecord(record.package_currentness);
   const sourceRef = source === "canonical_agent_packages"
     ? "opl app state --profile fast --json#app_state.agent_packages.directory + app_state.agent_packages.status_index"
@@ -2119,6 +2147,7 @@ function packageLifecycleItem(
     descriptionI18n: asLocalizedText(record.description_i18n),
     sessionRoutingSummaryI18n: asLocalizedText(record.session_routing_summary_i18n),
     ...capabilityMetadata,
+    dependencies,
     installed,
     activated: asOptionalBoolean(record.activated),
     readiness,
