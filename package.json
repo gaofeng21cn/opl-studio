@@ -118,6 +118,7 @@
     "build:docker": "docker build --tag one-person-lab-app:headless-candidate .",
     "plan:oci:multiarch": "node scripts/oci/build-plan.mjs",
     "smoke:desktop-live": "node scripts/smoke-desktop-live.mjs",
+    "smoke:preview": "node scripts/desktop/preview-smoke.mjs",
     "test:desktop": "node --test desktop/accessibility-qualification.test.mjs desktop/app-log-directory.test.mjs desktop/desktop-contract.test.mjs desktop/shutdown.test.mjs desktop/tray.test.mjs desktop/updater.test.mjs && npm run test:desktop-distribution",
     "test:desktop-distribution": "node --test tests/desktop/*.test.mjs",
     "test:headless": "node --test tests/headless/*.test.mjs",

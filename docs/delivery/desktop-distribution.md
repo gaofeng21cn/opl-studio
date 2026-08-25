@@ -26,9 +26,19 @@ version through the host contract. HOME, Electron state, installation, builder o
 one temporary root; the command removes them after writing `out/macos-desktop-updater-qualification.json`.
 This proves the local packaged update chain, not the GitHub release feed or Apple notarization.
 
+`npm run smoke:preview` runs the carrier-neutral renderer harness against an existing CDP page. It reads the
+Preview bundle identity when `--app-path` is supplied, exercises Standard and Full Framework readback through
+the native bridge, then opens Settings, Account & Models, About, Run status, and the task inspector. Optional
+Gateway setup and Codex turn hooks are supplied only through `OPL_STUDIO_GATEWAY_CREDENTIALS_FILE` or
+`OPL_STUDIO_GATEWAY_EMAIL`/`OPL_STUDIO_GATEWAY_PASSWORD`, and `OPL_STUDIO_CODEX_TURN_HOOK_FILE` or
+`OPL_STUDIO_CODEX_TURN_PROMPT`; secrets and prompts are never written to the receipt. Set
+`OPL_STUDIO_RUNTIME_PROFILES=standard,full` to require both mapped profiles, and use
+`--require-gateway-setup` or `--require-codex-turn` when those hooks are part of the run's acceptance.
+
 `npm run qualify:desktop:clean-vm` clones the configured Tart macOS base, installs the exact local DMG,
-launches the packaged App through a temporary SSH/CDP tunnel, and reads the renderer bridge, App state,
-Gateway owner projection, and native updater status. Its receipt always keeps `cleanVmReady=false` and
+launches the packaged App through a temporary SSH/CDP tunnel, and delegates to the same Preview smoke
+harness. `--attach` reuses an already running CDP target for debugging; it does not claim package identity
+unless `--app-path` allows a real `Info.plist` readback. Its receipt always keeps `cleanVmReady=false` and
 `releaseReady=false`: a successful local install is candidate evidence only, while a missing Framework/Codex
 runtime is recorded as a typed blocker instead of being hidden behind a shell fallback. The harness deletes
 the temporary VM by default; use `--keep-vm` only for local debugging.
