@@ -206,6 +206,112 @@ select {
   padding: 28px 0 20px;
 }
 
+/* The host owns a small, stable session chrome above DSH's scroll body. This
+   is intentionally text-only: it identifies the current conversation without
+   reintroducing a product mark or making the header compete with the transcript. */
+.opl-dsh-session-header {
+  flex: none;
+  min-width: 0;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 8px 32px 6px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+}
+
+.opl-dsh-session-header-copy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: min(748px, 100%);
+  margin: 0 auto;
+}
+
+.opl-dsh-session-header-copy strong,
+.opl-dsh-session-header-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opl-dsh-session-header-copy strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.opl-dsh-session-header-copy span {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.opl-studio-dsh-root [data-composer-seat] {
+  padding-bottom: 4px;
+}
+
+/* Studio keeps DSH's permission semantics but owns the localized label. The
+   control stays in the native composer mode row beside the existing + and
+   standard-Agent surfaces. */
+.opl-dsh-permission-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 220px;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.opl-dsh-permission-trigger:hover:not(:disabled),
+.opl-dsh-permission-trigger:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.opl-dsh-permission-trigger:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.opl-dsh-permission-trigger:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
+.opl-dsh-permission-icon,
+.opl-dsh-permission-chevron {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.opl-dsh-permission-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opl-dsh-permission-chevron {
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms ease;
+}
+
+.opl-dsh-permission-chevron.is-open {
+  transform: rotate(180deg);
+}
+
 .opl-dsh-conversation-shell {
   position: relative;
   width: 100%;
@@ -952,4 +1058,7 @@ select {
 
 @media (max-width: 640px) {
   .opl-dsh-thread { width: min(100% - 24px, 748px); }
+  .opl-dsh-session-header { padding-right: 16px; padding-left: 16px; }
+  .opl-dsh-session-header-copy { display: block; }
+  .opl-dsh-session-header-copy span { display: block; }
 }

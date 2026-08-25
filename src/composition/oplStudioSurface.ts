@@ -11,6 +11,8 @@ export type OplSetupOperationResult = {
   message?: string;
 };
 
+export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
+
 export type OplStudioPrimaryView = "conversation" | "runtime";
 export type RenderSettingsContribution = (options?: { only?: string }) => ReactNode;
 
@@ -18,6 +20,7 @@ export type OplStudioSurface = {
   locale: "zh" | "en";
   projectTitle: string;
   sessionTitle: string;
+  agentPermissions: OplAgentPermission;
   workspacePath: string;
   prompt: string;
   promptRevision: number;
@@ -91,6 +94,7 @@ export type OplStudioSurface = {
   updateQueue(itemId: string, action: { kind: string; content?: Array<{ type?: string; text?: string }> }): Promise<void>;
   notifyQueue(level: "info" | "error", text: string): void;
   openComposerPalette(): void;
+  setAgentPermissions(value: OplAgentPermission): void;
   stopTurn?(): void;
 };
 

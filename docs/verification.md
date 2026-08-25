@@ -163,10 +163,18 @@ The minimum installed pass verifies all of the following from
 
 - the Electron main process, sandboxed renderer, pinned DSH Host plugins, and
   persistent `codex app-server --stdio` child start from packaged resources;
-- desktop shows no OPL pseudo-logo or custom conversation header, retains DSH's
-  native hero/timeline placement, gives the wide sidebar title an 18 px top
-  inset while preserving compact-rail geometry, and exposes a top drag region
-  before mount;
+- desktop shows no OPL pseudo-logo, retains DSH's native hero/timeline placement,
+  and uses the Studio-owned text-only session/project header to keep the
+  conversation from touching the top edge. The wide sidebar title has an 18 px
+  top inset while preserving compact-rail geometry, the composer has a small
+  bottom clearance aligned with the sidebar footer, and the top drag region is
+  present before mount;
+- the composer keeps the existing DSH `+` capability entry and OPL standard-Agent
+  entry, and exposes a Chinese-labeled permission control using DSH's native
+  Menu/RiskConfirmation interaction. Selecting `工作区访问` or `只读` sends the
+  existing `/permission` command values; selecting `完全访问` requires the
+  native risk acknowledgement before the App-owned `agentPermissions` setting
+  is updated;
 - App-owned Settings placement shows `service_status` under Installed Services,
   keeps raw technical data collapsed until explicitly opened, and keeps
   `activity_log` absent from ordinary Settings;

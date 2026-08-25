@@ -122,7 +122,7 @@ import type {
 } from "../composition/contributionProjection";
 import { groupSettingsContributions, settingsContributionDestination } from "../composition/contributionProjection";
 import { createOplContributionActionRequest } from "../composition/contributionProjection";
-import type { OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
+import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
 import { CodexServerRequestPanel } from "./CodexServerRequestPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
@@ -2403,6 +2403,10 @@ export function App({
     setSettings(writeSetting(key, value));
   }
 
+  function setAgentPermissions(value: OplAgentPermission) {
+    updateSetting("agentPermissions", value);
+  }
+
   function updateAdditionalConversationInstructions(value: string) {
     setAdditionalConversationInstructions(writeAdditionalConversationInstructions(value));
   }
@@ -2705,6 +2709,7 @@ export function App({
     locale: settings.locale,
     projectTitle: currentProject,
     sessionTitle: localizedSessionTitle(currentSession?.title || t.newTaskTitle, settings.locale),
+    agentPermissions: settings.agentPermissions,
     workspacePath: selectedProject?.workspace ?? currentProject,
     prompt,
     promptRevision: prompt.length,
@@ -2813,6 +2818,7 @@ export function App({
     updateQueue: updateEphemeralQueue,
     notifyQueue: (_level, text) => setComposerSubmissionError(text),
     openComposerPalette,
+    setAgentPermissions,
     stopTurn: () => void stopActiveTurn()
   });
 

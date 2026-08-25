@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, PanelRight, Puzzle, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
-import { Menu, OnboardingSurface, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Activity, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, PanelRight, Puzzle, RefreshCw, Settings as SettingsIcon, Shield, ShieldAlert, ShieldCheck, X } from "lucide-react";
+import { IconChevronDownOutline14, Menu, OnboardingSurface, RiskConfirmation, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   SlotCore,
   type HostObservable,
@@ -37,7 +37,7 @@ import {
   type OplUiContributionsProjection,
   type OplUiContributionSlot
 } from "./contributionProjection";
-import type { OplStudioSurface } from "./oplStudioSurface";
+import type { OplAgentPermission, OplStudioSurface } from "./oplStudioSurface";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -477,10 +477,109 @@ function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   </div>;
 }
 
-function ConversationHeaderSlot(): null { return null; }
+function ConversationHeaderSlot() {
+  const studio = useStudio();
+  return <header className="opl-dsh-session-header" data-testid="opl-session-header">
+    <div className="opl-dsh-session-header-copy">
+      <strong title={studio.sessionTitle}>{studio.sessionTitle}</strong>
+      <span title={studio.projectTitle}>{studio.projectTitle}</span>
+    </div>
+  </header>;
+}
 
 function ConversationBodySlot() { return <>{useStudio().conversationBody}</>; }
 function OplBrandMarkSlot(): null { return null; }
+
+function StudioPermissionSelect({
+  value,
+  options,
+  locked,
+  locale,
+  command
+}: {
+  value: string;
+  options: Array<{ value: string; name: string; description: string }>;
+  locked: boolean;
+  locale: "zh" | "en";
+  command: (line: string) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const current = options.find((option) => option.value === value);
+  const currentLabel = current?.name ?? value;
+  const busy = pending !== null || confirmation !== null;
+  const iconFor = (permission: string) => permission === "danger-full-access"
+    ? <ShieldAlert aria-hidden="true" size={14} />
+    : permission === "workspace-write"
+      ? <ShieldCheck aria-hidden="true" size={14} />
+      : <Shield aria-hidden="true" size={14} />;
+  const items: MenuEntry[] = options.filter((option) => option.value !== "custom").map((option) => ({
+    id: option.value,
+    label: option.name,
+    icon: iconFor(option.value)
+  }));
+  const submit = (next: string) => {
+    setPending(next);
+    void command(`/permission ${next}`).catch(() => false).finally(() => setPending(null));
+  };
+  const choose = (next: string) => {
+    setOpen(false);
+    if (next === value) return;
+    if (next === "danger-full-access") {
+      setAcknowledged(false);
+      setConfirmation(next);
+      return;
+    }
+    submit(next);
+  };
+  const closeConfirmation = () => {
+    setAcknowledged(false);
+    setConfirmation(null);
+  };
+  const confirmFullAccess = () => {
+    if (locked || !acknowledged || confirmation === null) return;
+    const next = confirmation;
+    closeConfirmation();
+    submit(next);
+  };
+  return <>
+    <Menu
+      open={open}
+      items={items}
+      selectedId={value}
+      onSelect={choose}
+      onClose={() => setOpen(false)}
+      side="top"
+      anchor={<button
+        type="button"
+        className="opl-dsh-permission-trigger"
+        aria-label={locale === "zh" ? `权限：${currentLabel}` : `Access: ${currentLabel}`}
+        title={current?.description}
+        disabled={locked || busy}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+      >
+        <span className="opl-dsh-permission-icon">{iconFor(value)}</span>
+        <span className="opl-dsh-permission-label">{currentLabel}</span>
+        <span className={`opl-dsh-permission-chevron${open ? " is-open" : ""}`} aria-hidden="true"><IconChevronDownOutline14 /></span>
+      </button>}
+    />
+    <RiskConfirmation
+      open={confirmation !== null}
+      title={locale === "zh" ? "启用完整权限" : "Enable full access"}
+      description={locale === "zh" ? "完整权限允许任务修改本机文件。" : "Full access allows the task to modify local files."}
+      acknowledgeLabel={locale === "zh" ? "我了解此权限" : "I understand this access"}
+      cancelLabel={locale === "zh" ? "取消" : "Cancel"}
+      confirmLabel={locale === "zh" ? "启用" : "Enable"}
+      acknowledged={acknowledged}
+      disabled={locked}
+      onAcknowledgedChange={setAcknowledged}
+      onCancel={closeConfirmation}
+      onConfirm={confirmFullAccess}
+    />
+  </>;
+}
 function OplBrandNameSlot() { return <>One Person Lab</>; }
 function EmptyAttachmentSlot() { return null; }
 function HeroActionsSlot() {
@@ -583,13 +682,37 @@ function ComposerModelSlot() {
 function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const studio = useStudio();
   const input = { draft: studio.prompt, imageIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
+  const permissionValue = studio.agentPermissions === ":danger-full-access"
+    ? "danger-full-access"
+    : studio.agentPermissions === ":workspace" ? "workspace-write" : "read-only";
+  const permissionName = (value: string) => value === "danger-full-access"
+    ? (studio.locale === "zh" ? "完全访问" : "Full access")
+    : value === "workspace-write"
+      ? (studio.locale === "zh" ? "工作区访问" : "Workspace access")
+      : (studio.locale === "zh" ? "只读" : "Read only");
+  const permissionOptions = [
+    { value: "read-only", name: permissionName("read-only"), description: studio.locale === "zh" ? "仅读取，不修改文件。" : "Read without modifying files." },
+    { value: "workspace-write", name: permissionName("workspace-write"), description: studio.locale === "zh" ? "允许修改当前工作区。" : "Allow changes in the current workspace." },
+    { value: "danger-full-access", name: permissionName("danger-full-access"), description: studio.locale === "zh" ? "允许执行更广泛的本机操作。" : "Allow broader local operations." }
+  ];
+  const command = async (line: string) => {
+    const match = /^\/permission\s+(\S+)\s*$/.exec(line.trim());
+    const value = match?.[1];
+    const next = value === "danger-full-access" ? ":danger-full-access" : value === "workspace-write" ? ":workspace" : value === "read-only" ? ":read-only" : undefined;
+    if (!next) return false;
+    studio.setAgentPermissions(next);
+    return true;
+  };
   const keyboard = {
     snapshot: input, setDraft: studio.updatePrompt, submit: studio.submitPrompt, steerQueue: studio.steerQueue,
     undo: () => undefined, redo: () => undefined,
     pasteBegin: (text: string, selection: { start: number; end: number }) => studio.updatePrompt(`${studio.prompt.slice(0, selection.start)}${text}${studio.prompt.slice(selection.end)}`),
     invalidatePaste: () => undefined, track: () => undefined, arbitrate: () => "pass", space: () => false, dismissPopup: () => undefined
   };
-  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addImages: () => false, removeImage: () => undefined, pruneImages: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} draftImages={() => []} resolveSubmitMode={(running: boolean, gesture: string) => running && gesture === "accelerated" ? "steer" : "queue"} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={renderSlot} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
+  const inputRenderSlot = (key: string, props: Record<string, unknown>) => key === "conversation.input.plan"
+    ? <StudioPermissionSelect value={permissionValue} options={permissionOptions} locked={studio.sending} locale={studio.locale} command={command} />
+    : renderSlot(key, props);
+  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addImages: () => false, removeImage: () => undefined, pruneImages: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} draftImages={() => []} resolveSubmitMode={(running: boolean, gesture: string) => running && gesture === "accelerated" ? "steer" : "queue"} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
 }
 
 function QueueDockSlot() {

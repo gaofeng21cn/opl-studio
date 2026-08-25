@@ -540,6 +540,15 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(app, /setComposerSelections\(pendingSelections\)/);
   assert.match(settings, /agentPermissions: ":danger-full-access"/);
   assert.match(app, /permissions: settings\.agentPermissions/);
+  assert.match(slotHost, /function StudioPermissionSelect\(/);
+  assert.match(slotHost, /完整权限/);
+  assert.match(slotHost, /工作区访问/);
+  assert.match(slotHost, /只读/);
+  assert.match(slotHost, /command\(`\/permission \$\{next\}`\)/);
+  assert.match(slotHost, /key === "conversation\.input\.plan"/);
+  assert.match(slotHost, /<StudioPermissionSelect/);
+  assert.match(slotHost, /function EmptyAttachmentSlot\(\) \{ return null; \}/);
+  assert.match(slotHost, /function HeroActionsSlot\(\)/);
   for (const method of ["readCodexCapabilities", "readCodexPermissionProfiles", "pickFiles", "pickDirectory", "setLogDirectory"]) {
     assert.match(desktopPreload, new RegExp(`${method}:`));
     assert.match(hostCore, new RegExp(`case "${method}"`));
