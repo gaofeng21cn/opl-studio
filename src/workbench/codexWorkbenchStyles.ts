@@ -5,8 +5,36 @@ export const codexWorkbenchStyles = `
     color-scheme: light;
     --opl-native-titlebar-inset: 0px;
     --opl-sidebar-width: 236px;
-    --opl-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --opl-font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --opl-font-sans: var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    --opl-font-mono: var(--ds-font-family-code, ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+    /* OPL uses one compact desktop scale across DSH surfaces and host-owned
+       pages. Components may opt into a larger title, but should not invent a
+       new base size or weight. */
+    --opl-text-xs: 11px;
+    --opl-text-sm: 12px;
+    --opl-text-md: 13px;
+    --opl-text-body: 14px;
+    --opl-text-lg: 16px;
+    --opl-text-xl: 20px;
+    --opl-text-2xl: 24px;
+    --opl-text-display-sm: 28px;
+    --opl-text-display: 32px;
+    --opl-leading-tight: 1.25;
+    --opl-leading-normal: 1.45;
+    --opl-leading-relaxed: 1.6;
+    --opl-weight-regular: 400;
+    --opl-weight-medium: 500;
+    --opl-weight-semibold: 600;
+    --opl-space-1: 4px;
+    --opl-space-2: 8px;
+    --opl-space-3: 12px;
+    --opl-space-4: 16px;
+    --opl-space-5: 20px;
+    --opl-space-6: 24px;
+    --opl-control-sm: 30px;
+    --opl-control-md: 34px;
+    --opl-radius-control: 7px;
+    --opl-radius-surface: 10px;
 
     /* Selected from DeepSeek Harness ui-theme/design-platform.css at
        b150a551b8d465e31e418e1b2eaf5e79bbb7d28e for the reused primitives. */
@@ -63,6 +91,11 @@ export const codexWorkbenchStyles = `
     --opl-warning: var(--dsw-alias-state-warn-primary);
     --opl-warning-soft: color-mix(in oklab, var(--opl-warning) 16%, transparent);
     --opl-danger: var(--dsw-alias-state-error-primary);
+    --opl-surface-elevated: color-mix(in srgb, var(--opl-canvas) 94%, var(--opl-text));
+    --opl-focus-ring: 0 0 0 3px color-mix(in srgb, var(--opl-accent) 22%, transparent);
+    font-family: var(--opl-font-sans);
+    font-size: var(--opl-text-body);
+    line-height: var(--opl-leading-normal);
   }
 
   :root[data-opl-sidebar-resizing="true"],
@@ -88,6 +121,11 @@ export const codexWorkbenchStyles = `
 
   button {
     cursor: pointer;
+  }
+
+  :where(button, input, textarea, select, summary):focus-visible {
+    outline: 0;
+    box-shadow: var(--opl-focus-ring);
   }
 
   button:disabled {
@@ -120,23 +158,23 @@ export const codexWorkbenchStyles = `
     margin-bottom: 26px;
     color: var(--opl-text, rgb(15, 17, 21));
     overflow-wrap: anywhere;
-    font-size: 32px;
-    font-weight: 680;
-    line-height: 1.08;
+    font-size: var(--opl-text-display);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
   }
 
   .startup-readiness h1 {
     margin: 0;
-    font-size: 28px;
-    font-weight: 680;
-    line-height: 1.24;
+    font-size: var(--opl-text-display-sm);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
     letter-spacing: 0;
   }
 
   .startup-readiness-count {
     margin: 10px 0 30px;
     color: var(--opl-muted, rgb(97, 102, 107));
-    font-size: 15px;
+    font-size: var(--opl-text-lg);
     font-variant-numeric: tabular-nums;
   }
 
@@ -183,23 +221,23 @@ export const codexWorkbenchStyles = `
   .startup-readiness-stage-copy strong {
     min-width: 0;
     overflow-wrap: anywhere;
-    font-size: 14px;
-    font-weight: 620;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .startup-readiness-stage-copy > span {
     min-width: 0;
     overflow: hidden;
     color: var(--opl-muted, rgb(97, 102, 107));
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .startup-readiness-stage-status {
     color: var(--opl-muted, rgb(97, 102, 107));
-    font-size: 13px;
+    font-size: var(--opl-text-md);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -232,8 +270,8 @@ export const codexWorkbenchStyles = `
     border-radius: 8px;
     background: transparent;
     color: inherit;
-    font-size: 13px;
-    font-weight: 620;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .startup-readiness-actions button:hover {
@@ -254,8 +292,8 @@ export const codexWorkbenchStyles = `
     flex-basis: 100%;
     margin: 2px 0 0;
     color: var(--opl-muted, rgb(97, 102, 107));
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
   }
 
   @keyframes startup-readiness-spin {
@@ -355,8 +393,8 @@ export const codexWorkbenchStyles = `
 
   .opl-runtime-detail-result > section > h4 {
     margin: 0 0 6px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
     letter-spacing: 0;
   }
 
@@ -364,7 +402,7 @@ export const codexWorkbenchStyles = `
     display: block;
     margin-bottom: 4px;
     overflow-wrap: anywhere;
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .opl-structured-fields,
@@ -420,8 +458,8 @@ export const codexWorkbenchStyles = `
 
   .settings-contribution-section > h2 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .settings-contribution-package {
@@ -433,13 +471,13 @@ export const codexWorkbenchStyles = `
   .settings-contribution-package > h3 {
     margin: 8px 0 0;
     color: var(--opl-text);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .opl-contribution-technical-details {
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .opl-contribution-technical-details summary {
@@ -473,9 +511,9 @@ export const codexWorkbenchStyles = `
     background: var(--opl-canvas);
     color: var(--opl-text);
     font-family: var(--opl-font-sans);
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.5;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-regular);
+    line-height: var(--opl-leading-normal);
     letter-spacing: 0;
   }
 
@@ -554,8 +592,8 @@ export const codexWorkbenchStyles = `
     display: inline-flex;
     align-items: center;
     gap: 0;
-    font-size: 14px;
-    font-weight: 560;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-semibold);
     white-space: nowrap;
   }
 
@@ -657,8 +695,8 @@ export const codexWorkbenchStyles = `
     background: transparent;
     color: var(--opl-text);
     text-align: left;
-    font-size: 13px;
-    font-weight: 400;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-regular);
   }
 
   .quick-actions button:hover,
@@ -673,7 +711,7 @@ export const codexWorkbenchStyles = `
   .kbd-hint {
     margin-left: auto;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .sidebar-primary {
@@ -693,8 +731,8 @@ export const codexWorkbenchStyles = `
     justify-content: space-between;
     padding: 0 8px;
     color: var(--opl-muted);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
   }
 
   .sidebar-section-head strong {
@@ -724,14 +762,14 @@ export const codexWorkbenchStyles = `
   }
 
   .project-root {
-    font-weight: 520;
+    font-weight: var(--opl-weight-medium);
   }
 
   .project-root .project-device {
     margin-left: auto;
     color: var(--opl-muted);
-    font-size: 11px;
-    font-weight: 430;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-regular);
   }
 
   .project-root .project-status-dot {
@@ -756,13 +794,13 @@ export const codexWorkbenchStyles = `
   .project-context-link {
     min-height: 30px;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .project-context-link span:last-child {
     margin-left: auto;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .sidebar-panel-card,
@@ -790,8 +828,8 @@ export const codexWorkbenchStyles = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
-    font-weight: 400;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-regular);
   }
 
   .history-list li button span {
@@ -801,7 +839,7 @@ export const codexWorkbenchStyles = `
   .history-list li button small {
     margin-left: auto;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
     white-space: nowrap;
   }
 
@@ -827,8 +865,8 @@ export const codexWorkbenchStyles = `
     border-radius: 50%;
     background: var(--opl-success);
     color: var(--opl-canvas);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .account-auth-icon {
@@ -847,13 +885,13 @@ export const codexWorkbenchStyles = `
   }
 
   .account-copy strong {
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .account-copy small {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .sidebar-footer .settings-glyph {
@@ -910,8 +948,8 @@ export const codexWorkbenchStyles = `
     text-overflow: ellipsis;
     white-space: nowrap;
     margin: 0;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .topbar-actions {
@@ -971,7 +1009,7 @@ export const codexWorkbenchStyles = `
     border-radius: 7px;
     background: color-mix(in oklab, var(--opl-danger) 7%, transparent);
     color: var(--opl-danger);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .empty-thread {
@@ -988,14 +1026,14 @@ export const codexWorkbenchStyles = `
   }
 
   .empty-thread-inner strong {
-    font-size: 18px;
-    font-weight: 550;
+    font-size: var(--opl-text-lg);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .empty-thread-inner p {
     margin: 0;
     color: var(--opl-muted);
-    font-size: 13px;
+    font-size: var(--opl-text-md);
   }
 
   .empty-starters {
@@ -1028,8 +1066,8 @@ export const codexWorkbenchStyles = `
   .message-label {
     display: none;
     color: var(--opl-muted);
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-medium);
   }
 
   .message.assistant .message-label {
@@ -1072,8 +1110,8 @@ export const codexWorkbenchStyles = `
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    font-size: 14px;
-    line-height: 1.62;
+    font-size: var(--opl-text-body);
+    line-height: var(--opl-leading-relaxed);
   }
 
   .message-frame > div,
@@ -1088,9 +1126,9 @@ export const codexWorkbenchStyles = `
 
   .message.assistant .message-frame :where(h1, h2, h3, h4) {
     margin: 22px 0 9px;
-    font-size: 15px;
-    line-height: 1.4;
-    font-weight: 600;
+    font-size: var(--opl-text-lg);
+    line-height: var(--opl-leading-normal);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .message.assistant .message-frame :where(ul, ol) {
@@ -1107,7 +1145,7 @@ export const codexWorkbenchStyles = `
     background: color-mix(in srgb, var(--opl-text) 6%, transparent);
     font-family: var(--opl-font-mono);
     font-size: 0.9em;
-    font-weight: 400;
+    font-weight: var(--opl-weight-regular);
   }
 
   .message.assistant .message-frame :where([data-streamdown="link"]) {
@@ -1118,7 +1156,7 @@ export const codexWorkbenchStyles = `
     background: transparent;
     color: inherit;
     font: inherit;
-    font-weight: 450;
+    font-weight: var(--opl-weight-medium);
     text-decoration-line: underline;
     text-decoration-color: color-mix(in oklab, var(--opl-text) 28%, transparent);
     text-decoration-thickness: 1px;
@@ -1150,7 +1188,7 @@ export const codexWorkbenchStyles = `
     border-bottom: 1px solid var(--opl-border-light);
     background: color-mix(in srgb, var(--opl-sidebar) 72%, var(--opl-canvas));
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .message.assistant .message-frame :where([data-streamdown="code-block-actions"]) {
@@ -1193,8 +1231,8 @@ export const codexWorkbenchStyles = `
     padding: 0;
     background: transparent;
     font-family: var(--opl-font-mono);
-    font-size: 12px;
-    line-height: 1.55;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-relaxed);
   }
 
   .message.assistant .message-frame :where([data-streamdown="code-block"] code) {
@@ -1205,7 +1243,7 @@ export const codexWorkbenchStyles = `
   .message.assistant .message-frame :where(table) {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--opl-text-md);
   }
 
   .message.assistant .message-frame :where(th, td) {
@@ -1224,7 +1262,7 @@ export const codexWorkbenchStyles = `
     gap: 5px;
     margin-top: 3px;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .run-event {
@@ -1268,8 +1306,8 @@ export const codexWorkbenchStyles = `
     outline: none;
     background: transparent;
     color: var(--opl-text);
-    font-size: 13.5px;
-    line-height: 1.5;
+    font-size: var(--opl-text-body);
+    line-height: var(--opl-leading-normal);
     resize: none;
     field-sizing: content;
     max-height: 180px;
@@ -1299,7 +1337,7 @@ export const codexWorkbenchStyles = `
     border-radius: 7px;
     background: var(--opl-sidebar);
     color: var(--opl-text);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .composer-selection > span {
@@ -1355,8 +1393,8 @@ export const codexWorkbenchStyles = `
   }
 
   .composer-palette > header strong {
-    font-size: 13px;
-    font-weight: 560;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .composer-palette-search {
@@ -1382,7 +1420,7 @@ export const codexWorkbenchStyles = `
     outline: 0;
     background: transparent;
     color: var(--opl-text);
-    font-size: 12.5px;
+    font-size: var(--opl-text-md);
   }
 
   .composer-palette-scroll {
@@ -1403,8 +1441,8 @@ export const codexWorkbenchStyles = `
     display: block;
     padding: 4px 7px;
     color: var(--opl-faint);
-    font-size: 10.5px;
-    font-weight: 560;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .composer-palette-row {
@@ -1447,15 +1485,15 @@ export const codexWorkbenchStyles = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12.5px;
-    font-weight: 520;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .composer-palette-row small {
     overflow: hidden;
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1467,7 +1505,7 @@ export const codexWorkbenchStyles = `
   .composer-palette-state {
     margin: 8px;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .composer-palette-state.error {
@@ -1517,7 +1555,7 @@ export const codexWorkbenchStyles = `
     outline: 0;
     background: transparent;
     color: var(--opl-text);
-    font-size: 14px;
+    font-size: var(--opl-text-body);
   }
 
   .thread-search-input button {
@@ -1547,8 +1585,8 @@ export const codexWorkbenchStyles = `
     display: block;
     padding: 3px 7px 6px;
     color: var(--opl-faint);
-    font-size: 10.5px;
-    font-weight: 560;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .thread-search-results > button {
@@ -1586,15 +1624,15 @@ export const codexWorkbenchStyles = `
   }
 
   .thread-search-result-copy strong {
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .thread-search-result-copy small,
   .thread-search-project,
   .thread-search-empty {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .thread-search-project {
@@ -1630,7 +1668,7 @@ export const codexWorkbenchStyles = `
 
   .composer-status {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .composer-status.error {
@@ -1654,7 +1692,7 @@ export const codexWorkbenchStyles = `
     border-radius: 8px;
     background: transparent;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .composer-action {
@@ -1734,22 +1772,22 @@ export const codexWorkbenchStyles = `
 
   .settings-detail-header,
   .settings-content {
-    width: min(100%, 760px);
+    width: min(100%, 860px);
     margin: 0 auto;
-    padding-right: 34px;
-    padding-left: 34px;
+    padding-right: 40px;
+    padding-left: 40px;
   }
 
   .settings-detail-header {
-    padding-top: 32px;
-    padding-bottom: 20px;
+    padding-top: 28px;
+    padding-bottom: 18px;
   }
 
   .settings-detail-header h1 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 550;
-    line-height: 1.3;
+    font-size: var(--opl-text-xl);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
   }
 
   .settings-detail-title-row {
@@ -1774,13 +1812,14 @@ export const codexWorkbenchStyles = `
 
   .settings-subnav button {
     flex: none;
-    min-height: 28px;
-    padding: 0 9px;
+    min-height: var(--opl-control-sm);
+    padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-tight);
   }
 
   .settings-subnav button:hover {
@@ -1794,7 +1833,7 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-content {
-    padding-bottom: 62px;
+    padding-bottom: 56px;
   }
 
   .settings-group {
@@ -1806,14 +1845,15 @@ export const codexWorkbenchStyles = `
   .settings-group + .settings-group,
   .gateway-identity + .settings-group,
   .about-mark + .settings-group {
-    margin-top: 28px;
+    margin-top: var(--opl-space-6);
   }
 
   .settings-group h2 {
-    margin: 0 0 9px;
+    margin: 0 0 var(--opl-space-2);
     color: var(--opl-text);
-    font-size: 13px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
   }
 
   .settings-rows {
@@ -1821,12 +1861,12 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-row {
-    min-height: 60px;
+    min-height: 56px;
     display: grid;
     grid-template-columns: minmax(150px, 0.9fr) minmax(230px, 1.35fr);
     align-items: center;
-    gap: 20px;
-    padding: 10px 0;
+    gap: var(--opl-space-6);
+    padding: 9px 0;
     border-bottom: 1px solid var(--opl-border);
   }
 
@@ -1840,13 +1880,15 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-row-label > span {
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-page small {
     color: var(--opl-faint);
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-row-value {
@@ -1855,6 +1897,8 @@ export const codexWorkbenchStyles = `
     align-items: center;
     justify-content: flex-end;
     color: var(--opl-muted);
+    font-size: var(--opl-text-md);
+    line-height: var(--opl-leading-normal);
     text-align: right;
   }
 
@@ -1871,13 +1915,13 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-inline-command {
-    min-height: 30px;
+    min-height: var(--opl-control-sm);
     display: inline-flex;
     align-items: center;
     gap: 7px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -1890,7 +1934,7 @@ export const codexWorkbenchStyles = `
     overflow-wrap: anywhere;
     color: var(--opl-muted);
     font-family: var(--opl-font-mono);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
     white-space: normal;
   }
 
@@ -1906,7 +1950,7 @@ export const codexWorkbenchStyles = `
   .gateway-identity strong {
     overflow: hidden;
     color: var(--opl-text);
-    font-weight: 550;
+    font-weight: var(--opl-weight-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1920,15 +1964,15 @@ export const codexWorkbenchStyles = `
     border-radius: 50%;
     background: var(--opl-text);
     color: var(--opl-canvas);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .settings-avatar.large {
     width: 42px;
     height: 42px;
     flex-basis: 42px;
-    font-size: 13px;
+    font-size: var(--opl-text-md);
   }
 
   .gateway-identity {
@@ -1954,16 +1998,17 @@ export const codexWorkbenchStyles = `
     gap: 6px;
     min-width: 0;
     color: var(--dsh-text-secondary, #666);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-tight);
   }
 
   .gateway-login-form input {
     width: 100%;
     min-width: 0;
-    height: 32px;
+    height: var(--opl-control-md);
     padding: 0 9px;
     border: 1px solid var(--dsh-border-default, rgba(127, 127, 127, 0.28));
-    border-radius: 6px;
+    border-radius: var(--opl-radius-control);
     background: var(--dsh-surface-primary, transparent);
     color: inherit;
     font: inherit;
@@ -2013,16 +2058,17 @@ export const codexWorkbenchStyles = `
     display: grid;
     gap: 6px;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-tight);
   }
 
   .settings-api-key-form input {
     width: 100%;
     min-width: 0;
-    height: 32px;
+    height: var(--opl-control-md);
     padding: 0 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--opl-radius-control);
     outline: 0;
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -2039,8 +2085,8 @@ export const codexWorkbenchStyles = `
     grid-column: 1 / -1;
     margin: 0;
     color: var(--opl-faint);
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-workspace-location {
@@ -2083,28 +2129,28 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-command {
-    min-height: 31px;
+    min-height: var(--opl-control-md);
     display: inline-flex;
     align-items: center;
     gap: 7px;
     margin-top: 18px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
 
   .settings-icon-button {
-    width: 29px;
-    height: 29px;
-    min-width: 29px;
-    flex: 0 0 29px;
+    width: var(--opl-control-sm);
+    height: var(--opl-control-sm);
+    min-width: var(--opl-control-sm);
+    flex: 0 0 var(--opl-control-sm);
     display: inline-grid;
     place-items: center;
     padding: 0;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -2133,10 +2179,10 @@ export const codexWorkbenchStyles = `
 
   .setting-toggle,
   .setting-select {
-    min-height: 30px;
+    min-height: var(--opl-control-sm);
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -2192,7 +2238,7 @@ export const codexWorkbenchStyles = `
     gap: 2px;
     padding: 2px;
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-sidebar);
   }
 
@@ -2212,15 +2258,17 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-page-summary {
-    min-height: 48px;
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 18px;
-    padding-bottom: 14px;
+    gap: var(--opl-space-4);
+    margin-bottom: var(--opl-space-4);
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--opl-border);
     color: var(--opl-muted);
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-page-summary-with-action > span:first-child {
@@ -2245,7 +2293,8 @@ export const codexWorkbenchStyles = `
   .settings-capability-summary {
     margin-top: -12px;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-inline-notice {
@@ -2278,14 +2327,14 @@ export const codexWorkbenchStyles = `
     gap: 12px;
     margin: 0;
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .settings-capability-group > h2 span {
     color: var(--opl-faint);
-    font-size: 10.5px;
-    font-weight: 450;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-regular);
   }
 
   .settings-capability-list {
@@ -2299,12 +2348,12 @@ export const codexWorkbenchStyles = `
 
   .settings-capability-row > summary,
   .settings-instruction-source > summary {
-    min-height: 64px;
+    min-height: 60px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 16px;
-    padding: 9px 0;
+    gap: var(--opl-space-4);
+    padding: 8px 0;
     list-style: none;
     cursor: pointer;
   }
@@ -2324,8 +2373,8 @@ export const codexWorkbenchStyles = `
   .settings-capability-copy strong {
     overflow: hidden;
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -2382,8 +2431,8 @@ export const codexWorkbenchStyles = `
     border-top: 1px solid var(--opl-border);
     color: var(--opl-muted);
     font-family: var(--opl-font-mono);
-    font-size: 11px;
-    line-height: 1.55;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-relaxed);
     text-align: left;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -2417,8 +2466,8 @@ export const codexWorkbenchStyles = `
   .settings-editor-heading strong,
   .settings-default-row strong {
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .settings-editor-heading small,
@@ -2426,8 +2475,8 @@ export const codexWorkbenchStyles = `
   .settings-default-row small,
   .settings-editor-label > span {
     color: var(--opl-faint);
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-editor-block textarea {
@@ -2441,8 +2490,8 @@ export const codexWorkbenchStyles = `
     background: var(--opl-canvas);
     color: var(--opl-text);
     font-family: var(--opl-font-mono);
-    font-size: 11.5px;
-    line-height: 1.55;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-relaxed);
   }
 
   .settings-editor-block textarea:focus {
@@ -2471,7 +2520,7 @@ export const codexWorkbenchStyles = `
     justify-content: space-between;
     gap: 12px;
     color: var(--opl-muted);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
     list-style: none;
     cursor: pointer;
   }
@@ -2500,8 +2549,8 @@ export const codexWorkbenchStyles = `
     background: var(--opl-hover);
     color: var(--opl-muted);
     font-family: var(--opl-font-mono);
-    font-size: 11px;
-    line-height: 1.55;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-relaxed);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -2531,8 +2580,8 @@ export const codexWorkbenchStyles = `
     place-items: center;
     border: 1px solid var(--opl-border-strong);
     border-radius: 6px;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .opl-first-run header p,
@@ -2544,12 +2593,12 @@ export const codexWorkbenchStyles = `
   .opl-first-run header p {
     margin-bottom: 5px;
     color: var(--opl-faint);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
   }
 
   .opl-first-run header h1 {
-    font-size: 24px;
-    font-weight: 620;
+    font-size: var(--opl-text-2xl);
+    font-weight: var(--opl-weight-semibold);
     letter-spacing: 0;
   }
 
@@ -2557,8 +2606,8 @@ export const codexWorkbenchStyles = `
     display: block;
     margin-top: 9px;
     color: var(--opl-muted);
-    font-size: 12px;
-    line-height: 1.6;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-relaxed);
   }
 
   .opl-first-run-checklist {
@@ -2587,13 +2636,13 @@ export const codexWorkbenchStyles = `
 
   .opl-first-run-checklist strong {
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .opl-first-run-checklist small {
     color: var(--opl-muted);
-    line-height: 1.45;
+    line-height: var(--opl-leading-normal);
   }
 
   .opl-first-run > footer {
@@ -2605,8 +2654,8 @@ export const codexWorkbenchStyles = `
   .opl-first-run-error {
     margin: -12px 0 0;
     color: var(--opl-danger);
-    font-size: 12px;
-    line-height: 1.5;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
   }
 
   .agent-catalog,
@@ -2633,19 +2682,19 @@ export const codexWorkbenchStyles = `
     border: 1px solid var(--opl-border);
     border-radius: 7px;
     color: var(--opl-muted);
-    font-size: 11.5px;
-    line-height: 1.45;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-search-field {
     width: min(100%, 360px);
-    min-height: 34px;
+    min-height: var(--opl-control-md);
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-faint);
   }
@@ -2679,13 +2728,13 @@ export const codexWorkbenchStyles = `
     border-radius: 6px;
     background: var(--opl-canvas);
     color: var(--opl-muted);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
   }
 
   .agent-catalog-filters > span {
     margin-left: auto;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .agent-catalog-group {
@@ -2698,14 +2747,14 @@ export const codexWorkbenchStyles = `
     gap: 7px;
     margin: 0;
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .agent-catalog-group > h2 span {
     color: var(--opl-faint);
-    font-size: 10.5px;
-    font-weight: 450;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
   }
 
   .agent-package-list {
@@ -2740,8 +2789,8 @@ export const codexWorkbenchStyles = `
   .agent-package-copy > strong {
     overflow: hidden;
     color: var(--opl-text);
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -2758,7 +2807,7 @@ export const codexWorkbenchStyles = `
     flex-wrap: wrap;
     gap: 4px 10px;
     color: var(--opl-faint);
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
   }
 
   .agent-package-summary-actions,
@@ -2808,7 +2857,7 @@ export const codexWorkbenchStyles = `
   .agent-package-details dt,
   .agent-technical-details dt {
     color: var(--opl-faint);
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
   }
 
   .agent-package-details dd,
@@ -2816,7 +2865,7 @@ export const codexWorkbenchStyles = `
     margin: 0;
     overflow-wrap: anywhere;
     color: var(--opl-muted);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
   }
 
   .agent-package-actions,
@@ -2862,8 +2911,8 @@ export const codexWorkbenchStyles = `
 
   .home-shortcut-copy strong {
     color: var(--opl-text);
-    font-size: 11.5px;
-    font-weight: 550;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .home-shortcut-preference input {
@@ -2874,7 +2923,7 @@ export const codexWorkbenchStyles = `
     min-width: 0;
     overflow: hidden;
     color: var(--opl-faint);
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -2901,17 +2950,17 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-action-button {
-    min-height: 29px;
+    min-height: var(--opl-control-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     padding: 0 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
     white-space: nowrap;
   }
 
@@ -2951,7 +3000,7 @@ export const codexWorkbenchStyles = `
     align-items: center;
     gap: 6px;
     color: var(--opl-faint);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
     list-style: none;
     cursor: default;
   }
@@ -2976,16 +3025,16 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-action-feedback {
-    min-height: 38px;
+    min-height: 40px;
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 18px;
     padding: 8px 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     color: var(--opl-muted);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
   }
 
   .settings-action-feedback[data-tone="success"] {
@@ -3017,10 +3066,10 @@ export const codexWorkbenchStyles = `
     width: min(410px, calc(100vw - 32px));
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
-    gap: 12px;
-    padding: 18px;
+    gap: var(--opl-space-3);
+    padding: var(--opl-space-5);
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
+    border-radius: var(--opl-radius-surface);
     background: var(--opl-canvas);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
   }
@@ -3037,15 +3086,15 @@ export const codexWorkbenchStyles = `
 
   .settings-action-dialog h2 {
     margin: 2px 0 7px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .settings-action-dialog p {
     margin: 0 0 5px;
     color: var(--opl-muted);
-    font-size: 12px;
-    line-height: 1.5;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
   }
 
   .settings-add-agent-dialog {
@@ -3061,7 +3110,7 @@ export const codexWorkbenchStyles = `
     display: grid;
     gap: 5px;
     color: var(--opl-muted);
-    font-size: 11.5px;
+    font-size: var(--opl-text-sm);
   }
 
   .settings-add-agent-fields input,
@@ -3085,13 +3134,13 @@ export const codexWorkbenchStyles = `
   }
 
   .settings-action-dialog-actions button {
-    min-height: 31px;
+    min-height: var(--opl-control-md);
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 0 11px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -3142,8 +3191,8 @@ export const codexWorkbenchStyles = `
 
   .inspector-header h2 {
     margin: 0;
-    font-size: 12.5px;
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .environment-detail-header {
@@ -3196,8 +3245,8 @@ export const codexWorkbenchStyles = `
   .environment-menu-group {
     margin: 5px 8px 2px;
     color: var(--opl-muted);
-    font-size: 10.5px;
-    font-weight: 500;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
   }
 
   .environment-menu-entry:first-of-type .environment-menu-group {
@@ -3212,8 +3261,8 @@ export const codexWorkbenchStyles = `
     margin: 0;
     padding: 0 8px 9px;
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .environment-menu-entry button {
@@ -3253,8 +3302,8 @@ export const codexWorkbenchStyles = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-medium);
   }
 
   .environment-menu-copy small {
@@ -3263,13 +3312,13 @@ export const codexWorkbenchStyles = `
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.3;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-tight);
   }
 
   .environment-menu-meta {
     color: var(--opl-faint);
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
     white-space: nowrap;
   }
 
@@ -3305,8 +3354,8 @@ export const codexWorkbenchStyles = `
   .context-block h3,
   .starter-form h3 {
     margin: 0;
-    font-size: 12.5px;
-    font-weight: 500;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
   .context-empty,
@@ -3317,8 +3366,8 @@ export const codexWorkbenchStyles = `
   .package-lifecycle-card p,
   .package-lifecycle-card small {
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .context-list,
@@ -3366,7 +3415,7 @@ export const codexWorkbenchStyles = `
     word-break: break-word;
     white-space: pre-wrap;
     font-family: var(--opl-font-mono);
-    font-size: 10px;
+    font-size: var(--opl-text-xs);
   }
 
   .context-quiet-action,
@@ -3381,7 +3430,7 @@ export const codexWorkbenchStyles = `
     border-radius: 7px;
     background: var(--opl-canvas);
     color: var(--opl-text);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .artifact-preview-tabs,
@@ -3407,7 +3456,7 @@ export const codexWorkbenchStyles = `
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .artifact-preview-tabs [role="tab"][data-state="active"] {
@@ -3431,7 +3480,7 @@ export const codexWorkbenchStyles = `
 
   .artifact-preview-card h3 {
     margin: 0;
-    font-size: 12.5px;
+    font-size: var(--opl-text-md);
   }
 
   .artifact-preview-card .status-pill,
@@ -3473,7 +3522,7 @@ export const codexWorkbenchStyles = `
   .package-detail-list dt,
   .package-ref-list dt {
     color: var(--opl-muted);
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
   }
 
   .trace-list dd,
@@ -3501,7 +3550,7 @@ export const codexWorkbenchStyles = `
   .starter-field {
     display: grid;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .starter-field input,
@@ -3529,7 +3578,7 @@ export const codexWorkbenchStyles = `
     border-radius: 5px;
     background: var(--opl-accent-soft);
     color: var(--opl-text);
-    font-size: 10px;
+    font-size: var(--opl-text-xs);
   }
 
   .project-directory {
@@ -3564,7 +3613,7 @@ export const codexWorkbenchStyles = `
     color: var(--opl-muted);
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10.5px;
+    font-size: var(--opl-text-xs);
   }
 
   .thread-scope-filter button[data-active="true"] {
@@ -3588,7 +3637,7 @@ export const codexWorkbenchStyles = `
   .thread-directory-state {
     margin: 6px 9px 10px;
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .thread-directory-state.error,
@@ -3629,8 +3678,8 @@ export const codexWorkbenchStyles = `
   .thread-directory-copy strong {
     max-width: 100%;
     display: block;
-    font-size: 12.5px;
-    font-weight: 400;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-regular);
   }
 
   .thread-directory-copy small,
@@ -3723,15 +3772,15 @@ export const codexWorkbenchStyles = `
   .thread-detail-popover h2,
   .thread-confirmation-dialog h2 {
     margin: 0;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-medium);
   }
 
   .thread-detail-title {
     display: block;
     margin: 12px 0 8px;
     overflow-wrap: anywhere;
-    font-size: 13px;
+    font-size: var(--opl-text-md);
   }
 
   .thread-detail-popover dl,
@@ -3768,7 +3817,7 @@ export const codexWorkbenchStyles = `
   .thread-confirmation-dialog code {
     white-space: pre-wrap;
     font-family: var(--opl-font-mono);
-    font-size: 10px;
+    font-size: var(--opl-text-xs);
   }
 
   .thread-detail-actions,
@@ -3821,7 +3870,7 @@ export const codexWorkbenchStyles = `
   .codex-server-request-panel > header span {
     margin-left: auto;
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .codex-server-request {
@@ -3840,19 +3889,19 @@ export const codexWorkbenchStyles = `
   .codex-server-request-message {
     margin: 0;
     color: var(--opl-muted);
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
     overflow-wrap: anywhere;
   }
 
   .codex-server-request-field {
     display: grid;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
   }
 
   .codex-server-request-field small {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .codex-server-request-field input,
@@ -3911,8 +3960,8 @@ export const codexWorkbenchStyles = `
     border-radius: 6px;
     background: transparent;
     color: var(--opl-text);
-    font-size: 13px;
-    font-weight: 400;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-regular);
     line-height: 20px;
     cursor: pointer;
     overflow: hidden;
@@ -3937,8 +3986,8 @@ export const codexWorkbenchStyles = `
     border-radius: 6px;
     background: transparent;
     color: var(--opl-text);
-    font-size: 13px;
-    font-weight: 400;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-regular);
     line-height: 20px;
   }
 
@@ -4009,16 +4058,16 @@ export const codexWorkbenchStyles = `
     margin: 0;
     padding: 0 4px;
     color: var(--dsw-alias-label-tertiary);
-    font-size: 14px;
-    font-weight: 400;
+    font-size: var(--opl-text-body);
+    font-weight: var(--opl-weight-regular);
     line-height: 20px;
   }
 
   .runtime-snapshot-note {
     margin: 8px 0 0;
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .runtime-snapshot-note[data-source="cached"] {
@@ -4045,9 +4094,11 @@ export const codexWorkbenchStyles = `
     min-width: 0;
     min-height: 100%;
     overflow: auto;
-    padding: 28px clamp(18px, 3.4vw, 48px) 40px;
+    padding: var(--opl-space-6) clamp(20px, 3.2vw, 44px) 32px;
     background: var(--opl-canvas);
     color: var(--opl-text);
+    font-size: var(--opl-text-md);
+    line-height: var(--opl-leading-normal);
   }
 
   .runtime-overview-header,
@@ -4066,33 +4117,33 @@ export const codexWorkbenchStyles = `
 
   .runtime-overview-header {
     justify-content: space-between;
-    gap: 16px;
-    min-height: 38px;
+    gap: var(--opl-space-4);
+    min-height: 36px;
   }
 
   .runtime-overview-header > div {
-    gap: 9px;
+    gap: var(--opl-space-2);
     min-width: 0;
   }
 
   .runtime-overview-header h1 {
     margin: 0;
-    font-size: 20px;
-    line-height: 1.2;
-    font-weight: 600;
+    font-size: var(--opl-text-xl);
+    line-height: var(--opl-leading-tight);
+    font-weight: var(--opl-weight-semibold);
     letter-spacing: 0;
   }
 
   .runtime-icon-button,
   .runtime-stage-popover > header button {
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
+    flex: 0 0 var(--opl-control-md);
+    width: var(--opl-control-md);
+    height: var(--opl-control-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-muted);
   }
@@ -4115,7 +4166,7 @@ export const codexWorkbenchStyles = `
 
   .runtime-domain-view-title > span {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .runtime-domain-view-title h1 {
@@ -4129,8 +4180,8 @@ export const codexWorkbenchStyles = `
   .runtime-domain-detail-view > header h4,
   .runtime-domain-view-entries > h4 {
     margin: 0;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .runtime-domain-detail-view > header h4 {
@@ -4208,21 +4259,22 @@ export const codexWorkbenchStyles = `
     display: grid;
     grid-template-columns: auto minmax(150px, 220px) minmax(150px, 240px) minmax(120px, 1fr);
     align-items: end;
-    gap: 12px;
-    margin-top: 24px;
-    padding: 14px 0;
+    gap: var(--opl-space-4);
+    margin-top: var(--opl-space-5);
+    padding: 12px 0;
     border-block: 1px solid var(--opl-border);
   }
 
   .runtime-scope-band > strong {
     align-self: center;
-    font-size: 12px;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .runtime-scope-band label {
     min-width: 0;
     display: grid;
-    gap: 5px;
+    gap: var(--opl-space-1);
   }
 
   .runtime-scope-band label > span,
@@ -4235,16 +4287,16 @@ export const codexWorkbenchStyles = `
   .runtime-work-usage dt,
   .runtime-work-time {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .runtime-scope-band select,
   .runtime-list-controls select {
     min-width: 0;
-    height: 34px;
+    height: var(--opl-control-md);
     padding: 0 28px 0 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -4264,7 +4316,7 @@ export const codexWorkbenchStyles = `
 
   .runtime-summary-band > div {
     min-width: 0;
-    padding: 16px 0;
+    padding: 14px 0;
   }
 
   .runtime-summary-band > div + div {
@@ -4274,13 +4326,13 @@ export const codexWorkbenchStyles = `
 
   .runtime-summary-band dt {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .runtime-summary-band dd {
-    margin: 5px 0 0;
-    font-size: 18px;
-    font-weight: 600;
+    margin: var(--opl-space-1) 0 0;
+    font-size: var(--opl-text-lg);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .runtime-summary-band dd[data-tone="success"] { color: var(--opl-success); }
@@ -4293,7 +4345,7 @@ export const codexWorkbenchStyles = `
     display: grid;
     grid-template-columns: minmax(220px, 1.1fr) minmax(240px, 1fr) minmax(220px, auto);
     align-items: center;
-    gap: 18px;
+    gap: var(--opl-space-4);
     padding: 14px 0;
     border-bottom: 1px solid var(--opl-border);
   }
@@ -4327,8 +4379,8 @@ export const codexWorkbenchStyles = `
   }
 
   .runtime-recovery-heading h2 {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .runtime-recovery-heading p,
@@ -4336,8 +4388,8 @@ export const codexWorkbenchStyles = `
   .runtime-recovery-action > span,
   .runtime-recovery-action p {
     color: var(--opl-muted);
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
   }
 
   .runtime-recovery-band dl {
@@ -4351,8 +4403,8 @@ export const codexWorkbenchStyles = `
   .runtime-recovery-band dd {
     margin: 3px 0 0;
     overflow-wrap: anywhere;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
   }
 
   .runtime-recovery-action {
@@ -4363,17 +4415,17 @@ export const codexWorkbenchStyles = `
 
   .runtime-recovery-action button,
   .runtime-recovery-confirmation button {
-    min-height: 32px;
+    min-height: var(--opl-control-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
-    font-size: 11px;
+    font-size: var(--opl-text-sm);
   }
 
   .runtime-recovery-action button:hover:not(:disabled),
@@ -4389,7 +4441,7 @@ export const codexWorkbenchStyles = `
 
   .runtime-recovery-confirmation > span {
     color: var(--opl-muted);
-    font-size: 11px;
+    font-size: var(--opl-text-xs);
   }
 
   .runtime-recovery-confirmation button.primary {
@@ -4409,19 +4461,19 @@ export const codexWorkbenchStyles = `
 
   .runtime-list-heading {
     justify-content: space-between;
-    gap: 16px;
-    margin-top: 24px;
+    gap: var(--opl-space-4);
+    margin-top: var(--opl-space-5);
   }
 
   .runtime-list-heading > div:first-child {
-    gap: 10px;
+    gap: var(--opl-space-2);
     min-width: 0;
   }
 
   .runtime-list-heading h2 {
     margin: 0;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: var(--opl-text-lg);
+    font-weight: var(--opl-weight-semibold);
   }
 
   .runtime-list-controls {
@@ -4429,14 +4481,14 @@ export const codexWorkbenchStyles = `
   }
 
   .runtime-archive-button {
-    min-height: 34px;
+    min-height: var(--opl-control-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -4460,8 +4512,8 @@ export const codexWorkbenchStyles = `
 
   .runtime-work-list {
     display: grid;
-    gap: 8px;
-    margin-top: 12px;
+    gap: var(--opl-space-3);
+    margin-top: var(--opl-space-3);
   }
 
   .runtime-work-row {
@@ -4470,11 +4522,11 @@ export const codexWorkbenchStyles = `
     display: grid;
     grid-template-columns: minmax(190px, 1.15fr) minmax(92px, .55fr) minmax(260px, 1.5fr) minmax(150px, .8fr);
     align-items: center;
-    gap: 16px;
-    padding: 14px;
+    gap: var(--opl-space-4);
+    padding: var(--opl-space-4);
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
-    background: var(--opl-canvas);
+    border-radius: var(--opl-radius-surface);
+    background: var(--opl-surface-elevated);
   }
 
   .runtime-work-row:hover {
@@ -4495,8 +4547,8 @@ export const codexWorkbenchStyles = `
   .runtime-work-identity > button > strong {
     display: block;
     color: var(--opl-muted);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
   }
 
   .runtime-work-identity > button {
@@ -4516,11 +4568,11 @@ export const codexWorkbenchStyles = `
   }
 
   .runtime-work-identity h3 {
-    margin: 4px 0 7px;
+    margin: var(--opl-space-1) 0 var(--opl-space-2);
     overflow-wrap: anywhere;
-    font-size: 13px;
-    line-height: 1.35;
-    font-weight: 550;
+    font-size: var(--opl-text-md);
+    line-height: var(--opl-leading-normal);
+    font-weight: var(--opl-weight-semibold);
     letter-spacing: 0;
   }
 
@@ -4532,19 +4584,19 @@ export const codexWorkbenchStyles = `
   .runtime-work-status {
     min-width: 0;
     display: grid;
-    gap: 5px;
+    gap: var(--opl-space-1);
     justify-items: start;
   }
 
   .runtime-work-status > span {
     display: inline-flex;
     max-width: 100%;
-    padding: 3px 7px;
+    padding: 4px 8px;
     border-radius: 999px;
     background: var(--opl-surface-secondary);
     color: var(--opl-muted);
     overflow-wrap: anywhere;
-    font-size: 11px;
+    font-size: var(--opl-text-sm);
   }
 
   .runtime-work-row[data-status="running"] .runtime-work-status > span {
@@ -4559,12 +4611,12 @@ export const codexWorkbenchStyles = `
 
   .runtime-stage-button {
     width: 100%;
-    min-height: 30px;
+    min-height: var(--opl-control-sm);
     justify-content: space-between;
     gap: 9px;
     padding: 0 8px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
     text-align: left;
@@ -4575,7 +4627,7 @@ export const codexWorkbenchStyles = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: var(--opl-text-sm);
   }
 
   .runtime-stage-button[aria-expanded="true"] svg {
@@ -4583,14 +4635,15 @@ export const codexWorkbenchStyles = `
   }
 
   .runtime-work-progress p {
-    margin: 6px 0 0;
-    line-height: 1.4;
+    margin: var(--opl-space-2) 0 0;
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-normal);
     overflow-wrap: anywhere;
   }
 
   .runtime-work-progress p strong {
     color: var(--opl-text);
-    font-weight: 500;
+    font-weight: var(--opl-weight-medium);
   }
 
   .runtime-stage-popover {
@@ -4601,9 +4654,9 @@ export const codexWorkbenchStyles = `
     width: min(360px, calc(100% - 28px));
     max-height: 320px;
     overflow: auto;
-    padding: 10px;
+    padding: var(--opl-space-3);
     border: 1px solid var(--opl-border-heavy);
-    border-radius: 8px;
+    border-radius: var(--opl-radius-surface);
     background: var(--opl-canvas);
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16);
   }
@@ -4661,8 +4714,8 @@ export const codexWorkbenchStyles = `
 
   .runtime-stage-popover li strong {
     overflow-wrap: anywhere;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-medium);
   }
 
   .runtime-work-usage {
@@ -4683,9 +4736,9 @@ export const codexWorkbenchStyles = `
   }
 
   .runtime-work-usage dd {
-    margin: 3px 0 0;
-    font-size: 11px;
-    font-weight: 500;
+    margin: var(--opl-space-1) 0 0;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-medium);
   }
 
   .runtime-work-time {
@@ -4769,7 +4822,7 @@ export const codexWorkbenchStyles = `
     }
 
     .startup-readiness h1 {
-      font-size: 24px;
+      font-size: var(--opl-text-2xl);
     }
 
     .startup-readiness-count {
@@ -4999,7 +5052,7 @@ export const codexWorkbenchStyles = `
     }
 
     .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav button {
-      font-size: 12px;
+      font-size: var(--opl-text-sm);
     }
 
     .settings-workspace-location {
