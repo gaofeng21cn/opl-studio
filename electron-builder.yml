@@ -46,3 +46,4 @@ publish:
   provider: github
   owner: gaofeng21cn
   repo: opl-studio
+afterPack: scripts/desktop/write-app-update-config.mjs

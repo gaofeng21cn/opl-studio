@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,6 +12,7 @@ import {
   validateMacPublicUpdateFeed,
   validateMacUpdateFeed
 } from "../../scripts/desktop/macos-distribution.mjs";
+import { buildAppUpdateConfig, writeAppUpdateConfig } from "../../scripts/desktop/write-app-update-config.mjs";
 import { nextPatchVersion } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -26,11 +28,60 @@ test("macOS builder declares hardened runtime, ULFO, and the dedicated Studio up
   assert.match(builder, /hardenedRuntime:\s*true/);
   assert.match(builder, /dmg:\s*\n\s+format:\s*ULFO/);
   assert.match(builder, /publish:\s*\n\s+provider:\s*github\s*\n\s+owner:\s*gaofeng21cn\s*\n\s+repo:\s*opl-studio/);
+  assert.match(builder, /afterPack:\s*scripts\/desktop\/write-app-update-config\.mjs/);
   assert.match(pkg.scripts["dist:mac"], /qualify:desktop:mac/);
   assert.match(pkg.scripts["qualify:desktop:mac:release"], /--require-release-trust/);
   assert.match(pkg.scripts["qualify:desktop:mac:release"], /--require-public-feed/);
   assert.equal(pkg.scripts["test:desktop-distribution"], "node --test tests/desktop/*.test.mjs");
   assert.equal(pkg.scripts["qualify:desktop:updater:local"], "node scripts/desktop/qualify-local-updater.mjs");
+});
+
+test("Studio afterPack writes the dedicated GitHub updater identity", () => {
+  assert.deepEqual(buildAppUpdateConfig({
+    publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" }
+  }), { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" });
+  assert.throws(
+    () => buildAppUpdateConfig({ publish: { provider: "github", owner: "other", repo: "other" } }),
+    /dedicated gaofeng21cn\/opl-studio GitHub feed/
+  );
+});
+
+test("Studio afterPack writes app-update.yml inside the single packaged app", async () => {
+  const appOutDir = await mkdtemp(path.join(os.tmpdir(), "opl-app-update-hook-test-"));
+  const appDir = path.join(appOutDir, "One Person Lab Preview.app");
+  await mkdir(path.join(appDir, "Contents"), { recursive: true });
+
+  const outputPath = writeAppUpdateConfig({
+    appOutDir,
+    builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
+  });
+
+  assert.equal(outputPath, path.join(appDir, "Contents", "Resources", "app-update.yml"));
+  assert.equal(existsSync(outputPath), true);
+  assert.equal(await readFile(outputPath, "utf8"), "provider: github\nowner: gaofeng21cn\nrepo: opl-studio\n");
+  assert.equal(existsSync(path.join(appOutDir, "Contents", "Resources", "app-update.yml")), false);
+});
+
+test("Studio afterPack rejects missing or ambiguous packaged apps", async () => {
+  const emptyOutDir = await mkdtemp(path.join(os.tmpdir(), "opl-app-update-hook-empty-"));
+  assert.throws(
+    () => writeAppUpdateConfig({
+      appOutDir: emptyOutDir,
+      builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
+    }),
+    /exactly one top-level \.app/
+  );
+
+  const ambiguousOutDir = await mkdtemp(path.join(os.tmpdir(), "opl-app-update-hook-ambiguous-"));
+  await mkdir(path.join(ambiguousOutDir, "First.app"));
+  await mkdir(path.join(ambiguousOutDir, "Second.app"));
+  assert.throws(
+    () => writeAppUpdateConfig({
+      appOutDir: ambiguousOutDir,
+      builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
+    }),
+    /exactly one top-level \.app/
+  );
 });
 
 test("macOS updater feed binds exact ZIP and DMG bytes and creates the compatibility metadata copy", async () => {
