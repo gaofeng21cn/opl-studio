@@ -27,10 +27,12 @@ test("Preview smoke maps Standard and Full to the real bridge profiles", () => {
 });
 
 test("Preview smoke skips optional hooks without claiming they ran", async () => {
+  const evaluated = [];
   const receipt = await runPreviewSmoke({
     identity: { status: "passed", expected: PREVIEW_PRODUCT, actual: PREVIEW_PRODUCT },
     waitForReady: async () => ({ readyState: "complete", root: true, bridge: true }),
     evaluate: async (expression) => {
+      evaluated.push(expression);
       if (expression.includes("Object.keys(window.oplStudio)")) {
         return { state: { readback: { exitCode: 0 } }, bridgeKeys: ["readState", "sendMessage"], startupErrors: [] };
       }
@@ -55,6 +57,10 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.equal(receipt.status, "passed");
   assert.equal(receipt.hooks.gatewaySetup, "skipped");
   assert.equal(receipt.hooks.codexTurn, "skipped");
+  assert.ok(evaluated.some((expression) => expression.includes('settings-page-about')));
+  assert.ok(evaluated.some((expression) => expression.includes('opl-runtime-overview-page')));
+  assert.ok(evaluated.some((expression) => expression.includes('opl-context-inspector-trigger')));
+  assert.ok(evaluated.some((expression) => expression.includes('opl-context-tabs')));
 });
 
 test("Preview smoke never serializes supplied secrets into diagnostics", async () => {

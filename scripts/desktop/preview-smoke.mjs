@@ -225,12 +225,16 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("settings");
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关于"||node.innerText.trim()==="About"); button?.click(); return !!button;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="settings-page-about"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("about");
     await evaluate(`(()=>{const close=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关闭"||node.innerText.trim()==="Close"||node.getAttribute("aria-label")==="关闭"||node.getAttribute("aria-label")==="Close"); close?.click(); return !!close;})()`);
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.getAttribute("aria-label")==="运行状态"||node.getAttribute("aria-label")==="Run status"||node.innerText.trim()==="运行状态"||node.innerText.trim()==="Run status"); button?.click(); return !!button;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-runtime-overview-page"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("runtime");
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="新建任务"||node.innerText.trim()==="New task"||node.innerText.trim()==="新建会话"||node.innerText.trim()==="New session"); button?.click(); return !!button;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector-trigger"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await evaluate(`(()=>{const node=document.querySelector('[data-testid="opl-context-inspector-trigger"]'); node?.click(); return !!node;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("inspector");
   }
   return result;
