@@ -656,6 +656,7 @@ type EphemeralQueueItem = {
   prompt: string;
   inputs: CodexComposerInput[];
   selections: ComposerSelection[];
+  turnAgentSelection?: CodexAgentSelectionSnapshot;
 };
 
 function composerSelectionArtifact(selection: ComposerSelection): WorkbenchArtifactRef {
@@ -2090,7 +2091,7 @@ export function App({
     setEphemeralQueue(next);
   }
 
-  function queuedItemFromComposer(text: string, selections: ComposerSelection[]): EphemeralQueueItem {
+  function queuedItemFromComposer(text: string, selections: ComposerSelection[], turnAgentSelection?: CodexAgentSelectionSnapshot): EphemeralQueueItem {
     return {
       id: `queue-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       placement: "queued",
@@ -2098,7 +2099,8 @@ export function App({
       text: text || null,
       prompt: text,
       inputs: selections.map((selection) => selection.input),
-      selections
+      selections,
+      ...(turnAgentSelection ? { turnAgentSelection } : {})
     };
   }
 
@@ -2109,7 +2111,8 @@ export function App({
       threadId: active.threadId,
       expectedTurnId: active.turnId,
       prompt: item.prompt,
-      inputs: item.inputs
+      inputs: item.inputs,
+      ...(item.turnAgentSelection ? { turnAgentSelection: item.turnAgentSelection } : {})
     });
     replaceEphemeralQueue(ephemeralQueueRef.current.filter((candidate) => candidate.id !== item.id));
     const acceptedMessage: ChatMessage = {
@@ -2188,7 +2191,8 @@ export function App({
     if ((!text && !pendingSelections.length) || !resolvedModel) return;
     setComposerSubmissionError("");
     if (sendState === "running") {
-      const item = queuedItemFromComposer(text, pendingSelections);
+      const queuedAgentSelection = selectedAgentSnapshot();
+      const item = queuedItemFromComposer(text, pendingSelections, queuedAgentSelection);
       replaceEphemeralQueue(ephemeralQueueRef.current.concat(item));
       updatePrompt("");
       setComposerSelections([]);

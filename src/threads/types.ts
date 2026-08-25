@@ -50,6 +50,12 @@ export type ThreadSteerRequest = {
   threadId: string;
   expectedTurnId: string;
   prompt: string;
+  turnAgentSelection?: {
+    package_id: string;
+    shortcut_id: string;
+    codex_visible_entry: string;
+    required_skill_ids: string[];
+  };
   inputs?: Array<
     | { type: "localImage"; path: string; detail?: "auto" | "low" | "high" | "original" | null }
     | { type: "skill"; name: string; path: string }

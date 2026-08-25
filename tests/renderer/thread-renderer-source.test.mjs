@@ -236,6 +236,7 @@ test("standard Agent selection starts a thread or adds turn context without rebi
       turnByThread.set(params.threadId, turnId);
       return { turn: { id: turnId } };
     }
+    if (method === "turn/steer") return { turnId: params.expectedTurnId };
     if (method === "thread/read") {
       return {
         thread: {
@@ -295,6 +296,21 @@ test("standard Agent selection starts a thread or adds turn context without rebi
   assert.equal(existing.threadId, first.threadId);
   const existingTurnStart = requests.filter((request) => request.method === "turn/start").at(-1);
   assert.deepEqual(existingTurnStart.params.additionalContext, {
+    "opl.standard_agent_selection": {
+      kind: "application",
+      value: JSON.stringify(selection)
+    }
+  });
+
+  await transport.steerMessage({
+    threadId: first.threadId,
+    expectedTurnId: existingTurnStart.params.turnId ?? "turn-2",
+    prompt: "Steer with the selected Agent",
+    inputs: [],
+    turnAgentSelection: selection
+  });
+  const steerFrame = requests.find((request) => request.method === "turn/steer");
+  assert.deepEqual(steerFrame.params.additionalContext, {
     "opl.standard_agent_selection": {
       kind: "application",
       value: JSON.stringify(selection)

@@ -151,6 +151,12 @@ function agentSelectionContext(selection) {
   } : undefined;
 }
 
+function turnAgentSelectionContext(selection) {
+  // turn/steer is already scoped to the active turn; keep the same typed
+  // application context shape as turn/start without changing thread identity.
+  return agentSelectionContext(selection);
+}
+
 function requiredChannelObject(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new AppServerTransportError("invalid_request", `${label} must be an object`);
@@ -664,11 +670,12 @@ export class CodexAppServerTransport extends EventEmitter {
     });
   }
 
-  async steerTurn(threadId, expectedTurnId, prompt, inputs = []) {
+  async steerTurn(threadId, expectedTurnId, prompt, inputs = [], turnAgentSelection) {
     return this.request("turn/steer", {
       threadId,
       expectedTurnId,
-      input: buildUserInputs(prompt, inputs)
+      input: buildUserInputs(prompt, inputs),
+      ...(turnAgentSelection ? { additionalContext: turnAgentSelectionContext(normalizeAgentSelection(turnAgentSelection)) } : {})
     });
   }
 
@@ -676,14 +683,14 @@ export class CodexAppServerTransport extends EventEmitter {
     return this.request("turn/interrupt", { threadId, turnId });
   }
 
-  async steerMessage({ threadId, expectedTurnId, prompt, inputs }) {
+  async steerMessage({ threadId, expectedTurnId, prompt, inputs, turnAgentSelection }) {
     if (typeof threadId !== "string" || !threadId.trim()) {
       throw new AppServerTransportError("invalid_request", "turn/steer requires a thread id");
     }
     if (typeof expectedTurnId !== "string" || !expectedTurnId.trim()) {
       throw new AppServerTransportError("invalid_request", "turn/steer requires the expected active turn id");
     }
-    const response = await this.steerTurn(threadId, expectedTurnId, prompt, inputs);
+    const response = await this.steerTurn(threadId, expectedTurnId, prompt, inputs, turnAgentSelection);
     if (response.turnId && response.turnId !== expectedTurnId) {
       throw new AppServerTransportError(
         "invalid_app_server_response",
