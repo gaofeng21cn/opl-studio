@@ -23,13 +23,13 @@ Machine boundary: Human-readable Studio entry. App product and adoption truth st
 
 ## 项目定位
 
-OPL Studio 是 One Person Lab 第一方的下一代 Application Host。它把持久化
-Codex 后端、OPL App 产品模型、Framework 管理的运行时与 Package 投影，以及
-Desktop/WebUI 共用的渲染器整合到同一个工作台中。
+OPL Studio 是 One Person Lab 第一方的下一代应用宿主。它在同一个工作台中
+整合持久化 Codex 后端、OPL App 产品模型、由 Framework 管理的运行时与
+Package 投影，以及 Desktop/WebUI 共用的渲染器。
 
 Studio 基于固定版本的 DeepSeek Harness（DSH）`v0.1.1-rc.2` 应用骨架和
-GUI 源码 cohort 构建。DSH 提供 Cordis 应用宿主、插件生命周期、布局系统、
-UI primitives 和交互基础；OPL 提供产品身份、Codex 集成、Framework bridge、
+GUI 源码版本组构建。DSH 提供 Cordis 应用宿主、插件生命周期、布局系统、
+基础 UI 组件和交互能力；OPL 提供产品身份、Codex 集成、Framework 桥接层、
 产品策略和第一方插件。
 
 本仓库不是第二套 OPL Framework。整体产品边界仍然是：
@@ -60,13 +60,13 @@ Preview 自动更新源。其 bundle identifier 为
 
 Standard 和 Full 是同一版本的两种载荷，不是两个产品版本，也不是两条更新
 通道。Full 不内置 Codex；Studio 仍通过 App 管理的启动与验收合同解析精确的
-外部 Codex carrier。
+外部 Codex 运行载体。
 
 > **Preview 边界：**公开安装包用于内部评估。只有 App owner 完成独立的
 > clean-VM、功能等价和采用门禁后，Studio 才能成为正式 OPL App Shell。
 > 在完成切换之前，AionUI 仍是当前正式版 App Shell。
 
-Windows、Linux、Standalone Headless WebUI 和 Docker/OCI 已有开发候选与测试
+Windows、Linux、独立 Headless WebUI 和 Docker/OCI 已有开发候选实现与测试
 路径，但目前不是公开 Studio 分发目标。只有未来 Release 明确提供并验收对应
 产物时，才能把它们视为已发布平台。
 
