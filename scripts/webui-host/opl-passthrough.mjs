@@ -44,6 +44,14 @@ function commandReadback(args, result) {
   };
 }
 
+// Confirmation and receipt fields belong to the Studio bridge envelope. They
+// are not part of ordinary App action payloads (which are validated strictly
+// by Framework); package contribution execution is handled separately above.
+function frameworkActionPayload(payload) {
+  const { confirmed, confirmationId, receiptId, rollbackRef, ...fields } = payload;
+  return fields;
+}
+
 function jsonValue(value) {
   if (!value.trim()) return undefined;
   try {
@@ -989,7 +997,8 @@ export function createOplPassthrough({
         ? "confirmation_required"
         : (requestedMode === "rollback" || rollbackRef ? "rollback" : (dryRun ? "preview" : "execute"));
       const args = [command, "app", "action", "execute", "--action", actionId];
-      if (Object.keys(payload).length) args.push("--payload", JSON.stringify(payload));
+      const actionPayload = frameworkActionPayload(payload);
+      if (Object.keys(actionPayload).length) args.push("--payload", JSON.stringify(actionPayload));
       if (dryRun) args.push("--dry-run");
       args.push("--json");
       const result = blockedReadOnly

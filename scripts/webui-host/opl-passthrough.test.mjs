@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -248,6 +248,30 @@ test("desktop candidate actions require an explicit host-injected allowlist", as
     () => createOplPassthrough({ candidateActionAllowlist: [""] }),
     /non-empty action IDs/
   );
+});
+
+test("ordinary app actions do not forward Studio confirmation metadata to Framework", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-action-passthrough-test-"));
+  const argsFile = path.join(directory, "args.json");
+  const command = path.join(directory, "fake-opl");
+  await writeFile(command, `#!/bin/sh
+printf '%s' "$*" > ${JSON.stringify(argsFile)}
+printf '%s' '{"schema":"opl_app_action_execution.v1","status":"executed"}'
+`, "utf8");
+  await chmod(command, 0o755);
+  const passthrough = createOplPassthrough({ command, cwd: directory, allowActions: true });
+  const receipt = await passthrough.executeAction({
+    actionId: "gateway_account_use_for_model_access",
+    dryRun: false,
+    payload: { confirmed: true, confirmationId: "studio-confirmation", receiptId: "receipt-1" }
+  });
+  assert.equal(receipt.status, "executed");
+  assert.equal(await readFile(argsFile, "utf8"), "app action execute --action gateway_account_use_for_model_access --json");
+  assert.deepEqual(receipt.payload, {
+    confirmed: true,
+    confirmationId: "studio-confirmation",
+    receiptId: "receipt-1"
+  });
 });
 
 test("initialize projection keeps launch readiness while omitting private runtime details", () => {
