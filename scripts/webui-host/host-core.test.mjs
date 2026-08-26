@@ -497,6 +497,34 @@ test("Framework registrar loads only the carrier public Cordis export and return
   ]);
 });
 
+test("Framework registrar accepts a packaged runtime wrapper with an explicit Package root", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-framework-wrapper-test-"));
+  const wrapperRoot = path.join(directory, "runtime");
+  const packageRoot = path.join(wrapperRoot, "opl");
+  const command = path.join(wrapperRoot, "bin", "opl");
+  await mkdir(path.dirname(command), { recursive: true });
+  await mkdir(path.join(packageRoot, "dist", "host"), { recursive: true });
+  await writeFile(command, "#!/bin/sh\nexit 0\n", "utf8");
+  await chmod(command, 0o755);
+  await writeFile(path.join(packageRoot, "package.json"), JSON.stringify({
+    name: "opl-framework",
+    type: "module",
+    exports: { "./cordis-profiles": "./dist/host/composition-profiles.js" }
+  }), "utf8");
+  await writeFile(
+    path.join(packageRoot, "dist", "host", "composition-profiles.js"),
+    "export const packagedRuntimeMarker = 'packaged-runtime';\n",
+    "utf8"
+  );
+  t.after(() => rm(directory, { recursive: true, force: true }));
+
+  const profiles = await loadFrameworkCordisProfiles({
+    command,
+    env: { PATH: "", OPL_FRAMEWORK_PACKAGE_ROOT: packageRoot }
+  });
+  assert.equal(profiles.packagedRuntimeMarker, "packaged-runtime");
+});
+
 test("shared host core serves desktop and HTTP adapters through one typed method surface", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-host-core-test-"));
   const transport = new CodexAppServerTransport({
