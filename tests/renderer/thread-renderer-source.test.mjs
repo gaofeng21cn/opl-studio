@@ -514,7 +514,9 @@ test("App update restart follows the carrier result instead of a host-name speci
 
 test("desktop version and updater state have one main-process source", () => {
   assert.match(desktopMain, /resolveDesktopRuntimeEnvironment/);
-  assert.match(desktopMain, /homeDir: app\.getPath\("home"\),\s*resourcesPath: process\.resourcesPath/);
+  assert.match(desktopMain, /ensureStudioDesktopRuntime\(\{/);
+  assert.match(desktopMain, /resourcesPath: process\.resourcesPath/);
+  assert.match(desktopMain, /const homeDir = app\.getPath\("home"\)/);
   assert.match(desktopMain, /desktop\/native-app-update/);
   assert.match(desktopMain, /window\.webContents\.once\("did-finish-load"/);
   assert.match(app, /method === "desktop\/native-app-update"/);
