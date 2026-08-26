@@ -77,6 +77,7 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.ok(evaluated.some((expression) => expression.includes('[role="menu"] [role="menuitem"]')));
   assert.ok(evaluated.some((expression) => expression.includes('menuItem.click()')));
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-inspector-close')));
+  assert.ok(evaluated.some((expression) => expression.includes('requestAnimationFrame(()=>requestAnimationFrame(resolve))')));
   assert.ok(evaluated.some((expression) => expression.includes('稍后处理')));
   assert.ok(evaluated.some((expression) => expression.includes('waitForGone')));
 });
@@ -116,7 +117,18 @@ test("Preview smoke requires a completed non-simulated Codex turn with a final r
       };
     }
     if (expression.includes("window.oplStudio.sendMessage")) {
-      return { threadId: "thread-1", turnId: "turn-1", completed: "failed", finalMessagePresent: true, simulated: false };
+      return {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        completed: "failed",
+        finalMessagePresent: true,
+        simulated: false,
+        error: {
+          code: "model_provider_failed",
+          message: "Only reply OK could not reach the configured provider",
+          details: { provider: "test" }
+        }
+      };
     }
     return {};
   };
@@ -129,6 +141,11 @@ test("Preview smoke requires a completed non-simulated Codex turn with a final r
   });
   assert.equal(receipt.status, "partial");
   assert.equal(receipt.checks.codexTurn.status, "partial");
+  assert.deepEqual(receipt.checks.codexTurn.error, {
+    code: "model_provider_failed",
+    message: "[REDACTED] could not reach the configured provider",
+    fields: ["code", "details", "message"]
+  });
   assert.ok(receipt.blockers.includes("required_codex_turn_hook_not_passed"));
 });
 

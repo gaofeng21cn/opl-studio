@@ -11,6 +11,7 @@ import {
   loadFrameworkCordisProfiles
 } from "./framework-channel-bootstrap.mjs";
 import { createOplHostCore, OplHostCore } from "./host-core.mjs";
+import { OplCodexNative } from "./opl-codex-native.mjs";
 import { createOplPassthrough } from "./opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
@@ -74,6 +75,11 @@ test("desktop runtime environment drives Codex and Gateway commands from one hos
     channelBindingFile: path.join(directory, "bindings.json"),
     env
   });
+  let reloadCount = 0;
+  core.codex.reloadConfiguration = async () => {
+    reloadCount += 1;
+    return { available: true };
+  };
 
   assert.equal(core.transport.command, env.OPL_CODEX_BIN);
   assert.equal(core.transport.clientVersion, env.OPL_APP_VERSION);
@@ -91,6 +97,80 @@ test("desktop runtime environment drives Codex and Gateway commands from one hos
   assert.deepEqual(await core.invoke("configureCodexApiKey", {
     apiKey: "sk-test"
   }), { ok: true, stateRefreshRequired: true });
+  assert.equal(reloadCount, 1);
+});
+
+test("Codex configuration reload keeps the native adapter and serializes concurrent reloads", async () => {
+  const transport = new EventEmitter();
+  const calls = [];
+  Object.assign(transport, {
+    initialized: true,
+    async stop() {
+      calls.push("stop");
+      this.initialized = false;
+    },
+    async start() {
+      calls.push("start");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      this.initialized = true;
+    }
+  });
+  const codex = new OplCodexNative({ transport, env: {} });
+  const threads = codex.threads;
+
+  const [first, second] = await Promise.all([
+    codex.reloadConfiguration(),
+    codex.reloadConfiguration()
+  ]);
+
+  assert.deepEqual(calls, ["stop", "start"]);
+  assert.equal(first.available, true);
+  assert.equal(second.available, true);
+  assert.equal(codex.threads, threads);
+});
+
+test("successful Gateway model-access execution reloads the persistent App Server", async () => {
+  let reloadCount = 0;
+  const actionCalls = [];
+  const core = new OplHostCore({
+    opl: {
+      async executeAction(request) {
+        actionCalls.push(request);
+        return {
+          actionId: request.actionId,
+          dryRun: request.dryRun !== false,
+          status: request.dryRun === false ? "executed" : "preview_ready",
+          exitCode: 0
+        };
+      }
+    }
+  });
+  core.codex.reloadConfiguration = async () => {
+    reloadCount += 1;
+    return { available: true };
+  };
+
+  await core.invoke("executeAction", {
+    actionId: "gateway_account_use_for_model_access",
+    payload: { confirmed: true },
+    dryRun: true
+  });
+  assert.equal(reloadCount, 0);
+
+  await core.invoke("executeAction", {
+    actionId: "gateway_account_use_for_model_access",
+    payload: { confirmed: true },
+    dryRun: false
+  });
+  assert.equal(reloadCount, 1);
+
+  await core.invoke("executeAction", {
+    actionId: "unrelated_action",
+    payload: { confirmed: true },
+    dryRun: false
+  });
+  assert.equal(reloadCount, 1);
+  assert.equal(actionCalls.length, 3);
 });
 
 test("App Server exit clears pending interactive requests instead of leaving stale approvals", async (t) => {

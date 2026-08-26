@@ -59,6 +59,7 @@ export class OplCodexNative extends EventEmitter {
       : null;
     this.appServerError = null;
     this.closePromise = null;
+    this.reloadPromise = null;
 
     this.threads.on("event", (event) => this.emit("event", event));
     this.transport.on("availability", (availability) => {
@@ -89,6 +90,31 @@ export class OplCodexNative extends EventEmitter {
       };
     }
     return this.capabilities();
+  }
+
+  async reloadConfiguration() {
+    if (this.closePromise) {
+      throw Object.assign(new Error("Codex App Server is closing"), {
+        code: "app_server_unavailable"
+      });
+    }
+    this.reloadPromise ??= (async () => {
+      await this.transport.stop();
+      try {
+        await this.transport.start();
+        this.appServerError = null;
+      } catch (error) {
+        this.appServerError = {
+          code: error.code ?? "app_server_unavailable",
+          message: error.message ?? String(error)
+        };
+        throw error;
+      }
+      return this.capabilities();
+    })().finally(() => {
+      this.reloadPromise = null;
+    });
+    return this.reloadPromise;
   }
 
   capabilities() {

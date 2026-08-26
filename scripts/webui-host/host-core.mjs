@@ -118,6 +118,25 @@ export class OplHostCore extends EventEmitter {
     this.hostContext = context;
   }
 
+  async executeAction(payload) {
+    const receipt = await this.opl.executeAction(payload);
+    if (
+      payload?.actionId === "gateway_account_use_for_model_access"
+      && payload?.dryRun === false
+      && receipt?.status === "executed"
+      && receipt?.exitCode === 0
+    ) {
+      await this.codex.reloadConfiguration();
+    }
+    return receipt;
+  }
+
+  async configureCodexApiKey(payload) {
+    const result = await this.codexApiKeyConfiguration(payload);
+    if (result?.ok === true) await this.codex.reloadConfiguration();
+    return result;
+  }
+
   readHostPluginInventory() {
     const inventory = this.hostContext?.get("pluginInventory");
     if (!inventory || typeof inventory.list !== "function") {
@@ -165,7 +184,7 @@ export class OplHostCore extends EventEmitter {
       case "readFullDrilldown": return this.opl.readFullDrilldown();
       case "readDomainDetailView": return this.opl.readDomainDetailView(payload);
       case "readContribution": return this.opl.readContribution(payload);
-      case "executeAction": return this.opl.executeAction(payload);
+      case "executeAction": return this.executeAction(payload);
       case "readCodexModels": return this.transport.listModels();
       case "readCodexCapabilities": return this.transport.listCapabilities(payload.threadId);
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
@@ -182,7 +201,7 @@ export class OplHostCore extends EventEmitter {
       case "steerTurn": return this.transport.steerMessage(payload);
       case "interruptTurn": return this.transport.interruptMessage(payload);
       case "loginGatewayAccount": return this.gatewayAccountLogin(payload);
-      case "configureCodexApiKey": return this.codexApiKeyConfiguration(payload);
+      case "configureCodexApiKey": return this.configureCodexApiKey(payload);
       case "readNativeAppUpdateStatus": return this.nativeUpdater.perform("status", payload);
       case "checkNativeAppUpdate": return this.nativeUpdater.perform("check", payload);
       case "applyNativeAppUpdate": return this.nativeUpdater.perform("apply", payload);

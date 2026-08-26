@@ -249,6 +249,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       result.inspector.tabs=await waitFor('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]');
       const tab=document.querySelector('[data-testid="opl-context-tabs"] button');
       tab?.click();
+      await new Promise((resolve)=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       const close=document.querySelector('[data-testid="opl-context-inspector"] .opl-context-inspector-close, [data-testid="opl-context-inspector"] button[aria-label="关闭详情"], [data-testid="opl-context-inspector"] button[aria-label="关闭任务详情"], [data-testid="opl-context-inspector"] button[aria-label="Close details"]');
       close?.click();
       result.inspector.closed=await waitForGone('[data-testid="opl-context-inspector"]');
@@ -362,9 +363,19 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
   };
 }
 
-async function runCodexTurnHook({ evaluate, request }) {
+function boundedTurnFailure(error, secretValues = []) {
+  if (!error || typeof error !== "object" || Array.isArray(error)) return null;
+  const code = typeof error.code === "string" ? error.code.slice(0, 160) : null;
+  const message = typeof error.message === "string"
+    ? redactSecrets(error.message.slice(0, 1_000), secretValues)
+    : null;
+  const fields = Object.keys(error).filter((field) => typeof field === "string").sort().slice(0, 32);
+  return { code, message, fields };
+}
+
+async function runCodexTurnHook({ evaluate, request, secretValues = [] }) {
   if (!request) return { status: "skipped", reason: "turn_hook_not_provided" };
-  const result = await evaluate(`(async()=>{const reply=await window.oplStudio.sendMessage(${JSON.stringify(request)}); return {threadId:typeof reply?.threadId==="string"?reply.threadId:null,turnId:typeof reply?.turnId==="string"?reply.turnId:null,completed:reply?.completed?.turn?.status||null,finalMessagePresent:typeof reply?.finalMessage==="string"&&reply.finalMessage.length>0,simulated:reply?.simulated===true};})()`);
+  const result = await evaluate(`(async()=>{const reply=await window.oplStudio.sendMessage(${JSON.stringify(request)}); const turn=Array.isArray(reply?.canonicalThread?.turns)?reply.canonicalThread.turns.find((candidate)=>candidate?.id===reply?.turnId):null; return {threadId:typeof reply?.threadId==="string"?reply.threadId:null,turnId:typeof reply?.turnId==="string"?reply.turnId:null,completed:reply?.completed?.turn?.status||null,finalMessagePresent:typeof reply?.finalMessage==="string"&&reply.finalMessage.length>0,simulated:reply?.simulated===true,error:turn?.error&&typeof turn.error==="object"?turn.error:null};})()`);
   const passed = Boolean(
     result?.threadId
     && result?.turnId
@@ -378,7 +389,8 @@ async function runCodexTurnHook({ evaluate, request }) {
     turnId: result?.turnId ?? null,
     completed: result?.completed ?? null,
     finalMessagePresent: result?.finalMessagePresent === true,
-    simulated: result?.simulated === true
+    simulated: result?.simulated === true,
+    error: boundedTurnFailure(result?.error, secretValues)
   };
 }
 
@@ -434,7 +446,7 @@ export async function runPreviewSmoke({
       timeoutMs: smokeOptions.timeoutMs
     });
     checks.gateway = await runGatewayHook({ evaluate, credentials, timeoutMs: smokeOptions.timeoutMs });
-    checks.codexTurn = await runCodexTurnHook({ evaluate, request: turnRequest });
+    checks.codexTurn = await runCodexTurnHook({ evaluate, request: turnRequest, secretValues });
   } catch (error) {
     checks.failure = { detail: sanitizeError(error, secretValues) };
   }
