@@ -4,7 +4,10 @@ import path from "node:path";
 import test from "node:test";
 
 import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
-import { parseArgs as parseCleanVmArgs } from "../../scripts/desktop/qualify-clean-vm.mjs";
+import {
+  buildGuestLaunchCommand,
+  parseArgs as parseCleanVmArgs
+} from "../../scripts/desktop/qualify-clean-vm.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
 
@@ -70,6 +73,34 @@ test("clean VM keeps external Codex preparation optional for legacy invocations"
   const options = parseCleanVmArgs(["--attach"]);
   assert.equal(options.codexPlatformPackageTarball, null);
   assert.equal(options.codexVersion, null);
+  assert.equal(options.allowActions, false);
+});
+
+test("clean VM enables action execution only with an explicit non-attach opt-in", () => {
+  const readOnly = buildGuestLaunchCommand({
+    appExecutable: "/Applications/One Person Lab Preview.app/Contents/MacOS/One Person Lab Preview",
+    logPath: "/tmp/preview.log"
+  });
+  assert.doesNotMatch(readOnly, /OPL_NATIVE_WORKBENCH_READ_ONLY=0/);
+
+  const options = parseCleanVmArgs(["--allow-actions"]);
+  assert.equal(options.allowActions, true);
+  const enabled = buildGuestLaunchCommand({
+    appExecutable: "/Applications/One Person Lab Preview.app/Contents/MacOS/One Person Lab Preview",
+    logPath: "/tmp/preview.log",
+    codexBinary: "/tmp/codex/bin/codex",
+    allowActions: options.allowActions
+  });
+  assert.match(enabled, /OPL_CODEX_BIN='\/tmp\/codex\/bin\/codex'/);
+  assert.match(enabled, /OPL_NATIVE_WORKBENCH_READ_ONLY=0/);
+  assert.match(enabled, /nohup/);
+});
+
+test("clean VM rejects action execution in attach mode", () => {
+  assert.throws(
+    () => parseCleanVmArgs(["--attach", "--allow-actions"]),
+    /cannot be used with --attach/
+  );
 });
 
 test("clean VM rejects a partial external Codex identity", () => {

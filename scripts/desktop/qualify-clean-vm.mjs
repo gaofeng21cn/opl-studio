@@ -32,6 +32,21 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 }
 
+export function buildGuestLaunchCommand({ appExecutable, logPath, codexBinary = null, allowActions = false }) {
+  return [
+    codexBinary ? `OPL_CODEX_BIN=${shellQuote(codexBinary)}` : null,
+    allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
+    "nohup",
+    shellQuote(appExecutable),
+    "--disable-gpu",
+    "--remote-debugging-port=9222",
+    "--remote-debugging-address=127.0.0.1",
+    `>${shellQuote(logPath)}`,
+    "2>&1",
+    "& echo $!"
+  ].filter(Boolean).join(" ");
+}
+
 export function parseArgs(argv) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const cleanOptions = {
@@ -44,6 +59,7 @@ export function parseArgs(argv) {
     keepVm: false,
     skipClone: false,
     attach: false,
+    allowActions: false,
     codexPlatformPackageTarball: null,
     codexVersion: null
   };
@@ -58,6 +74,7 @@ export function parseArgs(argv) {
     if (arg === "--keep-vm") { cleanOptions.keepVm = true; continue; }
     if (arg === "--skip-clone") { cleanOptions.skipClone = true; continue; }
     if (arg === "--attach") { cleanOptions.attach = true; continue; }
+    if (arg === "--allow-actions") { cleanOptions.allowActions = true; continue; }
     if (arg === "--source-vm") { cleanOptions.sourceVm = takeValue(arg, index); index += 1; continue; }
     if (arg === "--dmg") { cleanOptions.dmg = path.resolve(takeValue(arg, index)); index += 1; continue; }
     if (arg === "--guest-user") { cleanOptions.guestUser = takeValue(arg, index); index += 1; continue; }
@@ -94,6 +111,7 @@ export function parseArgs(argv) {
     Boolean(cleanOptions.codexPlatformPackageTarball) === Boolean(cleanOptions.codexVersion),
     "--codex-platform-package-tarball and --codex-version must be provided together"
   );
+  invariant(!cleanOptions.attach || !cleanOptions.allowActions, "--allow-actions cannot be used with --attach");
   return {
     ...cleanOptions,
     ...smokeOptions,
@@ -230,17 +248,12 @@ async function qualifyCleanVm(options) {
         invariant(actualVersion === expectedVersion, `external Codex version mismatch: expected ${expectedVersion}, got ${actualVersion || "<empty>"}`);
       }
 
-      const launch = [
-        options.codexPlatformPackageTarball ? `OPL_CODEX_BIN=${shellQuote(guestCodexBinary)}` : null,
-        "nohup",
-        shellQuote(`${guestApp}/Contents/MacOS/${productName}`),
-        "--disable-gpu",
-        "--remote-debugging-port=9222",
-        "--remote-debugging-address=127.0.0.1",
-        `>${shellQuote(guestLog)}`,
-        "2>&1",
-        "& echo $!"
-      ].filter(Boolean).join(" ");
+      const launch = buildGuestLaunchCommand({
+        appExecutable: `${guestApp}/Contents/MacOS/${productName}`,
+        logPath: guestLog,
+        codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
+        allowActions: options.allowActions
+      });
       guestRun(options, ip, launch);
       tunnel = spawn("ssh", ["-N", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: "ignore" });
     }
