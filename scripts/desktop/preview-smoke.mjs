@@ -140,24 +140,50 @@ export async function readCodexTurnHook({ file, prompt, env = process.env } = {}
   return value ? validateTurn(value) : null;
 }
 
-function gatewayProjection(state) {
+export function projectGatewayState(state) {
+  const record = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
   const outer = state?.app_state ?? state;
   const root = outer?.app_state ?? outer;
-  return root?.settings_control_center?.app_settings_read_model?.opl_gateway_account ?? null;
+  const gateway = root?.settings_control_center?.app_settings_read_model?.opl_gateway_account;
+  if (!record(gateway)) return null;
+  const settings = root?.settings_control_center?.app_settings_read_model;
+  const policy = settings?.codex_model_policy;
+  const coreCodex = root?.core?.codex;
+  const modelAccessSource = typeof policy?.model_access_source === "string"
+    ? policy.model_access_source
+    : typeof coreCodex?.model_access_source === "string"
+      ? coreCodex.model_access_source
+      : null;
+  const actionId = typeof gateway.actions?.use_for_model_access === "string"
+    ? gateway.actions.use_for_model_access
+    : null;
+  const action = Array.isArray(root?.actions)
+    ? root.actions.find((candidate) => record(candidate) && candidate.action_id === actionId)
+    : null;
+  return {
+    surfaceKind: gateway.surface_kind ?? null,
+    status: gateway.status ?? null,
+    connectionMode: gateway.connection_mode ?? null,
+    accountCardVisible: gateway.account_card_visible === true,
+    accountStatus: gateway.account?.status ?? null,
+    managedKeyStatus: gateway.managed_key?.status ?? null,
+    freshnessStale: gateway.freshness?.stale === true,
+    modelAccessSource,
+    modelAccessAction: actionId
+      ? {
+        actionId,
+        confirmationRequired: action?.confirmation_required === true,
+        dryRunSupported: action?.dry_run_supported === true,
+        payloadFields: Array.isArray(action?.payload_fields)
+          ? action.payload_fields.filter((field) => typeof field === "string")
+          : []
+      }
+      : null
+  };
 }
 
 export function sanitizeGatewayProjection(state) {
-  const projection = gatewayProjection(state);
-  if (!isRecord(projection)) return null;
-  return {
-    surfaceKind: projection.surface_kind ?? null,
-    status: projection.status ?? null,
-    connectionMode: projection.connection_mode ?? null,
-    accountCardVisible: projection.account_card_visible === true,
-    accountStatus: projection.account?.status ?? null,
-    managedKeyStatus: projection.managed_key?.status ?? null,
-    freshnessStale: projection.freshness?.stale === true
-  };
+  return projectGatewayState(state);
 }
 
 function readbackSummary(state, secretValues) {
@@ -175,7 +201,6 @@ function readbackSummary(state, secretValues) {
 async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   const uiTimeoutMs = Math.min(timeoutMs, 10_000);
   const result = await evaluate(`(async()=>{
-    const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
     const click=(selector)=>{const node=document.querySelector(selector); if(!node) return false; node.click(); return true;};
     const clickButton=(label)=>{const node=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()===label || button.getAttribute("aria-label")===label); if(!node) return false; node.click(); return true;};
     const waitFor=(selector,ms=${uiTimeoutMs})=>new Promise((resolve)=>{const deadline=Date.now()+ms; const tick=()=>{if(document.querySelector(selector)) return resolve(true); if(Date.now()>=deadline) return resolve(false); setTimeout(tick,100);}; tick();});
@@ -207,7 +232,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     }
     const closeSettings=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()==="关闭"||button.innerText.trim()==="Close"||button.getAttribute("aria-label")==="关闭"||button.getAttribute("aria-label")==="Close");
     closeSettings?.click();
-    await sleep(100);
+    await waitForGone('[data-testid="opl-settings-panel"]',Math.min(${timeoutMs},5000));
     const runtimeButton=[...document.querySelectorAll("button")].find((button)=>button.getAttribute("aria-label")==="运行状态"||button.getAttribute("aria-label")==="Run status"||button.innerText.trim()==="运行状态"||button.innerText.trim()==="Run status");
     runtimeButton?.click();
     result.runtime.opened=!!runtimeButton;
@@ -226,8 +251,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       tab?.click();
       const close=document.querySelector('[data-testid="opl-context-inspector"] button[aria-label="关闭详情"], [data-testid="opl-context-inspector"] button[aria-label="Close details"]');
       close?.click();
-      await sleep(100);
-      result.inspector.closed=!document.querySelector('[data-testid="opl-context-inspector"]');
+      result.inspector.closed=await waitForGone('[data-testid="opl-context-inspector"]');
     }
     return result;
   })()`);
@@ -252,8 +276,8 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   return result;
 }
 
-async function waitForGatewayState({ evaluate, timeoutMs }) {
-  return evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; let state=null; let projection=null; while(Date.now()<deadline){state=await window.oplStudio.readState("fast"); const p=${gatewayProjection.toString()}(state); projection=p?{surfaceKind:p.surface_kind??null,status:p.status??null,connectionMode:p.connection_mode??null,accountCardVisible:p.account_card_visible===true,accountStatus:p.account?.status??null,managedKeyStatus:p.managed_key?.status??null,freshnessStale:p.freshness?.stale===true}:null; if(projection?.surfaceKind==="opl_gateway_account_read_model.v1"&&projection.connectionMode==="account"&&projection.status==="connected"&&projection.accountStatus==="active"&&projection.managedKeyStatus==="active"&&projection.freshnessStale!==true) return {state,projection}; await new Promise((resolve)=>setTimeout(resolve,500));} return {state,projection};})()`);
+async function waitForGatewayState({ evaluate, timeoutMs, requireModelAccess = false }) {
+  return evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; const project=${projectGatewayState.toString()}; let state=null; let projection=null; while(Date.now()<deadline){state=await window.oplStudio.readState("fast"); projection=project(state); const accountReady=projection?.surfaceKind==="opl_gateway_account_read_model.v1"&&projection.connectionMode==="account"&&projection.status==="connected"&&projection.accountStatus==="active"&&projection.managedKeyStatus==="active"&&projection.freshnessStale!==true; const source=typeof projection?.modelAccessSource==="string"?projection.modelAccessSource.trim().toLowerCase():""; const modelAccessReady=${requireModelAccess ? 'source==="opl_gateway"' : "true"}; if(accountReady&&modelAccessReady) return {state,projection}; await new Promise((resolve)=>setTimeout(resolve,500));} return {state,projection};})()`);
 }
 
 async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
@@ -261,7 +285,7 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
   const result = await evaluate(`(async()=>{const response=await window.oplStudio.loginGatewayAccount(${JSON.stringify(credentials)}); return {ok:response?.ok===true,stateRefreshRequired:response?.stateRefreshRequired===true,errorCode:response?.ok===true?null:(response?.errorCode||"gateway_account_failed")};})()`);
   const readback = result?.ok === true ? await waitForGatewayState({ evaluate, timeoutMs }) : null;
   const projection = readback?.projection;
-  const passed = Boolean(
+  const accountReady = Boolean(
     result?.ok === true
     && projection?.surfaceKind === "opl_gateway_account_read_model.v1"
     && projection?.connectionMode === "account"
@@ -270,12 +294,69 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
     && projection?.managedKeyStatus === "active"
     && projection?.freshnessStale !== true
   );
+  if (!accountReady) {
+    return {
+      status: "partial",
+      ok: result?.ok === true,
+      stateRefreshRequired: result?.stateRefreshRequired === true,
+      errorCode: result?.errorCode ?? null,
+      projection: projection ?? sanitizeGatewayProjection(readback?.state),
+      credentialsProvided: true
+    };
+  }
+  const modelAccessSource = typeof projection?.modelAccessSource === "string"
+    ? projection.modelAccessSource.trim().toLowerCase()
+    : "";
+  if (modelAccessSource !== "opl_gateway") {
+    const action = projection?.modelAccessAction;
+    if (
+      action?.actionId !== "gateway_account_use_for_model_access"
+      || action.confirmationRequired !== true
+      || action.dryRunSupported !== false
+      || action.payloadFields.length !== 0
+    ) {
+      return {
+        status: "partial",
+        ok: true,
+        stateRefreshRequired: result?.stateRefreshRequired === true,
+        errorCode: "gateway_model_access_action_not_projected",
+        projection,
+        credentialsProvided: true,
+        modelAccessAction: action ?? null
+      };
+    }
+    const actionId = action.actionId;
+    const dryRun = await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:true}); return {ok:true,status:receipt?.status??null,dryRun:receipt?.dryRun===true,confirmationRequired:receipt?.confirmationRequired===true,canExecute:receipt?.canExecute===true,exitCode:receipt?.exitCode??null};}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_dry_run_failed"};}})()`);
+    const execute = await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:false}); return {ok:true,status:receipt?.status??null,dryRun:receipt?.dryRun===true,confirmationRequired:receipt?.confirmationRequired===true,canExecute:receipt?.canExecute===true,exitCode:receipt?.exitCode??null};}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_execute_failed"};}})()`);
+    const after = execute?.ok === true && execute?.status === "executed"
+      ? await waitForGatewayState({ evaluate, timeoutMs, requireModelAccess: true })
+      : null;
+    const afterProjection = after?.projection;
+    const passed = Boolean(
+      dryRun?.ok === true
+      && dryRun?.dryRun === true
+      && execute?.ok === true
+      && execute?.dryRun === false
+      && execute?.status === "executed"
+      && afterProjection?.modelAccessSource?.trim?.().toLowerCase?.() === "opl_gateway"
+    );
+    return {
+      status: passed ? "passed" : "partial",
+      ok: true,
+      stateRefreshRequired: result?.stateRefreshRequired === true,
+      errorCode: passed ? null : (execute?.errorCode ?? "gateway_model_access_not_confirmed"),
+      projection: afterProjection ?? projection,
+      credentialsProvided: true,
+      modelAccessAction: action,
+      confirmation: { dryRun, execute }
+    };
+  }
   return {
-    status: passed ? "passed" : "partial",
-    ok: result?.ok === true,
+    status: "passed",
+    ok: true,
     stateRefreshRequired: result?.stateRefreshRequired === true,
     errorCode: result?.errorCode ?? null,
-    projection: projection ?? sanitizeGatewayProjection(readback?.state),
+    projection,
     credentialsProvided: true
   };
 }

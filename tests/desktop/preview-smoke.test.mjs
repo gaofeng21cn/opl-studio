@@ -4,6 +4,7 @@ import {
   PREVIEW_PRODUCT,
   parsePreviewSmokeArgs,
   parseRuntimeProfiles,
+  projectGatewayState,
   redactSecrets,
   runPreviewSmoke
 } from "../../scripts/desktop/preview-smoke.mjs";
@@ -175,4 +176,138 @@ test("Preview smoke does not accept the pre-login Gateway projection as authenti
   });
   assert.equal(receipt.checks.gateway.status, "partial");
   assert.ok(receipt.blockers.includes("required_gateway_setup_hook_not_passed"));
+});
+
+test("Preview smoke confirms the projected Gateway model-access action before the Codex turn", async () => {
+  let modelAccessSource = "codex_login";
+  const actionCalls = [];
+  const state = () => ({
+    app_state: {
+      core: { codex: { model_access_source: modelAccessSource } },
+      actions: [{
+        action_id: "gateway_account_use_for_model_access",
+        confirmation_required: true,
+        dry_run_supported: false,
+        payload_fields: []
+      }],
+      settings_control_center: {
+        app_settings_read_model: {
+          codex_model_policy: { model_access_source: modelAccessSource },
+          opl_gateway_account: {
+            surface_kind: "opl_gateway_account_read_model.v1",
+            connection_mode: "account",
+            status: "connected",
+            account_card_visible: true,
+            account: { status: "active" },
+            managed_key: { status: "active" },
+            freshness: { stale: false },
+            actions: { use_for_model_access: "gateway_account_use_for_model_access" }
+          }
+        }
+      }
+    }
+  });
+  const evaluate = async (expression) => {
+    if (expression.includes("Object.keys(window.oplStudio)")) {
+      return { state: { readback: { exitCode: 0 } }, bridgeKeys: ["readState", "sendMessage", "executeAction"], startupErrors: [] };
+    }
+    if (expression.includes("const project=")) {
+      const current = state();
+      return { state: current, projection: projectGatewayState(current) };
+    }
+    if (expression.includes("window.oplStudio.executeAction")) {
+      const dryRun = expression.includes("dryRun:true");
+      actionCalls.push(dryRun ? "dryRun" : "execute");
+      if (!dryRun) modelAccessSource = "opl_gateway";
+      return {
+        ok: true,
+        status: dryRun ? "preview_ready" : "executed",
+        dryRun,
+        confirmationRequired: false,
+        canExecute: true,
+        exitCode: 0
+      };
+    }
+    if (expression.includes("loginGatewayAccount")) return { ok: true, stateRefreshRequired: true, errorCode: null };
+    if (expression.includes("readState(\"fast\")") || expression.includes("readState(\"full\")")) {
+      return { profile: expression.includes("full") ? "full" : "fast", readback: { exitCode: 0 } };
+    }
+    if (expression.includes("document.querySelector")) {
+      return {
+        root: true,
+        studioRoot: true,
+        sessionHeader: true,
+        composerRunState: true,
+        settings: { opened: true, panel: true, account: true, about: true },
+        runtime: { opened: true, panel: true, returnedToConversation: true },
+        inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
+      };
+    }
+    return {};
+  };
+  const receipt = await runPreviewSmoke({
+    identity: { status: "passed", expected: PREVIEW_PRODUCT, actual: PREVIEW_PRODUCT },
+    waitForReady: async () => ({ readyState: "complete", root: true, bridge: true }),
+    evaluate,
+    credentials: { email: "release@example.com", password: "secret" },
+    options: { requireGatewaySetup: true, runtimeProfiles: ["standard"] }
+  });
+  assert.equal(receipt.checks.gateway.status, "passed");
+  assert.deepEqual(actionCalls, ["dryRun", "execute"]);
+  assert.equal(receipt.checks.gateway.projection.modelAccessSource, "opl_gateway");
+  assert.equal(receipt.checks.gateway.modelAccessAction.actionId, "gateway_account_use_for_model_access");
+});
+
+test("Preview smoke reports a partial Gateway check when model-access admission is not projected", async () => {
+  const evaluate = async (expression) => {
+    if (expression.includes("Object.keys(window.oplStudio)")) {
+      return { state: { readback: { exitCode: 0 } }, bridgeKeys: ["readState", "sendMessage"], startupErrors: [] };
+    }
+    if (expression.includes("const project=")) {
+      return {
+        state: {},
+        projection: {
+          surfaceKind: "opl_gateway_account_read_model.v1",
+          status: "connected",
+          connectionMode: "account",
+          accountStatus: "active",
+          managedKeyStatus: "active",
+          freshnessStale: false,
+          modelAccessSource: "codex_login",
+          modelAccessAction: null
+        }
+      };
+    }
+    if (expression.includes("loginGatewayAccount")) return { ok: true, stateRefreshRequired: true, errorCode: null };
+    if (expression.includes("readState(\"fast\")") || expression.includes("readState(\"full\")")) {
+      return { profile: expression.includes("full") ? "full" : "fast", readback: { exitCode: 0 } };
+    }
+    if (expression.includes("document.querySelector")) {
+      return {
+        root: true,
+        studioRoot: true,
+        sessionHeader: true,
+        composerRunState: true,
+        settings: { opened: true, panel: true, account: true, about: true },
+        runtime: { opened: true, panel: true, returnedToConversation: true },
+        inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
+      };
+    }
+    return {};
+  };
+  const evaluated = [];
+  const wrappedEvaluate = async (expression) => {
+    evaluated.push(expression);
+    return evaluate(expression);
+  };
+  const receipt = await runPreviewSmoke({
+    identity: { status: "passed", expected: PREVIEW_PRODUCT, actual: PREVIEW_PRODUCT },
+    waitForReady: async () => ({ readyState: "complete", root: true, bridge: true }),
+    evaluate: wrappedEvaluate,
+    credentials: { email: "release@example.com", password: "secret" },
+    options: { requireGatewaySetup: true, runtimeProfiles: ["standard"] }
+  });
+  assert.equal(receipt.checks.gateway.status, "partial");
+  assert.equal(receipt.checks.gateway.errorCode, "gateway_model_access_action_not_projected");
+  assert.equal(evaluated.some((expression) => expression.includes("window.oplStudio.executeAction")), false);
 });
