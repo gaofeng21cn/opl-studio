@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +14,7 @@ import {
 } from "./preview-smoke.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const studioVersion = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8")).version;
 const defaultSourceVm = process.env.OPL_STUDIO_CLEAN_VM_SOURCE || "opl-first-run-no-clt-clean-base-26-5-18";
 const defaultGuestUser = process.env.OPL_STUDIO_CLEAN_VM_USER || "admin";
 const defaultSshKey = process.env.OPL_STUDIO_CLEAN_VM_SSH_KEY || path.join(os.homedir(), ".ssh", "opl_first_run_tart_ed25519");
@@ -31,7 +32,7 @@ export function parseArgs(argv) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const cleanOptions = {
     sourceVm: defaultSourceVm,
-    dmg: path.join(repositoryRoot, "out", "one-person-lab-preview-0.1.1-mac-arm64.dmg"),
+    dmg: path.join(repositoryRoot, "out", `one-person-lab-preview-${studioVersion}-mac-arm64.dmg`),
     guestUser: defaultGuestUser,
     sshKey: defaultSshKey,
     vmName: `opl-studio-clean-${stamp}`,

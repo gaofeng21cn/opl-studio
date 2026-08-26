@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { evaluatePage, waitForPageReady } from "./cdp.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const studioVersion = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8")).version;
 const gatewayFileNames = ["credentials.json", "account.json", "installation.json"];
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -165,7 +166,7 @@ async function launchAndRead({ appPath, port }) {
           about?.click();
           await new Promise((resolve)=>setTimeout(resolve,250));
           const aboutText=document.querySelector('[data-testid="opl-settings-panel"]')?.innerText||"";
-          return {readyState:document.readyState,root:!!document.getElementById("root"),bridge:!!window.oplStudio,state,ui:{settingsPanel:!!document.querySelector('[data-testid="opl-settings-panel"]'),gatewayCard:gatewayVisible,accountText,versionVisible:aboutText.includes("0.1.1")}};
+          return {readyState:document.readyState,root:!!document.getElementById("root"),bridge:!!window.oplStudio,state,ui:{settingsPanel:!!document.querySelector('[data-testid="opl-settings-panel"]'),gatewayCard:gatewayVisible,accountText,versionVisible:aboutText.includes(${JSON.stringify(studioVersion)})}};
         })()`
       });
       if (page?.state?.readback?.exitCode === 0 && gatewayProjection(page.state)) break;

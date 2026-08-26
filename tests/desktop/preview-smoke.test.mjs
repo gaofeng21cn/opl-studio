@@ -11,9 +11,9 @@ import { parseInstalledIdentityOutput } from "../../scripts/desktop/qualify-clea
 
 test("clean VM parses plutil raw values without embedding line breaks in JSON strings", () => {
   assert.deepEqual(parseInstalledIdentityOutput(
-    '{"version":"0.1.1\n","productName":"One Person Lab Preview\n","bundleId":"cn.onepersonlab.opl.studio.preview\n"}'
+    '{"version":"0.1.2\n","productName":"One Person Lab Preview\n","bundleId":"cn.onepersonlab.opl.studio.preview\n"}'
   ), {
-    version: "0.1.1",
+    version: "0.1.2",
     productName: "One Person Lab Preview",
     bundleId: "cn.onepersonlab.opl.studio.preview"
   });

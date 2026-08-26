@@ -1,4 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -9,6 +12,10 @@ import {
 
 export const DSH_TOOL_MCP_PATH = "/mcp/dsh-tools";
 export const DSH_TOOL_MCP_TOKEN_ENV = "OPL_STUDIO_DSH_MCP_TOKEN";
+const studioVersion = JSON.parse(await readFile(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../package.json"),
+  "utf8"
+)).version;
 
 class DshToolMcpHttpError extends Error {
   constructor(status, message) {
@@ -170,7 +177,7 @@ export class DshToolMcp {
       }
     });
     const server = new Server(
-      { name: "opl-studio-dsh-tools", version: "0.1.1" },
+      { name: "opl-studio-dsh-tools", version: studioVersion },
       {
         capabilities: { tools: { listChanged: true } },
         debouncedNotificationMethods: ["notifications/tools/list_changed"]

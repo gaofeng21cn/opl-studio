@@ -60,7 +60,7 @@ test("Linux arm64 cross-distribution qualification reads the architecture-specif
 });
 
 test("distribution qualification accepts an explicit lifecycle target version", async () => {
-  const targetVersion = "0.1.1";
+  const targetVersion = "0.1.2";
   const outRoot = await fixture("win32", { artifactVersion: targetVersion });
   const receipt = validateDesktopPackage({
     repositoryRoot,
