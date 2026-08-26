@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
     modelAccessSecretInput: true
   },
   beginWindowDrag: () => invoke("beginWindowDrag"),
+  retryDesktopHost: () => invoke("retryDesktopHost"),
   readState: (profile = "fast") => invoke("readState", { profile }),
   readInitialize: () => invoke("readInitialize"),
   readFullDrilldown: () => invoke("readFullDrilldown"),

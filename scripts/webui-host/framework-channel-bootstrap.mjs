@@ -32,6 +32,18 @@ async function resolveExecutable(command, env) {
 }
 
 async function frameworkPackageRoot(command, env) {
+  const explicitRoot = env.OPL_FRAMEWORK_PACKAGE_ROOT?.trim();
+  if (explicitRoot) {
+    const root = path.resolve(explicitRoot);
+    const packageJsonPath = path.join(root, "package.json");
+    const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+    if (packageJson.name !== "opl-framework") {
+      throw Object.assign(new Error("Configured Framework Package root is not opl-framework"), {
+        code: "framework_carrier_invalid"
+      });
+    }
+    return { packageJson, packageJsonPath, root };
+  }
   let current = path.dirname(await resolveExecutable(command, env));
   while (true) {
     const packageJsonPath = path.join(current, "package.json");

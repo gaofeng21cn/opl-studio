@@ -7,6 +7,7 @@ import { createOplHostCore } from "../scripts/webui-host/host-core.mjs";
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
+import { ensureStudioDesktopRuntime } from "./runtime-bootstrap.mjs";
 import { createShutdownController } from "./shutdown.mjs";
 import { createDesktopTray } from "./tray.mjs";
 import {
@@ -23,6 +24,7 @@ let hostCore;
 let mainWindow;
 let desktopTray;
 let desktopUpdater;
+let desktopHostPromise;
 let installingUpdate = false;
 let quittingApplication = false;
 let updaterQualificationEnabled = false;
@@ -170,10 +172,16 @@ async function createDesktopHost(appLogDirectory) {
       installingUpdate = true;
     }
   });
+  const homeDir = app.getPath("home");
+  const runtime = await ensureStudioDesktopRuntime({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    homeDir,
+    env: process.env
+  });
   const hostEnvironment = resolveDesktopRuntimeEnvironment({
-    env: process.env,
-    homeDir: app.getPath("home"),
-    resourcesPath: process.resourcesPath
+    env: runtime?.env ?? process.env,
+    homeDir
   });
   hostEnvironment.OPL_APP_VERSION ??= app.getVersion();
   core = await createOplHostCore({
@@ -212,12 +220,6 @@ async function createDesktopHost(appLogDirectory) {
     nativeUpdater: updater
   });
 
-  ipcMain.handle("opl:invoke", async (event, request) => {
-    if (!trustedRendererUrl(event.senderFrame.url)) {
-      throw new Error("Untrusted renderer cannot invoke the OPL host");
-    }
-    return core.invoke(request?.method, request?.payload ?? {});
-  });
   core.on("event", (event) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send("opl:event", event);
@@ -226,28 +228,58 @@ async function createDesktopHost(appLogDirectory) {
   return { core, desktopUpdater: updater };
 }
 
+async function desktopHost(appLogDirectory, { retry = false } = {}) {
+  if (retry && desktopHostPromise) {
+    const previous = desktopHostPromise;
+    desktopHostPromise = undefined;
+    try {
+      const active = await previous;
+      await active.core.close();
+    } catch {
+      // A failed bootstrap has no live Host to dispose.
+    }
+    hostCore = undefined;
+    desktopUpdater = undefined;
+  }
+  desktopHostPromise ??= createDesktopHost(appLogDirectory).then((desktopHost) => {
+    hostCore = desktopHost.core;
+    desktopUpdater = desktopHost.desktopUpdater;
+    return desktopHost;
+  });
+  return await desktopHostPromise;
+}
+
 app.whenReady().then(async () => {
   if (nativeAccessibilityQualificationEnabled) {
     app.setAccessibilitySupportEnabled(true);
   }
   const appLogDirectory = createAppLogDirectoryController({ electronApp: app });
   await appLogDirectory.restore();
-  const desktopHost = await createDesktopHost(appLogDirectory);
-  hostCore = desktopHost.core;
-  desktopUpdater = desktopHost.desktopUpdater;
   createWindow();
-  desktopTray = await createDesktopTray({
-    electron: { app, dialog, Menu, nativeImage, Tray },
-    repositoryRoot,
-    resourcesPath: process.resourcesPath,
-    isPackaged: app.isPackaged,
-    invokeHost: (method, payload) => hostCore.invoke(method, payload),
-    checkForUpdates: () => desktopHost.desktopUpdater.perform("check"),
-    getWindow: () => mainWindow,
-    sendRendererEvent: sendDesktopRendererEvent,
-    restart: restartApplication,
-    quit: quitApplication
+  ipcMain.handle("opl:invoke", async (event, request) => {
+    if (!trustedRendererUrl(event.senderFrame.url)) {
+      throw new Error("Untrusted renderer cannot invoke the OPL host");
+    }
+    const retry = request?.method === "retryDesktopHost";
+    const activeHost = await desktopHost(appLogDirectory, { retry });
+    return retry
+      ? { status: "ready" }
+      : activeHost.core.invoke(request?.method, request?.payload ?? {});
   });
+  void desktopHost(appLogDirectory).then(async (activeHost) => {
+    desktopTray = await createDesktopTray({
+      electron: { app, dialog, Menu, nativeImage, Tray },
+      repositoryRoot,
+      resourcesPath: process.resourcesPath,
+      isPackaged: app.isPackaged,
+      invokeHost: (method, payload) => activeHost.core.invoke(method, payload),
+      checkForUpdates: () => activeHost.desktopUpdater.perform("check"),
+      getWindow: () => mainWindow,
+      sendRendererEvent: sendDesktopRendererEvent,
+      restart: restartApplication,
+      quit: quitApplication
+    });
+  }).catch(() => undefined);
   app.on("activate", () => {
     if (!mainWindow || mainWindow.isDestroyed()) createWindow();
     else {

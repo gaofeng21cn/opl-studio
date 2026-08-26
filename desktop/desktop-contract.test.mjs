@@ -8,20 +8,28 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const main = fs.readFileSync(path.join(root, "desktop", "main.mjs"), "utf8");
 const preload = fs.readFileSync(path.join(root, "desktop", "preload.cjs"), "utf8");
 const logDirectoryOwner = fs.readFileSync(path.join(root, "desktop", "app-log-directory.mjs"), "utf8");
+const runtimeBootstrap = fs.readFileSync(path.join(root, "desktop", "runtime-bootstrap.mjs"), "utf8");
 const settingsPanel = fs.readFileSync(path.join(root, "src", "workbench", "SettingsPanel.tsx"), "utf8");
 
 test("Electron is a thin, isolated adapter over the shared host core", () => {
   assert.match(main, /createOplHostCore/);
   assert.match(main, /workspaceRoot:\s*desktopCodexWorkspaceRoot\(\)/);
   assert.match(main, /app\.getPath\("home"\)/);
+  assert.match(main, /ensureStudioDesktopRuntime/);
+  assert.match(main, /createWindow\(\);[\s\S]+desktopHost\(appLogDirectory\)/);
+  assert.match(main, /request\?\.method === "retryDesktopHost"/);
   assert.match(main, /contextIsolation: true/);
   assert.match(main, /nodeIntegration: false/);
   assert.match(main, /sandbox: true/);
   assert.match(main, /ipcMain\.handle\("opl:invoke"/);
   assert.match(preload, /contextBridge\.exposeInMainWorld\("oplStudio"/);
   assert.match(preload, /ipcRenderer\.invoke\("opl:invoke"/);
+  assert.match(preload, /retryDesktopHost: \(\) => invoke\("retryDesktopHost"\)/);
   assert.match(preload, /readDomainDetailView: \(request\) => invoke\("readDomainDetailView", request\)/);
   assert.doesNotMatch(main, /AionCore|AionUI/);
+  assert.match(runtimeBootstrap, /Application Support", "opl-studio", "runtime/);
+  assert.match(runtimeBootstrap, /OPL_FRAMEWORK_PACKAGE_ROOT/);
+  assert.match(runtimeBootstrap, /OPL_APP_OPL_BIN/);
 });
 
 test("desktop readiness reports the exact running package version", () => {

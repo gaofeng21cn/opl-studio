@@ -15,6 +15,11 @@ extraResources:
     filter:
       - trayTemplate.png
       - trayTemplate@2x.png
+  - from: resources/opl-framework-bootstrap
+    to: opl-framework-bootstrap
+    filter:
+      - opl-install.sh
+      - manifest.json
 mac:
   icon: assets/branding/opl-studio.icns
   category: public.app-category.developer-tools

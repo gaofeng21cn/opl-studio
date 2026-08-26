@@ -26,6 +26,7 @@ function nodeVersionBins(homeDir, readDirectory) {
 
 function managedRuntimeBins(homeDir, readDirectory) {
   const bins = [
+    path.join(homeDir, "Library", "Application Support", "opl-studio", "runtime", "current", "bin"),
     path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current", "bin")
   ];
   const toolchainRoot = path.join(homeDir, ".opl", "toolchain");
@@ -39,11 +40,6 @@ function managedRuntimeBins(homeDir, readDirectory) {
     // The managed toolchain is optional on clean machines.
   }
   return bins;
-}
-
-function packagedFrameworkRuntimeBin(resourcesPath) {
-  if (!resourcesPath) return undefined;
-  return path.join(resourcesPath, "opl-studio-full-runtime", "runtime", "current", "bin");
 }
 
 function findExecutable(name, directories, executable) {
@@ -69,11 +65,10 @@ function defaultExecutable(candidate) {
 export function resolveDesktopRuntimeEnvironment({
   env = process.env,
   homeDir = os.homedir(),
-  resourcesPath,
   readDirectory = fs.readdirSync,
   executable = defaultExecutable
 } = {}) {
-  const baseSearchDirectories = uniqueDirectories([
+  const searchDirectories = uniqueDirectories([
     ...String(env.PATH ?? "").split(path.delimiter),
     path.join(homeDir, ".local", "bin"),
     path.join(homeDir, ".volta", "bin"),
@@ -86,18 +81,14 @@ export function resolveDesktopRuntimeEnvironment({
     ...managedRuntimeBins(homeDir, readDirectory),
     "/Applications/ChatGPT.app/Contents/Resources"
   ]);
-  // Full carries Framework in Electron resources; it may provide OPL but never
-  // becomes a Codex source, even if the payload contains a same-named wrapper.
-  const packagedFrameworkBin = packagedFrameworkRuntimeBin(resourcesPath);
-  const oplSearchDirectories = uniqueDirectories([...baseSearchDirectories, packagedFrameworkBin]);
-  const resolved = { ...env, PATH: baseSearchDirectories.join(path.delimiter) };
+  const resolved = { ...env, PATH: searchDirectories.join(path.delimiter) };
 
   if (!resolved.OPL_CODEX_BIN && !resolved.CODEX_APP_SERVER_COMMAND) {
-    const codex = findExecutable("codex", baseSearchDirectories, executable);
+    const codex = findExecutable("codex", searchDirectories, executable);
     if (codex) resolved.OPL_CODEX_BIN = codex;
   }
   if (!resolved.OPL_APP_OPL_BIN && !resolved.OPL_COMMAND) {
-    const opl = findExecutable("opl", oplSearchDirectories, executable);
+    const opl = findExecutable("opl", searchDirectories, executable);
     if (opl) resolved.OPL_APP_OPL_BIN = opl;
   }
   return resolved;

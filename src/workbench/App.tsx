@@ -1590,6 +1590,7 @@ export function App({
         setSettingsActionFeedback({ tone: "attention", message });
         return { status: "error", message };
       }
+      await Promise.all([loadModels(), loadCapabilities(true)]);
       const message = settings.locale === "zh" ? "本机助手已安装并通过自检。" : "The local assistant was installed and passed the startup check.";
       setSettingsActionFeedback({ tone: "success", message });
       return { status: "completed", message };
@@ -1863,6 +1864,13 @@ export function App({
       loadCapabilities(true)
     ]);
   }, [bridge, settings.runtimeProfile, startupAttempt]);
+
+  async function retryStartup() {
+    setStartupGateOpen(false);
+    setStartupTimedOut(false);
+    await bridge.retryDesktopHost();
+    setStartupAttempt((attempt) => attempt + 1);
+  }
 
   useEffect(() => {
     if (startupGateOpen || startupAllReady) {
@@ -2780,11 +2788,7 @@ export function App({
             </ol>
             {startupHasFailure ? (
               <div className="startup-readiness-actions">
-                <button type="button" className="startup-readiness-retry" onClick={() => {
-                  setStartupGateOpen(false);
-                  setStartupTimedOut(false);
-                  setStartupAttempt((attempt) => attempt + 1);
-                }}><RefreshCw aria-hidden="true" size={16} />{settings.locale === "zh" ? "重新加载" : "Retry"}</button>
+                <button type="button" className="startup-readiness-retry" onClick={() => void retryStartup()}><RefreshCw aria-hidden="true" size={16} />{settings.locale === "zh" ? "重新加载" : "Retry"}</button>
                 <button type="button" className="startup-readiness-limited" onClick={() => setStartupGateOpen(true)}>
                   {settings.locale === "zh" ? "受限进入" : "Enter with limits"}<ArrowRight aria-hidden="true" size={16} />
                 </button>

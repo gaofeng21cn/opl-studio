@@ -48,6 +48,11 @@ test("Studio declares one branded preview carrier for the App-owned desktop rele
   assert.equal(builder.mac.hardenedRuntime, true);
   assert.equal(builder.artifactName, carrier.artifact_name_template);
   assert.equal(builder.dmg.format, "ULFO");
+  assert.deepEqual(builder.extraResources.find((entry) => entry.to === "opl-framework-bootstrap"), {
+    from: "resources/opl-framework-bootstrap",
+    to: "opl-framework-bootstrap",
+    filter: ["opl-install.sh", "manifest.json"]
+  });
   assert.equal(`${builder.publish.owner}/${builder.publish.repo}`, carrier.release_repository);
   assert.equal(
     carrier.commands.qualify_public_release,

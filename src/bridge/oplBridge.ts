@@ -523,6 +523,7 @@ export type OplStudioSurface = Pick<
   "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "searchThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
+  retryDesktopHost?: () => Promise<{ status: string }>;
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;
 };
 
@@ -576,6 +577,7 @@ export const CODEX_APP_SERVER = {
 export type OplBridge = CodexThreadAdapterBridge & {
   platformCapabilities: OplPlatformCapabilities;
   beginWindowDrag(): void;
+  retryDesktopHost(): Promise<void>;
   readState(profile?: OplStateProfile): Promise<OplStateReadback>;
   readInitialize(): Promise<OplInitializeReadback>;
   readFullDrilldown(): Promise<OplFullDrilldownReadback>;
@@ -1661,6 +1663,9 @@ export function createBrowserBridge(): OplBridge {
     },
     beginWindowDrag() {
       candidate?.beginWindowDrag?.();
+    },
+    retryDesktopHost() {
+      return Promise.resolve(candidate?.retryDesktopHost?.()).then(() => undefined);
     },
     readState(profile = readRuntimeProfile()) {
       const normalizedProfile = normalizeProfile(profile);
