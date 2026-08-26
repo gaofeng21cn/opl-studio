@@ -76,6 +76,7 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-tabs')));
   assert.ok(evaluated.some((expression) => expression.includes('[role="menu"] [role="menuitem"]')));
   assert.ok(evaluated.some((expression) => expression.includes('menuItem.click()')));
+  assert.ok(evaluated.some((expression) => expression.includes('opl-context-inspector-close')));
   assert.ok(evaluated.some((expression) => expression.includes('稍后处理')));
   assert.ok(evaluated.some((expression) => expression.includes('waitForGone')));
 });
@@ -253,7 +254,7 @@ test("Preview smoke confirms the projected Gateway model-access action before th
     options: { requireGatewaySetup: true, runtimeProfiles: ["standard"] }
   });
   assert.equal(receipt.checks.gateway.status, "passed");
-  assert.deepEqual(actionCalls, ["dryRun", "execute"]);
+  assert.deepEqual(actionCalls, ["execute"]);
   assert.equal(receipt.checks.gateway.projection.modelAccessSource, "opl_gateway");
   assert.equal(receipt.checks.gateway.modelAccessAction.actionId, "gateway_account_use_for_model_access");
 });

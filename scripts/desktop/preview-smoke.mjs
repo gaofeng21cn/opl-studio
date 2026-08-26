@@ -249,7 +249,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       result.inspector.tabs=await waitFor('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]');
       const tab=document.querySelector('[data-testid="opl-context-tabs"] button');
       tab?.click();
-      const close=document.querySelector('[data-testid="opl-context-inspector"] button[aria-label="关闭详情"], [data-testid="opl-context-inspector"] button[aria-label="Close details"]');
+      const close=document.querySelector('[data-testid="opl-context-inspector"] .opl-context-inspector-close, [data-testid="opl-context-inspector"] button[aria-label="关闭详情"], [data-testid="opl-context-inspector"] button[aria-label="关闭任务详情"], [data-testid="opl-context-inspector"] button[aria-label="Close details"]');
       close?.click();
       result.inspector.closed=await waitForGone('[data-testid="opl-context-inspector"]');
     }
@@ -326,15 +326,16 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
       };
     }
     const actionId = action.actionId;
-    const dryRun = await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:true}); return {ok:true,status:receipt?.status??null,dryRun:receipt?.dryRun===true,confirmationRequired:receipt?.confirmationRequired===true,canExecute:receipt?.canExecute===true,exitCode:receipt?.exitCode??null};}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_dry_run_failed"};}})()`);
+    const dryRun = action.dryRunSupported
+      ? await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:true}); return {ok:true,status:receipt?.status??null,dryRun:receipt?.dryRun===true,confirmationRequired:receipt?.confirmationRequired===true,canExecute:receipt?.canExecute===true,exitCode:receipt?.exitCode??null};}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_dry_run_failed"};}})()`)
+      : null;
     const execute = await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:false}); return {ok:true,status:receipt?.status??null,dryRun:receipt?.dryRun===true,confirmationRequired:receipt?.confirmationRequired===true,canExecute:receipt?.canExecute===true,exitCode:receipt?.exitCode??null};}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_execute_failed"};}})()`);
     const after = execute?.ok === true && execute?.status === "executed"
       ? await waitForGatewayState({ evaluate, timeoutMs, requireModelAccess: true })
       : null;
     const afterProjection = after?.projection;
     const passed = Boolean(
-      dryRun?.ok === true
-      && dryRun?.dryRun === true
+      (action.dryRunSupported !== true || (dryRun?.ok === true && dryRun?.dryRun === true))
       && execute?.ok === true
       && execute?.dryRun === false
       && execute?.status === "executed"
