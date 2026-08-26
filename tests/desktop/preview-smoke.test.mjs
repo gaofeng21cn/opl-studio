@@ -59,6 +59,7 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
           composerRunState: true,
           settings: { opened: true, panel: true, account: true, about: true },
           runtime: { opened: true, panel: true, returnedToConversation: true },
+          onboarding: { visible: false, dismissed: true },
           inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
         };
       }
@@ -74,6 +75,8 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-tabs')));
   assert.ok(evaluated.some((expression) => expression.includes('[role="menu"] [role="menuitem"]')));
   assert.ok(evaluated.some((expression) => expression.includes('menuItem.click()')));
+  assert.ok(evaluated.some((expression) => expression.includes('稍后处理')));
+  assert.ok(evaluated.some((expression) => expression.includes('waitForGone')));
 });
 
 test("Preview smoke never serializes supplied secrets into diagnostics", async () => {
@@ -106,6 +109,7 @@ test("Preview smoke requires a completed non-simulated Codex turn with a final r
         composerRunState: true,
         settings: { opened: true, panel: true, account: true, about: true },
         runtime: { opened: true, panel: true, returnedToConversation: true },
+        onboarding: { visible: false, dismissed: true },
         inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
       };
     }
@@ -142,6 +146,7 @@ test("Preview smoke does not accept the pre-login Gateway projection as authenti
         composerRunState: true,
         settings: { opened: true, panel: true, account: true, about: true },
         runtime: { opened: true, panel: true, returnedToConversation: true },
+        onboarding: { visible: false, dismissed: true },
         inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
       };
     }

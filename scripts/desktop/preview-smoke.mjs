@@ -173,21 +173,28 @@ function readbackSummary(state, secretValues) {
 }
 
 async function runUiInteractions({ evaluate, capture, timeoutMs }) {
+  const uiTimeoutMs = Math.min(timeoutMs, 10_000);
   const result = await evaluate(`(async()=>{
     const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
     const click=(selector)=>{const node=document.querySelector(selector); if(!node) return false; node.click(); return true;};
     const clickButton=(label)=>{const node=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()===label || button.getAttribute("aria-label")===label); if(!node) return false; node.click(); return true;};
-    const waitFor=(selector,ms=${timeoutMs})=>new Promise((resolve)=>{const deadline=Date.now()+ms; const tick=()=>{if(document.querySelector(selector)) return resolve(true); if(Date.now()>=deadline) return resolve(false); setTimeout(tick,100);}; tick();});
+    const waitFor=(selector,ms=${uiTimeoutMs})=>new Promise((resolve)=>{const deadline=Date.now()+ms; const tick=()=>{if(document.querySelector(selector)) return resolve(true); if(Date.now()>=deadline) return resolve(false); setTimeout(tick,100);}; tick();});
+    const waitForGone=(selector,ms=${uiTimeoutMs})=>new Promise((resolve)=>{const deadline=Date.now()+ms; const tick=()=>{if(!document.querySelector(selector)) return resolve(true); if(Date.now()>=deadline) return resolve(false); setTimeout(tick,100);}; tick();});
     const result={
       root:!!document.getElementById("root"),
       studioRoot:!!document.querySelector('[data-testid="opl-studio-root"]'),
       startupReadiness:!!document.querySelector('[data-testid="opl-startup-readiness"]'),
       sessionHeader:!!document.querySelector('[data-testid="opl-session-header"]'),
       composerRunState:!!document.querySelector('[data-testid="opl-composer-run-state"]'),
+      onboarding:{visible:!!document.querySelector('.opl-first-run'),dismissed:false},
       settings:{opened:false,panel:false,account:false,about:false},
       runtime:{opened:false,panel:false},
       inspector:{opened:false,menuItemSelected:false,tabs:false,closed:false},
     };
+    if(result.onboarding.visible){
+      const dismissed=clickButton("稍后处理")||clickButton("Do this later");
+      result.onboarding.dismissed=dismissed && await waitForGone('.opl-first-run',Math.min(${uiTimeoutMs},5000));
+    } else result.onboarding.dismissed=true;
     result.settings.opened=clickButton("设置")||clickButton("Settings");
     if(result.settings.opened){
       result.settings.panel=await waitFor('[data-testid="opl-settings-panel"]');
@@ -204,7 +211,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     const runtimeButton=[...document.querySelectorAll("button")].find((button)=>button.getAttribute("aria-label")==="运行状态"||button.getAttribute("aria-label")==="Run status"||button.innerText.trim()==="运行状态"||button.innerText.trim()==="Run status");
     runtimeButton?.click();
     result.runtime.opened=!!runtimeButton;
-    result.runtime.panel=await waitFor('[data-testid="opl-runtime-overview-page"]',Math.min(${timeoutMs},5000));
+    result.runtime.panel=await waitFor('[data-testid="opl-runtime-overview-page"]',Math.min(${uiTimeoutMs},5000));
     const chatButton=clickButton("新建任务")||clickButton("New task")||clickButton("新建会话")||clickButton("New session");
     result.runtime.returnedToConversation=chatButton && await waitFor('[data-testid="opl-context-inspector-trigger"]');
     result.inspector.opened=click('[data-testid="opl-context-inspector-trigger"]');
@@ -227,19 +234,19 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   if (typeof capture === "function") {
     await capture("conversation");
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="设置"||node.innerText.trim()==="Settings"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("settings");
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关于"||node.innerText.trim()==="About"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="settings-page-about"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="settings-page-about"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("about");
     await evaluate(`(()=>{const close=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关闭"||node.innerText.trim()==="Close"||node.getAttribute("aria-label")==="关闭"||node.getAttribute("aria-label")==="Close"); close?.click(); return !!close;})()`);
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.getAttribute("aria-label")==="运行状态"||node.getAttribute("aria-label")==="Run status"||node.innerText.trim()==="运行状态"||node.innerText.trim()==="Run status"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-runtime-overview-page"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-runtime-overview-page"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("runtime");
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="新建任务"||node.innerText.trim()==="New task"||node.innerText.trim()==="新建会话"||node.innerText.trim()==="New session"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector-trigger"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
-    await evaluate(`(()=>{const node=document.querySelector('[data-testid="opl-context-inspector-trigger"]'); node?.click(); return !!node;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector-trigger"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const node=document.querySelector('[data-testid="opl-context-inspector-trigger"]'); if(!node) return false; node.click(); const deadline=Date.now()+5000; while(Date.now()<deadline){const item=document.querySelector('[role="menu"] [role="menuitem"]'); if(item){item.click(); return true;} await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("inspector");
   }
   return result;
@@ -355,6 +362,7 @@ export async function runPreviewSmoke({
     && checks.ui?.studioRoot === true
     && checks.ui?.sessionHeader === true
     && checks.ui?.composerRunState === true
+    && checks.ui?.onboarding?.dismissed === true
     && checks.ui?.settings?.opened === true
     && checks.ui?.settings?.panel === true
     && checks.ui?.settings?.account === true
