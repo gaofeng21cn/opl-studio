@@ -53,7 +53,7 @@ release admission, and is explicitly adopted.
 | Product brand | `one_person_lab_only` | `OPL Studio` remains an internal repo/codename and is not a user-facing product brand or logo |
 | Renderer/hosts | `shared_application_host_renderer_and_bridge_implemented` | Electron IPC and HTTP/SSE adapt one DSH Application Host, OPL Host core, and renderer; release-cohort equivalence is not proven |
 | Carrier evidence command | `exact_commit_three_carrier_generator_implemented` | `npm run package` reads the current App carrier contract, requires committed tracked-clean Studio source, and emits Electron, standalone WebUI, Docker smoke, and candidate manifest outputs bound to exact `HEAD`; it grants no distribution, release, or adoption authority |
-| Desktop host | `electron_hosted_installer_native_api_accessibility_baseline` | macOS directory packaging is proven locally; hosted Windows x64 and Linux x64 build two unsigned package cohorts and prove install/update/rollback/uninstall of NSIS and DEB with exact running-version, state-preservation, and process-bound UIA/AT-SPI tree readback. DEB is the only admitted Linux native carrier; AppImage is rejected because its sandbox requirements conflict with direct portable execution on Ubuntu 24.04. Dedicated clean-VM, NVDA/Orca experience, signing, release, and platform support remain unqualified |
+| Desktop host | `macos_public_preview_windows_linux_candidate` | macOS arm64 `v0.1.4` Standard and Full Preview assets are publicly distributed with signing, notarization, stapling, and an automatic-update feed. Hosted Windows x64 and Linux x64 still qualify unsigned development cohorts only; their public distribution, dedicated clean-VM evidence, and NVDA/Orca experience remain unqualified |
 | Headless/WebUI host | `posix_user_service_qualification_wired` | Candidate WebUI starts Codex App Server directly. Formal install/status/stop/start/restart/update/rollback/uninstall commands manage only the current user's launchd or systemd service. The hosted jobs bind exact pinned runtime paths, readiness and App-state readback, then prove native service-definition and payload removal. Supported installers, remote access, signing and release remain open; no Electron/AionCore or Desktop database is used |
 | Docker carrier | `successor_oci_hosted_qualification_wired` | Dockerfile/Compose reuse the shared Node host core and renderer with pinned inputs and persistent volumes; the manual additional-carrier qualification builds local-only OCI layouts with SBOM/provenance and runs install/update/recreate/rollback/uninstall on matching native amd64 and arm64 runners. Registry index identity, signing, public distribution, clean-host and release admission remain open |
 | AionUI/AionCore dependency | `false` | Native starts Codex App Server directly and consumes only Framework App state/action contracts |
@@ -70,16 +70,16 @@ release admission, and is explicitly adopted.
 | Files and results Detail tool | `canonical_thread_workspace_read_only` | Lists, searches, and previews bounded UTF-8 text files below the canonical thread workspace, then keeps existing input-file and result/artifact views in the same tab. No edit, create, rename, move, delete, Git, terminal, or second workspace owner is introduced |
 | Standard Agents | `explicit_owner_readiness_enforced` | Composer separates OPL-owned `standard_agent` packages from skills/plugins/connections and preserves real Codex routes. Unknown diagnostics remain selectable, while explicit `launch_allowed=false`, `operational_ready=false`, physical absence, or non-callability reject selection |
 | Active turn | `canonical_reopen_and_steer` | Active submissions use Codex `turn/steer`, and the DSH queue remains renderer-only state. Launch confirms the terminal turn through `thread/read(includeTurns=true)`; reopening a thread restores only the canonical `activeTurnId` before steer is enabled |
-| Settings | `canonical_functional_surface_installed_preview_verified` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. The installed Preview for the current cohort passed local interaction and runtime readback; later functional bytes require a new acceptance pass |
+| Settings | `canonical_functional_surface_installed_preview_verified` | Account/Gateway, model, workspace, storage, capabilities, instructions, services, updates, diagnostics, preferences, first-run checks, Runtime Overview, and the macOS tray are canonical. A recorded installed Preview cohort passed local interaction and runtime readback; that evidence is cohort-bound and does not automatically qualify later public bytes |
 | UI shell | `dsh_native_brand_and_host_chrome_baseline` | Product identity is text-only `One Person Lab`; the upstream DSH mark is suppressed, while Studio adds a small text-only session/project header through the slot adapter so conversation content does not touch the top edge. Wide desktop keeps an 18 px sidebar top inset for the product title, the composer keeps a small bottom clearance, and the compact rail retains DSH geometry. The native DSH composer `+` entry and OPL standard-Agent entry remain unchanged; Studio adds only a localized permission control that uses DSH Menu/RiskConfirmation and the existing App-owned `agentPermissions` state. Desktop also keeps one 28 px drag strip from boot through mounted-shell phases. This is a candidate UI baseline and does not adopt the active shell |
 | Updates | `desktop_and_headless_callers_present_owner_projection_consumed` | Electron Desktop and standalone Headless updater callers consume the Framework-owned App/Base/Packages managed-update projection. Studio preserves the compact projection and typed Flow dependency catalog through the fast Host path without adding an updater/currentness owner; Docker host-side update remains deliberately deferred rather than exposing the container runtime socket |
 | Run detail | `real_producer_consumer_e2e` | MAS has a canonical read-only producer backed by a real workspace and trajectory. Studio passes the selected resolved six-field identity into `runtime.detail`, does not invoke the producer when identity is unresolved, rejects mismatched producer identity, and renders the allowlisted result as eight structured sections |
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
 | Service recovery | `app_state_derived_action_closed_loop` | Runtime Overview derives one causal root and one safe action from the same App state/action projection. Mutating and read-only actions are revalidated against a fresh App state immediately before execution, respect the mutation guard, and always refresh App state afterward |
 | Local launcher | `implemented_candidate_path` | Isolated bundle; actions dry-run-only by default |
-| Minimum product baseline | `active_functional_closure` | Distribution qualification paths are independently green. The managed-update/Flow fast-state, Fleet `service_status`, and current installed Preview paths are closed; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` |
-| Validation | `distribution_core_and_installed_preview_gates_green` | Default PR/main CI remains source-only, and carrier qualification remains manual. The current candidate completed exact-commit three-carrier construction plus installed Preview Settings, Framework contribution, Gateway, real Codex turn, graceful restart, and canonical thread recovery readback. This does not replace a new installed pass after later runtime bytes change |
-| Adoption and readiness | `false` | No active-shell adoption, release, clean-VM, domain, owner-acceptance, or production claim |
+| Minimum product baseline | `active_functional_closure` | Public macOS Preview distribution is live. The managed-update/Flow fast-state and Fleet `service_status` paths are closed; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` |
+| Validation | `public_preview_release_plus_cohort_bound_installed_evidence` | The public `v0.1.4` Release provides signed, notarized, stapled Standard and Full macOS arm64 assets plus the Preview update feed. Earlier installed interaction, Gateway, real Codex turn, restart, and thread-recovery evidence remains valid only for its exact candidate cohort; later bytes require fresh installed acceptance |
+| Adoption and readiness | `preview_released_stable_not_adopted` | Public Preview distribution does not adopt Studio as the Stable App shell and does not establish clean-VM equivalence, domain readiness, owner acceptance, or production readiness |
 
 ## Sidebar Information Architecture
 
@@ -106,7 +106,8 @@ source.
 
 ## Recently Closed
 
-The conversation task-inspector slice is closed in the installed Preview. A
+The conversation task-inspector implementation slice is closed. Its recorded
+installed interaction evidence is cohort-bound. A
 single floating `Task details` entry opens a secondary menu for the ordered
 `Project progress`, `Files and results`, and `Agents and capabilities` Client
 Cordis tabs; the entry exposes its text label automatically on wide windows.
@@ -134,7 +135,8 @@ the bounded summary generically. `activity_log` remains destination-null and hid
 from ordinary Settings. Cross-GUI conformance and serial Fleet readback passed; this
 is source/candidate evidence, not active-shell adoption.
 
-The current installed Preview slice is closed for Studio candidate
+The most recent fully recorded installed interaction cohort in this document is
+Studio candidate
 `40ea6e795702eb71c399bd1f5d2de296e2d58d0d`. A clean App-contract-driven
 `npm run package` qualified Desktop, standalone WebUI, and Docker; the App-owned
 atomic installer installed the isolated `cn.onepersonlab.opl.studio.preview`
@@ -148,8 +150,9 @@ tests for all three inspector tabs; exclusive Workspace, Inputs, and Results
 views; search and preview of `AGENTS.md`; and a 760 x 900 full-viewport modal
 whose Escape path restores focus to the floating entry. Browser console and
 page-error readback were empty. The running Stable App kept the same PID during
-install and acceptance. This installed acceptance is candidate evidence only;
-it does not change active-shell adoption or release authority.
+install and acceptance. This evidence predates the public `v0.1.4` Release and
+must not be read as installed acceptance of the current public bytes. It also
+does not change active-shell adoption or release authority.
 
 ## Current Gaps
 
@@ -157,10 +160,10 @@ it does not change active-shell adoption or release authority.
 | --- | --- | --- | --- |
 | Non-Fleet managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Browser Automation, and future managed companions through typed slots/actions and a generic directory; Fleet `service_status` is already closed and must not be reintroduced as a fixed brand allowlist |
 
-Signing, notarization, public update feeds, public OCI publication, dedicated
-clean-VM certification, and the final AionUI cutover remain separate deferred
-delivery/adoption work. They are not prerequisites for the current local
-functional baseline and must not be moved back into default development CI.
+Signed, notarized, and stapled macOS arm64 Preview distribution and its public
+update feed are live in `v0.1.4`. Dedicated clean-VM certification, public
+Windows/Linux/OCI distribution, and the final AionUI cutover remain separate
+delivery/adoption work. They must not be moved into default development CI.
 
 Remote cross-machine coordination, model-driven permission/write-set decisions,
 private thread runtimes, and candidate-owned delivery ledgers are explicitly not
@@ -176,7 +179,7 @@ does not depend on Team mode.
 For successor product development, finish the remaining non-Fleet managed-companion
 user paths while preserving the Codex-only thin-consumer boundary. Rebuild and
 repeat installed Preview acceptance only after those functional bytes change.
-Distribution and release qualification stay independent and deferred in this round.
+Further platform distribution and Stable adoption stay independent in this round.
 Do not reproduce AionUI-only inherited surfaces, create a speculative
 multi-backend framework, or duplicate the renderer/host core for another
 carrier.

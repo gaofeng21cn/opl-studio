@@ -30,7 +30,7 @@ App release admission remains separate.
 
 | Theme | Single Source of Truth |
 | --- | --- |
-| Public Studio entry | [Root README](../README.md) |
+| Public Studio entry | [English README](../README.md) and [Chinese README](../README.zh-CN.md) |
 | Application Host implementation boundary | [Architecture](./architecture.md) |
 | Application Host architecture rationale | [Whitepaper](./whitepaper.md) |
 | Current state, open gaps, and next prompt | [Single Active Truth plan](./active/current-state-vs-ideal-gap.md) |
@@ -41,7 +41,7 @@ App release admission remains separate.
 
 Canonical filenames are mapped without creating duplicate truth:
 
-- the root README carries the `project` role;
+- the root English and Chinese README pair carries the `project` role;
 - the Active Truth plan carries the `status` role;
 - `AGENTS.md` and `architecture.md` carry repo invariants;
 - App-owned contracts carry product/adoption decisions, so this repository does
@@ -64,7 +64,7 @@ document is unclassified.
 
 | Lifecycle | Covered files |
 | --- | --- |
-| Public entry | `README.md` |
+| Public entry | `README.md`, `README.zh-CN.md` |
 | Navigation and architecture | `docs/README.md`, `docs/architecture.md`, `docs/whitepaper.md` |
 | Active Truth | `docs/active/current-state-vs-ideal-gap.md` |
 | Verification support | `docs/verification.md` |
