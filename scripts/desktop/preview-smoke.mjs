@@ -2,7 +2,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { capturePageScreenshot, evaluatePage, waitForPageReady } from "./cdp.mjs";
+import { capturePageScreenshot, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 
 export const PREVIEW_PRODUCT = Object.freeze({
   productName: "One Person Lab Preview",
@@ -528,7 +528,7 @@ if (isMain) {
     ? await verifyPreviewIdentity({ appPath: options.appPath, productName: options.productName, bundleId: options.bundleId })
     : { status: "unavailable", reason: "app_path_not_provided" };
   const receipt = await runPreviewSmoke({
-    evaluate: (expression) => evaluatePage({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
+    evaluate: (expression) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
     waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
     options: {
       ...options,

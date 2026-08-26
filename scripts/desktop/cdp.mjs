@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function pageTarget(port) {
@@ -91,6 +93,70 @@ export async function evaluatePage({ port, expression, timeoutMs = 30_000 } = {}
     return result?.result?.value;
   } finally {
     close();
+  }
+}
+
+export async function evaluatePageStable({
+  port,
+  expression,
+  timeoutMs = 30_000,
+  evaluate = evaluatePage,
+  pollIntervalMs = 100
+} = {}) {
+  if (!expression) throw new Error("CDP expression is required");
+  const requestKey = `opl-studio-qualification-${randomUUID()}`;
+  const storeKey = "__oplStudioQualificationRequests";
+  const callTimeoutMs = Math.min(5_000, Math.max(500, timeoutMs));
+  const startExpression = `(()=>{
+    const store=globalThis[${JSON.stringify(storeKey)}]??=Object.create(null);
+    const entry={status:"pending",value:undefined,error:null};
+    store[${JSON.stringify(requestKey)}]=entry;
+    Promise.resolve().then(()=>(${expression})).then(
+      (value)=>{entry.status="fulfilled";entry.value=value;},
+      (error)=>{entry.status="rejected";entry.error={name:error?.name??"Error",message:error?.message??String(error),code:error?.code??null};}
+    );
+    return true;
+  })()`;
+  const pollExpression = `(()=>{
+    const store=globalThis[${JSON.stringify(storeKey)}];
+    const entry=store?.[${JSON.stringify(requestKey)}];
+    if(!entry) return {status:"missing"};
+    if(entry.status==="pending") return {status:"pending"};
+    const result={status:entry.status,value:entry.value,error:entry.error};
+    delete store[${JSON.stringify(requestKey)}];
+    return result;
+  })()`;
+  const cleanupExpression = `(()=>{const store=globalThis[${JSON.stringify(storeKey)}];if(store) delete store[${JSON.stringify(requestKey)}];return true;})()`;
+  await evaluate({ port, expression: startExpression, timeoutMs: callTimeoutMs });
+  const deadline = Date.now() + timeoutMs;
+  let lastPollError = null;
+  try {
+    while (Date.now() < deadline) {
+      let result;
+      try {
+        result = await evaluate({
+          port,
+          expression: pollExpression,
+          timeoutMs: Math.min(callTimeoutMs, Math.max(500, deadline - Date.now()))
+        });
+        lastPollError = null;
+      } catch (error) {
+        lastPollError = error;
+        await delay(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
+        continue;
+      }
+      if (result?.status === "fulfilled") return result.value;
+      if (result?.status === "rejected") {
+        const error = new Error(result.error?.message || "CDP expression failed");
+        if (result.error?.code !== null && result.error?.code !== undefined) error.code = result.error.code;
+        throw error;
+      }
+      if (result?.status === "missing") throw new Error("CDP stable evaluation request was lost");
+      await delay(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
+    }
+    throw new Error(`timed out evaluating stable CDP expression${lastPollError ? `: ${lastPollError.message}` : ""}`);
+  } finally {
+    try { await evaluate({ port, expression: cleanupExpression, timeoutMs: callTimeoutMs }); } catch {}
   }
 }
 

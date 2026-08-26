@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { capturePageScreenshot, evaluatePage, waitForPageReady } from "./cdp.mjs";
+import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 import {
   PREVIEW_PRODUCT,
   loadPreviewSmokeInputs,
@@ -275,7 +275,7 @@ async function qualifyCleanVm(options) {
         app: guestApp
       };
     const smoke = await runPreviewSmoke({
-      evaluate: (expression) => evaluatePage({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
+      evaluate: (expression) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
       waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
       options: {
         ...options,
