@@ -181,7 +181,8 @@ async function createDesktopHost(appLogDirectory) {
   });
   const hostEnvironment = resolveDesktopRuntimeEnvironment({
     env: runtime?.env ?? process.env,
-    homeDir
+    homeDir,
+    resourcesPath: process.resourcesPath
   });
   hostEnvironment.OPL_APP_VERSION ??= app.getVersion();
   core = await createOplHostCore({

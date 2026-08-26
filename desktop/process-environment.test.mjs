@@ -84,3 +84,35 @@ test("Finder launches resolve an already installed Studio Full runtime", () => {
   assert.equal(resolved.OPL_APP_OPL_BIN, studioOpl);
   assert.ok(resolved.PATH.split(path.delimiter).includes(path.dirname(studioOpl)));
 });
+
+test("packaged Studio Full resolves only its bundled OPL runtime, never a bundled Codex", () => {
+  const resourcesPath = "/Applications/One Person Lab Preview.app/Contents/Resources";
+  const bundledOpl = path.join(resourcesPath, "opl-studio-full-runtime", "runtime", "current", "bin", "opl");
+  const bundledCodex = path.join(resourcesPath, "opl-studio-full-runtime", "runtime", "current", "bin", "codex");
+  const resolved = resolveDesktopRuntimeEnvironment({
+    env: { PATH: "/usr/bin:/bin" },
+    homeDir: "/Users/opl",
+    resourcesPath,
+    readDirectory: () => [],
+    executable: (candidate) => candidate === bundledOpl || candidate === bundledCodex
+  });
+
+  assert.equal(resolved.OPL_APP_OPL_BIN, bundledOpl);
+  assert.equal(resolved.OPL_CODEX_BIN, undefined);
+  assert.equal(resolved.PATH.includes(path.dirname(bundledOpl)), false);
+});
+
+test("explicit OPL executable overrides a packaged Studio Full runtime", () => {
+  const resolved = resolveDesktopRuntimeEnvironment({
+    env: {
+      PATH: "/usr/bin",
+      OPL_APP_OPL_BIN: "/managed/opl"
+    },
+    homeDir: "/Users/opl",
+    resourcesPath: "/Applications/One Person Lab Preview.app/Contents/Resources",
+    readDirectory: () => [],
+    executable: () => true
+  });
+
+  assert.equal(resolved.OPL_APP_OPL_BIN, "/managed/opl");
+});
