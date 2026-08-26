@@ -186,7 +186,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       composerRunState:!!document.querySelector('[data-testid="opl-composer-run-state"]'),
       settings:{opened:false,panel:false,account:false,about:false},
       runtime:{opened:false,panel:false},
-      inspector:{opened:false,tabs:false,closed:false},
+      inspector:{opened:false,menuItemSelected:false,tabs:false,closed:false},
     };
     result.settings.opened=clickButton("设置")||clickButton("Settings");
     if(result.settings.opened){
@@ -209,6 +209,11 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     result.runtime.returnedToConversation=chatButton && await waitFor('[data-testid="opl-context-inspector-trigger"]');
     result.inspector.opened=click('[data-testid="opl-context-inspector-trigger"]');
     if(result.inspector.opened){
+      const menuItemReady=await waitFor('[role="menu"] [role="menuitem"]');
+      if(menuItemReady){
+        const menuItem=document.querySelector('[role="menu"] [role="menuitem"]');
+        if(menuItem){ menuItem.click(); result.inspector.menuItemSelected=true; }
+      }
       result.inspector.tabs=await waitFor('[data-testid="opl-context-inspector"] [data-testid="opl-context-tabs"]');
       const tab=document.querySelector('[data-testid="opl-context-tabs"] button');
       tab?.click();
@@ -358,6 +363,7 @@ export async function runPreviewSmoke({
     && checks.ui?.runtime?.panel === true
     && checks.ui?.runtime?.returnedToConversation === true
     && checks.ui?.inspector?.opened === true
+    && checks.ui?.inspector?.menuItemSelected === true
     && checks.ui?.inspector?.tabs === true
     && checks.ui?.inspector?.closed === true;
   const gatewayPassed = checks.gateway?.status === "passed"

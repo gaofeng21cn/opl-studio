@@ -59,7 +59,7 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
           composerRunState: true,
           settings: { opened: true, panel: true, account: true, about: true },
           runtime: { opened: true, panel: true, returnedToConversation: true },
-          inspector: { opened: true, tabs: true, closed: true }
+          inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
         };
       }
       return {};
@@ -72,6 +72,8 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.ok(evaluated.some((expression) => expression.includes('opl-runtime-overview-page')));
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-inspector-trigger')));
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-tabs')));
+  assert.ok(evaluated.some((expression) => expression.includes('[role="menu"] [role="menuitem"]')));
+  assert.ok(evaluated.some((expression) => expression.includes('menuItem.click()')));
 });
 
 test("Preview smoke never serializes supplied secrets into diagnostics", async () => {
@@ -104,7 +106,7 @@ test("Preview smoke requires a completed non-simulated Codex turn with a final r
         composerRunState: true,
         settings: { opened: true, panel: true, account: true, about: true },
         runtime: { opened: true, panel: true, returnedToConversation: true },
-        inspector: { opened: true, tabs: true, closed: true }
+        inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
       };
     }
     if (expression.includes("window.oplStudio.sendMessage")) {
@@ -140,7 +142,7 @@ test("Preview smoke does not accept the pre-login Gateway projection as authenti
         composerRunState: true,
         settings: { opened: true, panel: true, account: true, about: true },
         runtime: { opened: true, panel: true, returnedToConversation: true },
-        inspector: { opened: true, tabs: true, closed: true }
+        inspector: { opened: true, menuItemSelected: true, tabs: true, closed: true }
       };
     }
     if (expression.includes("loginGatewayAccount")) return { ok: true, stateRefreshRequired: true, errorCode: null };
