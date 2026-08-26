@@ -109,3 +109,36 @@ test("clean VM rejects a partial external Codex identity", () => {
     /must be provided together/
   );
 });
+
+test("clean VM binds exact Framework source inputs for Standard bootstrap", () => {
+  const options = parseCleanVmArgs([
+    "--framework-source-archive", "fixtures/one-person-lab-framework.tar.gz",
+    "--framework-ref", "1f57e11848d1ac832f4550dcf17ac354a2af43a3"
+  ]);
+  assert.equal(options.frameworkSourceArchive, path.resolve(root, "fixtures/one-person-lab-framework.tar.gz"));
+  assert.equal(options.frameworkRef, "1f57e11848d1ac832f4550dcf17ac354a2af43a3");
+
+  const command = buildGuestLaunchCommand({
+    appExecutable: "/Applications/One Person Lab Preview.app/Contents/MacOS/One Person Lab Preview",
+    logPath: "/tmp/preview.log",
+    frameworkSourceArchive: "/tmp/framework.tar.gz",
+    frameworkRef: options.frameworkRef
+  });
+  assert.match(command, /OPL_SOURCE_ARCHIVE_URL='file:\/\/\/tmp\/framework\.tar\.gz'/);
+  assert.match(command, /OPL_FRAMEWORK_SOURCE_COMMIT='1f57e11848d1ac832f4550dcf17ac354a2af43a3'/);
+});
+
+test("clean VM rejects partial or attach-mode Framework source preparation", () => {
+  assert.throws(
+    () => parseCleanVmArgs(["--framework-ref", "1f57e11848d1ac832f4550dcf17ac354a2af43a3"]),
+    /must be provided together/
+  );
+  assert.throws(
+    () => parseCleanVmArgs([
+      "--attach",
+      "--framework-source-archive", "fixtures/framework.tar.gz",
+      "--framework-ref", "1f57e11848d1ac832f4550dcf17ac354a2af43a3"
+    ]),
+    /cannot be used with --attach/
+  );
+});

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
@@ -32,9 +34,22 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 }
 
-export function buildGuestLaunchCommand({ appExecutable, logPath, codexBinary = null, allowActions = false }) {
+function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+export function buildGuestLaunchCommand({
+  appExecutable,
+  logPath,
+  codexBinary = null,
+  frameworkSourceArchive = null,
+  frameworkRef = null,
+  allowActions = false
+}) {
   return [
     codexBinary ? `OPL_CODEX_BIN=${shellQuote(codexBinary)}` : null,
+    frameworkSourceArchive ? `OPL_SOURCE_ARCHIVE_URL=${shellQuote(`file://${frameworkSourceArchive}`)}` : null,
+    frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
     allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
     "nohup",
     shellQuote(appExecutable),
@@ -61,7 +76,9 @@ export function parseArgs(argv) {
     attach: false,
     allowActions: false,
     codexPlatformPackageTarball: null,
-    codexVersion: null
+    codexVersion: null,
+    frameworkSourceArchive: null,
+    frameworkRef: null
   };
   const smokeArgv = [];
   const takeValue = (arg, index) => {
@@ -92,6 +109,17 @@ export function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === "--framework-source-archive") {
+      cleanOptions.frameworkSourceArchive = path.resolve(takeValue(arg, index));
+      index += 1;
+      continue;
+    }
+    if (arg === "--framework-ref") {
+      cleanOptions.frameworkRef = takeValue(arg, index).trim();
+      invariant(/^[0-9a-f]{40}$/.test(cleanOptions.frameworkRef), "--framework-ref must be an exact lowercase 40-character SHA");
+      index += 1;
+      continue;
+    }
     if (["--require-gateway-setup", "--require-codex-turn"].includes(arg)) { smokeArgv.push(arg); continue; }
     if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path", "--screenshots-dir"].includes(arg)) {
       const value = takeValue(arg, index);
@@ -111,7 +139,12 @@ export function parseArgs(argv) {
     Boolean(cleanOptions.codexPlatformPackageTarball) === Boolean(cleanOptions.codexVersion),
     "--codex-platform-package-tarball and --codex-version must be provided together"
   );
+  invariant(
+    Boolean(cleanOptions.frameworkSourceArchive) === Boolean(cleanOptions.frameworkRef),
+    "--framework-source-archive and --framework-ref must be provided together"
+  );
   invariant(!cleanOptions.attach || !cleanOptions.allowActions, "--allow-actions cannot be used with --attach");
+  invariant(!cleanOptions.attach || !cleanOptions.frameworkSourceArchive, "Framework source preparation cannot be used with --attach");
   return {
     ...cleanOptions,
     ...smokeOptions,
@@ -157,6 +190,7 @@ async function qualifyCleanVm(options) {
     await stat(options.dmg);
     await stat(options.sshKey);
     if (options.codexPlatformPackageTarball) await stat(options.codexPlatformPackageTarball);
+    if (options.frameworkSourceArchive) await stat(options.frameworkSourceArchive);
   }
   const runRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-clean-vm-"));
   const productName = options.productName || PREVIEW_PRODUCT.productName;
@@ -165,6 +199,7 @@ async function qualifyCleanVm(options) {
   const guestCodexTarball = `/tmp/opl-studio-clean-${process.pid}-codex.tgz`;
   const guestCodexRoot = `/tmp/opl-studio-clean-${process.pid}-codex`;
   const guestCodexBinary = `${guestCodexRoot}/package/vendor/aarch64-apple-darwin/bin/codex`;
+  const guestFrameworkArchive = `/tmp/opl-studio-clean-${process.pid}-framework.tar.gz`;
   const guestApp = `/Applications/${productName}.app`;
   const guestLog = `/tmp/opl-studio-clean-${process.pid}.log`;
   let tartProcess;
@@ -193,6 +228,22 @@ async function qualifyCleanVm(options) {
         source: null,
         binary: null,
         injectedVia: null,
+        bundleIncluded: false
+      },
+    framework: options.frameworkSourceArchive
+      ? {
+        status: "pending",
+        expectedRef: options.frameworkRef,
+        archive: path.basename(options.frameworkSourceArchive),
+        archiveSha256: sha256File(options.frameworkSourceArchive),
+        source: "exact_runner_checkout_archive",
+        guestInjection: "OPL_SOURCE_ARCHIVE_URL_and_OPL_FRAMEWORK_SOURCE_COMMIT",
+        bundleIncluded: false
+      }
+      : {
+        status: "skipped",
+        reason: "packaged_full_runtime_or_external_framework_not_provided",
+        expectedRef: null,
         bundleIncluded: false
       }
   };
@@ -223,6 +274,28 @@ async function qualifyCleanVm(options) {
       };
       invariant(checks.install.passed, `installed Preview identity mismatch: ${JSON.stringify(installIdentity)}`);
 
+      if (options.frameworkSourceArchive) {
+        scpToGuest(options, ip, options.frameworkSourceArchive, guestFrameworkArchive);
+        const packagedManifest = `${guestApp}/Contents/Resources/opl-framework-bootstrap/manifest.json`;
+        const packagedInstaller = `${guestApp}/Contents/Resources/opl-framework-bootstrap/opl-install.sh`;
+        guestRun(options, ip, [
+          "set -eu",
+          `test -f ${shellQuote(packagedManifest)}`,
+          `test -f ${shellQuote(packagedInstaller)}`,
+          `test -f ${shellQuote(guestFrameworkArchive)}`,
+          `test "$(plutil -extract framework_ref raw -o - ${shellQuote(packagedManifest)})" = ${shellQuote(options.frameworkRef)}`,
+          `test "$(plutil -extract installer_sha256 raw -o - ${shellQuote(packagedManifest)})" = "$(shasum -a 256 ${shellQuote(packagedInstaller)} | awk '{print $1}')"`,
+          `test "$(plutil -extract installer_size_bytes raw -o - ${shellQuote(packagedManifest)})" = "$(stat -f %z ${shellQuote(packagedInstaller)})"`,
+          `test "$(shasum -a 256 ${shellQuote(guestFrameworkArchive)} | awk '{print $1}')" = ${shellQuote(checks.framework.archiveSha256)}`
+        ].join(" && "));
+        checks.framework = {
+          ...checks.framework,
+          status: "prepared",
+          packagedInstallerManifestValidated: true,
+          archiveCopiedToGuest: true
+        };
+      }
+
       if (options.codexPlatformPackageTarball) {
         scpToGuest(options, ip, options.codexPlatformPackageTarball, guestCodexTarball);
         const expectedVersion = `codex-cli ${options.codexVersion}`;
@@ -252,6 +325,8 @@ async function qualifyCleanVm(options) {
         appExecutable: `${guestApp}/Contents/MacOS/${productName}`,
         logPath: guestLog,
         codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
+        frameworkSourceArchive: options.frameworkSourceArchive ? guestFrameworkArchive : null,
+        frameworkRef: options.frameworkRef,
         allowActions: options.allowActions
       });
       guestRun(options, ip, launch);
@@ -293,6 +368,19 @@ async function qualifyCleanVm(options) {
     checks.smoke = smoke;
     checks.startup = smoke.checks.startup;
     checks.runtime = smoke.checks.runtime;
+    if (options.frameworkSourceArchive && ip) {
+      const identityResult = guestRun(options, ip, "cat \"$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json\"");
+      const installedIdentity = JSON.parse(identityResult.stdout);
+      const identityPassed = installedIdentity?.schema === "opl_framework_installed_source_identity.v1"
+        && installedIdentity.framework_sha === options.frameworkRef
+        && installedIdentity.install_mode === "archive";
+      checks.framework = {
+        ...checks.framework,
+        status: identityPassed ? "passed" : "partial",
+        installedIdentity
+      };
+      invariant(identityPassed, "Studio Standard Framework bootstrap did not install the exact injected Framework archive");
+    }
     checks.gateway = smoke.checks.gateway;
     checks.update = {
       status: await evaluatePage({ port: options.cdpPort, expression: "window.oplStudio.readNativeAppUpdateStatus()", timeoutMs: options.timeoutMs }),
@@ -310,7 +398,8 @@ async function qualifyCleanVm(options) {
     if (!options.attach && !options.keepVm) run("tart", ["delete", options.vmName], { allowFailure: true });
     await rm(runRoot, { recursive: true, force: true });
   }
-  const status = checks.failure ? "partial" : checks.smoke?.status === "passed" ? "passed" : "partial";
+  const frameworkPassed = !options.frameworkSourceArchive || checks.framework?.status === "passed";
+  const status = checks.failure ? "partial" : checks.smoke?.status === "passed" && frameworkPassed ? "passed" : "partial";
   const receipt = {
     schema: "opl_studio_macos_clean_vm_qualification.v1",
     status,
