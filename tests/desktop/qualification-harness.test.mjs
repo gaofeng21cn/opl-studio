@@ -55,3 +55,26 @@ test("clean VM preserves explicit smoke and receipt paths", () => {
   assert.equal(options.screenshotsDir, path.resolve(root, "out/screenshots"));
   assert.deepEqual(options.runtimeProfiles, ["standard"]);
 });
+
+test("clean VM accepts an optional exact external Codex platform package", () => {
+  const options = parseCleanVmArgs([
+    "--attach",
+    "--codex-platform-package-tarball", "fixtures/openai-codex-darwin-arm64.tgz",
+    "--codex-version", "0.147.0"
+  ]);
+  assert.equal(options.codexPlatformPackageTarball, path.resolve(root, "fixtures/openai-codex-darwin-arm64.tgz"));
+  assert.equal(options.codexVersion, "0.147.0");
+});
+
+test("clean VM keeps external Codex preparation optional for legacy invocations", () => {
+  const options = parseCleanVmArgs(["--attach"]);
+  assert.equal(options.codexPlatformPackageTarball, null);
+  assert.equal(options.codexVersion, null);
+});
+
+test("clean VM rejects a partial external Codex identity", () => {
+  assert.throws(
+    () => parseCleanVmArgs(["--attach", "--codex-version", "0.147.0"]),
+    /must be provided together/
+  );
+});

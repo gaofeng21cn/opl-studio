@@ -28,6 +28,10 @@ export function parseInstalledIdentityOutput(value) {
   return JSON.parse(String(value).replace(/\r?\n/g, ""));
 }
 
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
 export function parseArgs(argv) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const cleanOptions = {
@@ -39,7 +43,9 @@ export function parseArgs(argv) {
     outPath: path.join(repositoryRoot, "out", "studio-clean-vm-qualification.json"),
     keepVm: false,
     skipClone: false,
-    attach: false
+    attach: false,
+    codexPlatformPackageTarball: null,
+    codexVersion: null
   };
   const smokeArgv = [];
   const takeValue = (arg, index) => {
@@ -58,6 +64,17 @@ export function parseArgs(argv) {
     if (arg === "--ssh-key") { cleanOptions.sshKey = path.resolve(takeValue(arg, index)); index += 1; continue; }
     if (arg === "--vm-name") { cleanOptions.vmName = takeValue(arg, index); index += 1; continue; }
     if (arg === "--out") { cleanOptions.outPath = path.resolve(takeValue(arg, index)); index += 1; continue; }
+    if (arg === "--codex-platform-package-tarball") {
+      cleanOptions.codexPlatformPackageTarball = path.resolve(takeValue(arg, index));
+      index += 1;
+      continue;
+    }
+    if (arg === "--codex-version") {
+      cleanOptions.codexVersion = takeValue(arg, index).trim();
+      invariant(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(cleanOptions.codexVersion), "--codex-version must be a package version");
+      index += 1;
+      continue;
+    }
     if (["--require-gateway-setup", "--require-codex-turn"].includes(arg)) { smokeArgv.push(arg); continue; }
     if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path", "--screenshots-dir"].includes(arg)) {
       const value = takeValue(arg, index);
@@ -73,6 +90,10 @@ export function parseArgs(argv) {
       OPL_STUDIO_CDP_PORT: process.env.OPL_STUDIO_CDP_PORT || String(19222 + (process.pid % 500))
     }
   });
+  invariant(
+    Boolean(cleanOptions.codexPlatformPackageTarball) === Boolean(cleanOptions.codexVersion),
+    "--codex-platform-package-tarball and --codex-version must be provided together"
+  );
   return {
     ...cleanOptions,
     ...smokeOptions,
@@ -117,18 +138,46 @@ async function qualifyCleanVm(options) {
   if (!options.attach) {
     await stat(options.dmg);
     await stat(options.sshKey);
+    if (options.codexPlatformPackageTarball) await stat(options.codexPlatformPackageTarball);
   }
   const runRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-clean-vm-"));
   const productName = options.productName || PREVIEW_PRODUCT.productName;
   const bundleId = options.bundleId || PREVIEW_PRODUCT.bundleId;
   const guestDmg = `/tmp/opl-studio-clean-${process.pid}.dmg`;
+  const guestCodexTarball = `/tmp/opl-studio-clean-${process.pid}-codex.tgz`;
+  const guestCodexRoot = `/tmp/opl-studio-clean-${process.pid}-codex`;
+  const guestCodexBinary = `${guestCodexRoot}/package/vendor/aarch64-apple-darwin/bin/codex`;
   const guestApp = `/Applications/${productName}.app`;
   const guestLog = `/tmp/opl-studio-clean-${process.pid}.log`;
   let tartProcess;
   let tunnel;
   let ip = null;
   let smokeInputs = { credentials: null, turnRequest: null };
-  const checks = {};
+  const checks = {
+    codex: options.codexPlatformPackageTarball
+      ? {
+        status: options.attach ? "skipped" : "pending",
+        reason: options.attach ? "attach_mode_does_not_prepare_guest_codex" : null,
+        platform: "darwin-arm64",
+        package: "@openai/codex-darwin-arm64",
+        expectedVersion: options.codexVersion,
+        source: path.basename(options.codexPlatformPackageTarball),
+        binary: "<guest-temp>/package/vendor/aarch64-apple-darwin/bin/codex",
+        injectedVia: "OPL_CODEX_BIN",
+        bundleIncluded: false
+      }
+      : {
+        status: "skipped",
+        reason: "external_codex_not_provided",
+        platform: null,
+        package: null,
+        expectedVersion: null,
+        source: null,
+        binary: null,
+        injectedVia: null,
+        bundleIncluded: false
+      }
+  };
   try {
     if (!options.attach) {
       if (!options.skipClone) run("tart", ["clone", options.sourceVm, options.vmName]);
@@ -156,7 +205,43 @@ async function qualifyCleanVm(options) {
       };
       invariant(checks.install.passed, `installed Preview identity mismatch: ${JSON.stringify(installIdentity)}`);
 
-      guestRun(options, ip, `nohup "${guestApp}/Contents/MacOS/${productName}" --disable-gpu --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 >${guestLog} 2>&1 & echo $!`);
+      if (options.codexPlatformPackageTarball) {
+        scpToGuest(options, ip, options.codexPlatformPackageTarball, guestCodexTarball);
+        const expectedVersion = `codex-cli ${options.codexVersion}`;
+        const verifyCodex = guestRun(options, ip, [
+          "set -eu",
+          `rm -rf ${shellQuote(guestCodexRoot)}`,
+          `mkdir -p ${shellQuote(guestCodexRoot)}`,
+          `tar -xzf ${shellQuote(guestCodexTarball)} -C ${shellQuote(guestCodexRoot)}`,
+          `codex_bin=${shellQuote(guestCodexBinary)}`,
+          'test -x "$codex_bin"',
+          'actual_version="$($codex_bin --version)"',
+          `test "$actual_version" = ${shellQuote(expectedVersion)}`,
+          'printf "%s" "$actual_version"'
+        ].join(" && "));
+        const actualVersion = verifyCodex.stdout.trim();
+        checks.codex = {
+          ...checks.codex,
+          status: actualVersion === expectedVersion ? "passed" : "partial",
+          verifiedVersion: actualVersion,
+          preparation: "scp_tarball_tar_extract_guest_temp",
+          binaryExecutable: true
+        };
+        invariant(actualVersion === expectedVersion, `external Codex version mismatch: expected ${expectedVersion}, got ${actualVersion || "<empty>"}`);
+      }
+
+      const launch = [
+        options.codexPlatformPackageTarball ? `OPL_CODEX_BIN=${shellQuote(guestCodexBinary)}` : null,
+        "nohup",
+        shellQuote(`${guestApp}/Contents/MacOS/${productName}`),
+        "--disable-gpu",
+        "--remote-debugging-port=9222",
+        "--remote-debugging-address=127.0.0.1",
+        `>${shellQuote(guestLog)}`,
+        "2>&1",
+        "& echo $!"
+      ].filter(Boolean).join(" ");
+      guestRun(options, ip, launch);
       tunnel = spawn("ssh", ["-N", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: "ignore" });
     }
     await waitForPageReady({ port: options.cdpPort, timeoutMs: 45_000 });
