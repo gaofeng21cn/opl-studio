@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -16,8 +16,8 @@ const secretRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-cloud-secret
 const password = "preview-test-password";
 const passwordFile = path.join(secretRoot, "password");
 const sessionFile = path.join(secretRoot, "session-secret");
-await writeFile(passwordFile, password, { mode: 0o600 });
-await writeFile(sessionFile, "preview-session-secret-0123456789abcdef0123456789", { mode: 0o600 });
+await writeFile(passwordFile, password, { mode: 0o444 });
+await writeFile(sessionFile, "preview-session-secret-0123456789abcdef0123456789", { mode: 0o444 });
 
 function docker(...args) {
   return execFileSync("docker", args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }).trim();
@@ -181,4 +181,5 @@ try {
 } finally {
   spawnSync("docker", ["rm", "--force", container], { stdio: "ignore" });
   spawnSync("docker", ["volume", "rm", "--force", dataVolume, projectsVolume], { stdio: "ignore" });
+  await rm(secretRoot, { recursive: true, force: true });
 }
