@@ -196,18 +196,29 @@ jobs:
           retention-days: 7
 
   package-visibility:
-    name: Make Preview package public
+    name: Verify Preview package is public
     needs: build-child
     runs-on: ubuntu-24.04
     steps:
-      - name: Publish the dedicated Studio package visibility
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Download native child digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: opl-studio-webui-*-${{ github.sha }}
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Verify anonymous exact-digest access
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh api --method PATCH /user/packages/container/opl-studio-webui -f visibility=public > "$RUNNER_TEMP/package.json"
-          test "$(jq -r '.visibility' "$RUNNER_TEMP/package.json")" = public
+          child_digest="$(cat "$RUNNER_TEMP/digests/amd64-child")"
+          test "${child_digest#sha256:}" != "$child_digest"
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker buildx imagetools inspect "$IMAGE@$child_digest" --raw > "$RUNNER_TEMP/public-child.json"
+          jq -e '.schemaVersion == 2' "$RUNNER_TEMP/public-child.json" > /dev/null
 
   publish-index:
     name: Sign and publish Preview index

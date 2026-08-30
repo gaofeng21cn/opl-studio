@@ -43,7 +43,9 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   assert.match(source, /provenance: mode=max/);
   assert.match(source, /cosign sign --yes/);
   assert.match(source, /cosign verify/);
-  assert.match(source, /\/user\/packages\/container\/opl-studio-webui -f visibility=public/);
+  assert.match(source, /Verify anonymous exact-digest access/);
+  assert.match(source, /imagetools inspect "\$IMAGE@\$child_digest" --raw/);
+  assert.doesNotMatch(source, /\/user\/packages\/container\/opl-studio-webui/);
   assert.match(source, /Anonymous native smoke/);
   assert.match(source, /docker logout ghcr\.io/);
   assert.match(source, /docker pull "\$OPL_CLOUD_SMOKE_IMAGE"/);
