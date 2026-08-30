@@ -42,6 +42,30 @@ jobs:
             exit 1
           fi
 
+      - name: Check out canonical Framework cohort
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab
+          ref: main
+          path: .cohort/framework
+          persist-credentials: false
+
+      - name: Check out canonical App cohort
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab-app
+          ref: main
+          path: .cohort/app
+          persist-credentials: false
+
+      - name: Check out canonical AionUI cohort
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/opl-aion-shell
+          ref: main
+          path: .cohort/aionui
+          persist-credentials: false
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -54,6 +78,10 @@ jobs:
           bun-version: 1.3.14
 
       - name: Install and validate source
+        env:
+          OPL_FRAMEWORK_REPO: ${{ github.workspace }}/.cohort/framework
+          OPL_APP_REPO: ${{ github.workspace }}/.cohort/app
+          OPL_AIONUI_REPO: ${{ github.workspace }}/.cohort/aionui
         run: |
           npm ci
           npm run typecheck

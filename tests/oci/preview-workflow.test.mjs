@@ -9,6 +9,23 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
   assert.equal(workflow.permissions.packages, "write");
   assert.equal(workflow.permissions["id-token"], "write");
+  const sourceGate = workflow.jobs["source-gate"];
+  const cohortCheckouts = sourceGate.steps.filter((step) => step.name?.startsWith("Check out canonical "));
+  assert.deepEqual(cohortCheckouts.slice(1).map((step) => ({
+    repository: step.with.repository,
+    ref: step.with.ref,
+    path: step.with.path
+  })), [
+    { repository: "gaofeng21cn/one-person-lab", ref: "main", path: ".cohort/framework" },
+    { repository: "gaofeng21cn/one-person-lab-app", ref: "main", path: ".cohort/app" },
+    { repository: "gaofeng21cn/opl-aion-shell", ref: "main", path: ".cohort/aionui" }
+  ]);
+  const sourceValidation = sourceGate.steps.find((step) => step.name === "Install and validate source");
+  assert.deepEqual(sourceValidation.env, {
+    OPL_FRAMEWORK_REPO: "${{ github.workspace }}/.cohort/framework",
+    OPL_APP_REPO: "${{ github.workspace }}/.cohort/app",
+    OPL_AIONUI_REPO: "${{ github.workspace }}/.cohort/aionui"
+  });
   const build = workflow.jobs["build-child"];
   assert.deepEqual(build.strategy.matrix.include, [
     { architecture: "amd64", platform: "linux/amd64", runner: "ubuntu-24.04" },
