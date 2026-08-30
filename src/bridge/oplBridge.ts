@@ -318,6 +318,8 @@ export type CodexPickedInput = {
   kind: "file" | "folder" | "image";
   name: string;
   path: string;
+  cleanupToken?: string;
+  previewUrl?: string;
 };
 
 export type ThreadWorkspaceEntry = {
@@ -520,7 +522,7 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "searchThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "searchThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -591,6 +593,9 @@ export type OplBridge = CodexThreadAdapterBridge & {
   respondToServerRequest(request: { id: string | number; response: { result?: unknown; error?: { code: number; message: string } } }): Promise<{ id: string | number; accepted: boolean }>;
   pickFiles(): Promise<CodexPickedInput[]>;
   pickDirectory(): Promise<CodexPickedInput[]>;
+  resolveDroppedInputs(files: readonly File[]): Promise<CodexPickedInput[]>;
+  releaseInputs(cleanupTokens: readonly string[]): Promise<void>;
+  notifyCompletion(request: { threadId: string; turnId: string; title: string; body: string }): Promise<void>;
   listThreadWorkspace(request: { threadId: string; relativePath?: string }): Promise<ThreadWorkspaceListing>;
   readThreadWorkspaceFile(request: { threadId: string; relativePath: string }): Promise<ThreadWorkspaceFile>;
   searchThreadWorkspace(request: { threadId: string; query: string }): Promise<ThreadWorkspaceSearch>;
@@ -1643,7 +1648,13 @@ function normalizePickedInputs(value: unknown): CodexPickedInput[] {
     const path = asString(item?.path);
     const kind = asString(item?.kind);
     return name && path && (kind === "file" || kind === "folder" || kind === "image")
-      ? [{ name, path, kind } as CodexPickedInput]
+      ? [{
+          name,
+          path,
+          kind,
+          ...(asString(item?.cleanupToken) ? { cleanupToken: asString(item?.cleanupToken) } : {}),
+          ...(asString(item?.previewUrl) ? { previewUrl: asString(item?.previewUrl) } : {})
+        } as CodexPickedInput]
       : [];
   });
 }
@@ -1760,6 +1771,16 @@ export function createBrowserBridge(): OplBridge {
     pickDirectory() {
       const promise = candidate?.pickDirectory?.() ?? Promise.resolve([]);
       return Promise.resolve(promise).then(normalizePickedInputs);
+    },
+    resolveDroppedInputs(files) {
+      const promise = candidate?.resolveDroppedInputs?.(files) ?? Promise.resolve([]);
+      return Promise.resolve(promise).then(normalizePickedInputs);
+    },
+    releaseInputs(cleanupTokens) {
+      return Promise.resolve(candidate?.releaseInputs?.(cleanupTokens)).then(() => undefined);
+    },
+    notifyCompletion(request) {
+      return Promise.resolve(candidate?.notifyCompletion?.(request)).then(() => undefined);
     },
     listThreadWorkspace(request) {
       if (!candidate?.listThreadWorkspace) {

@@ -19,7 +19,7 @@ export function resolveHeadlessConfig(env = process.env) {
   if (!address) throw new Error("OPL_HEADLESS_HOST must not be empty");
   return {
     address,
-    port: integer(env.OPL_HEADLESS_PORT ?? env.PORT, 4178, {
+    port: integer(env.OPL_HEADLESS_PORT ?? env.PORT, 3000, {
       minimum: 0,
       maximum: 65_535,
       name: "OPL_HEADLESS_PORT"

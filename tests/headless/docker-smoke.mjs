@@ -42,7 +42,7 @@ try {
   docker("volume", "create", projectsVolume);
   docker(
     "run", "--detach", "--name", container,
-    "--publish", "127.0.0.1::4178",
+    "--publish", "127.0.0.1::3000",
     "--read-only",
     "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=256m",
     "--cap-drop", "ALL",
@@ -53,7 +53,7 @@ try {
     "--mount", `type=volume,src=${projectsVolume},dst=/projects`,
     image
   );
-  const port = docker("port", container, "4178/tcp").match(/:(\d+)$/)?.[1];
+  const port = docker("port", container, "3000/tcp").match(/:(\d+)$/)?.[1];
   assert.ok(port, "Docker did not publish the headless port");
   const baseUrl = `http://127.0.0.1:${port}`;
   const health = await waitFor(`${baseUrl}/healthz`, 30_000);

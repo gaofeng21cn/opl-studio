@@ -9,7 +9,7 @@ RUN apt-get update \
 
 FROM source-builder-base AS framework-builder
 ARG OPL_FRAMEWORK_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab.git
-ARG OPL_FRAMEWORK_REF=39a7047c7374ef073eec0a3a5635f71fb61063b7
+ARG OPL_FRAMEWORK_REF=a277b2baf611e3352bdc5c81d95cd1aa20a118af
 WORKDIR /src/opl-framework
 
 RUN git init \
@@ -31,7 +31,7 @@ RUN npm install --global --prefix /opt/codex "${OPL_CODEX_NPM_SPEC}" \
 
 FROM source-builder-base AS app-product-profile
 ARG OPL_APP_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab-app.git
-ARG OPL_APP_REF=67816e19c85683a5d16feaa8fb816507e9ed4d26
+ARG OPL_APP_REF=757d941d152f00a73377c3e9910ade7a92716adb
 WORKDIR /src/one-person-lab-app
 RUN git init \
   && git remote add origin "${OPL_APP_REPOSITORY}" \
@@ -73,7 +73,7 @@ LABEL org.opencontainers.image.title="One Person Lab" \
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git \
   && rm -rf /var/lib/apt/lists/* \
-  && mkdir -p /data/codex /projects \
+  && mkdir -p /data/codex /data/inputs /projects \
   && chown -R node:node /data /projects
 
 COPY --from=framework-builder /opt/opl-framework /opt/opl-framework
@@ -95,13 +95,13 @@ ENV NODE_ENV=production \
   OPL_CODEX_BIN=/opt/codex/bin/codex \
   OPL_APP_OPL_BIN=/opt/opl-framework/bin/opl \
   OPL_HEADLESS_HOST=0.0.0.0 \
-  OPL_HEADLESS_PORT=4178 \
+  OPL_HEADLESS_PORT=3000 \
   OPL_HEADLESS_SHUTDOWN_TIMEOUT_MS=8000 \
   OPL_NATIVE_WORKBENCH_READ_ONLY=1 \
   PATH=/opt/opl-framework/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 VOLUME ["/data", "/projects"]
-EXPOSE 4178
+EXPOSE 3000
 USER node
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.OPL_HEADLESS_PORT+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]

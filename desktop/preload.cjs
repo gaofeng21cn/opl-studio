@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 const invoke = (method, payload = {}) => ipcRenderer.invoke("opl:invoke", { method, payload });
 const subscriptions = new Map();
@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld("oplStudio", {
   respondToServerRequest: (request) => invoke("respondToServerRequest", request),
   pickFiles: () => invoke("pickFiles"),
   pickDirectory: () => invoke("pickDirectory"),
+  resolveDroppedInputs: (files) => invoke("classifyInputPaths", {
+    paths: Array.from(files ?? []).map((file) => webUtils.getPathForFile(file)).filter(Boolean)
+  }),
+  releaseInputs: (cleanupTokens) => invoke("releaseInputs", { cleanupTokens }),
+  notifyCompletion: (request) => invoke("notifyCompletion", request),
   listThreadWorkspace: (request) => invoke("listThreadWorkspace", request),
   readThreadWorkspaceFile: (request) => invoke("readThreadWorkspaceFile", request),
   searchThreadWorkspace: (request) => invoke("searchThreadWorkspace", request),

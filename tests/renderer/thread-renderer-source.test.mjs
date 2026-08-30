@@ -33,6 +33,7 @@ const hostCore = read("scripts/webui-host/host-core.mjs");
 const dshHost = read("scripts/webui-host/dsh/host.mjs");
 const dshProfile = read("scripts/webui-host/dsh/cordis.yml");
 const dshWebOverlay = read("scripts/webui-host/dsh/web.patch.yml");
+const httpRoutes = read("scripts/webui-host/http-routes.mjs");
 const codexNative = read("scripts/webui-host/opl-codex-native.mjs");
 const dshToolMcp = read("scripts/webui-host/dsh-tool-mcp.mjs");
 const appServerTransport = read("scripts/webui-host/app-server-transport.mjs");
@@ -189,9 +190,13 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.match(app, /linkSafety=\{assistantMarkdownLinkSafety\}/);
   assert.match(app, /assistantDisplayMarkdown\(/);
   assert.doesNotMatch(app, /opl-assistant-artifact-card/);
-  assert.match(app, /bridge\.readThread\(\{ threadId: thread\.id, includeTurns: true \}\)/);
-  assert.match(app, /activeTurnRef\.current = readbackTurnId \? \{ threadId: readbackThreadId, turnId: readbackTurnId \} : null/);
-  assert.match(app, /setActiveTurnId\(readbackTurnId \?\? null\)/);
+  assert.match(app, /async function reconcileCanonicalThread\(threadId: string, reason: string, expectedTurnId\?: string\)/);
+  assert.match(app, /bridge\.readThread\(\{ threadId, includeTurns: true \}\)/);
+  assert.match(app, /assistant-pending:\$\{threadId\}:\$\{activeTurnId\}/);
+  assert.match(app, /activeTurnRef\.current = \{ threadId, turnId: activeTurnId \}/);
+  assert.match(app, /trackedTurnIdsRef\.current\.set\(threadId, turnId\)/);
+  assert.match(app, /collectCanonicalReconcileTargets\(/);
+  assert.match(app, /settingsRef\.current/);
   assert.doesNotMatch(app, /const resumed = thread\.status === "unloaded"/);
   assert.match(app, /async function resumeThreadAndOpen/);
   assert.match(app, /thread-read-error/);
@@ -577,7 +582,12 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(app, /agentSelection: codexThreadId \? undefined : selectedAgentSnapshot\(\)/);
   assert.match(app, /turnAgentSelection: codexThreadId \? selectedAgentSnapshot\(\) : undefined/);
   assert.match(app, /permissions: settings\.agentPermissions/);
-  assert.match(app, /setComposerSelections\(pendingSelections\)/);
+  assert.doesNotMatch(app, /setComposerSelections\(pendingSelections\)/);
+  assert.match(app, /updatePrompt\(\[text, laterPrompt\]\.filter\(Boolean\)\.join\("\\n\\n"\)\)/);
+  assert.match(app, /failed\.id === selection\.id/);
+  assert.match(app, /failed\.attachment\?\.path && failed\.attachment\.path === selection\.attachment\?\.path/);
+  assert.match(app, /if \(text === "\/open"\)/);
+  assert.match(app, /void pickComposerFiles\(\)/);
   assert.match(settings, /agentPermissions: ":danger-full-access"/);
   assert.match(app, /permissions: settings\.agentPermissions/);
   assert.match(slotHost, /function StudioPermissionSelect\(/);
@@ -588,6 +598,9 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(slotHost, /key === "conversation\.input\.plan"/);
   assert.match(slotHost, /<StudioPermissionSelect/);
   assert.match(slotHost, /function EmptyAttachmentSlot\(\) \{ return null; \}/);
+  assert.match(slotHost, /addImages=\{studio\.addComposerImages\}/);
+  assert.match(slotHost, /draftImages=/);
+  assert.match(slotHost, /removeImage=\{studio\.removeComposerImage\}/);
   assert.match(slotHost, /function HeroActionsSlot\(\)/);
   for (const method of ["readCodexCapabilities", "readCodexPermissionProfiles", "pickFiles", "pickDirectory", "setLogDirectory"]) {
     assert.match(desktopPreload, new RegExp(`${method}:`));
@@ -731,9 +744,12 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
   for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-host-core", "plugin-inventory"]) {
     assert.match(dshProfile, new RegExp(`id: ${id}`));
   }
-  for (const id of ["frontend-static", "client-modules", "opl-studio-client", "opl-web-routes"]) {
+  for (const id of ["client-modules", "opl-studio-client", "opl-web-routes"]) {
     assert.match(dshWebOverlay, new RegExp(`id: ${id}`));
   }
+  assert.doesNotMatch(dshWebOverlay, /id: frontend-static/);
+  assert.match(httpRoutes, /serveStatic/);
+  assert.match(httpRoutes, /webAuth\.requireSession\(req\)/);
   assert.match(dshToolMcp, /StreamableHTTPServerTransport/);
   assert.match(dshToolMcp, /sendToolListChanged/);
   assert.match(codexNative, /const name = "opl_studio_dsh"/);

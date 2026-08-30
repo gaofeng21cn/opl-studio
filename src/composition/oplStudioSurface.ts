@@ -57,6 +57,9 @@ export type OplStudioSurface = {
   openPrimaryView(view: OplStudioPrimaryView): void;
   composerAccessory: ReactNode;
   composerOverlay: ReactNode;
+  composerImages: Array<{ id: string; file: File; previewUrl: string }>;
+  addComposerImages(files: readonly File[]): string | null;
+  removeComposerImage(id: string): void;
   details: ReactNode;
   detailTabs: readonly OplStudioDetailTab[];
   activeDetailTabId: OplStudioDetailTab["id"];

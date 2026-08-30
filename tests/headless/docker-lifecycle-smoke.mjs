@@ -146,7 +146,7 @@ try {
   assert.match(docker("inspect", container, "--format", "{{json .HostConfig.SecurityOpt}}"), /no-new-privileges/);
   assert.match(docker("inspect", container, "--format", "{{json .HostConfig.CapDrop}}"), /ALL/);
   assert.equal(docker("inspect", container, "--format", "{{.HostConfig.PidsLimit}}"), "512");
-  assert.match(docker("port", container, "4178/tcp"), /^127\.0\.0\.1:/);
+  assert.match(docker("port", container, "3000/tcp"), /^127\.0\.0\.1:/);
 
   const preserved = manager("uninstall", ...baseArgs);
   assert.equal(preserved.dataPreserved, true);

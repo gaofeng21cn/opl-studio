@@ -39,7 +39,7 @@
       "tools_native_registry",
       "host_webserver",
       "host_plugin_inventory",
-      "frontend_static_web_only",
+      "frontend_static_primitive_behind_studio_auth_routes",
       "client_modules_web_only"
     ],
     "studio_plugins": [
@@ -859,7 +859,7 @@
     ],
     "brand_override": "upstream_rc2_brand_slots_with_text_only_opl_occupants",
     "slot_renderer_source": "packages/client/ui-renderer/src/client/scoped-slots.tsx#createSlotRenderer",
-    "attachment_slot_policy": "registered_empty_occupant_no_multimodal_runtime",
+    "attachment_slot_policy": "registered_empty_slot_with_studio_controlled_inputbar_attachment_rail",
     "workspace_host_description_policy": "unavailable_until_app_abi_exists",
     "home_path_abbreviation_policy": "posix_boundary_shim_windows_fail_open_without_app_home_field",
     "active_gui_roots": [
@@ -920,12 +920,12 @@
     "receipt_path": "out/qualification/client-conformance.json",
     "receipt_is_git_ignored": true,
     "external_cohort": {
-      "framework_commit": "39a7047c7374ef073eec0a3a5635f71fb61063b7",
-      "framework_tree": "7ea0c1b9e76f2586e7ff5b6f4739e910789ce1ae",
-      "app_commit": "67816e19c85683a5d16feaa8fb816507e9ed4d26",
-      "app_tree": "da7b0d68dd2adbb54fd60b8225f2757a62fdf443",
-      "aionui_commit": "8fc46f172998e905dcd94f65a1a0e52ef20e9478",
-      "aionui_tree": "56cab213883b43e31d02fba9ff692c54d4377868"
+      "framework_commit": "a277b2baf611e3352bdc5c81d95cd1aa20a118af",
+      "framework_tree": "a2cc6ce492442ee08299a5fe32fdd95e00c6f77a",
+      "app_commit": "757d941d152f00a73377c3e9910ade7a92716adb",
+      "app_tree": "25a6a7208b93d1d12f6ad02d696dd88cf9cb15ee",
+      "aionui_commit": "5c42b0969cf268a0c73e0d6d175fd35ca66912d6",
+      "aionui_tree": "e112bff592f56799fb2d97eef5f1c7a810f36fe9"
     },
     "framework_producer": "src/read-models/operator/app-state-ui-contributions.ts#buildAppUiContributionsProjection",
     "host_app_studio_e2e": true,

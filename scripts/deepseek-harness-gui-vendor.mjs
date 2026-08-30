@@ -113,7 +113,7 @@ function sync(sourceRoot) {
         "tools_native_registry",
         "host_webserver",
         "host_plugin_inventory",
-        "frontend_static_web_only",
+        "frontend_static_primitive_behind_studio_auth_routes",
         "client_modules_web_only"
       ],
       excluded_upstream_profiles: ["dsh-base"],

@@ -20,7 +20,10 @@ function defaultPlatformServices() {
   return {
     beginWindowDrag: async () => ({ accepted: false, reasonCode: "host_window_drag_unavailable" }),
     pickFiles: unavailablePlatformCapability("pickFiles"),
-    pickDirectory: unavailablePlatformCapability("pickDirectory")
+    pickDirectory: unavailablePlatformCapability("pickDirectory"),
+    classifyInputPaths: unavailablePlatformCapability("classifyInputPaths"),
+    releaseInputs: async () => undefined,
+    notifyCompletion: async () => undefined
   };
 }
 
@@ -190,6 +193,9 @@ export class OplHostCore extends EventEmitter {
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
       case "pickFiles": return this.platform.pickFiles(payload);
       case "pickDirectory": return this.platform.pickDirectory(payload);
+      case "classifyInputPaths": return this.platform.classifyInputPaths(payload);
+      case "releaseInputs": return this.platform.releaseInputs(payload);
+      case "notifyCompletion": return this.platform.notifyCompletion(payload);
       case "listThreadWorkspace": return this.threadWorkspace.list(payload);
       case "readThreadWorkspaceFile": return this.threadWorkspace.read(payload);
       case "searchThreadWorkspace": return this.threadWorkspace.search(payload);

@@ -1,9 +1,4 @@
 - insert:
-    - id: frontend-static
-      name: '@deepseek-ai/dsh-host-frontend-static'
-      config:
-        distIndex: !!js "process.getBuiltinModule('node:path').join(ctx.oplStudioHostOptions.webRoot, 'index.html')"
-
     - id: client-modules
       name: '@deepseek-ai/dsh-client-modules'
 

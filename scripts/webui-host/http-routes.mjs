@@ -1,4 +1,6 @@
 import { ThreadAdapterError } from "./thread-adapter.mjs";
+import path from "node:path";
+import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
 
 function json(res, status, value) {
   res.writeHead(status, {
@@ -157,7 +159,18 @@ async function dispatchApi(req, res, hostCore) {
   });
 }
 
-export function registerOplHttpRoutes(webServer, hostCore) {
+function authError(res, result) {
+  json(res, result.status, {
+    error: { code: result.code, message: result.message, details: {} }
+  });
+}
+
+export function registerOplHttpRoutes(webServer, hostCore, {
+  webAuth,
+  stagedInputs,
+  webRoot
+} = {}) {
+  if (!webAuth || !stagedInputs || !webRoot) throw new Error("Web routes require authentication, staged inputs, and web root services");
   const eventClients = new Map();
   let closing = false;
 
@@ -193,8 +206,59 @@ export function registerOplHttpRoutes(webServer, hostCore) {
     }),
     webServer.register({
       kind: "exact",
+      path: "/login",
+      handler(_req, res) {
+        res.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'"
+        });
+        res.end(webAuth.loginHtml());
+      }
+    }),
+    webServer.register({
+      kind: "exact",
+      path: "/api/auth/login",
+      async handler(req, res) {
+        if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
+        try {
+          const value = await body(req);
+          if (!webAuth.enabled) return json(res, 200, { authenticated: true, username: "opl", csrfToken: null });
+          const result = webAuth.checkLogin(req, value.username, value.password);
+          if (!result.ok) return authError(res, result);
+          json(res, 200, { authenticated: true, ...webAuth.issueSession(res) });
+        } catch (error) {
+          errorResponse(res, error);
+        }
+      }
+    }),
+    webServer.register({
+      kind: "exact",
+      path: "/api/auth/user",
+      handler(req, res) {
+        if (req.method !== "GET") return json(res, 405, { error: { code: "method_not_allowed", message: "GET required", details: {} } });
+        const result = webAuth.requireSession(req);
+        if (!result.ok) return authError(res, result);
+        json(res, 200, { authenticated: true, username: result.session.username, csrfToken: result.session.csrfToken });
+      }
+    }),
+    webServer.register({
+      kind: "exact",
+      path: "/api/auth/logout",
+      handler(req, res) {
+        if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
+        const result = webAuth.requireSession(req, { csrf: true });
+        if (!result.ok) return authError(res, result);
+        webAuth.clearSession(res);
+        json(res, 200, { authenticated: false });
+      }
+    }),
+    webServer.register({
+      kind: "exact",
       path: "/api/opl-events",
       handler(req, res) {
+        const auth = webAuth.requireSession(req);
+        if (!auth.ok) return authError(res, auth);
         res.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-cache, no-transform",
@@ -215,11 +279,53 @@ export function registerOplHttpRoutes(webServer, hostCore) {
       path: "/api",
       async handler(req, res) {
         try {
+          const auth = webAuth.requireSession(req, { csrf: !new Set(["GET", "HEAD"]).has(req.method ?? "") });
+          if (!auth.ok) return authError(res, auth);
+          const url = new URL(req.url ?? "/", "http://127.0.0.1");
+          const inputMatch = /^\/api\/inputs\/([^/]+)(?:\/(files|complete))?$/.exec(url.pathname);
+          if (req.method === "POST" && url.pathname === "/api/inputs") {
+            return json(res, 201, await stagedInputs.create(await body(req)));
+          }
+          if (inputMatch) {
+            const [, id, operation] = inputMatch;
+            if (req.method === "PUT" && operation === "files") {
+              return json(res, 201, await stagedInputs.put(id, url.searchParams.get("path"), req));
+            }
+            if (req.method === "POST" && operation === "complete") {
+              await body(req);
+              return json(res, 200, await stagedInputs.complete(id));
+            }
+            if (req.method === "DELETE" && operation === undefined) {
+              await stagedInputs.remove(id);
+              return json(res, 200, { id, status: "deleted" });
+            }
+          }
           await dispatchApi(req, res, hostCore);
         } catch (error) {
           errorResponse(res, error);
         }
       }
+    }),
+    webServer.registerFallback(async (req, res) => {
+      const auth = webAuth.requireSession(req);
+      if (!auth.ok) {
+        res.writeHead(302, { location: "/login", "cache-control": "no-store" });
+        res.end();
+        return;
+      }
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        res.writeHead(405);
+        res.end();
+        return;
+      }
+      const rawPath = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+      await serveStatic(
+        decodeURIComponent(rawPath),
+        res,
+        path.resolve(webRoot),
+        path.resolve(webRoot, "index.html"),
+        async () => webServer.renderIndex(await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")))
+      );
     })
   ];
 

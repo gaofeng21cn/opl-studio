@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import updaterPackage from "electron-updater";
 import fs from "node:fs";
 import path from "node:path";
@@ -196,7 +196,8 @@ async function createDesktopHost(appLogDirectory) {
         return result.canceled ? [] : result.filePaths.map((filePath) => ({
           kind: /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(filePath) ? "image" : "file",
           name: path.basename(filePath),
-          path: filePath
+          path: filePath,
+          previewUrl: pathToFileURL(filePath).href
         }));
       },
       pickDirectory: async () => {
@@ -205,6 +206,32 @@ async function createDesktopHost(appLogDirectory) {
         return result.canceled || !directory
           ? []
           : [{ kind: "folder", name: path.basename(directory), path: directory }];
+      },
+      classifyInputPaths: async ({ paths = [] } = {}) => {
+        const inputs = [];
+        for (const filePath of paths) {
+          if (typeof filePath !== "string" || !path.isAbsolute(filePath)) continue;
+          const metadata = await fs.promises.stat(filePath);
+          inputs.push({
+            kind: metadata.isDirectory() ? "folder" : /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(filePath) ? "image" : "file",
+            name: path.basename(filePath),
+            path: filePath,
+            ...(metadata.isFile() ? { previewUrl: pathToFileURL(filePath).href } : {})
+          });
+        }
+        return inputs;
+      },
+      releaseInputs: async () => undefined,
+      notifyCompletion: async ({ threadId, title, body } = {}) => {
+        if (!Notification.isSupported() || (mainWindow?.isVisible() && mainWindow.isFocused())) return;
+        const notification = new Notification({ title: title || "One Person Lab", body: body || "Task completed" });
+        notification.on("click", () => {
+          if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+          mainWindow?.show();
+          mainWindow?.focus();
+          if (threadId) sendDesktopRendererEvent("desktop/open-thread", { threadId });
+        });
+        notification.show();
       }
     },
     carrierDiagnostics: {

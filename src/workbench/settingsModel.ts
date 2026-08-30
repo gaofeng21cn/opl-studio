@@ -26,6 +26,7 @@ export type SettingKey =
   | "defaultWorkspace"
   | "runtimeProfile"
   | "confirmBeforeExecute"
+  | "notificationEnabled"
   | "artifactPreviewMode"
   | "professionalStarterDefaults"
   | "theme"
@@ -39,6 +40,7 @@ export type WorkbenchSettings = {
   defaultWorkspace: "opl_app";
   runtimeProfile: "fast" | "full";
   confirmBeforeExecute: boolean;
+  notificationEnabled: boolean;
   artifactPreviewMode: "rich_refs_only";
   professionalStarterDefaults: "research_grant_presentation";
   theme: "system" | "light" | "dark";
@@ -60,7 +62,7 @@ export const settingsSections: SettingsSection[] = [
   { id: "workspace", title: "Workspace", keys: ["defaultWorkspace"] },
   { id: "agents_capabilities", title: "Agents & Capabilities", keys: ["agentPermissions", "professionalStarterDefaults"] },
   { id: "runtime_maintenance", title: "Runtime & Maintenance", keys: ["runtimeProfile", "developerDetails"] },
-  { id: "preferences", title: "Preferences", keys: ["locale", "theme", "artifactPreviewMode", "confirmBeforeExecute"] }
+  { id: "preferences", title: "Preferences", keys: ["locale", "theme", "artifactPreviewMode", "notificationEnabled", "confirmBeforeExecute"] }
 ];
 
 export const settingsDefaults: WorkbenchSettings = {
@@ -71,6 +73,7 @@ export const settingsDefaults: WorkbenchSettings = {
   defaultWorkspace: "opl_app",
   runtimeProfile: "fast",
   confirmBeforeExecute: true,
+  notificationEnabled: true,
   artifactPreviewMode: "rich_refs_only",
   professionalStarterDefaults: "research_grant_presentation",
   theme: "system",
@@ -85,6 +88,7 @@ const allowedSettingsValues = {
   defaultWorkspace: ["opl_app"],
   runtimeProfile: ["fast", "full"],
   confirmBeforeExecute: [true, false],
+  notificationEnabled: [true, false],
   artifactPreviewMode: ["rich_refs_only"],
   professionalStarterDefaults: ["research_grant_presentation"],
   theme: ["system", "light", "dark"],

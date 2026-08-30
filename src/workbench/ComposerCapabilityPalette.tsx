@@ -15,12 +15,27 @@ function focusableElements(root: HTMLElement | null): HTMLElement[] {
   )).filter((element) => !element.closest('[hidden], [aria-hidden="true"]') && element.getClientRects().length > 0);
 }
 
+export type ComposerAttachment = {
+  id: string;
+  kind: "file" | "folder" | "image";
+  source: "picker" | "paste" | "drop";
+  name: string;
+  path: string;
+  status: "pending" | "ready" | "error";
+  progress: number;
+  error?: string;
+  cleanupToken?: string;
+  previewUrl?: string;
+  previewFile?: File;
+};
+
 export type ComposerSelection = {
   id: string;
   kind: "file" | "folder" | "image" | "skill";
   label: string;
   detail: string;
   input: CodexComposerInput;
+  attachment?: ComposerAttachment;
 };
 
 export type ComposerAgentOption = {

@@ -26,10 +26,38 @@ class WebTransportError extends Error {
   }
 }
 
+let csrfTokenPromise: Promise<string | null> | undefined;
+
+async function csrfToken(): Promise<string | null> {
+  csrfTokenPromise ??= fetch("/api/auth/user")
+    .then(async (response) => {
+      if (response.status === 401) {
+        globalThis.location?.replace("/login");
+        throw new WebTransportError("authentication_required", "Authentication required");
+      }
+      const value = await response.json() as { csrfToken?: unknown };
+      return typeof value.csrfToken === "string" ? value.csrfToken : null;
+    })
+    .catch((error) => {
+      csrfTokenPromise = undefined;
+      throw error;
+    });
+  return csrfTokenPromise;
+}
+
+async function authenticatedInit(init: RequestInit = {}): Promise<RequestInit> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return init;
+  const token = await csrfToken();
+  const headers = new Headers(init.headers);
+  if (token) headers.set("x-csrf-token", token);
+  return { ...init, headers };
+}
+
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, init);
+    response = await fetch(url, await authenticatedInit(init));
   } catch (error) {
     throw new WebTransportError("local_host_unavailable", "Local WebUI host is unavailable", {
       cause: String(error)
@@ -54,6 +82,62 @@ function postJson<T>(url: string, value: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(value)
   });
+}
+
+function chooseBrowserFiles(directory: boolean): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = !directory;
+    if (directory) {
+      input.setAttribute("webkitdirectory", "");
+      input.setAttribute("directory", "");
+    }
+    input.addEventListener("change", () => resolve(Array.from(input.files ?? [])), { once: true });
+    input.addEventListener("cancel", () => resolve([]), { once: true });
+    input.click();
+  });
+}
+
+async function deleteInputGroup(id: string): Promise<void> {
+  await requestJson(`/api/inputs/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+async function stageBrowserFiles(files: readonly File[], kind: "files" | "directory"): Promise<Array<{
+  kind: "file" | "folder" | "image";
+  name: string;
+  path: string;
+  cleanupToken?: string;
+  previewUrl?: string;
+}>> {
+  if (!files.length) return [];
+  const oversized = files.find((file) => file.size > 30 * 1024 * 1024);
+  if (oversized) throw new WebTransportError("upload_too_large", `${oversized.name} exceeds 30 MiB`);
+  const group = await postJson<{ id: string }>("/api/inputs", { kind });
+  try {
+    for (const file of files) {
+      const browserPath = kind === "directory"
+        ? ((file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name)
+        : file.name;
+      await requestJson(`/api/inputs/${encodeURIComponent(group.id)}/files?path=${encodeURIComponent(browserPath)}`, {
+        method: "PUT",
+        headers: { "content-type": file.type || "application/octet-stream" },
+        body: file
+      });
+    }
+    const completed = await postJson<{ inputs: Array<{ kind: "file" | "folder" | "image"; name: string; path: string; cleanupToken?: string }> }>(
+      `/api/inputs/${encodeURIComponent(group.id)}/complete`,
+      {}
+    );
+    return completed.inputs.map((input) => {
+      if (input.kind !== "image") return input;
+      const source = files.find((file) => file.name === input.name);
+      return { ...input, ...(source ? { previewUrl: URL.createObjectURL(source) } : {}) };
+    });
+  } catch (error) {
+    await deleteInputGroup(group.id).catch(() => undefined);
+    throw error;
+  }
 }
 
 function connectServerEvents(
@@ -89,8 +173,21 @@ export function installWebTransport(): void {
     readCodexPermissionProfiles: () => requestJson("/api/codex/permission-profiles"),
     listPendingServerRequests: () => requestJson("/api/codex/pending-requests"),
     respondToServerRequest: (request) => postJson("/api/codex/respond-request", request),
-    pickFiles: () => Promise.reject(new WebTransportError("native_picker_unavailable", "The local WebUI cannot expose native file paths")),
-    pickDirectory: () => Promise.reject(new WebTransportError("native_picker_unavailable", "The local WebUI cannot expose native folder paths")),
+    pickFiles: () => chooseBrowserFiles(false).then((files) => stageBrowserFiles(files, "files")),
+    pickDirectory: () => chooseBrowserFiles(true).then((files) => stageBrowserFiles(files, "directory")),
+    resolveDroppedInputs: (files) => stageBrowserFiles(files, "files"),
+    releaseInputs: async (cleanupTokens) => {
+      await Promise.all([...new Set(cleanupTokens)].map((token) => deleteInputGroup(token)));
+    },
+    notifyCompletion: async ({ threadId, title, body }) => {
+      if (!("Notification" in globalThis) || Notification.permission !== "granted") return;
+      const notification = new Notification(title, { body });
+      notification.onclick = () => {
+        globalThis.focus();
+        globalThis.dispatchEvent(new CustomEvent("opl:open-thread", { detail: { threadId } }));
+        notification.close();
+      };
+    },
     listThreadWorkspace: (request) => postJson("/api/threads/workspace/list", request),
     readThreadWorkspaceFile: (request) => postJson("/api/threads/workspace/read", request),
     searchThreadWorkspace: (request) => postJson("/api/threads/workspace/search", request),

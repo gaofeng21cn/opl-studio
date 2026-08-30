@@ -108,6 +108,7 @@ import { assistantDisplayMarkdown } from "./messageDisplay";
 import {
   ComposerCapabilityPalette,
   type ComposerAgentOption,
+  type ComposerAttachment,
   type ComposerOplCapabilityOption,
   type ComposerSelection
 } from "./ComposerCapabilityPalette";
@@ -115,6 +116,12 @@ import {
   buildRunDetailViewModel,
   type ScopedRunDetailItem
 } from "./runDetailModel";
+import {
+  collectCanonicalReconcileTargets,
+  isEventForActiveTurn,
+  resolveCanonicalTurn,
+  shouldNotifyCanonicalCompletion
+} from "./canonicalThreadReconcile";
 import type {
   OplContributionAction,
   OplUiContribution,
@@ -861,6 +868,7 @@ export function App({
   const [uiMetadata, setUiMetadata] = useState<WorkbenchUiMetadata>(persistedUi.metadata);
   const [drafts, setDrafts] = useState<WorkbenchDrafts>(persistedUi.drafts);
   const [prompt, setPrompt] = useState(persistedUi.drafts.prompts[persistedUi.metadata.selectedThreadId ?? "new"] ?? "");
+  const promptRef = useRef(prompt);
   const [sendState, setSendState] = useState<"idle" | "running" | "error">("idle");
   const [threadProjects, setThreadProjects] = useState<WorkbenchProjectGroup[]>([]);
   const [archivedThreadProjects, setArchivedThreadProjects] = useState<WorkbenchProjectGroup[]>([]);
@@ -869,11 +877,16 @@ export function App({
   const [messages, setMessages] = useState<ChatMessage[]>(createIntroMessages());
   const [eventFeed, setEventFeed] = useState<string[]>(["bridge.preview_only"]);
   const [codexThreadId, setCodexThreadId] = useState<string | undefined>(persistedUi.metadata.selectedThreadId);
+  const selectedThreadIdRef = useRef<string | undefined>(persistedUi.metadata.selectedThreadId);
+  const reconcileSequenceRef = useRef(new Map<string, number>());
+  const trackedTurnIdsRef = useRef(new Map<string, string>());
+  const notifiedTurnIdsRef = useRef(new Set<string>());
   const [threadDetail, setThreadDetail] = useState<WorkbenchThreadItem | null>(null);
   const [threadActionBusy, setThreadActionBusy] = useState(false);
   const [threadActionError, setThreadActionError] = useState("");
   const [lifecycleConfirmation, setLifecycleConfirmation] = useState<{ thread: WorkbenchThreadItem; action: ThreadLifecycleAction } | null>(null);
   const [settings, setSettings] = useState<WorkbenchSettings>(() => readSettings());
+  const settingsRef = useRef(settings);
   const [codexCatalog, setCodexCatalog] = useState<CodexModelCatalogEntry[]>([]);
   const [modelCatalogStatus, setModelCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
   const [modelCatalogError, setModelCatalogError] = useState("");
@@ -1182,6 +1195,10 @@ export function App({
   }, [allThreads]);
 
   useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
     ephemeralQueueRef.current = ephemeralQueue;
   }, [ephemeralQueue]);
 
@@ -1272,10 +1289,39 @@ export function App({
   }
 
   function updatePrompt(value: string) {
+    promptRef.current = value;
     setPrompt(value);
     const key = codexThreadId ?? "new";
     updateDrafts((current) => ({ ...current, prompts: { ...current.prompts, [key]: value } }));
   }
+
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files ?? []);
+      if (!files.length) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      stageComposerFiles(files, "paste");
+    };
+    const dragover = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    const drop = (event: DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (!files.length) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      stageComposerFiles(files, "drop");
+    };
+    document.addEventListener("paste", paste, true);
+    document.addEventListener("dragover", dragover, true);
+    document.addEventListener("drop", drop, true);
+    return () => {
+      document.removeEventListener("paste", paste, true);
+      document.removeEventListener("dragover", dragover, true);
+      document.removeEventListener("drop", drop, true);
+    };
+  }, [bridge]);
 
   function loadState(profile = settings.runtimeProfile) {
     setStateStatus("loading");
@@ -1695,11 +1741,75 @@ export function App({
     }
   }
 
+  async function reconcileCanonicalThread(threadId: string, reason: string, expectedTurnId?: string): Promise<CodexThread> {
+    const sequence = (reconcileSequenceRef.current.get(threadId) ?? 0) + 1;
+    reconcileSequenceRef.current.set(threadId, sequence);
+    const readback = await bridge.readThread({ threadId, includeTurns: true });
+    if (reconcileSequenceRef.current.get(threadId) !== sequence) return readback;
+
+    const trackedTurnId = trackedTurnIdsRef.current.get(threadId);
+    const resolvedExpectedTurnId = expectedTurnId ?? trackedTurnId;
+    const { activeTurnId, terminalTurn } = resolveCanonicalTurn(readback, resolvedExpectedTurnId);
+    const selected = selectedThreadIdRef.current === threadId;
+
+    if (activeTurnId) trackedTurnIdsRef.current.set(threadId, activeTurnId);
+    else if (resolvedExpectedTurnId && trackedTurnIdsRef.current.get(threadId) === resolvedExpectedTurnId) {
+      trackedTurnIdsRef.current.delete(threadId);
+    }
+
+    if (selected) {
+      const nextMessages = deriveThreadMessages(readback);
+      if (activeTurnId) {
+        const pendingId = `assistant-pending:${threadId}:${activeTurnId}`;
+        if (!nextMessages.some((message) => message.id === pendingId)) {
+          nextMessages.push({ id: pendingId, role: "assistant", text: "" });
+        }
+        pendingAssistantIdRef.current = pendingId;
+        activeTurnRef.current = { threadId, turnId: activeTurnId };
+        setActiveTurnId(activeTurnId);
+        setSendState("running");
+      } else {
+        pendingAssistantIdRef.current = null;
+        activeTurnRef.current = null;
+        setActiveTurnId(null);
+        setSendState("idle");
+      }
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
+      setThreadDetail(null);
+    }
+
+    const currentSettings = settingsRef.current;
+    if (terminalTurn && shouldNotifyCanonicalCompletion({
+      enabled: currentSettings.notificationEnabled,
+      threadId,
+      turnId: terminalTurn.id,
+      selectedThreadId: selectedThreadIdRef.current,
+      documentVisible: document.visibilityState === "visible",
+      windowFocused: document.hasFocus(),
+      notifiedTurnIds: notifiedTurnIdsRef.current
+    })) {
+      const notificationKey = `${threadId}:${terminalTurn.id}`;
+      notifiedTurnIdsRef.current.add(notificationKey);
+      await bridge.notifyCompletion({
+        threadId,
+        turnId: terminalTurn.id,
+        title: "One Person Lab",
+        body: terminalTurn.status === "completed"
+          ? (currentSettings.locale === "zh" ? "任务已完成。" : "Task completed.")
+          : (currentSettings.locale === "zh" ? "任务已结束，请查看结果。" : "Task ended; review the result.")
+      });
+    }
+    if (reason !== "open") void loadThreadDirectory(false);
+    return readback;
+  }
+
   async function openThread(thread: WorkbenchThreadItem): Promise<string | null> {
     setPrimaryView("conversation");
     setSelectedRuntimeWorkItemId(undefined);
     setThreadActionBusy(true);
     setThreadActionError("");
+    selectedThreadIdRef.current = thread.id;
     setCodexThreadId(thread.id);
     const affinityProjectId = threadProjects.find((project) => project.threads.some((item) => item.id === thread.id))?.id;
     updateUiMetadata({
@@ -1708,23 +1818,16 @@ export function App({
         ?? uiMetadata.selectedProjectId
     });
     rememberThreadAffinity(thread.id, affinityProjectId);
-    setPrompt(drafts.prompts[thread.id] ?? "");
+    promptRef.current = drafts.prompts[thread.id] ?? "";
+    setPrompt(promptRef.current);
     activeTurnRef.current = null;
     setActiveTurnId(null);
     setSendState("idle");
+    releaseComposerSelections(composerSelections);
     setComposerSelections([]);
     setComposerPaletteOpen(false);
     try {
-      const readback = await bridge.readThread({ threadId: thread.id, includeTurns: true });
-      const nextMessages = deriveThreadMessages(readback);
-      const readbackThreadId = readback.id || thread.id;
-      const readbackTurnId = readback.activeTurnId;
-      activeTurnRef.current = readbackTurnId ? { threadId: readbackThreadId, turnId: readbackTurnId } : null;
-      setActiveTurnId(readbackTurnId ?? null);
-      setSendState(readbackTurnId ? "running" : "idle");
-      setMessages(nextMessages);
-      messagesRef.current = nextMessages;
-      setThreadDetail(null);
+      await reconcileCanonicalThread(thread.id, "open");
       return null;
     } catch (error) {
       const message = String(error);
@@ -1806,6 +1909,9 @@ export function App({
       const activeProjects = active ? deriveThreadDirectory(active) : threadProjects;
       const archivedProjects = archived ? deriveThreadDirectory(archived) : archivedThreadProjects;
       if (active) setThreadProjects(activeProjects);
+      for (const thread of activeProjects.flatMap((project) => project.threads)) {
+        if (thread.activeTurnId) trackedTurnIdsRef.current.set(thread.id, thread.activeTurnId);
+      }
       if (archived) setArchivedThreadProjects(archivedProjects);
       const selectedThreadId = uiMetadata.selectedThreadId;
       const directoryProjects = scope === "archived" ? archivedProjects : activeProjects;
@@ -1895,6 +2001,16 @@ export function App({
     const method = eventMethod(event);
     const params = eventParams(event);
     setEventFeed((items) => [formatEvent(event), ...items].slice(0, 8));
+    if (method === "bridge.ready") {
+      const targets = collectCanonicalReconcileTargets(
+        selectedThreadIdRef.current,
+        allThreadsRef.current,
+        trackedTurnIdsRef.current
+      );
+      for (const target of targets) {
+        void reconcileCanonicalThread(target.threadId, "bridge-ready", target.expectedTurnId).catch(() => undefined);
+      }
+    }
     if (method === "desktop/navigate" && (params.view === "conversation" || params.view === "runtime")) {
       setPrimaryView(params.view);
     }
@@ -1924,11 +2040,13 @@ export function App({
         : "The Codex App Server exited; pending requests were cleared.");
       return;
     }
-    if (method === "turn/started" && pendingAssistantIdRef.current) {
+    if (method === "turn/started") {
       const turn = typeof params.turn === "object" && params.turn ? params.turn as Record<string, unknown> : {};
       const threadId = typeof params.threadId === "string" ? params.threadId : "";
       const turnId = typeof turn.id === "string" ? turn.id : typeof params.turnId === "string" ? params.turnId : "";
-      if (threadId && turnId) {
+      if (threadId && turnId) trackedTurnIdsRef.current.set(threadId, turnId);
+      if (threadId && turnId && (!selectedThreadIdRef.current || selectedThreadIdRef.current === threadId)) {
+        selectedThreadIdRef.current ??= threadId;
         activeTurnRef.current = { threadId, turnId };
         setActiveTurnId(turnId);
         setCodexThreadId(threadId);
@@ -1936,17 +2054,19 @@ export function App({
       }
     }
     if (method === "turn/completed") {
+      const completedThreadId = typeof params.threadId === "string" ? params.threadId : activeTurnRef.current?.threadId;
       const completedTurnId = typeof params.turnId === "string"
         ? params.turnId
         : typeof params.turn === "object" && params.turn && "id" in params.turn
           ? String((params.turn as { id?: unknown }).id ?? "")
           : "";
-      if (!completedTurnId || activeTurnRef.current?.turnId === completedTurnId) {
-        activeTurnRef.current = null;
-        setActiveTurnId(null);
-      }
+      const expectedTurnId = completedThreadId
+        ? completedTurnId || trackedTurnIdsRef.current.get(completedThreadId)
+        : undefined;
+      if (completedThreadId) void reconcileCanonicalThread(completedThreadId, "turn-completed", expectedTurnId).catch(() => undefined);
     }
     if (!pendingAssistantIdRef.current) return;
+    if ((method === "item/agentMessage/delta" || method === "item/completed") && !isEventForActiveTurn(params, activeTurnRef.current)) return;
     if (method === "item/agentMessage/delta") {
       const delta = eventDelta(event);
       if (!delta) return;
@@ -1963,6 +2083,16 @@ export function App({
         : item));
     }
   }), [bridge]);
+
+  useEffect(() => {
+    const openNotifiedThread = (event: Event) => {
+      const threadId = (event as CustomEvent<{ threadId?: string }>).detail?.threadId;
+      const thread = threadId ? allThreadsRef.current.find((candidate) => candidate.id === threadId) : undefined;
+      if (thread) void openThread(thread);
+    };
+    globalThis.addEventListener("opl:open-thread", openNotifiedThread);
+    return () => globalThis.removeEventListener("opl:open-thread", openNotifiedThread);
+  }, []);
 
   useEffect(() => {
     void bridge.listPendingServerRequests()
@@ -2146,6 +2276,7 @@ export function App({
       inputs: item.inputs,
       ...(item.turnAgentSelection ? { turnAgentSelection: item.turnAgentSelection } : {})
     });
+    releaseComposerSelections(item.selections);
     replaceEphemeralQueue(ephemeralQueueRef.current.filter((candidate) => candidate.id !== item.id));
     const acceptedMessage: ChatMessage = {
       id: `user-steer-${Date.now()}`,
@@ -2160,6 +2291,7 @@ export function App({
     const item = ephemeralQueueRef.current.find((candidate) => candidate.id === itemId);
     if (!item) return;
     if (action.kind === "remove") {
+      releaseComposerSelections(item.selections);
       replaceEphemeralQueue(ephemeralQueueRef.current.filter((candidate) => candidate.id !== itemId));
       return;
     }
@@ -2220,7 +2352,19 @@ export function App({
     if (typeof modeOrEvent === "object") modeOrEvent.preventDefault();
     const text = prompt.trim();
     const pendingSelections = composerSelections;
+    if (text === "/open") {
+      updatePrompt("");
+      void pickComposerFiles();
+      return;
+    }
     if ((!text && !pendingSelections.length) || !resolvedModel) return;
+    const unavailableAttachment = pendingSelections.find((selection) => selection.attachment?.status !== undefined && selection.attachment.status !== "ready");
+    if (unavailableAttachment) {
+      setComposerSubmissionError(unavailableAttachment.attachment?.status === "pending"
+        ? (settings.locale === "zh" ? "附件仍在准备中。" : "An attachment is still being prepared.")
+        : (unavailableAttachment.attachment?.error ?? (settings.locale === "zh" ? "请移除失败的附件后重试。" : "Remove the failed attachment before retrying.")));
+      return;
+    }
     setComposerSubmissionError("");
     if (sendState === "running") {
       const queuedAgentSelection = selectedAgentSnapshot();
@@ -2277,12 +2421,16 @@ export function App({
         const finalMessage = typeof reply === "object" && reply && "finalMessage" in reply
           ? String((reply as { finalMessage?: unknown }).finalMessage ?? "")
           : "";
+        const replyTurnId = typeof reply === "object" && reply && "turnId" in reply
+          ? String((reply as { turnId?: unknown }).turnId ?? "")
+          : "";
         const nextMessages = messagesRef.current.map((item) => item.id === pendingId
           ? { id: pendingId, role: wasInterrupted ? "system" as const : "assistant" as const, text: wasInterrupted ? (item.text || (settings.locale === "zh" ? "运行已停止。" : "Run stopped.")) : finalMessage || formatReceipt(reply) }
           : item);
         messagesRef.current = nextMessages;
         setMessages(nextMessages);
         const resolvedThreadId = nextThreadId || codexThreadId;
+        selectedThreadIdRef.current = resolvedThreadId;
         setCodexThreadId(resolvedThreadId);
         updateUiMetadata({ selectedThreadId: resolvedThreadId });
         if (resolvedThreadId) {
@@ -2298,13 +2446,15 @@ export function App({
         }
         setPendingInputFiles([]);
         setSelectedAgent(null);
+        releaseComposerSelections(pendingSelections);
         activeTurnRef.current = null;
         setActiveTurnId(null);
         pendingAssistantIdRef.current = null;
         interruptRequestedForRef.current = null;
         setComposerSubmissionError("");
         setSendState("idle");
-        void loadThreadDirectory(false);
+        if (resolvedThreadId) void reconcileCanonicalThread(resolvedThreadId, "send-settled", replyTurnId || undefined).catch(() => undefined);
+        else void loadThreadDirectory(false);
       })
       .catch(() => {
         const wasInterrupted = interruptRequestedForRef.current === pendingId;
@@ -2324,9 +2474,32 @@ export function App({
           void loadThreadDirectory(false);
           return;
         }
+        const acceptedTurn = activeTurnRef.current;
+        if (acceptedTurn) {
+          setComposerSubmissionError(settings.locale === "zh" ? "连接已中断，正在从任务记录恢复。" : "Connection interrupted; recovering from the canonical task record.");
+          void reconcileCanonicalThread(acceptedTurn.threadId, "send-recover", acceptedTurn.turnId)
+            .then((thread) => {
+              const turn = thread.turns.find((candidate) => candidate.id === acceptedTurn.turnId);
+              if (turn && turn.status !== "inProgress") {
+                releaseComposerSelections(pendingSelections);
+                setPendingInputFiles([]);
+                setSelectedAgent(null);
+                setComposerSubmissionError("");
+              }
+            })
+            .catch((error) => setComposerSubmissionError(String(error)));
+          return;
+        }
         const message = t.sendFailed;
-        updatePrompt(text);
-        setComposerSelections(pendingSelections);
+        const laterPrompt = promptRef.current.trim();
+        updatePrompt([text, laterPrompt].filter(Boolean).join("\n\n"));
+        setComposerSelections((current) => [
+          ...pendingSelections,
+          ...current.filter((selection) => !pendingSelections.some((failed) => (
+            failed.id === selection.id
+            || (failed.attachment?.path && failed.attachment.path === selection.attachment?.path)
+          )))
+        ]);
         setPendingInputFiles([]);
         activeTurnRef.current = null;
         setActiveTurnId(null);
@@ -2346,15 +2519,18 @@ export function App({
     const nextMessages = createIntroMessages();
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
+    selectedThreadIdRef.current = undefined;
     setCodexThreadId(undefined);
     updateUiMetadata({
       selectedThreadId: undefined,
       selectedProjectId: currentWorkspaceProject?.id ?? uiMetadata.selectedProjectId
     });
-    setPrompt(drafts.prompts.new ?? "");
+    promptRef.current = drafts.prompts.new ?? "";
+    setPrompt(promptRef.current);
     setLastDryRun("");
     setThreadActionError("");
     setSendState("idle");
+    releaseComposerSelections(composerSelections);
     setComposerSelections([]);
     setSelectedAgent(null);
     setPendingInputFiles([]);
@@ -2441,20 +2617,118 @@ export function App({
     if (capabilityStatus === "idle" || capabilityStatus === "error") void loadCapabilities();
   }
 
-  function addPickedInputs(items: CodexPickedInput[]) {
-    const selections = items.map((item): ComposerSelection => ({
-      id: `${item.kind}:${item.path}`,
-      kind: item.kind,
-      label: item.name,
-      detail: item.path,
-      input: item.kind === "image"
-        ? { type: "localImage", path: item.path, detail: "auto" }
-        : { type: "mention", name: item.name, path: item.path }
-    }));
+  function imageMediaType(name: string): string {
+    if (/\.png$/i.test(name)) return "image/png";
+    if (/\.gif$/i.test(name)) return "image/gif";
+    if (/\.webp$/i.test(name)) return "image/webp";
+    return "image/jpeg";
+  }
+
+  function pickedSelections(items: CodexPickedInput[], source: ComposerAttachment["source"]): ComposerSelection[] {
+    return items.map((item): ComposerSelection => {
+      const id = `${item.kind}:${item.path}`;
+      return {
+        id,
+        kind: item.kind,
+        label: item.name,
+        detail: item.path,
+        input: item.kind === "image"
+          ? { type: "localImage", path: item.path, detail: "auto" }
+          : { type: "mention", name: item.name, path: item.path },
+        attachment: {
+          id,
+          kind: item.kind,
+          source,
+          name: item.name,
+          path: item.path,
+          status: "ready",
+          progress: 1,
+          ...(item.cleanupToken ? { cleanupToken: item.cleanupToken } : {}),
+          ...(item.previewUrl ? {
+            previewUrl: item.previewUrl,
+            previewFile: new File([], item.name, { type: imageMediaType(item.name) })
+          } : {})
+        }
+      };
+    });
+  }
+
+  function addPickedInputs(items: CodexPickedInput[], source: ComposerAttachment["source"] = "picker") {
+    const selections = pickedSelections(items, source);
     setComposerSelections((current) => [
       ...current,
       ...selections.filter((selection) => !current.some((item) => item.id === selection.id))
     ]);
+  }
+
+  function disposeSelectionPreviews(selections: readonly ComposerSelection[]) {
+    for (const selection of selections) {
+      const previewUrl = selection.attachment?.previewUrl;
+      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    }
+  }
+
+  function releaseComposerSelections(selections: readonly ComposerSelection[]) {
+    disposeSelectionPreviews(selections);
+    const cleanupTokens = selections.flatMap((selection) => selection.attachment?.cleanupToken ? [selection.attachment.cleanupToken] : []);
+    if (cleanupTokens.length) void bridge.releaseInputs(cleanupTokens).catch(() => undefined);
+  }
+
+  function removeComposerSelection(id: string) {
+    setComposerSelections((current) => {
+      const selected = current.find((item) => item.id === id);
+      const cleanupToken = selected?.attachment?.cleanupToken;
+      const removed = current.filter((item) => item.id === id || (cleanupToken && item.attachment?.cleanupToken === cleanupToken));
+      releaseComposerSelections(removed);
+      return current.filter((item) => !removed.includes(item));
+    });
+  }
+
+  function stageComposerFiles(files: readonly File[], source: "paste" | "drop"): string | null {
+    if (!files.length) return null;
+    const oversized = files.find((file) => file.size > 30 * 1024 * 1024);
+    if (oversized) return settings.locale === "zh" ? `${oversized.name} 超过 30 MiB。` : `${oversized.name} exceeds 30 MiB.`;
+    const batchId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const pending = files.map((file, index): ComposerSelection => {
+      const id = `${batchId}-${index}`;
+      const image = file.type.startsWith("image/");
+      const previewUrl = image ? URL.createObjectURL(file) : undefined;
+      return {
+        id,
+        kind: image ? "image" : "file",
+        label: file.name,
+        detail: settings.locale === "zh" ? "正在准备" : "Preparing",
+        input: image ? { type: "localImage", path: "", detail: "auto" } : { type: "mention", name: file.name, path: "" },
+        attachment: {
+          id,
+          kind: image ? "image" : "file",
+          source,
+          name: file.name,
+          path: "",
+          status: "pending",
+          progress: 0,
+          ...(previewUrl ? { previewUrl, previewFile: file } : {})
+        }
+      };
+    });
+    setComposerSelections((current) => current.concat(pending));
+    void bridge.resolveDroppedInputs(files).then((items) => {
+      const ready = pickedSelections(items, source);
+      setComposerSelections((current) => {
+        const withoutPending = current.filter((item) => !pending.some((candidate) => candidate.id === item.id));
+        disposeSelectionPreviews(pending);
+        return withoutPending.concat(ready.filter((selection) => !withoutPending.some((item) => item.id === selection.id)));
+      });
+    }).catch((error) => {
+      setComposerSelections((current) => current.map((item) => pending.some((candidate) => candidate.id === item.id)
+        ? {
+            ...item,
+            detail: String(error),
+            attachment: item.attachment ? { ...item.attachment, status: "error", error: String(error) } : undefined
+          }
+        : item));
+    });
+    return null;
   }
 
   async function pickComposerFiles() {
@@ -2491,7 +2765,12 @@ export function App({
   }
 
   function updateSetting<Key extends keyof WorkbenchSettings>(key: Key, value: WorkbenchSettings[Key]) {
-    setSettings(writeSetting(key, value));
+    if (key === "notificationEnabled" && value === true && globalThis.location?.protocol.startsWith("http") && "Notification" in globalThis && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+    const nextSettings = writeSetting(key, value);
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
   }
 
   function setAgentPermissions(value: OplAgentPermission) {
@@ -2533,7 +2812,7 @@ export function App({
     <>
       {composerSelections.length ? (
         <div className="composer-selections" aria-label={settings.locale === "zh" ? "已添加的内容" : "Added content"}>
-          {composerSelections.map((selection) => <span key={selection.id} className="composer-selection" title={selection.detail}><FileText aria-hidden="true" size={13} /><span>{selection.label}</span><button type="button" aria-label={`${settings.locale === "zh" ? "移除" : "Remove"} ${selection.label}`} onClick={() => setComposerSelections((current) => current.filter((item) => item.id !== selection.id))}><X aria-hidden="true" size={12} /></button></span>)}
+          {composerSelections.map((selection) => <span key={selection.id} className="composer-selection" data-status={selection.attachment?.status} title={selection.detail}>{selection.attachment?.status === "pending" ? <LoaderCircle aria-hidden="true" size={13} className="spin" /> : selection.attachment?.status === "error" ? <AlertTriangle aria-hidden="true" size={13} /> : <FileText aria-hidden="true" size={13} />}<span>{selection.label}</span><button type="button" aria-label={`${settings.locale === "zh" ? "移除" : "Remove"} ${selection.label}`} onClick={() => removeComposerSelection(selection.id)}><X aria-hidden="true" size={12} /></button></span>)}
         </div>
       ) : null}
       {selectedAgent ? (
@@ -2581,6 +2860,13 @@ export function App({
       contributions={hasContribution("composer.palette") ? renderContributionSlot?.("composer.palette", contributionOwner) : null}
     />
   );
+
+  const composerImages = useMemo(() => composerSelections.flatMap((selection) => {
+    const attachment = selection.attachment;
+    return attachment?.kind === "image" && attachment.previewFile && attachment.previewUrl
+      ? [{ id: attachment.id, file: attachment.previewFile, previewUrl: attachment.previewUrl }]
+      : [];
+  }), [composerSelections]);
 
   const studioDetails = (
     <aside className="opl-dsh-context-panel" aria-label="On-demand context panel">
@@ -2882,6 +3168,9 @@ export function App({
     openPrimaryView: setPrimaryView,
     composerAccessory: studioComposerAccessory,
     composerOverlay: studioComposerOverlay,
+    composerImages,
+    addComposerImages: (files) => stageComposerFiles(files, "drop"),
+    removeComposerImage: removeComposerSelection,
     details: studioDetails,
     detailTabs,
     activeDetailTabId: activeContextTab,

@@ -77,7 +77,7 @@ release admission, and is explicitly adopted.
 | Runtime overview continuity | `last_known_projection_then_background_refresh` | The first-level runtime page immediately renders a read-only, non-sensitive last-known App projection when available, then replaces it with a fresh `opl app state` readback; failed refreshes retain the snapshot with explicit stale status and never expose cached mutation actions |
 | Service recovery | `app_state_derived_action_closed_loop` | Runtime Overview derives one causal root and one safe action from the same App state/action projection. Mutating and read-only actions are revalidated against a fresh App state immediately before execution, respect the mutation guard, and always refresh App state afterward |
 | Local launcher | `implemented_candidate_path` | Isolated bundle; actions dry-run-only by default |
-| Minimum product baseline | `active_functional_closure` | Public macOS Preview distribution is live. The managed-update/Flow fast-state and Fleet `service_status` paths are closed; the remaining user-facing baseline is non-Fleet managed-companion consumption from `opl-glt.58` |
+| Minimum product baseline | `active_functional_closure` | Public macOS Preview distribution is live. Managed updates, Flow fast state, Fleet `service_status`, and generic non-Fleet `managed_companions[]` consumption all use Framework projections and App actions without a fixed provider allowlist |
 | Validation | `public_preview_release_plus_cohort_bound_installed_evidence` | The public `v0.1.4` Release provides signed, notarized, stapled Standard and Full macOS arm64 assets plus the Preview update feed. Earlier installed interaction, Gateway, real Codex turn, restart, and thread-recovery evidence remains valid only for its exact candidate cohort; later bytes require fresh installed acceptance |
 | Adoption and readiness | `preview_released_stable_not_adopted` | Public Preview distribution does not adopt Studio as the Stable App shell and does not establish clean-VM equivalence, domain readiness, owner acceptance, or production readiness |
 
@@ -158,12 +158,13 @@ does not change active-shell adoption or release authority.
 
 | Gap | Class | Owner route | Stop condition |
 | --- | --- | --- | --- |
-| Non-Fleet managed-companion contributions still need user-path consumption | `functional_p1` | `opl-glt.58` producer/consumer owner plus Studio integrator | Consume Channel Access, WeChat, Computer Use, Browser Automation, and future managed companions through typed slots/actions and a generic directory; Fleet `service_status` is already closed and must not be reintroduced as a fixed brand allowlist |
+| Public Studio WebUI Preview and Cloud activation | `delivery_p0` | Studio release workflow, then `opl-cloud` activation owner | Publish and verify one immutable signed dual-architecture Preview digest and handoff; Cloud then performs real Workspace login, attachment, turn, restart, and rollback smoke before user testing is declared open |
 
 Signed, notarized, and stapled macOS arm64 Preview distribution and its public
-update feed are live in `v0.1.4`. Dedicated clean-VM certification, public
-Windows/Linux/OCI distribution, and the final AionUI cutover remain separate
-delivery/adoption work. They must not be moved into default development CI.
+update feed are live in `v0.1.4`. Managed companions are no longer an open
+functional gap: Studio consumes the generic Framework directory and action
+catalog. Scheduled Tasks, public Windows/Linux Desktop distribution, Cloud
+activation, and the final AionUI cutover remain separate delivery/adoption work.
 
 Remote cross-machine coordination, model-driven permission/write-set decisions,
 private thread runtimes, and candidate-owned delivery ledgers are explicitly not
@@ -176,10 +177,10 @@ does not depend on Team mode.
 
 ### Goal
 
-For successor product development, finish the remaining non-Fleet managed-companion
-user paths while preserving the Codex-only thin-consumer boundary. Rebuild and
-repeat installed Preview acceptance only after those functional bytes change.
-Further platform distribution and Stable adoption stay independent in this round.
+For successor product delivery, qualify the authenticated Studio WebUI Preview
+OCI and hand it to the Cloud owner while preserving the Codex-only thin-consumer
+boundary. Further Desktop platform distribution and Stable adoption stay
+independent in this round.
 Do not reproduce AionUI-only inherited surfaces, create a speculative
 multi-backend framework, or duplicate the renderer/host core for another
 carrier.
@@ -226,13 +227,11 @@ carrier.
 
 ### Required Actions
 
-1. Preserve the closed managed-update/Flow and Fleet `service_status` projection
-   boundaries while consuming Host-derived managed-companion, Channel Access,
-   WeChat, Computer Use, Browser Automation, and future projections without adding
-   a Studio registry, Package discovery path, or action authority.
-2. After the remaining functional bytes are canonical, run the affected candidate
-   gates, rebuild the macOS Preview, and repeat installed interaction/runtime
-   readback before asking for acceptance of that new cohort.
+1. Preserve the closed managed-update, managed-companion, and Fleet projection
+   boundaries without adding a Studio registry, Package discovery path, or action
+   authority.
+2. Publish only the independently versioned Studio WebUI Preview digest and
+   machine-readable Cloud handoff; do not move App Stable or claim Cloud activation.
 
 ### Verification Commands
 

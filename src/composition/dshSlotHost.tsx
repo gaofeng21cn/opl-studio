@@ -681,7 +681,7 @@ function ComposerModelSlot() {
 
 function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const studio = useStudio();
-  const input = { draft: studio.prompt, imageIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
+  const input = { draft: studio.prompt, imageIds: studio.composerImages.map((image) => image.id), draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
   const permissionValue = studio.agentPermissions === ":danger-full-access"
     ? "danger-full-access"
     : studio.agentPermissions === ":workspace" ? "workspace-write" : "read-only";
@@ -712,7 +712,7 @@ function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const inputRenderSlot = (key: string, props: Record<string, unknown>) => key === "conversation.input.plan"
     ? <StudioPermissionSelect value={permissionValue} options={permissionOptions} locked={studio.sending} locale={studio.locale} command={command} />
     : renderSlot(key, props);
-  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addImages: () => false, removeImage: () => undefined, pruneImages: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} draftImages={() => []} resolveSubmitMode={(running: boolean, gesture: string) => running && gesture === "accelerated" ? "steer" : "queue"} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
+  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addImages: () => true, removeImage: studio.removeComposerImage, pruneImages: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} addImages={studio.addComposerImages} removeImage={studio.removeComposerImage} draftImages={(ids: readonly string[]) => ids.flatMap((id) => { const image = studio.composerImages.find((candidate) => candidate.id === id); return image ? [{ kind: "image", ...image }] : []; })} resolveSubmitMode={(running: boolean, gesture: string) => running && gesture === "accelerated" ? "steer" : "queue"} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
 }
 
 function QueueDockSlot() {

@@ -17,12 +17,14 @@ const imageB = {
   revision: "2".repeat(40)
 };
 
-function fakeDocker({ images, failUpFor = new Set() }) {
+function fakeDocker({ images, failUpFor = new Set(), healthStatuses = ["healthy"] }) {
   const calls = [];
+  let healthRead = 0;
   const execute = async (command, args, options = {}) => {
     calls.push({ command, args, env: options.env });
     const success = (stdout = "") => ({ exitCode: 0, signal: null, stdout, stderr: "" });
     const failure = (stderr = "failed") => ({ exitCode: 1, signal: null, stdout: "", stderr });
+    if (command === "cosign") return success("[]\n");
     if (command !== "docker") return failure("unexpected command");
     if (args[0] === "info") return success("27.0.0\n");
     if (args[0] === "compose" && args[1] === "version") return success("2.30.0\n");
@@ -43,7 +45,12 @@ function fakeDocker({ images, failUpFor = new Set() }) {
       if (operation === "ps") return success("fixture-container\n");
       return success();
     }
-    if (args[0] === "inspect" && args.at(-1) === "{{.State.Health.Status}}") return success("healthy\n");
+    if (args[0] === "inspect" && args.at(-1) === "{{.State.Health.Status}}") {
+      const status = healthStatuses[Math.min(healthRead, healthStatuses.length - 1)];
+      healthRead += 1;
+      return success(`${status}\n`);
+    }
+    if (args[0] === "inspect" && args.at(-1) === "{{json .State.Health.Log}}") return success("[]\n");
     return failure(`unexpected docker args: ${args.join(" ")}`);
   };
   return { calls, execute };
@@ -140,6 +147,28 @@ test("manager installs, updates, recreates, rolls back, and uninstalls with immu
   assert.equal(downCall.args.includes("--volumes"), false);
 });
 
+test("manager allows a transient unhealthy state to recover within the health deadline", async () => {
+  const paths = await fixture();
+  const docker = fakeDocker({
+    images: new Map([["fixture:a", imageA]]),
+    healthStatuses: ["unhealthy", "starting", "healthy"]
+  });
+  const manager = createOciManager({
+    execute: docker.execute,
+    sourceRoot: paths.sourceRoot,
+    sleep: async () => undefined
+  });
+  const installed = await manager.run("install", {
+    image: "fixture:a",
+    allowLocalImage: true,
+    stateDirectory: paths.stateDirectory,
+    projectName: "opl-health-recovery",
+    port: 49184
+  });
+  assert.equal(installed.health, "healthy");
+  assert.equal(docker.calls.filter((call) => call.args.at(-1) === "{{.State.Health.Status}}").length, 3);
+});
+
 test("failed update restores the previous image and does not advance installation state", async () => {
   const paths = await fixture();
   const docker = fakeDocker({
@@ -194,12 +223,12 @@ test("manager rejects a modified installed Compose template before Docker mutati
   assert.equal(docker.calls.slice(callsBefore).some((call) => call.args.includes("up")), false);
 });
 
-test("digest installation records the immutable registry identity without claiming signature verification", async () => {
+test("digest installation verifies the immutable registry identity before container mutation", async () => {
   const paths = await fixture();
-  const digest = `ghcr.io/example/one-person-lab@sha256:${"c".repeat(64)}`;
+  const digest = `ghcr.io/gaofeng21cn/opl-studio-webui@sha256:${"c".repeat(64)}`;
   const image = { id: `sha256:${"d".repeat(64)}`, digests: [digest], revision: "3".repeat(40) };
   const docker = fakeDocker({ images: new Map([[digest, image]]) });
-  const manager = createOciManager({ execute: docker.execute, sourceRoot: paths.sourceRoot });
+  const manager = createOciManager({ execute: docker.execute, sourceRoot: paths.sourceRoot, env: { COSIGN_BIN: "cosign" } });
   const receipt = await manager.run("install", {
     image: digest,
     stateDirectory: paths.stateDirectory,
@@ -208,8 +237,25 @@ test("digest installation records the immutable registry identity without claimi
   });
   assert.equal(receipt.current.immutableRef, digest);
   assert.equal(receipt.current.supplyChain.registryDigestPinned, true);
-  assert.equal(receipt.current.supplyChain.signatureVerification, "not_implemented");
+  assert.equal(receipt.current.supplyChain.signatureVerification.status, "verified");
+  assert.match(receipt.current.supplyChain.signatureVerification.workflowIdentity, /studio-webui-preview\.yml@refs\/heads\/main$/);
+  const cosignCall = docker.calls.find((call) => call.command === "cosign");
+  const composeUp = docker.calls.findIndex((call) => call.command === "docker" && call.args.includes("up"));
+  assert.ok(cosignCall);
+  assert.ok(docker.calls.indexOf(cosignCall) < composeUp);
   await manager.run("uninstall", { stateDirectory: paths.stateDirectory });
+});
+
+test("digest installation fails closed without a configured Cosign verifier", async () => {
+  const paths = await fixture();
+  const digest = `ghcr.io/gaofeng21cn/opl-studio-webui@sha256:${"e".repeat(64)}`;
+  const docker = fakeDocker({ images: new Map() });
+  const manager = createOciManager({ execute: docker.execute, sourceRoot: paths.sourceRoot, env: {} });
+  await assert.rejects(
+    manager.run("install", { image: digest, stateDirectory: paths.stateDirectory }),
+    (error) => error.code === "invalid_argument" && /COSIGN_BIN/.test(error.message)
+  );
+  assert.equal(docker.calls.some((call) => call.args.includes("up")), false);
 });
 
 test("purge-data is the only uninstall path that removes named volumes", async () => {

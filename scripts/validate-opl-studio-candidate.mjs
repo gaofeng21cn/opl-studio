@@ -322,9 +322,13 @@ function assertApplicationHost(evidence) {
   for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-host-core", "plugin-inventory"]) {
     assert(profile.includes(`id: ${id}`), `Studio DSH profile is missing ${id}`);
   }
-  for (const id of ["frontend-static", "client-modules", "opl-studio-client", "opl-web-routes"]) {
+  for (const id of ["client-modules", "opl-studio-client", "opl-web-routes"]) {
     assert(webOverlay.includes(`id: ${id}`), `Studio web overlay is missing ${id}`);
   }
+  assert(!webOverlay.includes("id: frontend-static"), "Studio web overlay must not register an unauthenticated static fallback");
+  const httpRoutes = read("scripts/webui-host/http-routes.mjs");
+  assert(httpRoutes.includes('import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static"'), "Studio auth routes must reuse the pinned DSH static-serving primitive");
+  assert(httpRoutes.includes("webAuth.requireSession(req)"), "Studio static fallback must require the canonical WebUI session");
   for (const marker of ["initProfile(profileDir, [])", "healProfilesModuleFallback", "loadProfile", "loadOverlayPatches", "boot("]) {
     assert(hostBoot.includes(marker), `DSH Host boot is missing ${marker}`);
   }
@@ -779,7 +783,7 @@ assert(JSON.stringify(evidence.reused_oss_module_policy.direct_reuse_modules) ==
 }
 assert(evidence.reused_oss_module_policy.brand_override === "upstream_rc2_brand_slots_with_text_only_opl_occupants", "OPL branding must use the rc2 brand slots");
 assert(evidence.reused_oss_module_policy.slot_renderer_source === "packages/client/ui-renderer/src/client/scoped-slots.tsx#createSlotRenderer", "candidate evidence must name the pinned slot renderer source");
-assert(evidence.reused_oss_module_policy.attachment_slot_policy === "registered_empty_occupant_no_multimodal_runtime", "candidate evidence must not claim multimodal attachment support");
+assert(evidence.reused_oss_module_policy.attachment_slot_policy === "registered_empty_slot_with_studio_controlled_inputbar_attachment_rail", "candidate evidence must bind attachment ownership to the Studio controller and DSH InputBar rail");
 assert(evidence.reused_oss_module_policy.workspace_host_description_policy === "unavailable_until_app_abi_exists", "candidate evidence must not claim a host-description ABI");
 for (const rootName of ["AppFrame", "SidebarRoot", "ConversationRoot", "InputBar", "SettingsRoot"]) {
   assert(evidence.reused_oss_module_policy.active_gui_roots.some((entry) => entry.includes(rootName)), `missing active DeepSeek Harness GUI root ${rootName}`);

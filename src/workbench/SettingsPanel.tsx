@@ -2303,6 +2303,7 @@ export function SettingsPanel({
             <SettingRow label={settings.locale === "zh" ? "文件预览" : "File previews"}>{renderSettingControl("artifactPreviewMode")}</SettingRow>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
+            <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>
             <SettingRow label={settings.locale === "zh" ? "执行前确认" : "Confirm before execute"}>{renderSettingControl("confirmBeforeExecute")}</SettingRow>
             <SettingRow label={settings.locale === "zh" ? "新任务工作区" : "New task workspace"}>{renderSettingControl("defaultWorkspace")}</SettingRow>
           </SettingsGroup>

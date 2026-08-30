@@ -19,6 +19,7 @@ async function post(baseUrl, route, value) {
 
 test("loopback HTTP host exposes standard thread lifecycle, subagent projection, SSE, and OPL passthrough", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-http-test-"));
+  await writeFile(path.join(directory, "index.html"), "<!doctype html><title>OPL</title>", "utf8");
   await writeFile(path.join(directory, "workspace-note.md"), "# Workspace note\n", "utf8");
   const appServerLog = path.join(directory, "app-server.jsonl");
   const transport = new CodexAppServerTransport({
@@ -107,19 +108,8 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
       ["./plugins/opl-web-routes.mjs", true, "active"]
     ]
   );
-  const staticEntry = host.context.loader.resolve("include:frontend-static");
-  await staticEntry._dispose();
-  const unloadedInventory = await fetch(`${baseUrl}/api/host/plugins`).then((response) => response.json());
-  assert.equal(
-    unloadedInventory.entries.find((entry) => entry.moduleName === "@deepseek-ai/dsh-host-frontend-static").fiberPhase,
-    null
-  );
-  await staticEntry.refresh();
-  const reloadedInventory = await fetch(`${baseUrl}/api/host/plugins`).then((response) => response.json());
-  assert.equal(
-    reloadedInventory.entries.find((entry) => entry.moduleName === "@deepseek-ai/dsh-host-frontend-static").fiberPhase,
-    "active"
-  );
+  const renderer = await fetch(`${baseUrl}/`).then((response) => response.text());
+  assert.match(renderer, /<title>OPL<\/title>/);
 
   const eventAbort = new AbortController();
   const eventResponse = await fetch(`${baseUrl}/api/opl-events`, { signal: eventAbort.signal });
@@ -382,4 +372,96 @@ test("loopback HTTP host sends model credentials only through the dedicated stdi
   });
   assert.deepEqual(result, { status: 200, body: { ok: true, stateRefreshRequired: true } });
   assert.deepEqual(calls, ["route-api-key"]);
+});
+
+test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the aionui-session ABI", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-cloud-auth-"));
+  await writeFile(path.join(directory, "index.html"), "<!doctype html><title>Cloud Studio</title>", "utf8");
+  const transport = new CodexAppServerTransport({
+    command: process.execPath,
+    args: [fixture],
+    cwd: directory,
+    env: process.env,
+    requestTimeoutMs: 2_000,
+    turnTimeoutMs: 2_000
+  });
+  const host = await createWebUiHost({
+    transport,
+    opl: {
+      readState: async () => ({}),
+      readInitialize: async () => ({}),
+      readFullDrilldown: async () => ({}),
+      readContribution: async () => ({}),
+      readDomainDetailView: async () => ({}),
+      executeAction: async () => ({})
+    },
+    webRoot: directory,
+    env: {
+      ...process.env,
+      OPL_DATA_DIR: directory,
+      OPL_WEBUI_DEPLOYMENT_MODE: "cloud",
+      OPL_WEBUI_AUTH_MODE: "password",
+      OPL_WEBUI_USERNAME: "opl",
+      OPL_WEBUI_PASSWORD: "cloud-password",
+      OPL_WEBUI_SESSION_SECRET: "0123456789abcdef0123456789abcdef"
+    }
+  });
+  t.after(() => host.close());
+
+  const anonymousRenderer = await fetch(`${host.url}/`, { redirect: "manual" });
+  assert.equal(anonymousRenderer.status, 302);
+  assert.equal(anonymousRenderer.headers.get("location"), "/login");
+  assert.equal((await fetch(`${host.url}/api/capabilities`)).status, 401);
+  assert.equal((await fetch(`${host.url}/api/opl-events`)).status, 401);
+  assert.equal((await fetch(`${host.url}/healthz`)).status, 200);
+  assert.equal((await fetch(`${host.url}/readyz`)).status, 200);
+
+  const failedLogin = await fetch(`${host.url}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "opl", password: "wrong" })
+  });
+  assert.equal(failedLogin.status, 401);
+  const login = await fetch(`${host.url}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "opl", password: "cloud-password" })
+  });
+  assert.equal(login.status, 200);
+  const loginBody = await login.json();
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  assert.match(cookie, /^aionui-session=/);
+  assert.equal((await fetch(`${host.url}/`, { headers: { cookie } })).status, 200);
+  assert.equal((await fetch(`${host.url}/api/capabilities`, { headers: { cookie } })).status, 200);
+
+  const noCsrf = await fetch(`${host.url}/api/inputs`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "files" })
+  });
+  assert.equal(noCsrf.status, 403);
+  const mutationHeaders = { cookie, "x-csrf-token": loginBody.csrfToken };
+  const createdResponse = await fetch(`${host.url}/api/inputs`, {
+    method: "POST",
+    headers: { ...mutationHeaders, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "files" })
+  });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json();
+  const uploaded = await fetch(`${host.url}/api/inputs/${created.id}/files?path=note.txt`, {
+    method: "PUT",
+    headers: mutationHeaders,
+    body: "cloud input"
+  });
+  assert.equal(uploaded.status, 201);
+  const completed = await fetch(`${host.url}/api/inputs/${created.id}/complete`, {
+    method: "POST",
+    headers: { ...mutationHeaders, "content-type": "application/json" },
+    body: "{}"
+  });
+  assert.equal(completed.status, 200);
+  assert.equal((await completed.json()).inputs[0].cleanupToken, created.id);
+  const logout = await fetch(`${host.url}/api/auth/logout`, { method: "POST", headers: mutationHeaders });
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
 });

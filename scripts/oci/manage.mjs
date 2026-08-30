@@ -20,6 +20,9 @@ const modulePath = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(modulePath), "../..");
 const digestPattern = /^\S+@sha256:[a-f0-9]{64}$/;
 const imageIdPattern = /^sha256:[a-f0-9]{64}$/;
+const officialImagePattern = /^ghcr\.io\/gaofeng21cn\/opl-studio-webui@sha256:[a-f0-9]{64}$/;
+const officialWorkflowIdentity = "https://github.com/gaofeng21cn/opl-studio/.github/workflows/studio-webui-preview.yml@refs/heads/main";
+const githubOidcIssuer = "https://token.actions.githubusercontent.com";
 
 export class OciManagerError extends Error {
   constructor(code, message, details = {}) {
@@ -197,6 +200,35 @@ export function createOciManager({
         { requestedRef }
       );
     }
+    let signatureVerification = {
+      status: "local_candidate_only",
+      workflowIdentity: null,
+      oidcIssuer: null
+    };
+    if (registryDigest) {
+      if (!officialImagePattern.test(requestedRef)) {
+        throw new OciManagerError("untrusted_registry_image", "Official install and update require the OPL Studio WebUI registry namespace", { requestedRef });
+      }
+      const cosignBin = assertSingleLine(env.COSIGN_BIN, "COSIGN_BIN");
+      const verification = await execute(cosignBin, [
+        "verify",
+        "--certificate-identity", officialWorkflowIdentity,
+        "--certificate-oidc-issuer", githubOidcIssuer,
+        "--output", "json",
+        requestedRef
+      ], { env });
+      if (!verification || verification.exitCode !== 0) {
+        throw new OciManagerError("signature_verification_failed", "Cosign did not verify the official Studio workflow identity", {
+          requestedRef,
+          exitCode: verification?.exitCode ?? null
+        });
+      }
+      signatureVerification = {
+        status: "verified",
+        workflowIdentity: officialWorkflowIdentity,
+        oidcIssuer: githubOidcIssuer
+      };
+    }
     const inspected = await inspectImage(requestedRef, { allowPull: registryDigest });
     if (registryDigest && !inspected.repoDigests.includes(requestedRef)) {
       throw new OciManagerError("registry_digest_mismatch", "The inspected image does not report the requested registry digest", {
@@ -214,7 +246,7 @@ export function createOciManager({
       supplyChain: {
         registryDigestPinned: registryDigest,
         localCandidateOnly: !registryDigest,
-        signatureVerification: "not_implemented",
+        signatureVerification,
         sbomAndProvenance: "required_by_multi_arch_build_contract_not_verified_by_installer"
       }
     };
@@ -308,13 +340,16 @@ export function createOciManager({
       if (result.exitCode === 0) {
         lastStatus = result.stdout.trim();
         if (lastStatus === "healthy") return { container, health: lastStatus };
-        if (lastStatus === "unhealthy") break;
       }
       await sleep(250);
     }
+    const healthChecks = await docker([
+      "inspect", container, "--format", "{{json .State.Health.Log}}"
+    ], { allowFailure: true });
     throw new OciManagerError("container_not_healthy", "One Person Lab container did not become healthy", {
       container,
-      health: lastStatus
+      health: lastStatus,
+      healthChecks: healthChecks.exitCode === 0 ? healthChecks.stdout.trim().slice(-8_000) : null
     });
   }
 
