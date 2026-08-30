@@ -33,6 +33,7 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   ]);
   assert.doesNotMatch(JSON.stringify(build), /setup-qemu-action|QEMU/i);
   assert.match(source, /push-by-digest=true/);
+  assert.match(source, /docker buildx prune --all --force/);
   assert.match(source, /amd64-build/);
   assert.match(source, /amd64-child/);
   assert.match(source, /digests\/\$\{\{ matrix\.architecture \}\}-\*/);

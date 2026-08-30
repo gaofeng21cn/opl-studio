@@ -165,6 +165,9 @@ jobs:
           BUILD_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           set -euo pipefail
+          # The hosted runner needs room to pull the exact pushed image and create
+          # its persistent volumes after BuildKit has finished exporting attestations.
+          docker buildx prune --all --force
           raw="$RUNNER_TEMP/build-index.json"
           docker buildx imagetools inspect "$IMAGE@$BUILD_DIGEST" --raw > "$raw"
           child_digest="$(jq -er --arg arch '${{ matrix.architecture }}' '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest' "$raw")"

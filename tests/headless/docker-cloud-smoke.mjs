@@ -170,6 +170,14 @@ try {
     upload: "directory_persisted_across_restart",
     runtimeUser: "1000:1000"
   }, null, 2));
+} catch (error) {
+  try {
+    console.error(docker("inspect", container, "--format", "status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}"));
+  } catch {}
+  try {
+    console.error(docker("logs", container));
+  } catch {}
+  throw error;
 } finally {
   spawnSync("docker", ["rm", "--force", container], { stdio: "ignore" });
   spawnSync("docker", ["volume", "rm", "--force", dataVolume, projectsVolume], { stdio: "ignore" });
