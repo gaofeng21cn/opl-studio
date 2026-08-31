@@ -1,8 +1,14 @@
-# OCI Distribution Candidate
+# OCI Preview Distribution
 
 The OCI carrier packages the same React renderer and Node host core used by the
 desktop and standalone WebUI carriers. It does not contain Electron, AionUI, or
-AionCore. This document describes a source candidate, not an admitted release.
+AionCore. The independently versioned OCI is a public Studio Preview carrier,
+not the Stable OPL App shell and not proof of Cloud activation.
+
+The current immutable Preview is
+`ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`
+(`v0.1.6`). The `preview` channel points to that digest; `stable` and `latest`
+are intentionally absent.
 
 ## Host-Managed Lifecycle
 
@@ -42,13 +48,17 @@ candidate evidence. This option is not a registry release path.
 The distribution template enforces UID/GID 1000, a read-only root filesystem,
 `no-new-privileges`, all Linux capabilities dropped, a bounded PID count, and a
 restricted temporary filesystem. Only `/data` and `/projects` are persistent.
-The HTTP port is published on `127.0.0.1`; the manager exposes no option to
-publish on a remote interface.
+The container listens on port `3000`; the distribution Compose template maps it
+to `127.0.0.1:${OPL_APP_PORT:-4178}`. Cloud mode requires password auth and
+signed sessions through `OPL_WEBUI_DEPLOYMENT_MODE=cloud`,
+`OPL_WEBUI_AUTH_MODE=password`, `OPL_WEBUI_PASSWORD_FILE`, and
+`OPL_WEBUI_SESSION_SECRET_FILE`. The session secret must contain at least 32
+bytes. The signed `aionui-session` cookie is HttpOnly, SameSite=Lax, valid for
+30 days, and all state-changing requests require a session-bound CSRF token.
 
-The current HTTP bridge has no remote authentication boundary. Reverse proxy,
-TLS, password, Internet exposure, and multi-user authorization therefore remain
-outside this candidate. Operators must not bypass the loopback binding and
-expose it to an untrusted network.
+Studio does not terminate public TLS or own Workspace routing and tenant
+isolation. Those remain Cloud proxy responsibilities; the manager continues to
+bind its local distribution to loopback.
 
 ## Multi-Architecture Contract
 
@@ -65,15 +75,13 @@ node scripts/oci/build-plan.mjs \
 ```
 
 The plan requests BuildKit provenance, an SBOM, both platforms, and a local OCI
-layout. It deliberately does not execute a build or push an image. The
-non-release workflow uses native GitHub-hosted `amd64` and `arm64` runners.
-Each runner creates a runner-local, architecture-specific OCI layout with its
-attestation descriptor and runs the host manager's full lifecycle without
-emulation. The source build plan still covers the combined `linux/amd64` and
-`linux/arm64` target set; constructing and publishing the release index remains
-a release-owner gate. It has no registry login or push step. Registry digest parity, signatures,
-vulnerability policy, public publication, clean-host installation, and final
-release runtime readback remain separate owner gates.
+layout. It deliberately does not execute a build or push an image. The Preview
+publication workflow uses native GitHub-hosted `amd64` and `arm64` runners,
+smokes each exact child digest, combines an immutable index, verifies the SPDX
+and SLSA attestations, and signs the index and both children with GitHub OIDC and
+Cosign. It moves only the `preview` channel after anonymous native smoke and
+emits `opl_studio_cloud_workspace_image_handoff.v1`. Cloud activation and final
+Workspace runtime readback remain separate owner gates.
 
 The Dockerfile pins the multi-platform Node base by digest and pins App and
 Framework source inputs by Git commit. Codex and Bun are exact package versions,
@@ -96,7 +104,7 @@ git diff --check
 The lifecycle smoke builds two local images, then proves install, start, update,
 recreate, rollback, preserving uninstall, reinstallation, destructive uninstall,
 volume persistence, health, image identity, loopback publication, and container
-hardening on the current Docker host. The hosted non-release workflow adds
-paired native-architecture OCI layouts and native lifecycle qualification, but
-neither path proves a public image, registry identity, release cohort, or
-production admission.
+hardening on the current Docker host. The hosted Preview workflow additionally
+proves public anonymous exact-digest access, registry identity, native
+dual-architecture runtime behavior, and supply-chain identity. It does not prove
+Cloud activation or Stable adoption.

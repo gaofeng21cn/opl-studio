@@ -158,13 +158,18 @@ does not change active-shell adoption or release authority.
 
 | Gap | Class | Owner route | Stop condition |
 | --- | --- | --- | --- |
-| Public Studio WebUI Preview and Cloud activation | `delivery_p0` | Studio release workflow, then `opl-cloud` activation owner | Publish and verify one immutable signed dual-architecture Preview digest and handoff; Cloud then performs real Workspace login, attachment, turn, restart, and rollback smoke before user testing is declared open |
+| Cloud activation | `adoption_p0` | `opl-cloud` activation owner | Activate the qualified immutable Preview digest and perform real Workspace login, attachment, turn, restart, and rollback smoke before user testing is declared open |
 
 Signed, notarized, and stapled macOS arm64 Preview distribution and its public
-update feed are live in `v0.1.4`. Managed companions are no longer an open
-functional gap: Studio consumes the generic Framework directory and action
-catalog. Scheduled Tasks, public Windows/Linux Desktop distribution, Cloud
-activation, and the final AionUI cutover remain separate delivery/adoption work.
+update feed are live in `v0.1.4`. The signed dual-architecture Studio WebUI
+Preview `v0.1.6` is public at
+`ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`;
+its handoff records native `amd64` and `arm64` smoke, BuildKit SBOM/provenance,
+Cosign verification, and the previous rollback digest. Managed companions are
+no longer an open functional gap: Studio consumes the generic Framework
+directory and action catalog. Scheduled Tasks, public Windows/Linux Desktop
+distribution, Cloud activation, and the final AionUI cutover remain separate
+delivery/adoption work.
 
 Remote cross-machine coordination, model-driven permission/write-set decisions,
 private thread runtimes, and candidate-owned delivery ledgers are explicitly not
@@ -177,10 +182,11 @@ does not depend on Team mode.
 
 ### Goal
 
-For successor product delivery, qualify the authenticated Studio WebUI Preview
-OCI and hand it to the Cloud owner while preserving the Codex-only thin-consumer
-boundary. Further Desktop platform distribution and Stable adoption stay
-independent in this round.
+For successor product delivery, activate the qualified Studio WebUI Preview OCI
+in an OPL Cloud Workspace and complete real login, attachment, turn, restart,
+and rollback smoke while preserving the Codex-only thin-consumer boundary.
+Further Desktop platform distribution and Stable adoption stay independent in
+this round.
 Do not reproduce AionUI-only inherited surfaces, create a speculative
 multi-backend framework, or duplicate the renderer/host core for another
 carrier.
@@ -230,8 +236,9 @@ carrier.
 1. Preserve the closed managed-update, managed-companion, and Fleet projection
    boundaries without adding a Studio registry, Package discovery path, or action
    authority.
-2. Publish only the independently versioned Studio WebUI Preview digest and
-   machine-readable Cloud handoff; do not move App Stable or claim Cloud activation.
+2. Activate only the handoff's immutable Studio WebUI Preview digest in Cloud;
+   do not move App Stable or claim Cloud user testing before the Workspace smoke
+   passes.
 
 ### Verification Commands
 

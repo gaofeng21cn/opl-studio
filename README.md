@@ -71,10 +71,11 @@ contract.
 > the separate clean-VM, equivalence, and adoption gates. AionUI remains the
 > current Stable App shell during that transition.
 
-Windows, Linux, standalone Headless WebUI, and Docker/OCI are implemented and
-tested as development candidates. They are not currently public Studio
-distribution targets unless a future Release explicitly provides and qualifies
-those artifacts.
+Windows, Linux, and standalone Headless WebUI remain development candidates and
+are not public Studio distribution targets. Docker/OCI WebUI `v0.1.6` is a
+public, signed dual-architecture Preview for Cloud owner evaluation at
+`ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`.
+It does not replace the Stable App shell or by itself open Cloud user testing.
 
 ## Core Capabilities
 
