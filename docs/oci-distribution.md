@@ -7,8 +7,8 @@ not the Stable OPL App shell and not proof of Cloud activation.
 
 The current immutable Preview is
 `ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`
-(`v0.1.6`). The `preview` channel points to that digest; `stable` and `latest`
-are intentionally absent.
+(`v0.1.6`). The `preview` and `latest` channels point to that digest; `stable`
+is intentionally absent.
 
 ## Host-Managed Lifecycle
 
@@ -79,7 +79,7 @@ layout. It deliberately does not execute a build or push an image. The Preview
 publication workflow uses native GitHub-hosted `amd64` and `arm64` runners,
 smokes each exact child digest, combines an immutable index, verifies the SPDX
 and SLSA attestations, and signs the index and both children with GitHub OIDC and
-Cosign. It moves only the `preview` channel after anonymous native smoke and
+Cosign. It moves only the `preview` and `latest` aliases after anonymous native smoke and
 emits `opl_studio_cloud_workspace_image_handoff.v1`. Cloud activation and final
 Workspace runtime readback remain separate owner gates.
 

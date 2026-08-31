@@ -41,7 +41,7 @@ export function createCloudWorkspaceImageHandoff(input) {
       ],
       immutable_tags: [`v${version}`, `sha-${studioRef}`],
       channel_tag: "preview",
-      forbidden_tags: ["stable", "latest"]
+      forbidden_tags: ["stable"]
     },
     source: {
       studio_ref: studioRef,

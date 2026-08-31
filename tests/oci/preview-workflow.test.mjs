@@ -51,7 +51,20 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   assert.match(source, /docker pull "\$OPL_CLOUD_SMOKE_IMAGE"/);
   assert.match(source, /opl-studio-cloud-workspace-image-handoff\.json/);
   assert.deepEqual(workflow.jobs["finalize-preview"].needs, ["source-gate", "publish-index", "anonymous-smoke"]);
-  assert.match(source, /Move Preview only after native anonymous acceptance/);
-  assert.match(source, /--tag "\$IMAGE:preview"/);
-  assert.doesNotMatch(source, /\$IMAGE:(?:stable|latest)\b/);
+  assert.match(source, /Move Preview aliases only after native anonymous acceptance/);
+  assert.match(source, /for tag in preview latest/);
+  assert.match(source, /--tag "\$IMAGE:\$tag"/);
+  assert.doesNotMatch(source, /\$IMAGE:stable\b/);
+});
+
+test("Latest alias workflow promotes only the signed current Preview digest", async () => {
+  const source = await readFile(new URL("../../.github/workflows/studio-webui-latest.yml", import.meta.url), "utf8");
+  const workflow = YAML.parse(source);
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.equal(workflow.permissions.packages, "write");
+  assert.equal(workflow.concurrency.group, "opl-studio-webui-preview");
+  assert.match(source, /cosign verify/);
+  assert.match(source, /studio-webui-preview\.yml@refs\/heads\/main/);
+  assert.match(source, /--tag "\$IMAGE:latest"/);
+  assert.doesNotMatch(source, /\$IMAGE:stable\b/);
 });

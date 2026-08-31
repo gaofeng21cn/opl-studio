@@ -389,13 +389,15 @@ jobs:
           previous="$(docker buildx imagetools inspect "$IMAGE:preview" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)"
           if test -n "$previous"; then printf 'digest=%s\n' "$previous" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Move Preview only after native anonymous acceptance
+      - name: Move Preview aliases only after native anonymous acceptance
         shell: bash
         env:
           INDEX_DIGEST: ${{ needs.publish-index.outputs.index_digest }}
         run: |
-          docker buildx imagetools create --tag "$IMAGE:preview" "$IMAGE@$INDEX_DIGEST"
-          test "$(docker buildx imagetools inspect "$IMAGE:preview" --format '{{json .Manifest.Digest}}' | tr -d '"')" = "$INDEX_DIGEST"
+          for tag in preview latest; do
+            docker buildx imagetools create --tag "$IMAGE:$tag" "$IMAGE@$INDEX_DIGEST"
+            test "$(docker buildx imagetools inspect "$IMAGE:$tag" --format '{{json .Manifest.Digest}}' | tr -d '"')" = "$INDEX_DIGEST"
+          done
 
       - name: Read back public index, children, and tags anonymously
         shell: bash
@@ -407,7 +409,7 @@ jobs:
         run: |
           set -euo pipefail
           docker logout ghcr.io >/dev/null 2>&1 || true
-          for tag in "v${VERSION}" "sha-${GITHUB_SHA}" preview; do
+          for tag in "v${VERSION}" "sha-${GITHUB_SHA}" preview latest; do
             test "$(docker buildx imagetools inspect "$IMAGE:$tag" --format '{{json .Manifest.Digest}}' | tr -d '"')" = "$INDEX_DIGEST"
           done
           for digest in "$INDEX_DIGEST" "$AMD64_DIGEST" "$ARM64_DIGEST"; do

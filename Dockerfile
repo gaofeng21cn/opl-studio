@@ -31,7 +31,7 @@ RUN npm install --global --prefix /opt/codex "${OPL_CODEX_NPM_SPEC}" \
 
 FROM source-builder-base AS app-product-profile
 ARG OPL_APP_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab-app.git
-ARG OPL_APP_REF=757d941d152f00a73377c3e9910ade7a92716adb
+ARG OPL_APP_REF=56ab1300fe632dfa8b8522dc20fbd8acb24ac636
 WORKDIR /src/one-person-lab-app
 RUN git init \
   && git remote add origin "${OPL_APP_REPOSITORY}" \

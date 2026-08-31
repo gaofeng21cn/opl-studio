@@ -4,7 +4,7 @@ services:
       context: .
       args:
         OPL_APP_REPOSITORY: ${OPL_APP_REPOSITORY:-https://github.com/gaofeng21cn/one-person-lab-app.git}
-        OPL_APP_REF: ${OPL_APP_REF:-757d941d152f00a73377c3e9910ade7a92716adb}
+        OPL_APP_REF: ${OPL_APP_REF:-56ab1300fe632dfa8b8522dc20fbd8acb24ac636}
         OPL_BUN_VERSION: ${OPL_BUN_VERSION:-1.3.14}
         OPL_FRAMEWORK_REPOSITORY: ${OPL_FRAMEWORK_REPOSITORY:-https://github.com/gaofeng21cn/one-person-lab.git}
         OPL_FRAMEWORK_REF: ${OPL_FRAMEWORK_REF:-a277b2baf611e3352bdc5c81d95cd1aa20a118af}

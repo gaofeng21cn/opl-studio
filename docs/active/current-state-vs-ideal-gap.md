@@ -171,6 +171,10 @@ directory and action catalog. Scheduled Tasks, public Windows/Linux Desktop
 distribution, Cloud activation, and the final AionUI cutover remain separate
 delivery/adoption work.
 
+The mutable `preview` and `latest` aliases both select the newest qualified
+Studio WebUI Preview digest. `latest` does not imply Stable quality or adoption;
+the `stable` tag remains absent.
+
 Remote cross-machine coordination, model-driven permission/write-set decisions,
 private thread runtimes, and candidate-owned delivery ledgers are explicitly not
 open product gaps. Their implementation surfaces have been removed and must not

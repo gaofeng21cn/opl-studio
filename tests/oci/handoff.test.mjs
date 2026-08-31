@@ -19,7 +19,7 @@ test("Cloud handoff binds dual architecture digests, auth ABI, and false-ready b
   assert.equal(handoff.runtime.endpoint, "http:3000");
   assert.equal(handoff.runtime.cookie_name, "aionui-session");
   assert.deepEqual(handoff.image.child_manifests.map((item) => item.platform), ["linux/amd64", "linux/arm64"]);
-  assert.deepEqual(handoff.image.forbidden_tags, ["stable", "latest"]);
+  assert.deepEqual(handoff.image.forbidden_tags, ["stable"]);
   assert.equal(handoff.supply_chain.cosign, "index_and_child_digests_verified");
   assert.equal(handoff.adoption.active_shell_adopted, false);
   assert.equal(handoff.adoption.release_ready, false);
