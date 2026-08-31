@@ -861,6 +861,7 @@ assert(evidence.user_visible_protocol_copy.agui === false, "AGUI must not be ord
 assert(evidence.user_visible_protocol_copy.copilotkit_surface === false, "CopilotKit must not be ordinary native UI copy");
 assert(evidence.settings_information_architecture?.persistence_model?.storage_key === "opl.studio.settings.v1", "settings persistence storage key must be recorded");
 assert(evidence.settings_information_architecture?.persistence_model?.system_write_permission === false, "settings persistence must not request system write permission");
+assert(evidence.settings_information_architecture?.persistence_model?.keys?.includes("notificationEnabled"), "settings persistence must record the notification preference key");
 assert(evidence.settings_information_architecture?.gateway_account_lkg_cache?.storage_key === "opl.app.gatewayAccount.lkg.v1", "Gateway account LKG cache key must be recorded");
 assert(evidence.settings_information_architecture?.gateway_account_lkg_cache?.secret_fields_cached === false, "Gateway account LKG cache must exclude secrets");
 assert(evidence.false_ready_boundary.settings_system_write_permission === false, "settings system write permission must stay false");

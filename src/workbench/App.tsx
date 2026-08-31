@@ -122,6 +122,14 @@ import {
   resolveCanonicalTurn,
   shouldNotifyCanonicalCompletion
 } from "./canonicalThreadReconcile";
+import {
+  composerTurnKey,
+  mergeComposerSelections,
+  mergeComposerSubmissionPrompt,
+  terminalTrackedComposerTurns,
+  trackComposerTurnSelections,
+  type TrackedComposerTurn
+} from "./composerSubmissionLifecycle";
 import type {
   OplContributionAction,
   OplUiContribution,
@@ -822,6 +830,11 @@ export function App({
   const interruptRequestedForRef = useRef<string | null>(null);
   const messagesRef = useRef<ChatMessage[]>(createIntroMessages());
   const activeTurnRef = useRef<{ threadId: string; turnId: string } | null>(null);
+  const pendingSubmissionSelectionsRef = useRef<{
+    expectedThreadId?: string;
+    selections: ComposerSelection[];
+  } | null>(null);
+  const stagedSelectionsByTurnRef = useRef(new Map<string, TrackedComposerTurn>());
   const ephemeralQueueRef = useRef<EphemeralQueueItem[]>([]);
   const projectedGatewayActionsRef = useRef<ProjectedGatewayAction[]>([]);
   const startupLoadKeyRef = useRef("");
@@ -1753,9 +1766,6 @@ export function App({
     const selected = selectedThreadIdRef.current === threadId;
 
     if (activeTurnId) trackedTurnIdsRef.current.set(threadId, activeTurnId);
-    else if (resolvedExpectedTurnId && trackedTurnIdsRef.current.get(threadId) === resolvedExpectedTurnId) {
-      trackedTurnIdsRef.current.delete(threadId);
-    }
 
     if (selected) {
       const nextMessages = deriveThreadMessages(readback);
@@ -1799,6 +1809,12 @@ export function App({
           ? (currentSettings.locale === "zh" ? "任务已完成。" : "Task completed.")
           : (currentSettings.locale === "zh" ? "任务已结束，请查看结果。" : "Task ended; review the result.")
       });
+    }
+    for (const entry of terminalTrackedComposerTurns(stagedSelectionsByTurnRef.current, readback)) {
+      await releaseTrackedTurnSelections(entry);
+    }
+    if (!activeTurnId && resolvedExpectedTurnId && trackedTurnIdsRef.current.get(threadId) === resolvedExpectedTurnId) {
+      trackedTurnIdsRef.current.delete(threadId);
     }
     if (reason !== "open") void loadThreadDirectory(false);
     return readback;
@@ -2044,7 +2060,14 @@ export function App({
       const turn = typeof params.turn === "object" && params.turn ? params.turn as Record<string, unknown> : {};
       const threadId = typeof params.threadId === "string" ? params.threadId : "";
       const turnId = typeof turn.id === "string" ? turn.id : typeof params.turnId === "string" ? params.turnId : "";
-      if (threadId && turnId) trackedTurnIdsRef.current.set(threadId, turnId);
+      if (threadId && turnId) {
+        trackedTurnIdsRef.current.set(threadId, turnId);
+        const pendingSubmission = pendingSubmissionSelectionsRef.current;
+        if (pendingSubmission && (!pendingSubmission.expectedThreadId || pendingSubmission.expectedThreadId === threadId)) {
+          trackComposerTurnSelections(stagedSelectionsByTurnRef.current, threadId, turnId, pendingSubmission.selections);
+          pendingSubmissionSelectionsRef.current = null;
+        }
+      }
       if (threadId && turnId && (!selectedThreadIdRef.current || selectedThreadIdRef.current === threadId)) {
         selectedThreadIdRef.current ??= threadId;
         activeTurnRef.current = { threadId, turnId };
@@ -2269,14 +2292,14 @@ export function App({
   async function steerQueuedItem(item: EphemeralQueueItem) {
     const active = activeTurnRef.current;
     if (!active) throw new Error(settings.locale === "zh" ? "当前运行尚未提供可插话的 Turn。" : "The current run has not exposed a steerable turn yet.");
-    await bridge.steerTurn({
+    const accepted = await bridge.steerTurn({
       threadId: active.threadId,
       expectedTurnId: active.turnId,
       prompt: item.prompt,
       inputs: item.inputs,
       ...(item.turnAgentSelection ? { turnAgentSelection: item.turnAgentSelection } : {})
     });
-    releaseComposerSelections(item.selections);
+    trackComposerTurnSelections(stagedSelectionsByTurnRef.current, accepted.threadId, accepted.turnId, item.selections);
     replaceEphemeralQueue(ephemeralQueueRef.current.filter((candidate) => candidate.id !== item.id));
     const acceptedMessage: ChatMessage = {
       id: `user-steer-${Date.now()}`,
@@ -2285,6 +2308,7 @@ export function App({
     };
     messagesRef.current = messagesRef.current.concat(acceptedMessage);
     setMessages(messagesRef.current);
+    void reconcileCanonicalThread(accepted.threadId, "steer-accepted", accepted.turnId).catch(() => undefined);
   }
 
   async function updateEphemeralQueue(itemId: string, action: { kind: string; content?: Array<{ type?: string; text?: string }> }) {
@@ -2397,6 +2421,10 @@ export function App({
     setPendingInputFiles(pendingSelections.filter((selection) => selection.kind !== "skill").map(composerSelectionArtifact));
     setComposerPaletteOpen(false);
     setSendState("running");
+    pendingSubmissionSelectionsRef.current = {
+      ...(codexThreadId ? { expectedThreadId: codexThreadId } : {}),
+      selections: pendingSelections
+    };
     void bridge
       .sendMessage({
         prompt: text,
@@ -2430,6 +2458,10 @@ export function App({
         messagesRef.current = nextMessages;
         setMessages(nextMessages);
         const resolvedThreadId = nextThreadId || codexThreadId;
+        if (resolvedThreadId && replyTurnId) {
+          trackComposerTurnSelections(stagedSelectionsByTurnRef.current, resolvedThreadId, replyTurnId, pendingSelections);
+        }
+        pendingSubmissionSelectionsRef.current = null;
         selectedThreadIdRef.current = resolvedThreadId;
         setCodexThreadId(resolvedThreadId);
         updateUiMetadata({ selectedThreadId: resolvedThreadId });
@@ -2446,7 +2478,6 @@ export function App({
         }
         setPendingInputFiles([]);
         setSelectedAgent(null);
-        releaseComposerSelections(pendingSelections);
         activeTurnRef.current = null;
         setActiveTurnId(null);
         pendingAssistantIdRef.current = null;
@@ -2459,10 +2490,8 @@ export function App({
       .catch(() => {
         const wasInterrupted = interruptRequestedForRef.current === pendingId;
         if (wasInterrupted) {
+          const interruptedTurn = activeTurnRef.current;
           setPendingInputFiles([]);
-          activeTurnRef.current = null;
-          setActiveTurnId(null);
-          setSendState("idle");
           const nextMessages = messagesRef.current.map((item) => item.id === pendingId
             ? { id: pendingId, role: "system" as const, text: item.text || (settings.locale === "zh" ? "运行已停止。" : "Run stopped.") }
             : item);
@@ -2471,7 +2500,14 @@ export function App({
           pendingAssistantIdRef.current = null;
           interruptRequestedForRef.current = null;
           setComposerSubmissionError("");
-          void loadThreadDirectory(false);
+          if (interruptedTurn) {
+            void reconcileCanonicalThread(interruptedTurn.threadId, "interrupt-settled", interruptedTurn.turnId)
+              .catch((error) => setComposerSubmissionError(String(error)));
+          } else {
+            setActiveTurnId(null);
+            setSendState("idle");
+            void loadThreadDirectory(false);
+          }
           return;
         }
         const acceptedTurn = activeTurnRef.current;
@@ -2481,7 +2517,6 @@ export function App({
             .then((thread) => {
               const turn = thread.turns.find((candidate) => candidate.id === acceptedTurn.turnId);
               if (turn && turn.status !== "inProgress") {
-                releaseComposerSelections(pendingSelections);
                 setPendingInputFiles([]);
                 setSelectedAgent(null);
                 setComposerSubmissionError("");
@@ -2491,15 +2526,9 @@ export function App({
           return;
         }
         const message = t.sendFailed;
-        const laterPrompt = promptRef.current.trim();
-        updatePrompt([text, laterPrompt].filter(Boolean).join("\n\n"));
-        setComposerSelections((current) => [
-          ...pendingSelections,
-          ...current.filter((selection) => !pendingSelections.some((failed) => (
-            failed.id === selection.id
-            || (failed.attachment?.path && failed.attachment.path === selection.attachment?.path)
-          )))
-        ]);
+        pendingSubmissionSelectionsRef.current = null;
+        updatePrompt(mergeComposerSubmissionPrompt(text, promptRef.current));
+        setComposerSelections((current) => mergeComposerSelections(pendingSelections, current));
         setPendingInputFiles([]);
         activeTurnRef.current = null;
         setActiveTurnId(null);
@@ -2672,6 +2701,15 @@ export function App({
     disposeSelectionPreviews(selections);
     const cleanupTokens = selections.flatMap((selection) => selection.attachment?.cleanupToken ? [selection.attachment.cleanupToken] : []);
     if (cleanupTokens.length) void bridge.releaseInputs(cleanupTokens).catch(() => undefined);
+  }
+
+  async function releaseTrackedTurnSelections(entry: TrackedComposerTurn) {
+    disposeSelectionPreviews(entry.selections);
+    const cleanupTokens = [...new Set(entry.selections.flatMap((selection) => (
+      selection.attachment?.cleanupToken ? [selection.attachment.cleanupToken] : []
+    )))];
+    if (cleanupTokens.length) await bridge.releaseInputs(cleanupTokens);
+    stagedSelectionsByTurnRef.current.delete(composerTurnKey(entry.threadId, entry.turnId));
   }
 
   function removeComposerSelection(id: string) {

@@ -1169,6 +1169,7 @@
         "runtimeProfile",
         "confirmBeforeExecute",
         "artifactPreviewMode",
+        "notificationEnabled",
         "professionalStarterDefaults",
         "theme",
         "developerDetails"

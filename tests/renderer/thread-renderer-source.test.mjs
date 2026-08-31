@@ -583,9 +583,14 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(app, /turnAgentSelection: codexThreadId \? selectedAgentSnapshot\(\) : undefined/);
   assert.match(app, /permissions: settings\.agentPermissions/);
   assert.doesNotMatch(app, /setComposerSelections\(pendingSelections\)/);
-  assert.match(app, /updatePrompt\(\[text, laterPrompt\]\.filter\(Boolean\)\.join\("\\n\\n"\)\)/);
-  assert.match(app, /failed\.id === selection\.id/);
-  assert.match(app, /failed\.attachment\?\.path && failed\.attachment\.path === selection\.attachment\?\.path/);
+  assert.match(app, /updatePrompt\(mergeComposerSubmissionPrompt\(text, promptRef\.current\)\)/);
+  assert.match(app, /mergeComposerSelections\(pendingSelections, current\)/);
+  assert.match(app, /trackComposerTurnSelections\(stagedSelectionsByTurnRef\.current/);
+  assert.match(app, /terminalTrackedComposerTurns\(stagedSelectionsByTurnRef\.current, readback\)/);
+  assert.match(app, /await releaseTrackedTurnSelections\(entry\)/);
+  assert.match(app, /if \(cleanupTokens\.length\) await bridge\.releaseInputs\(cleanupTokens\)/);
+  assert.match(app, /stagedSelectionsByTurnRef\.current\.delete\(composerTurnKey\(entry\.threadId, entry\.turnId\)\)/);
+  assert.doesNotMatch(app, /releaseComposerSelections\(pendingSelections\)/);
   assert.match(app, /if \(text === "\/open"\)/);
   assert.match(app, /void pickComposerFiles\(\)/);
   assert.match(settings, /agentPermissions: ":danger-full-access"/);
