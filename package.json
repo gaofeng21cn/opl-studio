@@ -1,6 +1,6 @@
 {
   "name": "opl-studio",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "type": "module",
   "description": "First-party DeepSeek Harness/Cordis Application Host for One Person Lab App across desktop and headless carriers.",
@@ -93,6 +93,7 @@
     "yaml": "2.9.0"
   },
   "scripts": {
+    "build:icon": "swift scripts/desktop/build-app-icon.swift",
     "dev": "npm run build:webui && node scripts/dev-webui-server.mjs",
     "dev:desktop": "npm run build:desktop && electron .",
     "webui": "npm run dev",
