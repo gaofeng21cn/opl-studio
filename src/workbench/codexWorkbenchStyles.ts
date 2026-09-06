@@ -37,7 +37,7 @@ export const codexWorkbenchStyles = `
     --opl-radius-surface: 10px;
 
     /* Selected from DeepSeek Harness ui-theme/design-platform.css at
-       b150a551b8d465e31e418e1b2eaf5e79bbb7d28e for the reused primitives. */
+       a66e4702047846cdaa10c66c9d3df3951f5ea70d for the reused primitives. */
     --dsw-static-deepseek-450: rgb(86, 134, 254);
     --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
     --dsw-static-neutral-bluish-100: rgb(235, 238, 242);

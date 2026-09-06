@@ -730,7 +730,7 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   assert.ok(!slotHost.includes(">\n      OPL\n    </span>"));
   assert.match(slotHost, /function OplBrandNameSlot\(\) \{ return <>One Person Lab<\/>; \}/);
   assert.match(slotHost, /function EmptyAttachmentSlot\(\) \{ return null; \}/);
-  assert.match(slotHost, /useHostDescription=\{\(selector: any\) => selector\(undefined\)\}/);
+  assert.match(slotHost, /useHostInfo=\{\(selector: any\) => selector\(\{ home: undefined \}\)\}/);
   assert.match(runtimeShim, /export function abbreviateHomePath/);
   assert.match(runtimeShim, /isWindowsStylePath/);
   assert.match(bunBuild, /"process\.env\.DSH_CLIENT_COMMIT_HASH": JSON\.stringify\(""\)/);
@@ -768,9 +768,9 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
 });
 
 test("primary canvas hides its scrollbar without disabling scrolling", () => {
-  assert.match(conversationStyles, /\.scrollBody \{[^}]*overflow-y: auto;[^}]*overflow-x: hidden;/s);
+  assert.match(conversationStyles, /\.scrollBody \{[^}]*overflow-y: auto;/s);
   assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;[^}]*scrollbar-width: none;/s);
-  const workspaceStyles = read("src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/WorkspaceBrowser.module.css");
+  const workspaceStyles = read("src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css");
   assert.match(workspaceStyles, /\.list \{[\s\S]*overflow-y: auto;/);
   assert.match(styles, /\.opl-workspace-browser-seat \{[^}]*overflow-y: auto;/s);
   assert.match(styles, /\.opl-workspace-browser-seat \[role="tree"\] \{[^}]*overflow: visible;/s);

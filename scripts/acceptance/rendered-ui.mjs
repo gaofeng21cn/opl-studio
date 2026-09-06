@@ -85,7 +85,6 @@ try {
     title: document.title,
     brand: document.querySelector('[data-testid="opl-studio-root"]')?.textContent?.includes('One Person Lab') === true,
     root: Boolean(document.querySelector('[data-testid="opl-studio-root"]')),
-    contextTabs: Array.from(document.querySelectorAll('aside nav button')).map((item) => item.textContent?.trim()),
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth,
     viewport: [window.innerWidth, window.innerHeight]
   })`, cliRoot);
@@ -94,7 +93,10 @@ try {
   assert.equal(wide.brand, true);
   assert.equal(wide.root, true);
   assert.equal(wide.horizontalOverflow, false);
-  assert.deepEqual(wide.contextTabs, ["运行状态", "文件与结果", "智能体与能力"]);
+  await evaluate(`() => { document.querySelector('[data-testid="opl-context-inspector-trigger"]').click(); return true; }`, cliRoot);
+  const contextMenu = await evaluate(`() => Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent.trim())`, cliRoot);
+  assert.deepEqual(contextMenu, ["项目进度", "文件与结果", "智能体与能力"]);
+  await cli(["press", "Escape"], cliRoot);
 
   const sidebarRecent = await evaluate(`() => {
     const seat = document.querySelector('.opl-workspace-browser-seat');
@@ -177,7 +179,7 @@ try {
     root: Boolean(document.querySelector('[data-testid="opl-studio-root"]')),
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth,
     viewport: [window.innerWidth, window.innerHeight],
-    promptVisible: document.querySelector('textarea')?.getClientRects().length > 0,
+    promptVisible: document.querySelector('[data-composer-input]')?.getClientRects().length > 0,
     selectedModelLabel: document.querySelector('button[aria-label^="选择模型"] span')?.textContent?.trim()
   })`, cliRoot);
   assert.deepEqual(narrow.viewport, [400, 800]);
@@ -187,6 +189,33 @@ try {
   assert.equal(narrow.selectedModelLabel, "自动（推荐）");
   await cli(["screenshot"], cliRoot);
   const narrowScreenshot = await latestScreenshot(cliRoot);
+
+  await evaluate(`() => { document.querySelector('[data-composer-input]').focus(); return true; }`, cliRoot);
+  await cli(["type", "DSH 中文输入 regression"], cliRoot);
+  await cli(["press", "Shift+Enter"], cliRoot);
+  await cli(["type", "second line"], cliRoot);
+  const composerText = await evaluate(`() => ({
+    text: document.querySelector('[data-composer-input]').innerText,
+    sendEnabled: !document.querySelector('button[aria-label="发送"]').disabled
+  })`, cliRoot);
+  assert.equal(composerText.text, "DSH 中文输入 regression\nsecond line");
+  assert.equal(composerText.sendEnabled, true);
+  await cli(["press", process.platform === "darwin" ? "Meta+z" : "Control+z"], cliRoot);
+  const undone = await evaluate(`() => document.querySelector('[data-composer-input]').innerText`, cliRoot);
+  assert.notEqual(undone, composerText.text);
+  await cli(["press", process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z"], cliRoot);
+  const redone = await evaluate(`() => document.querySelector('[data-composer-input]').innerText`, cliRoot);
+  assert.equal(redone, composerText.text);
+  await cli(["press", "Enter"], cliRoot);
+  const submitted = await evaluate(`async () => {
+    const deadline = Date.now() + 5000;
+    while (!document.body.innerText.includes('completed turn-') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    return {
+      completed: document.body.innerText.includes('completed turn-'),
+      draft: document.querySelector('[data-composer-input]').innerText.trim()
+    };
+  }`, cliRoot);
+  assert.deepEqual(submitted, { completed: true, draft: "" });
 
   await mkdir(outputRoot, { recursive: true });
   const wideOutput = path.join(outputRoot, "webui-1440x900.png");
@@ -209,7 +238,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { wide, sidebarRecent, settingsOpen, trapped, restored, narrow },
+    assertions: { wide, contextMenu, sidebarRecent, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }

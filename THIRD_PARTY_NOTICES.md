@@ -4,17 +4,20 @@
 
 OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
 
-- `@deepseek-ai/cordis` `4.0.1`;
-- `@deepseek-ai/cordis-plugin-group` `1.0.1`;
-- `@deepseek-ai/cordis-plugin-include` `1.0.6`;
-- `@deepseek-ai/cordis-plugin-loader` `1.0.2`;
+- `@deepseek-ai/cordis` `4.0.2`;
+- `@deepseek-ai/cordis-plugin-group` `1.0.2`;
+- `@deepseek-ai/cordis-plugin-include` `1.0.7`;
+- `@deepseek-ai/cordis-plugin-loader` `1.0.3`;
 - `@deepseek-ai/dsh-app-boot`, `dsh-brand`, `dsh-client-modules`,
   `dsh-client-ui-primitives`, `dsh-client-ui-slots`, `dsh-client-web`,
   `dsh-home-paths`, `dsh-host-frontend-static`,
   `dsh-host-plugin-inventory`, `dsh-host-webserver`, `dsh-invariants`,
   `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, and
-  `dsh-typert-protocol`, all at `0.1.1-rc.2`;
-- `use-sync-external-store` `1.2.0` for the vendored renderer closure.
+  `dsh-typert-protocol`, `dsh-client-store`, `dsh-agent-presets`, and
+  `dsh-util-workspace-path`, all at `0.1.2-rc.1`;
+- `use-sync-external-store` `1.2.0` for the vendored renderer closure;
+- Lexical and its history, plain-text, text, and utility modules `0.49.0`
+  for the upstream composer (MIT, Meta Platforms, Inc. and affiliates).
 
 Exact package integrity values are pinned in `package-lock.json` and the
 Application Host package cohort is repeated in
@@ -22,7 +25,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
+Inspected source ref: `a66e4702047846cdaa10c66c9d3df3951f5ea70d`
 
 The complete `src/` trees of eleven GUI packages are vendored byte-for-byte from
 that ref under `src/vendor/deepseek-harness/packages/client/`:
@@ -39,8 +42,8 @@ that ref under `src/vendor/deepseek-harness/packages/client/`:
 - `ui-primitives`
 - `ui-renderer`
 
-The snapshot contains 277 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.1.1-rc.2`), and
+The snapshot contains 250 files, including the upstream `LICENSE`. Its package
+roots, per-file SHA-256 inventory, source package version (`0.1.2-rc.1`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks local byte parity. OPL changes stay outside the vendor root.

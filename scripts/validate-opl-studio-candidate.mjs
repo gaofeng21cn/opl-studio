@@ -42,7 +42,7 @@ const requiredFiles = [
   "src/vendor/deepseek-harness/LICENSE",
   "src/vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx",
   "src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx",
+  "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx",
   "src/vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx",
   "src/vendor/deepseek-harness/packages/client/ui-model-selection/src/client/ModelSelect.tsx",
   "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx",
@@ -494,7 +494,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(!slotHost.includes(">\n      OPL\n    </span>"), "product identity must not render OPL as a pseudo logo");
   assert(rendererShell.includes('[data-opl-desktop-drag]') && rendererShell.includes('-webkit-app-region: drag'), "desktop shell must expose a boot-phase window drag region");
   assert(slotHost.includes("function EmptyAttachmentSlot() { return null; }"), "rc2 attachment slot must remain an empty adapter");
-  assert(slotHost.includes("useHostDescription={(selector: any) => selector(undefined)}"), "workspace host description must remain unavailable without a new App ABI field");
+  assert(slotHost.includes("useHostInfo={(selector: any) => selector({ home: undefined })}"), "workspace home must remain unavailable without a new App ABI field");
   assert(runtimeShim.includes("export function abbreviateHomePath") && runtimeShim.includes("isWindowsStylePath"), "runtime shim must provide POSIX home abbreviation with Windows fail-open");
   assert(bunBuild.includes('"process.env.DSH_CLIENT_COMMIT_HASH": JSON.stringify("")'), "browser build must not read Node process for the DSH commit hash");
   assert(
@@ -526,7 +526,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
     const at = module.lastIndexOf("@");
     assert(packageJson.dependencies?.[module.slice(0, at)] === module.slice(at + 1), `DSH Application Host dependency must match ${module}`);
   }
-  assert(packageJson.dependencies?.["@deepseek-ai/cordis"] === "4.0.1", "Cordis boundary must remain pinned to 4.0.1");
+  assert(packageJson.dependencies?.["@deepseek-ai/cordis"] === dshBinding.packageSpecs.find(({ name }) => name === "@deepseek-ai/cordis")?.version, "Cordis must match the manifest cohort");
   assert(packageJson.dependencies?.["use-sync-external-store"] === "1.2.0", "vendored rc2 renderer closure must declare use-sync-external-store directly");
   assert(packageJson.dependencies?.["@deepseek-ai/dsh-client-web-react"] === undefined, "obsolete dsh-client-web-react must stay removed");
   assert(packageJson.dependencies?.["@deepseek-ai/dsh-client-ui-renderer"] === undefined, "ui-renderer must be reused as pinned source, not installed as a package");

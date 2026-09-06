@@ -10,6 +10,9 @@ const result = await Bun.build({
   target: "browser",
   format: format as "esm" | "cjs" | "iife",
   define: {
+    "process.env.DSH_CLIENT_TITLE": JSON.stringify("One Person Lab"),
+    "process.env.DSH_CLIENT_VERSION": "undefined",
+    "process.env.DSH_CLIENT_GIT_DIRTY": "undefined",
     "process.env.DSH_CLIENT_COMMIT_HASH": JSON.stringify(""),
     "process.versions.node": JSON.stringify("0.0.0"),
     "process.execArgv": "[]",

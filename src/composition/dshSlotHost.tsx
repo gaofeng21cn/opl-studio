@@ -4,7 +4,7 @@ import { IconChevronDownOutline14, Menu, OnboardingSurface, RiskConfirmation, ty
 import {
   SlotCore,
   type HostObservable,
-  type SessionMaybeProvideInfo,
+  type StandardSourceBinding,
   type SlotRendererHost
 } from "@deepseek-ai/dsh-client-ui-slots";
 import { createSlotRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx";
@@ -21,6 +21,7 @@ import { createWorkspaceViewStore } from "../vendor/deepseek-harness/packages/cl
 import { zh as workspaceZh, en as workspaceEn } from "../vendor/deepseek-harness/packages/client/ui-workspace/src/client/locales.ts";
 import { zh as modelZh, en as modelEn } from "../vendor/deepseek-harness/packages/client/ui-model-selection/src/client/locales.ts";
 import { zh as agentZh, en as agentEn } from "../vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts";
+import { zh as settingsZh, en as settingsEn } from "../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/locales.ts";
 import {
   createSnapshotStore,
   type SessionListState,
@@ -38,6 +39,7 @@ import {
   type OplUiContributionSlot
 } from "./contributionProjection";
 import type { OplAgentPermission, OplStudioSurface } from "./oplStudioSurface";
+import { useComposerEditor } from "../integrations/deepseek-harness/useComposerEditor";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -73,8 +75,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-const emptyArraySnapshot = Object.freeze([]) as readonly unknown[];
-const noSessionSnapshot: SessionMaybeProvideInfo = Object.freeze({ sessionId: undefined, hooks: Object.freeze({}), props: Object.freeze({}) });
+const emptyRootBinding: StandardSourceBinding = Object.freeze({ key: undefined, hooks: Object.freeze({}), keyedHooks: Object.freeze({}), props: Object.freeze({}) });
 const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const SettingsContributionSlotContext = createContext<((options?: { only?: string }) => ReactNode) | null>(null);
 
@@ -184,8 +185,8 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
     "queue.steerFailed": ["插话发送失败，请重试。", "Steering failed. Try again."]
   };
   const dshDictionary = locale === "zh"
-    ? { ...workspaceZh, ...modelZh, ...agentZh }
-    : { ...workspaceEn, ...modelEn, ...agentEn };
+    ? { ...workspaceZh, ...modelZh, ...agentZh, ...settingsZh }
+    : { ...workspaceEn, ...modelEn, ...agentEn, ...settingsEn };
   let value = copy[key]?.[locale === "zh" ? 0 : 1] ?? dshDictionary[key as keyof typeof dshDictionary] ?? key;
   for (const [name, replacement] of Object.entries(params ?? {})) value = value.replaceAll(`{${name}}`, String(replacement));
   return value;
@@ -262,6 +263,8 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
           useSessions={(selector: (state: typeof sessions) => unknown) => selector(sessions)}
           actions={actions}
           renderSlot={renderSlot}
+          SessionProvider={({ children }: { children: ReactNode }) => <>{children}</>}
+          t={(key: string, params?: Record<string, unknown>) => translate(surface.locale, key, params)}
         />
       </main>
     </StudioContext.Provider>
@@ -382,6 +385,7 @@ function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandS
     wide={wide}
     expandSidebar={expandSidebar}
     useSessions={(selector: any) => selector(list)}
+    useSessionPendingInteraction={(selector: any) => selector(new Map(Object.values(list.byId).filter((session) => session.pendingInteraction).map((session) => [session.id, { kind: session.pendingInteraction }])))}
     useWorkspaces={(selector: any) => selector(workspaces)}
     useStore={(selector: any) => useDshSnapshot(workspaceStore, selector)}
     actions={actions}
@@ -398,7 +402,7 @@ function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandS
     searchSessions={async (query: string) => ({ items: await studio.searchThreads(query), hasMore: false })}
     searchResultLimit={100}
     useDirectoryFlow={() => false}
-    useHostDescription={(selector: any) => selector(undefined)}
+    useHostInfo={(selector: any) => selector({ home: undefined })}
     renderSlot={() => null}
     t={dshLocale}
   />
@@ -468,12 +472,12 @@ function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const studio = useStudio();
   if (studio.primaryView === "runtime") return <>{studio.runtimeOverview}</>;
   const sessionId = "opl-current";
-  const session = { openState: "open", composerPhase: studio.conversationBlank ? "blank" : "active", pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
+  const session = { openState: "open", blank: studio.conversationBlank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
   const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { blank: studio.conversationBlank, cwd: studio.workspacePath } } };
   const workspaces = { phase: "ready", items: [{ workspaceId: "opl-workspace", title: studio.projectTitle, sessionIds: [sessionId] }] };
   const input = { draft: studio.prompt, imageIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
   return <div className="opl-dsh-conversation-shell">
-    <ConversationRoot sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />
+    <ConversationRoot useSessionPendingInteraction={(selector: any) => selector(new Map())} useConversation={(selector: any) => selector({ views: { get: () => undefined }, activeTargets: new Set() })} sessionId={sessionId} useSession={(selector: any) => selector(session)} useSessions={(selector: any) => selector(sessions)} useWorkspaces={(selector: any) => selector(workspaces)} useInput={(selector: any) => selector(input)} useComposerBlock={(selector: any) => selector(undefined)} renderSlot={renderSlot} renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback} selectWorkspace={async () => undefined} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />
   </div>;
 }
 
@@ -571,6 +575,7 @@ function StudioPermissionSelect({
       description={locale === "zh" ? "完整权限允许任务修改本机文件。" : "Full access allows the task to modify local files."}
       acknowledgeLabel={locale === "zh" ? "我了解此权限" : "I understand this access"}
       cancelLabel={locale === "zh" ? "取消" : "Cancel"}
+      closeLabel={locale === "zh" ? "关闭" : "Close"}
       confirmLabel={locale === "zh" ? "启用" : "Enable"}
       acknowledged={acknowledged}
       disabled={locked}
@@ -681,6 +686,7 @@ function ComposerModelSlot() {
 
 function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const studio = useStudio();
+  const composer = useComposerEditor(studio.prompt, studio.updatePrompt, studio.currentThreadId);
   const input = { draft: studio.prompt, imageIds: studio.composerImages.map((image) => image.id), draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
   const permissionValue = studio.agentPermissions === ":danger-full-access"
     ? "danger-full-access"
@@ -704,6 +710,8 @@ function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
     return true;
   };
   const keyboard = {
+    ...composer,
+    caretSpan: () => ({ start: studio.prompt.length, end: studio.prompt.length }),
     snapshot: input, setDraft: studio.updatePrompt, submit: studio.submitPrompt, steerQueue: studio.steerQueue,
     undo: () => undefined, redo: () => undefined,
     pasteBegin: (text: string, selection: { start: number; end: number }) => studio.updatePrompt(`${studio.prompt.slice(0, selection.start)}${text}${studio.prompt.slice(selection.end)}`),
@@ -717,7 +725,10 @@ function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
 
 function QueueDockSlot() {
   const studio = useStudio();
-  const session = { queue: studio.queue, running: studio.sending, subagent: null };
+  const session = {
+    queue: studio.queue.map((row) => ({ ...row, content: row.text === null ? [] : [{ type: "text", text: row.text }] })),
+    pendingSubmissions: [], running: studio.sending, subagent: null
+  };
   return <QueueDock
     useSession={(selector: any) => selector(session)}
     updateQueue={studio.updateQueue}
@@ -859,7 +870,7 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
   const renderContribution = useCallback((options?: { only?: string }) => (
     renderSlot("settings.section", studio.contributionOwner, options)
   ), [renderSlot, studio.contributionOwner]);
-  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
+  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
 }
 
 function SettingsTriggerSlot({ wide }: { wide: boolean }) {
@@ -967,12 +978,13 @@ export class OplStudioDshSlotHost {
   private readonly host: SlotRendererHost;
 
   constructor() {
+    const emptySessionScope = { current: constantObservable(emptyRootBinding), resolve: () => undefined };
     this.host = {
       subscribe: (key, listener) => this.core.subscribe(key, listener), getVersion: (key) => this.core.getVersion(key),
       entriesOf: (key) => this.core.entries(key), entriesOfSlot: (key) => this.core.entriesOfSlot(key),
       reportEntryError: (key, entry, error, info) => this.core.reportEntryError(key, entry, error, info), specOf: (key) => this.core.specDynamic(key),
       isLive: (entry) => this.core.isLive(entry), storeOf: () => undefined,
-      sessions: { list: constantObservable(emptyArraySnapshot), provideInfo: constantObservable(noSessionSnapshot) }, workspaces: { list: constantObservable(emptyArraySnapshot) }
+      root: constantObservable(emptyRootBinding), scopeRevision: constantObservable(0), scope: () => emptySessionScope
     };
     this.core.onEntryError((key, entry, error) => console.error("OPL Studio UI slot failed", { slot: key, registrant: entry.registrant, error }));
     this.registerStaticSlots();
@@ -996,13 +1008,13 @@ export class OplStudioDshSlotHost {
         () => <SettingsMainSlot destination={destination.id} />
       );
     }
-    register({ name: "conversation", registrant: "dsh-ui-conversation", children: { "conversation.session.header": { kind: "single", scope: "root" }, "conversation.session": { kind: "single", scope: "root" }, "conversation.composer.bar": { kind: "single", scope: "root" }, "conversation.input.overlay": { kind: "single", scope: "root" }, "conversation.input.left": { kind: "list", scope: "root" }, "conversation.input.right": { kind: "list", scope: "root" }, "conversation.input.dock": { kind: "list", scope: "root" }, "conversation.composer.dock": { kind: "list", scope: "root" }, "conversation.hero.brand.mark": { kind: "single", scope: "root" }, "conversation.hero.workspace": { kind: "single", scope: "root" }, "conversation.hero.agentPreset": { kind: "single", scope: "root" } } }, ConversationSlot);
+    register({ name: "conversation", registrant: "dsh-ui-conversation", children: { "conversation.session.header": { kind: "single", scope: "root" }, "conversation.session": { kind: "single", scope: "root" }, "conversation.composer.bar": { kind: "single", scope: "root" }, "conversation.input.dock": { kind: "list", scope: "root" }, "conversation.hero.brand.mark": { kind: "single", scope: "root" }, "conversation.hero.workspace": { kind: "single", scope: "root" }, "conversation.hero.agentPreset": { kind: "single", scope: "root" } } }, ConversationSlot);
     register({ name: "conversation.hero.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "conversation.session.header", registrant: "opl-studio" }, ConversationHeaderSlot);
     register({ name: "conversation.session", registrant: "opl-studio" }, ConversationBodySlot);
-    register({ name: "conversation.input.overlay", registrant: "opl-studio" }, ComposerOverlaySlot);
-    register({ name: "conversation.composer.bar", registrant: "dsh-ui-conversation", children: { "conversation.input.attachments": { kind: "single", scope: "root" }, "conversation.input.plan": { kind: "single", scope: "root" }, "conversation.input.model": { kind: "single", scope: "root" } } }, InputBarSlot);
+    register({ name: "conversation.composer.bar", registrant: "dsh-ui-conversation", children: { "conversation.input.attachments": { kind: "single", scope: "root" }, "conversation.input.plan": { kind: "single", scope: "root" }, "conversation.input.model": { kind: "single", scope: "root" }, "conversation.input.overlay": { kind: "single", scope: "root" }, "conversation.input.left": { kind: "list", scope: "root" }, "conversation.input.right": { kind: "list", scope: "root" }, "conversation.composer.dock": { kind: "list", scope: "root" } } }, InputBarSlot);
     register({ name: "conversation.input.attachments", registrant: "opl-studio" }, EmptyAttachmentSlot);
+    register({ name: "conversation.input.overlay", registrant: "opl-studio" }, ComposerOverlaySlot);
     register({ name: "conversation.input.model", registrant: "opl-studio" }, ComposerModelSlot);
     register({ name: "conversation.input.dock", id: "queue", order: 20, registrant: "dsh-ui-conversation" }, QueueDockSlot);
     register({ name: "conversation.hero.agentPreset", registrant: "opl-studio" }, HeroActionsSlot);

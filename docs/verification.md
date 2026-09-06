@@ -38,7 +38,7 @@ is the command owner.
 | `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
 | `npm run validate:client-conformance` | Fresh four-repository Host -> App -> Studio/AionUI compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |
-| `npm run verify:dsh-gui` | Byte parity of the pinned DSH `v0.1.1-rc.2` GUI source manifest |
+| `npm run verify:dsh-gui` | Byte parity of the pinned DSH `v0.1.2-rc.1` GUI source manifest |
 | `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
 | `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
 | `npm run test:dsh-upgrade` | No-write DSH status/preflight command and scoped-package binding tests |
@@ -129,6 +129,15 @@ run `npm run vendor:dsh-gui -- --source <checkout>`, then replay the
 typecheck, WebUI Host/MCP tests, headless tests, renderer source tests, and the
 candidate validator. Passing only package installation or GUI byte parity does
 not prove Host/plugin compatibility.
+
+The `0.1.2-rc.1` replay updates Cordis to `4.0.2`, awaits the object-form
+`healProfilesModuleFallback`, and supplies the static index authorization
+callback after Studio's existing authentication check. The renderer uses the
+new root/scope binding API and workspace component path. Its Lexical composer
+projects into the existing Studio draft and submission actions; Codex remains
+the persistent session owner. GUI source remains byte-identical (250 files).
+The `0.1.3-alpha.1` GitHub release was not selected because its required npm
+Host package was unavailable at the September 6, 2026 intake.
 
 ## Rendered WebUI Acceptance
 

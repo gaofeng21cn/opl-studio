@@ -92,14 +92,29 @@ export function dshPackageNames(binding) {
 export function upgradeWriteSet() {
   return [
     "src/composition/deepseekHarnessSourceManifest.json",
+    "src/composition/dshSlotHost.tsx",
+    "src/integrations/deepseek-harness/**",
     "src/vendor/deepseek-harness/**",
     "package.json",
     "package-lock.json",
     "contracts/opl-studio-profile.json",
     "src/candidateContractEvidence.json",
     "src/workbench/codexWorkbenchStyles.ts",
+    "src/workbench/App.tsx",
+    "src/workbench/SettingsPanel.tsx",
+    "tsconfig.json",
+    "scripts/bun-build-renderer-entry.ts",
+    "scripts/webui-host/dsh/**",
+    "scripts/webui-host/http-routes.mjs",
+    "scripts/webui-host/http-host.test.mjs",
+    "scripts/validate-opl-studio-candidate.mjs",
+    "scripts/acceptance/rendered-ui.mjs",
+    "tests/renderer/thread-renderer-source.test.mjs",
     "THIRD_PARTY_NOTICES.md",
     "README.md",
-    "docs/verification.md"
+    "README.zh-CN.md",
+    "docs/verification.md",
+    "docs/architecture.md",
+    "docs/active/current-state-vs-ideal-gap.md"
   ];
 }

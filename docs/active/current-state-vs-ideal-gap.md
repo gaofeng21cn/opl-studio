@@ -16,7 +16,7 @@ authority, release adoption, or production readiness.
 ## Target State
 
 Studio is the maintainable first-party One Person Lab Application Host. It
-boots the pinned DeepSeek Harness `v0.1.1-rc.2` profile/patch/plugin skeleton,
+boots the pinned DeepSeek Harness `v0.1.2-rc.1` profile/patch/plugin skeleton,
 reuses the pinned App frame, workspace browser, conversation, composer, Agent
 preset, model selection, Settings, theme, and queue source, and supplies the OPL
 plugins that own Codex, Framework bridging, Host APIs, and Web routes.
@@ -45,9 +45,9 @@ release admission, and is explicitly adopted.
 | Product work policy | `active_product_development_release_admission_separate` | Minimum-complete OPL outcomes are required; full AionUI parity and implicit release are not |
 | Current mainline | `false` | AionUI remains the only mainline until Studio completes and passes separate release qualification |
 | Product completion obligation | `true` | Minimum-complete Native gaps enter the App development backlog without blocking the current AionUI release |
-| DSH Application Host | `pinned_rc2_application_host_implemented` | `opl-studio` profile, Web overlay, profile home, plugin inventory, startup/shutdown ordering, and Host service tree are implemented from DSH `v0.1.1-rc.2`; `dsh-base` is explicitly excluded |
+| DSH Application Host | `pinned_rc2_application_host_implemented` | `opl-studio` profile, Web overlay, profile home, plugin inventory, startup/shutdown ordering, and Host service tree are implemented from DSH `v0.1.2-rc.1`; `dsh-base` is explicitly excluded |
 | Codex native plugin | `persistent_codex_owner_implemented` | `opl-codex-native` owns the App Server process, canonical threads/turns, approvals, and live events; launch-time MCP settings do not mutate global Codex config |
-| DSH plugin bridge | `ctx_tools_to_codex_mcp_implemented` | Tools registered in DSH `ctx.tools` are listed/called through authenticated stateful loopback MCP with dynamic list-change notifications; `0.1.1-rc.2` is newer than the `0.1.0-rc.6/7/8` cohorts, but npm prerelease ranges and plugins that require excluded DSH Session/LLM/Agent/credential owners still need explicit compatibility and authority admission |
+| DSH plugin bridge | `ctx_tools_to_codex_mcp_implemented` | Tools registered in DSH `ctx.tools` are listed/called through authenticated stateful loopback MCP with dynamic list-change notifications; `0.1.2-rc.1` is newer than the `0.1.0-rc.6/7/8` cohorts, but npm prerelease ranges and plugins that require excluded DSH Session/LLM/Agent/credential owners still need explicit compatibility and authority admission |
 | Framework bridge | `public_contract_consumer_implemented` | `opl-framework-bridge` consumes App state/action, authentication, and channel callbacks; Framework remains the runtime/Package composition owner |
 | DSH GUI baseline | `pinned_source_reuse_implemented` | App frame, navigation, workspace/session tree, conversation, composer, Agent preset, model selection, Settings, theme, and queue are reused byte-identically from the pinned MIT upstream source; OPL keeps no parallel visual system |
 | Product brand | `one_person_lab_only` | `OPL Studio` remains an internal repo/codename and is not a user-facing product brand or logo |

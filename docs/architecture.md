@@ -17,7 +17,7 @@ Studio carrier. Source completion does not by itself change the selected Stable
 carrier, GUI ABI freeze, release composition, or installed product.
 
 ```text
-DeepSeek Harness v0.1.1-rc.2 boot/profile/patch loader
+DeepSeek Harness v0.1.2-rc.1 boot/profile/patch loader
   -> Studio Cordis Application Host
        -> DSH native tool registry -> authenticated MCP -> opl-codex-native
        -> opl-framework-bridge -> public OPL App contracts
@@ -81,11 +81,11 @@ adapter and authority decision.
 
 ### DSH Version And Plugin Compatibility
 
-The pinned `0.1.1-rc.2` cohort is newer than `0.1.0-rc.6`, `0.1.0-rc.7`, and
+The pinned `0.1.2-rc.1` cohort is newer than `0.1.0-rc.6`, `0.1.0-rc.7`, and
 `0.1.0-rc.8`. The apparent incompatibility with plugins declaring ranges such
 as `^0.1.0-rc.8` is not a downgrade: npm prerelease range matching does not
 automatically admit a prerelease from a different patch tuple, so
-`0.1.1-rc.2` does not satisfy that range even though SemVer orders it later.
+`0.1.2-rc.1` does not satisfy that range even though SemVer orders it later.
 
 Package metadata is only the first gate. A plugin is directly reusable when it
 registers a bounded `ctx.tools` capability or a renderer-only contribution

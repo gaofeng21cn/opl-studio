@@ -56,12 +56,13 @@ import {
   type SettingsActionViewModel
 } from "./settingsActions";
 import { AppearanceRow } from "../vendor/deepseek-harness/packages/client/ui-theme/src/client/AppearanceRow";
+import { en as themeEn, zh as themeZh, type ThemeKey } from "../vendor/deepseek-harness/packages/client/ui-theme/src/client/locales";
 
 export type { SettingsActionRequest } from "./settingsActions";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface LocaleNamespaceMap {
-    "settings.theme": "appearance.title" | "appearance.light" | "appearance.dark" | "appearance.system";
+    "settings.theme": ThemeKey;
   }
 }
 
@@ -2290,12 +2291,7 @@ export function SettingsPanel({
           <SettingsGroup title={settings.locale === "zh" ? "界面" : "Interface"}>
             <SettingRow label={settings.locale === "zh" ? "语言" : "Language"}>{renderSettingControl("locale")}</SettingRow>
             <AppearanceRow
-              t={(key) => ({
-                "appearance.title": settings.locale === "zh" ? "外观" : "Appearance",
-                "appearance.light": settings.locale === "zh" ? "浅色" : "Light",
-                "appearance.dark": settings.locale === "zh" ? "深色" : "Dark",
-                "appearance.system": settings.locale === "zh" ? "跟随系统" : "System"
-              })[key] ?? key}
+              t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key}
               setTheme={(theme) => onSettingChange("theme", theme)}
               useStore={(selector) => selector({ preference: settings.theme, revision: 0 })}
               actions={{ sync: () => undefined }}

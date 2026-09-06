@@ -324,6 +324,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
         res,
         path.resolve(webRoot),
         path.resolve(webRoot, "index.html"),
+        () => true,
         async () => webServer.renderIndex(await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")))
       );
     })

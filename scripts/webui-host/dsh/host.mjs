@@ -22,8 +22,8 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   const dshHome = resolveDshHome(options.dshHome, options.env ?? process.env);
   const profileDir = resolveProfileDir(profileName, dshHome);
   initProfile(profileDir, []);
-  healProfilesModuleFallback(installAnchor, dshHome);
   const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
+  await healProfilesModuleFallback({ installAnchor, profile: dshProfile, home: dshHome });
   const patches = [
     ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
     ...dshProfile.layers.flatMap((layer) => layer.patches),

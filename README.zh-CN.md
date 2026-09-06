@@ -27,7 +27,7 @@ OPL Studio 是 One Person Lab 面向下一代体验打造的第一方应用宿�
 Codex 后端、OPL App 产品模型、由 OPL Framework 管理的运行时和软件包投影，
 以及桌面端与 WebUI 共用的渲染器整合在一个工作台中。
 
-Studio 固定使用 DeepSeek Harness（DSH）`v0.1.1-rc.2` 的应用骨架和配套 GUI
+Studio 固定使用 DeepSeek Harness（DSH）`v0.1.2-rc.1` 的应用骨架和配套 GUI
 源码。DSH 提供 Cordis 应用宿主、插件生命周期、布局系统、基础 UI 组件和交互
 能力；OPL 提供产品身份、Codex 集成、Framework 桥接层、产品策略和第一方插件。
 
@@ -171,6 +171,10 @@ docker compose up --build
 DSH 源码版本、依赖版本组、纳入仓库的 GUI 源码目录和文件清单统一记录在
 [`deepseekHarnessSourceManifest.json`](./src/composition/deepseekHarnessSourceManifest.json)
 中。Studio 通过可审计的显式重放方式追随上游，而不是维护隐式分叉。
+
+2026 年 9 月 6 日更新至 `dsh-v0.1.2-rc.1` 与 Cordis `4.0.2`。
+当日 GitHub 已发布 `dsh-v0.1.3-alpha.1`，但 npm 尚无必需的同版
+`dsh-app-boot` 包，因此采用已完整发布的版本组，保证 GUI 与宿主依赖一致。
 
 读取当前绑定状态并生成不写入文件的升级计划：
 
