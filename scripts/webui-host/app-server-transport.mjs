@@ -260,6 +260,46 @@ export class CodexAppServerTransport extends EventEmitter {
     this.startPromise = null;
     this.stderrTail = "";
     this.pendingServerRequests = new Map();
+    this.activeOperations = 0;
+    this.activeTurns = new Set();
+    this.maintenance = null;
+    this.disposed = false;
+  }
+
+  isBusy() {
+    return this.activeOperations > 0 || this.activeTurns.size > 0
+      || this.pending.size > 0 || this.pendingServerRequests.size > 0;
+  }
+
+  async withActivity(operation) {
+    while (this.maintenance) await this.maintenance;
+    if (this.disposed) throw new AppServerTransportError("app_server_unavailable", "Codex App Server is closed");
+    this.activeOperations += 1;
+    try {
+      return await operation();
+    } finally {
+      this.activeOperations -= 1;
+    }
+  }
+
+  async runWhenIdle(operation) {
+    if (this.disposed || this.maintenance || this.isBusy()) {
+      return { status: "deferred", reasonCode: "app_server_busy" };
+    }
+    // Acquire synchronously before yielding, so a new turn cannot race a reload.
+    let release;
+    this.maintenance = new Promise((resolve) => { release = resolve; });
+    try {
+      return { status: "completed", result: await operation() };
+    } finally {
+      this.maintenance = null;
+      release();
+    }
+  }
+
+  async close() {
+    this.disposed = true;
+    await this.stop();
   }
 
   async start() {
@@ -351,6 +391,11 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async request(method, params = {}, timeoutMs = this.requestTimeoutMs, { skipStart = false } = {}) {
+    if (!skipStart) return this.withActivity(() => this.#request(method, params, timeoutMs));
+    return this.#request(method, params, timeoutMs, true);
+  }
+
+  async #request(method, params, timeoutMs, skipStart = false) {
     if (!skipStart) await this.start();
     if (!this.process?.stdin.writable) {
       throw new AppServerTransportError("app_server_unavailable", "codex app-server stdin is unavailable");
@@ -737,7 +782,11 @@ export class CodexAppServerTransport extends EventEmitter {
     });
   }
 
-  async sendMessage({ prompt, inputs, threadId, agentSelection, turnAgentSelection, additionalInstructions, model, reasoningEffort, permissions = DEFAULT_PERMISSION_PROFILE, cwd }) {
+  async sendMessage(request) {
+    return this.withActivity(() => this.#sendMessage(request));
+  }
+
+  async #sendMessage({ prompt, inputs, threadId, agentSelection, turnAgentSelection, additionalInstructions, model, reasoningEffort, permissions = DEFAULT_PERMISSION_PROFILE, cwd }) {
     const workingDirectory = cwd ?? this.cwd;
     const threadPermission = threadPermissionOverrides(permissions, workingDirectory);
     const turnPermission = turnPermissionOverrides(permissions, workingDirectory);
@@ -865,6 +914,10 @@ export class CodexAppServerTransport extends EventEmitter {
           { method: pending.method, error: message.error }
         ));
       } else {
+        const turn = message.result?.turn;
+        if (pending.method === "turn/start" && turn?.id && !this.turns.get(turn.id)?.completed) {
+          this.activeTurns.add(turn.id);
+        }
         pending.resolve(message.result ?? {});
       }
       return;
@@ -914,6 +967,8 @@ export class CodexAppServerTransport extends EventEmitter {
     const params = message.params ?? {};
     const turnId = params.turnId ?? params.turn?.id;
     if (!turnId) return;
+    if (message.method === "turn/started") this.activeTurns.add(turnId);
+    if (message.method === "turn/completed") this.activeTurns.delete(turnId);
     const bucket = this.turns.get(turnId) ?? { events: [], text: "", waiters: [] };
     bucket.events.push(message);
     if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") {
@@ -935,6 +990,7 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   #failAll(error) {
+    this.activeTurns.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
       pending.reject(error);

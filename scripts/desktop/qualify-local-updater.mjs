@@ -131,6 +131,7 @@ function launchApp({ appPath, feedUrl, stateRoot, homeRoot }) {
       OPL_NATIVE_WORKBENCH_CODEX_CWD: repositoryRoot,
       OPL_NATIVE_WORKBENCH_READ_ONLY: "1",
       OPL_DESKTOP_UPDATE_QUALIFICATION_FEED_URL: feedUrl,
+      OPL_DESKTOP_UPDATE_QUALIFICATION_AUTOMATIC: "1",
       OPL_DESKTOP_UPDATE_QUALIFICATION_STATE_ROOT: stateRoot
     },
     stdio: ["ignore", "pipe", "pipe", "ipc"]
@@ -229,14 +230,17 @@ export async function qualifyLocalUpdater() {
     invariant(initialStatus.currentVersion === baseVersion, "running base App reported the wrong version");
     const checked = await invokeUpdater(running, "check", 30_000);
     invariant(
-      checked.state === "available" && checked.targetVersion === targetVersion,
+      ["available", "downloading", "downloaded"].includes(checked.state) && checked.targetVersion === targetVersion,
       `packaged App did not discover the target update: state=${JSON.stringify(checked)} requests=${JSON.stringify(feed.requests)} output=${JSON.stringify(running.readOutput())}`
     );
-    const applied = await invokeUpdater(running, "apply", 120_000);
+    const applied = await waitFor(
+      () => running.messages.find((message) => message.type === "opl-desktop-update-state" && message.state?.state === "downloaded")?.state,
+      120_000, "silent update download"
+    );
     invariant(applied.state === "downloaded" && applied.restartRequired, "packaged App did not download the target update");
 
     const restartStartIndex = running.messages.length;
-    running.child.send({ type: "opl-desktop-update-qualification", operation: "restart" });
+    running.child.send({ type: "opl-desktop-smoke-quit" });
     await waitForExit(running.child, 90_000, "base App exit for update installation");
     const restartResponse = running.messages.slice(restartStartIndex).find((message) =>
       message?.type === "opl-desktop-update-qualification-result" && message.operation === "restart"
@@ -261,6 +265,7 @@ export async function qualifyLocalUpdater() {
       status: "passed",
       carrier: "electron_desktop",
       updater: "Squirrel.Mac via electron-updater",
+      activation: "silent_download_then_normal_quit",
       architecture: process.arch,
       qualificationBundleIdentifier: bundleIdentifier,
       baseVersion,

@@ -10,24 +10,34 @@ function boundedTimeout(value, fallback) {
 
 function run(command, args, { cwd, env, timeoutMs }) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
+    const terminate = (signal) => {
+      try {
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch { /* The command may already have exited. */ }
+    };
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let forceTimer;
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      terminate("SIGTERM");
+      forceTimer = setTimeout(() => terminate("SIGKILL"), 2_000);
     }, timeoutMs);
     child.once("error", (error) => {
       clearTimeout(timeout);
+      clearTimeout(forceTimer);
       resolve({ exitCode: -1, stdout, stderr: `${stderr}${error.message}`, timedOut: false });
     });
-    child.once("exit", (code) => {
+    child.once("close", (code) => {
       clearTimeout(timeout);
+      clearTimeout(forceTimer);
       resolve({ exitCode: timedOut ? -1 : (code ?? -1), stdout, stderr, timedOut });
     });
   });
@@ -865,6 +875,26 @@ export function createOplPassthrough({
   }
   let channelProviderHost = null;
   return {
+    async runManagedUpdate(operation) {
+      if (!["activate", "check", "plan", "apply", "status"].includes(operation)) {
+        throw new Error("Unsupported managed update operation");
+      }
+      if (["activate", "apply"].includes(operation)
+        && (env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1")) {
+        throw Object.assign(new Error("Managed updates are disabled in read-only mode"), { code: "blocked_read_only" });
+      }
+      const result = await run(command, ["update", operation, "--json"], {
+        cwd, env, timeoutMs: operation === "apply" ? 20 * 60_000 : operation === "activate" ? 120_000 : 90_000
+      });
+      const parsed = jsonValue(result.stdout);
+      if (result.exitCode !== 0 || !parsed) {
+        throw Object.assign(new Error(`Framework update ${operation} failed`), {
+          code: result.timedOut ? "managed_update_timeout" : "managed_update_failed"
+        });
+      }
+      return parsed;
+    },
+
     async registerChannelCallbackAdapter(adapter) {
       const validated = validateChannelCallbackAdapter(adapter);
       if (typeof channelCallbackRegistrar !== "function") {
@@ -989,7 +1019,8 @@ export function createOplPassthrough({
       const rollbackRef = typeof payload.rollbackRef === "string" ? payload.rollbackRef : undefined;
       const requestedMode = request.mode === "rollback" || request.mode === "execute" ? request.mode : "preview";
       const candidateAllowedAction = allowedCandidateActions.has(actionId);
-      const actionExecutionAllowed = allowActions || candidateAllowedAction;
+      const actionExecutionAllowed = (allowActions || candidateAllowedAction)
+        && env.OPL_STUDIO_READ_ONLY !== "1" && env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1";
       const blockedReadOnly = !dryRun && !actionExecutionAllowed;
       const receiptKind = blockedReadOnly
         ? "blocked_read_only"
@@ -1005,7 +1036,9 @@ export function createOplPassthrough({
         ? { exitCode: -1, stdout: "", stderr: "candidate_read_only_policy", timedOut: false }
         : !dryRun && !confirmed
         ? { exitCode: -1, stdout: "", stderr: "confirmation_required", timedOut: false }
-        : await run(command, args.slice(1), { cwd, env, timeoutMs: actionId === "codex_install" ? 120_000 : 45_000 });
+        : await run(command, args.slice(1), { cwd, env,
+          timeoutMs: ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_update", "agent_package_repair"].includes(actionId)
+            ? 20 * 60_000 : actionId === "codex_install" ? 120_000 : 45_000 });
       return {
         actionId,
         dryRun,

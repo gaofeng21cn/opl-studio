@@ -1,0 +1,12 @@
+{
+  "schema": "opl_studio_standard_framework_bootstrap.v1",
+  "framework_ref": "892496cc29f40fe401e8bc9a9d8014502b86139c",
+  "installer_url": "https://raw.githubusercontent.com/gaofeng21cn/one-person-lab/892496cc29f40fe401e8bc9a9d8014502b86139c/install.sh",
+  "archive_url": "https://github.com/gaofeng21cn/one-person-lab/archive/892496cc29f40fe401e8bc9a9d8014502b86139c.tar.gz",
+  "installer_path": "resources/opl-framework-bootstrap/opl-install.sh",
+  "installer_sha256": "1d39a2ab703ccd58980e57e2ed20993d65d57fce69387364aad534fbbcc31ac8",
+  "installer_size_bytes": 70552,
+  "source": "one-person-lab-app/scripts/prepare-standard-release-payload.ts",
+  "active_shell_adopted": false,
+  "aionui_standard_payload_preparation": false
+}

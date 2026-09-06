@@ -1,9 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import updaterPackage from "electron-updater";
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createOplHostCore } from "../scripts/webui-host/host-core.mjs";
+import { createOplPassthrough } from "../scripts/webui-host/opl-passthrough.mjs";
+import { createManagedUpdateMaintenance } from "../scripts/webui-host/managed-update-maintenance.mjs";
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
@@ -28,7 +31,8 @@ let desktopHostPromise;
 let installingUpdate = false;
 let quittingApplication = false;
 let updaterQualificationEnabled = false;
-let startupUpdateCheckStarted = false;
+let updaterQualificationAutomatic = false;
+const appProcessInstanceId = randomUUID();
 const nativeAccessibilityQualificationEnabled = process.env.OPL_DESKTOP_NATIVE_ACCESSIBILITY_QUALIFICATION === "1";
 if (nativeAccessibilityQualificationEnabled) {
   app.commandLine.appendSwitch("force-renderer-accessibility");
@@ -47,7 +51,13 @@ const shutdown = createShutdownController({
     ipcMain.removeHandler("opl:invoke");
     await hostCore?.close();
   },
-  quit: () => app.quit()
+  quit: async () => {
+    if (desktopUpdater?.snapshot().state === "downloaded" && (!updaterQualificationEnabled || updaterQualificationAutomatic)) {
+      const installed = await desktopUpdater.perform("installOnQuit");
+      if (installed.accepted) return;
+    }
+    app.quit();
+  }
 });
 
 function trustedRendererUrl(url) {
@@ -122,10 +132,6 @@ function createWindow() {
   window.webContents.once("did-finish-load", () => {
     if (!desktopUpdater) return;
     sendDesktopRendererEvent("desktop/native-app-update", desktopUpdater.snapshot());
-    if (!startupUpdateCheckStarted && desktopUpdater.snapshot().supported && !updaterQualificationEnabled) {
-      startupUpdateCheckStarted = true;
-      void desktopUpdater.perform("check").catch(() => undefined);
-    }
   });
   void window.loadFile(rendererIndex);
   return window;
@@ -159,17 +165,30 @@ async function createDesktopHost(appLogDirectory) {
     autoUpdater,
     feedUrl: process.env.OPL_DESKTOP_UPDATE_QUALIFICATION_FEED_URL
   });
+  updaterQualificationAutomatic = updaterQualificationEnabled && process.env.OPL_DESKTOP_UPDATE_QUALIFICATION_AUTOMATIC === "1";
   let core;
   const updater = createDesktopUpdater({
     autoUpdater,
     isPackaged: app.isPackaged,
     updateConfigAvailable,
     currentVersion: app.getVersion(),
-    onStateChange: (state) => sendDesktopRendererEvent("desktop/native-app-update", state),
-    beforeRestart: async () => {
-      await core?.close();
-      ipcMain.removeHandler("opl:invoke");
-      installingUpdate = true;
+    automatic: !updaterQualificationEnabled || updaterQualificationAutomatic,
+    onStateChange: (state) => {
+      sendDesktopRendererEvent("desktop/native-app-update", state);
+      if (updaterQualificationEnabled) process.send?.({ type: "opl-desktop-update-state", state });
+    },
+    beforeRestart: async ({ quitting }) => {
+      const prepare = async () => {
+        quittingApplication = true;
+        await core?.close();
+        ipcMain.removeHandler("opl:invoke");
+        installingUpdate = true;
+      };
+      if (quitting || !core) {
+        await prepare();
+        return true;
+      }
+      return (await core.transport.runWhenIdle(prepare)).status === "completed";
     }
   });
   const homeDir = app.getPath("home");
@@ -179,8 +198,33 @@ async function createDesktopHost(appLogDirectory) {
     homeDir,
     env: process.env
   });
-  const hostEnvironment = resolveDesktopRuntimeEnvironment({
+  const activationEnvironment = resolveDesktopRuntimeEnvironment({
     env: runtime?.env ?? process.env,
+    homeDir,
+    resourcesPath: process.resourcesPath
+  });
+  activationEnvironment.OPL_APP_PROCESS_INSTANCE_ID = appProcessInstanceId;
+  const managedUpdatesEnabled = app.isPackaged && !updaterQualificationEnabled
+    && process.env.OPL_STUDIO_MANAGED_UPDATES !== "0"
+    && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1";
+  let activationStatus = "disabled";
+  let activatedCodexPath;
+  if (managedUpdatesEnabled) {
+    try {
+      const activation = await createOplPassthrough({ env: activationEnvironment, cwd: homeDir }).runManagedUpdate("activate");
+      activationStatus = activation.runtime_activation?.status ?? "unknown";
+      const binary = activation.runtime_activation?.codex?.runtime_binary_path;
+      if (typeof binary === "string" && path.isAbsolute(binary) && fs.existsSync(binary)) activatedCodexPath = binary;
+    } catch {
+      activationStatus = "failed";
+    }
+  }
+  const hostEnvironment = resolveDesktopRuntimeEnvironment({
+    env: {
+      ...(runtime?.env ?? process.env), OPL_APP_PROCESS_INSTANCE_ID: appProcessInstanceId,
+      ...(!process.env.OPL_CODEX_BIN && !process.env.CODEX_APP_SERVER_COMMAND && activatedCodexPath
+        ? { OPL_CODEX_BIN: activatedCodexPath } : {})
+    },
     homeDir,
     resourcesPath: process.resourcesPath
   });
@@ -188,7 +232,10 @@ async function createDesktopHost(appLogDirectory) {
   core = await createOplHostCore({
     workspaceRoot: desktopCodexWorkspaceRoot(),
     env: hostEnvironment,
-    candidateActionAllowlist: ["workspace_root_set", "codex_install"],
+    candidateActionAllowlist: [
+      "workspace_root_set", "codex_install", "settings_check_opl_base_update", "settings_apply_opl_base_update",
+      "settings_apply_opl_packages", "agent_package_update", "agent_package_repair"
+    ],
     channelBindingFile: path.join(app.getPath("userData"), "channel-transport-bindings.json"),
     platform: {
       pickFiles: async () => {
@@ -253,6 +300,20 @@ async function createDesktopHost(appLogDirectory) {
       if (!window.isDestroyed()) window.webContents.send("opl:event", event);
     }
   });
+  if (managedUpdatesEnabled) {
+    core.updateMaintenance = createManagedUpdateMaintenance({
+      opl: core.opl,
+      codex: core.codex,
+      stateFile: path.join(app.getPath("userData"), "managed-update-maintenance.json"),
+      checkAppUpdate: () => updater.perform("check"),
+      onStateChange: (state) => core.emit("event", {
+        method: "host/managed-update", params: { ...state, activationStatus }
+      })
+    });
+    await core.updateMaintenance.start();
+  } else if (updater.snapshot().supported && !updaterQualificationEnabled) {
+    void updater.perform("check").catch(() => undefined);
+  }
   return { core, desktopUpdater: updater };
 }
 
@@ -285,6 +346,7 @@ app.whenReady().then(async () => {
   await appLogDirectory.restore();
   createWindow();
   ipcMain.handle("opl:invoke", async (event, request) => {
+    if (quittingApplication) throw new Error("Application is closing");
     if (!trustedRendererUrl(event.senderFrame.url)) {
       throw new Error("Untrusted renderer cannot invoke the OPL host");
     }

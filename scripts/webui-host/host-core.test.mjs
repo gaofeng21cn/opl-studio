@@ -16,6 +16,25 @@ import { createOplPassthrough } from "./opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 
+test("Host shutdown waits for a manual update and its Codex refresh", async () => {
+  const core = new OplHostCore();
+  const events = [];
+  let finishUpdate;
+  core.opl.executeAction = () => new Promise((resolve) => { finishUpdate = resolve; });
+  core.codex.reloadConfiguration = async () => { events.push("refresh"); };
+  core.framework.close = async () => { events.push("framework-close"); };
+  core.codex.close = async () => { events.push("codex-close"); };
+  const operation = core.executeAction({ actionId: "agent_package_update", dryRun: false });
+  const close = core.close();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, []);
+  await assert.rejects(core.executeAction({ actionId: "agent_package_update", dryRun: false }), /closing/);
+  finishUpdate({ status: "executed", exitCode: 0 });
+  await operation;
+  await close;
+  assert.deepEqual(events, ["refresh", "framework-close", "codex-close"]);
+});
+
 test("Codex permission profiles stay on the protocol layer that owns them", () => {
   assert.deepEqual(threadPermissionOverrides(":danger-full-access", "/workspace"), {
     approvalPolicy: "never",

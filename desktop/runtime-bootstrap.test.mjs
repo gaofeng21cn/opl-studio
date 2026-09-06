@@ -66,7 +66,7 @@ function createInstalledFramework(homeDir, frameworkRef) {
     install_mode: "archive",
     identity_source: "install_ref"
   }));
-  fs.writeFileSync(carrier, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  fs.writeFileSync(carrier, '#!/bin/sh\nprintf \'{"help":{"command":"update activate"}}\\n\'\n', { mode: 0o755 });
 }
 
 test("packaged Full runtime installs into the Studio carrier root and binds the Host environment", async (t) => {
@@ -138,6 +138,18 @@ test("packaged Standard reuses the exact installed Framework identity without re
   assert.equal(result.env.OPL_APP_OPL_BIN, path.join(homeDir, ".local", "bin", "opl"));
   assert.equal(result.env.OPL_FRAMEWORK_PACKAGE_ROOT, path.join(homeDir, ".opl", "one-person-lab"));
   assert.equal(result.env.PRESERVED, "yes");
+});
+
+test("packaged Standard preserves a newer managed Framework identity across App starts", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-standard-update-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const resourcesPath = createStandardBootstrap(root, {
+    frameworkRef: "b".repeat(40), installerBody: "#!/bin/bash\nexit 91\n"
+  });
+  createInstalledFramework(homeDir, "d".repeat(40));
+  const result = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: "linux" });
+  assert.equal(result.version, "d".repeat(40));
 });
 
 test("packaged Standard runs the App-owned installer and requires exact installed identity readback", async (t) => {

@@ -78,6 +78,7 @@ test("desktop updater preserves check, download, clean restart, and running-vers
     autoUpdater,
     isPackaged: true,
     currentVersion: "1.0.0",
+    automatic: false,
     onStateChange: (state) => states.push(state),
     beforeRestart: async () => lifecycle.push("host-closed")
   });
@@ -130,6 +131,25 @@ test("unpackaged desktop reports a truthful unsupported updater", async () => {
   const result = await updater.perform("check");
   assert.equal(result.supported, false);
   assert.equal(result.reasonCode, "desktop_updater_requires_packaged_app");
+});
+
+test("desktop defaults to silent download and installs only after normal Host shutdown", async () => {
+  const autoUpdater = new FakeAutoUpdater();
+  const calls = [];
+  autoUpdater.quitAndInstall = (...args) => calls.push(args);
+  const updater = createDesktopUpdater({
+    autoUpdater, isPackaged: true, currentVersion: "1.0.0",
+    beforeRestart: async ({ quitting }) => { calls.push(quitting); return quitting; }
+  });
+  assert.equal(autoUpdater.autoDownload, true);
+  assert.equal(autoUpdater.autoInstallOnAppQuit, false);
+  autoUpdater.emit("update-downloaded", { version: "1.1.0" });
+  assert.equal((await updater.perform("restart")).reasonCode, "app_server_busy");
+  assert.equal(updater.snapshot().state, "downloaded");
+  assert.equal((await updater.perform("installOnQuit")).accepted, true);
+  assert.equal(autoUpdater.autoRunAppAfterInstall, false);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, [false, true, [true, false]]);
 });
 
 test("directory package stays truthful until release update metadata is present", async () => {

@@ -92,7 +92,14 @@ export class OplCodexNative extends EventEmitter {
     return this.capabilities();
   }
 
-  async reloadConfiguration() {
+  async reloadConfiguration({ maintenanceHeld = false } = {}) {
+    if (!maintenanceHeld && typeof this.transport.runWhenIdle === "function") {
+      const result = await this.transport.runWhenIdle(() => this.reloadConfiguration({ maintenanceHeld: true }));
+      if (result.status === "deferred") {
+        throw Object.assign(new Error("Codex configuration reload is waiting for active tasks"), { code: "app_server_busy" });
+      }
+      return result.result;
+    }
     if (this.closePromise) {
       throw Object.assign(new Error("Codex App Server is closing"), {
         code: "app_server_unavailable"
@@ -127,7 +134,7 @@ export class OplCodexNative extends EventEmitter {
   }
 
   async close() {
-    this.closePromise ??= this.transport.stop();
+    this.closePromise ??= this.transport.close?.() ?? this.transport.stop();
     return this.closePromise;
   }
 }

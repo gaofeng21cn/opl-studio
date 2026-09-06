@@ -62,6 +62,7 @@ export function createDesktopUpdater({
   isPackaged,
   updateConfigAvailable = true,
   currentVersion,
+  automatic = true,
   onStateChange = () => undefined,
   beforeRestart = async () => undefined
 }) {
@@ -81,7 +82,8 @@ export function createDesktopUpdater({
   };
 
   if (supported) {
-    autoUpdater.autoDownload = false;
+    // Installation is requested after the Host has finished its normal shutdown.
+    autoUpdater.autoDownload = automatic;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.on("checking-for-update", () => update({ state: "checking", operation: "check" }));
     autoUpdater.on("update-not-available", (info) => update({
@@ -122,8 +124,14 @@ export function createDesktopUpdater({
       if (operation === "status") return this.snapshot(operation);
       if (!supported) return this.snapshot(operation);
       if (operation === "check") {
+        if (["checking", "downloading", "downloaded", "installing"].includes(state.state)) return this.snapshot(operation);
         update({ state: "checking", operation });
-        await autoUpdater.checkForUpdates();
+        try {
+          await autoUpdater.checkForUpdates();
+        } catch (error) {
+          update({ state: "error", errorCode: "desktop_updater_error", message: error?.message ?? String(error) });
+          throw error;
+        }
         return this.snapshot(operation);
       }
       if (operation === "apply") {
@@ -134,12 +142,14 @@ export function createDesktopUpdater({
         await autoUpdater.downloadUpdate();
         return { ...this.snapshot(operation), accepted: state.state === "downloaded" };
       }
-      if (operation === "restart") {
+      if (operation === "restart" || operation === "installOnQuit") {
         if (state.state !== "downloaded") {
           return { ...this.snapshot(operation), accepted: false, reasonCode: "downloaded_update_required" };
         }
         try {
-          await beforeRestart();
+          if (await beforeRestart({ quitting: operation === "installOnQuit" }) === false) {
+            return { ...this.snapshot(operation), accepted: false, reasonCode: "app_server_busy" };
+          }
         } catch {
           update({
             state: "error",
@@ -150,7 +160,8 @@ export function createDesktopUpdater({
           return { ...this.snapshot(operation), accepted: false };
         }
         update({ state: "installing", operation, restartRequired: true, errorCode: undefined });
-        setImmediate(() => autoUpdater.quitAndInstall(false, true));
+        autoUpdater.autoRunAppAfterInstall = operation !== "installOnQuit";
+        setImmediate(() => autoUpdater.quitAndInstall(true, operation !== "installOnQuit"));
         return { ...this.snapshot(operation), accepted: true };
       }
       return { ...this.snapshot(operation), accepted: false, reasonCode: "unsupported_update_operation" };

@@ -108,6 +108,7 @@ export class OplHostCore extends EventEmitter {
     this.nativeUpdater = nativeUpdater;
     this.carrierDiagnostics = carrierDiagnostics ?? defaultCarrierDiagnostics(env);
     this.closePromise = null;
+    this.manualUpdateOperations = new Set();
     this.codex.on("event", (event) => this.emit("event", event));
   }
 
@@ -122,6 +123,25 @@ export class OplHostCore extends EventEmitter {
   }
 
   async executeAction(payload) {
+    if (this.closePromise) throw new Error("Application is closing");
+    const updateActions = ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_update", "agent_package_repair"];
+    if (payload?.dryRun === false && updateActions.includes(payload?.actionId) && this.transport.runWhenIdle) {
+      const operation = this.transport.runWhenIdle(async () => {
+        const receipt = await this.opl.executeAction(payload);
+        if (payload.actionId !== "settings_apply_opl_base_update" && receipt.status === "executed" && receipt.exitCode === 0) {
+          await this.codex.reloadConfiguration({ maintenanceHeld: true });
+        }
+        return receipt;
+      });
+      this.manualUpdateOperations.add(operation);
+      let lease;
+      try { lease = await operation; }
+      finally { this.manualUpdateOperations.delete(operation); }
+      if (lease.status === "completed") return lease.result;
+      return { actionId: payload.actionId, dryRun: false, status: "error", receiptKind: "execute", canExecute: false,
+        confirmationRequired: false, command: "", commandArgs: [], timedOut: false,
+        reasonCode: "app_server_busy", exitCode: -1, stderr: "app_server_busy", stdout: "" };
+    }
     const receipt = await this.opl.executeAction(payload);
     if (
       payload?.actionId === "gateway_account_use_for_model_access"
@@ -181,7 +201,10 @@ export class OplHostCore extends EventEmitter {
         } catch {
           carrierDiagnostics = unavailableCarrierDiagnostics("carrier_diagnostics_read_failed");
         }
-        return { ...state, carrierDiagnostics };
+        return {
+          ...state, carrierDiagnostics,
+          ...(this.updateMaintenance ? { managedUpdateMaintenance: this.updateMaintenance.snapshot() } : {})
+        };
       }
       case "readInitialize": return this.opl.readInitialize();
       case "readFullDrilldown": return this.opl.readFullDrilldown();
@@ -231,6 +254,8 @@ export class OplHostCore extends EventEmitter {
 
   async close() {
     this.closePromise ??= (async () => {
+      await this.updateMaintenance?.close();
+      await Promise.allSettled([...this.manualUpdateOperations]);
       if (this.managedByDsh && this.hostContext) {
         await this.framework.close();
         await this.codex.close();

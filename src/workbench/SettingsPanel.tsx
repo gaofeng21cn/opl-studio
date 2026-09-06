@@ -106,6 +106,7 @@ type SettingsPanelProps = {
   initializationStatus: "loading" | "ready" | "error";
   initialization: OplInitializeReadback | null;
   nativeAppUpdate: NativeAppUpdateResult | null;
+  maintenanceStatus?: string | null;
   dockerDiagnostic: SettingsDockerDiagnostic | null;
   capabilityCatalog: CodexCapabilityCatalog;
   capabilityStatus: "idle" | "loading" | "ready" | "error";
@@ -1552,6 +1553,7 @@ export function SettingsPanel({
   initializationStatus,
   initialization,
   nativeAppUpdate,
+  maintenanceStatus,
   dockerDiagnostic,
   capabilityCatalog,
   capabilityStatus,
@@ -2334,6 +2336,16 @@ export function SettingsPanel({
             </SettingRow>
           </div>
           <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"}><span>{projection?.codex.version ?? "--"}</span></SettingRow>
+          {maintenanceStatus ? <SettingRow label={settings.locale === "zh" ? "组件维护" : "Component maintenance"}>
+            <span role="status">{({
+              idle: settings.locale === "zh" ? "等待检查" : "Pending check",
+              checking: settings.locale === "zh" ? "检查中" : "Checking",
+              applying: settings.locale === "zh" ? "后台更新中" : "Updating",
+              deferred: settings.locale === "zh" ? "等待任务完成" : "Waiting for tasks",
+              completed: settings.locale === "zh" ? "已检查" : "Checked",
+              failed: settings.locale === "zh" ? "更新未完成，将重试" : "Update incomplete, retry pending"
+            } as Record<string, string>)[maintenanceStatus] ?? maintenanceStatus}</span>
+          </SettingRow> : null}
         </SettingsGroup>
       </div>
     );

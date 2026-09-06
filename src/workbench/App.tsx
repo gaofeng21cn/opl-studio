@@ -848,6 +848,7 @@ export function App({
   const [runtimeSnapshotCachedAt, setRuntimeSnapshotCachedAt] = useState<string | undefined>(cachedRuntime?.cachedAt);
   const [managedUpdate, setManagedUpdate] = useState<ManagedUpdateProjection | null>(null);
   const [nativeAppUpdate, setNativeAppUpdate] = useState<NativeAppUpdateResult | null>(null);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
   const [projectedManagedUpdateActions, setProjectedManagedUpdateActions] = useState<ProjectedManagedUpdateAction[]>([]);
   const [projectedSetupActions, setProjectedSetupActions] = useState<ProjectedSetupAction[]>([]);
   const [projectedManifestInstallAction, setProjectedManifestInstallAction] = useState<ProjectedManifestInstallAction>();
@@ -1358,6 +1359,7 @@ export function App({
         setProjectedSetupActions(readProjectedSetupActions(state));
         setProjectedManifestInstallAction(readProjectedManifestInstallAction(state));
         setCarrierDiagnostics(state.carrierDiagnostics);
+        setMaintenanceStatus(state.managedUpdateMaintenance?.status ?? null);
         const nextGatewayActions = readGatewayActionsFromState(state);
         projectedGatewayActionsRef.current = nextGatewayActions;
         setProjectedGatewayActions(nextGatewayActions);
@@ -2039,6 +2041,10 @@ export function App({
     }
     if (method === "desktop/native-app-update" && params.schema === "opl_native_app_updater.v1") {
       setNativeAppUpdate(params as NativeAppUpdateResult);
+    }
+    if (method === "host/managed-update" && typeof params.status === "string") {
+      setMaintenanceStatus(params.status);
+      if (params.status === "completed") void loadState(settings.runtimeProfile);
     }
     if (method === "codex/server-request") {
       const request = params as import("../bridge/oplBridge").CodexPendingServerRequest;
@@ -3024,6 +3030,7 @@ export function App({
       initializationStatus={initializeStatus}
       initialization={initializeReadback}
       nativeAppUpdate={nativeAppUpdate}
+      maintenanceStatus={maintenanceStatus}
       dockerDiagnostic={dockerDiagnostic}
       capabilityCatalog={capabilityCatalog}
       capabilityStatus={capabilityStatus}

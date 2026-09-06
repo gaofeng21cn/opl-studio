@@ -54,3 +54,22 @@ The desktop main process resolves existing `codex` and `opl` installations into 
 Finder launches independent of a terminal-only `PATH` while preserving explicit operator overrides. The
 About and Updates surfaces read the running package version and the same main-process updater state; they
 do not maintain a second version or update store.
+
+Packaged Preview checks for App and eligible Framework updates daily in the main process. App updates
+download silently and install after normal Host shutdown; an explicit update restart waits for an idle
+Codex transport. Framework background apply stages Base and delegates installed official Package updates
+to their native carriers. The idle lease holds new Codex requests until Package refresh finishes, and the
+About page reports maintenance progress or retry state. Failed and busy runs retry after five minutes.
+
+Before starting its persistent App Server, Preview supplies a fresh `OPL_APP_PROCESS_INSTANCE_ID` and
+calls `opl update activate --json`. Framework owns verification, pending generation activation and rollback.
+Explicit Codex executables remain selected; otherwise the activation receipt selects the managed binary.
+The Standard bootstrap upgrades an older managed installation once if it lacks that public activation
+command, then preserves subsequent managed Framework updates. Explicit external Framework roots are
+preserved. External Temporal servers and developer or user-managed Packages remain with their owners.
+`OPL_STUDIO_MANAGED_UPDATES=0` disables component maintenance, and explicit read-only mode blocks it.
+
+For public macOS builds, `APPLE_KEYCHAIN_PROFILE` selects an existing notarytool credential profile through
+electron-builder. Staple the final DMG, regenerate its feed hash, and run the release qualification against
+the anonymous GitHub asset URL after publication. The dedicated Preview feed remains independent of
+the ordinary App's Stable feed.

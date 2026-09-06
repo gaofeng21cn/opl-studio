@@ -129,6 +129,7 @@ export type OplStateReadback = {
   app_state: OplAppState;
   readback: OplCommandReadback;
   carrierDiagnostics: CarrierDiagnosticsReadback;
+  managedUpdateMaintenance?: { schema: "opl_studio_update_maintenance.v1"; status: string; lastCompletedAt: number | null };
   raw_state?: Record<string, unknown>;
 };
 
@@ -1438,7 +1439,9 @@ export function normalizeStateReadback(value: unknown, profile = readRuntimeProf
     readback: record?.readback
       ? normalizeCommandReadback(record.readback, commandReadback.command, commandReadback.commandArgs)
       : commandReadback,
-    carrierDiagnostics: normalizeCarrierDiagnostics(record?.carrierDiagnostics ?? record?.carrier_diagnostics)
+    carrierDiagnostics: normalizeCarrierDiagnostics(record?.carrierDiagnostics ?? record?.carrier_diagnostics),
+    ...(asRecord(record?.managedUpdateMaintenance)?.schema === "opl_studio_update_maintenance.v1"
+      ? { managedUpdateMaintenance: record?.managedUpdateMaintenance as OplStateReadback["managedUpdateMaintenance"] } : {})
   };
 }
 

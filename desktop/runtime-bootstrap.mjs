@@ -266,7 +266,7 @@ function installedFrameworkRoot(homeDir) {
 function installedFrameworkEnvironment(homeDir, env) {
   const frameworkRoot = installedFrameworkRoot(homeDir);
   const oplBin = path.join(homeDir, ".local", "bin", "opl");
-  if (!fs.existsSync(path.join(frameworkRoot, "package.json")) || !fs.existsSync(oplBin)) return null;
+  if (readJsonRecord(path.join(frameworkRoot, "package.json"))?.name !== "opl-framework" || !fs.existsSync(oplBin)) return null;
   return {
     ...env,
     PATH: uniquePathEntries([path.dirname(oplBin), env.PATH, ...SYSTEM_PATH_ENTRIES]).join(path.delimiter),
@@ -285,6 +285,24 @@ function frameworkAtRef(homeDir, frameworkRef) {
   return installedFrameworkEnvironment(homeDir, {}) !== null
     && identity?.schema === "opl_framework_installed_source_identity.v1"
     && identity.framework_sha === frameworkRef;
+}
+
+async function supportsRuntimeActivation(env) {
+  return new Promise((resolve) => {
+    const child = spawn(env.OPL_APP_OPL_BIN, ["help", "update", "activate", "--json"], {
+      env, stdio: ["ignore", "pipe", "ignore"]
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { output = `${output}${chunk}`.slice(-32_000); });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20_000);
+    child.once("error", () => { clearTimeout(timer); resolve(false); });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      try { resolve(code === 0 && JSON.parse(output).help?.command === "update activate"); }
+      catch { resolve(false); }
+    });
+  });
 }
 
 function runBootstrapInstaller(installerPath, env) {
@@ -334,9 +352,12 @@ export async function ensureStudioDesktopRuntime({
   env = process.env,
   platform = process.platform
 } = {}) {
+  if (env.OPL_APP_OPL_BIN || env.OPL_COMMAND || env.OPL_FRAMEWORK_PACKAGE_ROOT) return null;
   if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env });
   const payload = resolvePayload(resourcesPath);
   if (payload) {
+    const installed = activateInstalledStudioRuntime({ homeDir, env });
+    if (installed && await supportsRuntimeActivation(installed.env)) return installed;
     const target = runtimeHome(homeDir);
     await installPayload({ payload, target, platform });
     writePointer(homeDir, target, payload.version, payload.manifestSha256, "packaged_payload");
@@ -350,18 +371,28 @@ export async function ensureStudioDesktopRuntime({
   }
 
   const installed = activateInstalledStudioRuntime({ homeDir, env });
-  if (installed) return installed;
+  if (installed && await supportsRuntimeActivation(installed.env)) return installed;
   const standard = resolveStandardBootstrap(resourcesPath);
   if (!standard) return null;
-  if (!frameworkAtRef(homeDir, standard.manifest.framework_ref)) {
+  const identity = installedFrameworkIdentity(homeDir);
+  const existingManagedIdentity = identity?.schema === "opl_framework_installed_source_identity.v1"
+    && /^[0-9a-f]{40}$/.test(identity.framework_sha ?? "")
+    && installedFrameworkEnvironment(homeDir, env) !== null;
+  const existingManagedRuntime = existingManagedIdentity && (
+    identity.framework_sha === standard.manifest.framework_ref
+    || fs.existsSync(path.join(installedFrameworkRoot(homeDir), ".git"))
+    || fs.lstatSync(installedFrameworkRoot(homeDir)).isSymbolicLink()
+    || await supportsRuntimeActivation(installedFrameworkEnvironment(homeDir, env))
+  );
+  if (!existingManagedRuntime) {
     await runBootstrapInstaller(standard.installerPath, { ...env, HOME: homeDir });
   }
   const installedEnv = installedFrameworkEnvironment(homeDir, env);
-  if (!installedEnv || !frameworkAtRef(homeDir, standard.manifest.framework_ref)) {
+  if (!installedEnv || (!existingManagedRuntime && !frameworkAtRef(homeDir, standard.manifest.framework_ref))) {
     throw new Error("Studio Standard Framework bootstrap completed without the exact App-owned Framework identity");
   }
   return {
-    version: standard.manifest.framework_ref,
+    version: installedFrameworkIdentity(homeDir).framework_sha,
     runtimeHome: installedFrameworkRoot(homeDir),
     manifestSha256: sha256File(standard.manifestPath),
     source: "packaged_standard_bootstrap",
