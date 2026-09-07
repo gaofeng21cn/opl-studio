@@ -71,11 +71,11 @@ contract.
 > the separate clean-VM, equivalence, and adoption gates. AionUI remains the
 > current Stable App shell during that transition.
 
-Windows, Linux, and standalone Headless WebUI remain development candidates and
-are not public Studio distribution targets. Docker/OCI WebUI `v0.1.6` is a
-public, signed dual-architecture Preview for Cloud owner evaluation at
-`ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`.
-It does not replace the Stable App shell or by itself open Cloud user testing.
+Windows, Linux, and standalone Headless WebUI have development qualification
+paths. OCI Preview uses a separate publication workflow and immutable Cloud
+handoff; see [OCI distribution](./docs/oci-distribution.md). Read the release
+assets and handoff for the current platform and digest rather than inferring
+publication from source support.
 
 ## Core Capabilities
 
@@ -177,11 +177,10 @@ Build the local Docker candidate:
 docker compose up --build
 ```
 
-Both routes default to loopback. Do not expose the HTTP/SSE bridge to an
-untrusted network; the current candidate does not define a public remote-access
-security boundary. See [OCI distribution](./docs/oci-distribution.md) and
-[desktop distribution](./docs/delivery/desktop-distribution.md) for the exact
-carrier status.
+Both local routes default to loopback. Cloud deployment uses the password,
+signed-session, and CSRF boundary described in [OCI distribution](./docs/oci-distribution.md),
+with TLS and tenant isolation supplied by the Cloud owner. Desktop distribution
+and qualification are described in [desktop distribution](./docs/delivery/desktop-distribution.md).
 
 ## DSH Upstream Maintenance
 
@@ -190,11 +189,6 @@ pinned in
 [`deepseekHarnessSourceManifest.json`](./src/composition/deepseekHarnessSourceManifest.json).
 The binding is designed to follow upstream through an explicit replay rather
 than an untracked fork.
-
-The September 6, 2026 intake uses `dsh-v0.1.2-rc.1` with Cordis `4.0.2`.
-GitHub also lists `dsh-v0.1.3-alpha.1`, but its required `dsh-app-boot` npm
-package was not published at intake. Studio therefore follows the complete
-published package cohort; it does not combine that alpha's GUI with RC packages.
 
 Read the current binding and produce a no-write upgrade plan with:
 
@@ -238,7 +232,6 @@ interpreting a test or package result.
 
 - [Documentation and owner map](./docs/README.md)
 - [Implementation and authority architecture](./docs/architecture.md)
-- [Architecture whitepaper](./docs/whitepaper.md)
 - [Current state and remaining gaps](./docs/active/current-state-vs-ideal-gap.md)
 - [Verification and evidence boundaries](./docs/verification.md)
 - [Desktop distribution](./docs/delivery/desktop-distribution.md)

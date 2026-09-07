@@ -5,10 +5,11 @@ desktop and standalone WebUI carriers. It does not contain Electron, AionUI, or
 AionCore. The independently versioned OCI is a public Studio Preview carrier,
 not the Stable OPL App shell and not proof of Cloud activation.
 
-The current immutable Preview is
-`ghcr.io/gaofeng21cn/opl-studio-webui@sha256:2725311bfb74483f71c6a6f363c1e96c62abb272ef9f0bef171131939b4945ea`
-(`v0.1.6`). The `preview` and `latest` channels point to that digest; `stable`
-is intentionally absent.
+The publication owner emits an `opl_studio_cloud_workspace_image_handoff.v1`
+receipt containing the immutable index, child identities, verification, and
+rollback input. Read that receipt and registry readback before installation.
+`preview` and `latest` are mutable convenience aliases, never installation or
+rollback identity; their names do not imply Stable adoption.
 
 ## Host-Managed Lifecycle
 

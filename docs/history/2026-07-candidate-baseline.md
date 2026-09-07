@@ -42,4 +42,5 @@ cross-thread tools, queue, ledger, bilateral receipts, and dynamic-tool host wer
 removed rather than retained as dormant maintenance surface. Standard Codex
 thread lifecycle and Codex-native subagent projection remain. AionUI Team is a
 separate multi-executor shell facility. Any new orchestration requirement needs
-the explicit re-entry gate in the current Active Truth plan.
+an explicit App product decision; the old implementation is not a compatibility
+surface or a deferred backlog.

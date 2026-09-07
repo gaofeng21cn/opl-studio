@@ -11,4 +11,4 @@ evidence, or a source for reviving deferred experiments.
 
 Current truth starts from [the docs index](../README.md),
 [architecture](../architecture.md), and
-[Active Truth plan](../active/current-state-vs-ideal-gap.md).
+[Adoption gaps](../active/current-state-vs-ideal-gap.md).

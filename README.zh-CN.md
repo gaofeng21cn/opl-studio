@@ -65,9 +65,9 @@ Standard 和 Full 是同一版本的两种载荷规格，不是两个产品版�
 > 虚拟机验收、功能等价验证和采用门禁后，Studio 才能成为正式版 OPL App 的
 > 应用外壳。在完成切换之前，AionUI 仍是当前正式版的应用外壳。
 
-Windows、Linux、独立 WebUI 服务和 Docker/OCI 已有开发候选实现与测试路径，
-但目前不是公开分发目标。只有未来的发布版本明确提供并验收对应产物时，才能
-把它们视为已发布平台。
+Windows、Linux 和独立 WebUI 已有开发验收路径。OCI Preview 使用独立发布
+工作流和不可变 Cloud 交接记录，详见 [OCI 分发](./docs/oci-distribution.md)。
+当前已发布平台和镜像摘要以发布产物及交接记录为准，不从源码支持推断。
 
 ## 核心能力
 
@@ -161,20 +161,15 @@ npm run start:headless
 docker compose up --build
 ```
 
-这两个入口默认只绑定本机回环地址。不要把当前 HTTP/SSE 接口暴露到不可信
-网络，因为候选版尚未定义公开远程访问的安全边界。各载体的准确状态参见
-[OCI 分发](./docs/oci-distribution.md)和
-[桌面端分发](./docs/delivery/desktop-distribution.md)。
+这两个本地入口默认绑定回环地址。Cloud 部署使用 [OCI 分发](./docs/oci-distribution.md)
+中定义的密码认证、签名会话与 CSRF 保护，TLS 和租户隔离由 Cloud 负责。
+桌面构建和验收参见[桌面端分发](./docs/delivery/desktop-distribution.md)。
 
 ## DSH 上游维护
 
 DSH 源码版本、依赖版本组、纳入仓库的 GUI 源码目录和文件清单统一记录在
 [`deepseekHarnessSourceManifest.json`](./src/composition/deepseekHarnessSourceManifest.json)
 中。Studio 通过可审计的显式重放方式追随上游，而不是维护隐式分叉。
-
-2026 年 9 月 6 日更新至 `dsh-v0.1.2-rc.1` 与 Cordis `4.0.2`。
-当日 GitHub 已发布 `dsh-v0.1.3-alpha.1`，但 npm 尚无必需的同版
-`dsh-app-boot` 包，因此采用已完整发布的版本组，保证 GUI 与宿主依赖一致。
 
 读取当前绑定状态并生成不写入文件的升级计划：
 
@@ -215,7 +210,6 @@ OPL_APP_REPO_ROOT=/absolute/path/to/one-person-lab-app npm run package
 
 - [文档与负责人导航](./docs/README.md)
 - [实现与权威架构](./docs/architecture.md)
-- [架构白皮书](./docs/whitepaper.md)
 - [当前状态与剩余缺口](./docs/active/current-state-vs-ideal-gap.md)
 - [验证与证据边界](./docs/verification.md)
 - [桌面端分发](./docs/delivery/desktop-distribution.md)

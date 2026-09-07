@@ -21,7 +21,6 @@ const requiredFiles = [
   "README.md",
   "docs/README.md",
   "docs/architecture.md",
-  "docs/whitepaper.md",
   "docs/active/current-state-vs-ideal-gap.md",
   "docs/verification.md",
   "docs/history/README.md",
@@ -440,9 +439,6 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const runtimeShim = read("src/integrations/deepseek-harness/runtimeShim.ts");
   const bunBuild = read("scripts/bun-build-renderer-entry.ts");
   const notices = read("THIRD_PARTY_NOTICES.md");
-  const architecture = read("docs/architecture.md");
-  const activePlan = read("docs/active/current-state-vs-ideal-gap.md");
-  const publicEntry = read("README.md");
   assert(alignment, "missing DeepSeek Harness GUI source-reuse evidence");
   assert(alignment.reference_product === "DeepSeek Harness", "DeepSeek Harness must be the primary GUI reference");
   assert(alignment.reference_version === expectedDshRef, "pinned DeepSeek Harness source ref must be recorded");
@@ -544,16 +540,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   }
   assert(!mainSource.includes("--opl-brand-logo") && !mainSource.includes("branding/opl-app-logo.png"), "renderer must keep OPL identity text-only without a Logo asset");
   assert(notices.includes(expectedDshRef) && notices.includes(expectedDshVersion) && notices.includes("use-sync-external-store") && notices.includes("MIT License"), "third-party notices must preserve the pinned DSH source and runtime licenses");
-  assert(architecture.includes("Model And Settings Boundary") && architecture.includes("App product profile"), "architecture must route model and settings authority to App");
-  assert(architecture.includes("Codex App Server owns canonical thread identity"), "architecture must route thread truth to Codex App Server");
-  assert(architecture.includes("AionUI is the current active release shell"), "architecture must preserve the active-shell boundary");
-  assert(
-    activePlan.includes("Purpose: `single_active_truth_plan`")
-      && activePlan.includes("State: `active_product_development_reference`")
-      && activePlan.includes("active_product_development_release_admission_separate"),
-    "Active Truth must preserve product development and separate release admission"
-  );
-  const legacyClaims = `${publicEntry}\n${architecture}\n${JSON.stringify(evidence)}`.toLowerCase();
+  const legacyClaims = JSON.stringify(evidence).toLowerCase();
   for (const claim of ["imagegen", "image-generated", "three-column", "chat_first_with_preview_inspector", "preview inspector default-open"]) {
     assert(!legacyClaims.includes(claim), `legacy visual baseline claim must be removed: ${claim}`);
   }

@@ -24,6 +24,9 @@
 - Candidate evidence must not claim active-shell adoption, release readiness,
   production readiness, domain readiness, or artifact authority.
 - Keep packaged macOS and WebUI on the same renderer and bridge shape.
+- Follow the topic owners and lifecycle in `docs/README.md`. Fold completed
+  implementation facts into their reference, remove obsolete checklists and
+  prompts, and preserve only history with a durable decision or provenance role.
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

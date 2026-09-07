@@ -1,6 +1,6 @@
 # Candidate Verification
 
-Owner: `one-person-lab-app`
+Owner: `opl-studio` verification; App retains acceptance authority
 Purpose: `candidate_verification_boundary`
 State: `active_support`
 Machine boundary: Command and evidence interpretation guide. Passing commands
@@ -59,7 +59,7 @@ is the command owner.
 `npm run package` reads the `opl-studio` carrier evidence contract from the App
 root selected by `OPL_APP_REPO_ROOT`. It rejects tracked source changes, binds
 the manifest to the exact Studio `HEAD`, runs the qualification commands named
-by the App contract, and writes the four outputs documented in the root README.
+by the App contract, and writes the Electron, standalone WebUI, Docker smoke, and candidate manifest outputs.
 Run it only after the intended Studio source is committed. The App candidate
 wrapper supplies the current App worktree root explicitly.
 
@@ -130,14 +130,10 @@ typecheck, WebUI Host/MCP tests, headless tests, renderer source tests, and the
 candidate validator. Passing only package installation or GUI byte parity does
 not prove Host/plugin compatibility.
 
-The `0.1.2-rc.1` replay updates Cordis to `4.0.2`, awaits the object-form
-`healProfilesModuleFallback`, and supplies the static index authorization
-callback after Studio's existing authentication check. The renderer uses the
-new root/scope binding API and workspace component path. Its Lexical composer
-projects into the existing Studio draft and submission actions; Codex remains
-the persistent session owner. GUI source remains byte-identical (250 files).
-The `0.1.3-alpha.1` GitHub release was not selected because its required npm
-Host package was unavailable at the September 6, 2026 intake.
+The manifest owns the exact upstream cohort. Host fallback initialization,
+static-index authorization, renderer binding, and composer submission must all
+be checked together; package installation or GUI byte parity does not prove
+these behavioral seams.
 
 ## Rendered WebUI Acceptance
 
@@ -224,21 +220,6 @@ The minimum installed pass verifies all of the following from
 - Files and results shows exactly one of Workspace, Inputs, or Results at a time,
   and workspace or artifact content opens as a drill-in preview with a back path.
 
-The current installed receipt is bound to candidate
-`40ea6e795702eb71c399bd1f5d2de296e2d58d0d` and installed `app.asar` SHA-256
-`fb62035d13c08056b4fb748db90e53c20ff3401ea5346c3ab8678270f7d33996`.
-Live Preview readback verified the wide floating label and three-item secondary
-menu; a 417.6 px panel whose left edge remained beyond both the composer and all
-messages in a long canonical conversation; successful 15%, 50%, and 85% height
-hit points on every primary tab; exclusive Workspace, Inputs, and Results views;
-search and drill-in preview of `AGENTS.md`; and a 760 x 900 full-viewport dialog
-with Escape focus restoration. The packaged `codex app-server --stdio` child
-started from the installed app, the Stable App retained its pre-install PID, and
-browser console/page-error readback remained empty. The selected task had no
-result artifacts, so this installed pass proves Results empty-state composition;
-artifact drill-in remains covered by the renderer acceptance gate rather than
-being overstated as installed live evidence.
-
 This pass closes only the installed candidate cohort whose exact bytes were
 tested. Any later Host, renderer, dependency, bridge, or contract change that
 affects the installed path requires a fresh package and installed acceptance.
@@ -315,7 +296,7 @@ Stopping the process with SIGINT or SIGTERM must emit
 
 The hosted macOS and Linux Headless jobs read the exact Framework and App
 commits from `src/candidateContractEvidence.json`, prepare the Framework source
-CLI's workspace Packages, build the shared WebUI, pin Codex CLI 0.147.0, then
+CLI's workspace Packages, build the shared WebUI, pin the workflow-declared Codex CLI version, then
 install a base payload, update to the exact checkout, roll back to the kept base
 payload, and inspect the final state through the public commands. Every running
 transition requires a ready Codex App Server, successful Framework App-state

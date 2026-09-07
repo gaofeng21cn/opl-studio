@@ -1,8 +1,9 @@
-# Studio 设置页信息架构 SSOT
+# Studio 设置页投影实现
 
-这份文档定义 Studio 设置页如何把 App/Framework 的真实投影交给用户。它是
-UI 归属和文案的产品 SSOT；安装、启用、可调用、连接和载体关系仍由 App/
-Framework projection 负责，Studio 不建立第二份状态。
+本文解释 Studio 如何执行 App 产品配置中的设置页归属与贡献准入规则。页面
+语义和文案决策由 App 合同管理；安装、启用、可调用、连接和载体关系由 App/
+Framework projection 提供。实现入口为 `src/composition/contributionProjection.ts`
+和 `src/workbench/SettingsPanel.tsx`，本文不定义独立产品规则。
 
 ## 用户任务与页面归属
 

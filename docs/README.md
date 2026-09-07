@@ -1,78 +1,50 @@
 # OPL Studio Documentation
 
-Owner: `one-person-lab-app`
-Purpose: `docs_index`
-State: `active_index`
-Machine boundary: Human-readable navigation and ownership map. App contracts,
-Framework state/action output, Codex App Server, source/tests, and explicit owner
-decisions remain the corresponding machine and product truth.
+Studio owns the DSH/Cordis Application Host implementation and its carrier
+adapters. App owns product behavior and release/adoption; Framework owns runtime
+and Package composition; Codex App Server owns threads and turns. Each document
+below explains one part of that arrangement without becoming another authority.
 
-This repository implements the first-party `opl-studio` DSH/Cordis Application
-Host and Studio carrier for the single OPL App product, not a second App. It
-does not own App product requirements, OPL runtime/package truth, Codex thread
-truth, domain verdicts, release adoption, or production readiness.
+| Reader task | Document | Responsibility |
+| --- | --- | --- |
+| Start using or developing Studio | [English README](../README.md), [中文入口](../README.zh-CN.md) | One public entry maintained as a language pair |
+| Change implementation boundaries | [Architecture](architecture.md) | Host, bridge, renderer, ownership, and durable design rationale |
+| Place a Settings contribution | [Settings projection](settings-information-architecture.md) | Studio rendering of App-owned placement policy |
+| Select verification | [Verification](verification.md) | Commands, prerequisites, and what their results prove |
+| Build and qualify macOS distribution | [Desktop distribution](delivery/desktop-distribution.md) | Desktop bundle, updater, bootstrap, and release qualification |
+| Operate the OCI carrier | [OCI distribution](oci-distribution.md) | Immutable-image lifecycle, authentication, and Cloud handoff |
+| Evaluate remaining adoption work | [Adoption gaps](active/current-state-vs-ideal-gap.md) | Owner decisions and exact evidence still to check |
+| Understand a retired design | [History](history/README.md) | Dated provenance and reasons not to revive old implementation |
+| Contribute safely | [AGENTS.md](../AGENTS.md) | Repository working rules |
+| Inspect third-party provenance | [Third-party notices](../THIRD_PARTY_NOTICES.md) | Source identity and license obligations |
 
-The Stable sibling is `opl-aion-shell`. Both carriers consume the same
-`one-person-lab-app` product contracts, Framework Host projection, Client Cordis
-contribution ABI, and versioned composition inputs. Studio additionally owns
-its DSH Host profile and App-process plugin lifecycle, but only the App repository
-can change `active_shell` or declare a release combination.
+`resources/opl-framework-bootstrap/README.md` describes only the generated
+payload directory. Exact payload identity remains in its generated manifest.
 
-Both carriers sit inside the same `OPL Base + OPL App + OPL Packages + optional
-OPL Cloud` ecology. Studio owns its Application Host implementation; it never
-promotes itself into Base, Package lifecycle, Cloud service, or App authority.
-Framework's Host projection is active. Studio's qualification lane consumes the
-canonical producer and App product profile, then compares its Client projection
-with AionUI. This repository still owns only candidate compatibility evidence;
-App release admission remains separate.
+## Authority Inputs
 
-## Current Owners
+- [App shell adapter](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-adapter.json) selects the active release carrier.
+- [App candidate contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-candidates.json) declares Studio's role and local carrier evidence requirements.
+- [App GUI contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-gui-product-contract.json) defines product state and actions.
+- Framework contracts and fresh `opl app state/action` output own runtime and Package truth.
 
-| Theme | Single Source of Truth |
-| --- | --- |
-| Public Studio entry | [English README](../README.md) and [Chinese README](../README.zh-CN.md) |
-| Application Host implementation boundary | [Architecture](./architecture.md) |
-| Application Host architecture rationale | [Whitepaper](./whitepaper.md) |
-| Current state, open gaps, and next prompt | [Single Active Truth plan](./active/current-state-vs-ideal-gap.md) |
-| Validation meaning | [Verification](./verification.md) |
-| Superseded implementation and visual baseline | [History](./history/README.md) |
-| App product, candidate role, and adoption | `one-person-lab-app` contracts and GUI docs |
-| Runtime/package state and actions | OPL Framework contracts and fresh `opl app ... --json` output |
+Read the current owner before changing an implementation or status claim. This
+index does not copy the owner's roadmap or publication state.
 
-Canonical filenames are mapped without creating duplicate truth:
+## Documentation Lifecycle
 
-- the root English and Chinese README pair carries the `project` role;
-- the Active Truth plan carries the `status` role;
-- `AGENTS.md` and `architecture.md` carry repo invariants;
-- App-owned contracts carry product/adoption decisions, so this repository does
-  not create a second `decisions.md`.
+Update the existing topic owner when behavior changes. New documents need a
+distinct reader task and a link from this index; navigation summarizes linked
+topics instead of repeating their rules. Keep the public language pair aligned.
 
-## App Authority Inputs
+Active references describe current code and constraints. Gap records contain
+only unresolved work. When a gap closes, fold durable facts into the reference
+and remove the completed entry. Retain a historical record only for unique
+rationale or provenance that prevents a plausible regression; ordinary task
+logs and superseded inventories belong in Git history.
 
-- [`app-shell-candidates.json`](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-candidates.json): Studio is the active-development Native successor and current foreground alternative; AionUI remains active until cutover.
-- [`app-shell-adapter.json`](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-adapter.json): only this contract can change the active release shell.
-- [`opl-studio-plan.md`](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/product/gui/opl-studio-plan.md): Studio must complete the App-owned minimum product before separate release qualification and explicit mainline cutover.
-- [`app-gui-product-contract.json`](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-gui-product-contract.json): product behavior and allowed state/action surfaces.
-
-These links are owner inputs, not copied truth. Read their current `main` bytes
-before changing candidate behavior or status language.
-
-## Current Portfolio Coverage
-
-Every tracked `README*` and `docs/**/*.md` file is assigned below; no active
-document is unclassified.
-
-| Lifecycle | Covered files |
-| --- | --- |
-| Public entry | `README.md`, `README.zh-CN.md` |
-| Navigation and architecture | `docs/README.md`, `docs/architecture.md`, `docs/whitepaper.md` |
-| Active Truth | `docs/active/current-state-vs-ideal-gap.md` |
-| Verification support | `docs/verification.md` |
-| History/provenance | `docs/history/README.md`, `docs/history/2026-07-candidate-baseline.md` |
-
-## Growth Rule
-
-Do not add candidate roadmaps, product specs, model lists, package catalogs, or
-thread-state documents here. Update an existing owner or route a product
-decision to App. New candidate docs require one durable purpose, lifecycle
-state, and authority boundary.
+Before retiring or moving a document, transfer unique current guarantees and
+repair inbound references in the same change. Do not retain aliases for removed
+documentation. Check links, file existence, license identity, and executable
+examples mechanically; assess meaning and owner boundaries from source and
+contracts, not required prose or heading snapshots.

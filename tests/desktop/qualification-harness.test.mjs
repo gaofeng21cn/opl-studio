@@ -16,7 +16,6 @@ test("clean VM and Gateway qualification remain candidate-only surfaces", () => 
   const cleanVm = fs.readFileSync(path.join(root, "scripts/desktop/qualify-clean-vm.mjs"), "utf8");
   const previewSmoke = fs.readFileSync(path.join(root, "scripts/desktop/preview-smoke.mjs"), "utf8");
   const gateway = fs.readFileSync(path.join(root, "scripts/desktop/diagnose-gateway-credential-persistence.mjs"), "utf8");
-  const docs = fs.readFileSync(path.join(root, "docs/delivery/desktop-distribution.md"), "utf8");
 
   assert.equal(packageJson.scripts["qualify:desktop:clean-vm"], "node scripts/desktop/qualify-clean-vm.mjs");
   assert.equal(packageJson.scripts["diagnose:gateway:persistence"], "node scripts/desktop/diagnose-gateway-credential-persistence.mjs");
@@ -33,8 +32,6 @@ test("clean VM and Gateway qualification remain candidate-only surfaces", () => 
   assert.match(gateway, /sha256/);
   assert.match(gateway, /mode0600After/);
   assert.match(gateway, /window\.oplStudio\.readState/);
-  assert.match(docs, /candidate evidence only/);
-  assert.match(docs, /Framework-owned/);
 });
 
 test("attach identity is unavailable without an app path and does not self-certify", async () => {

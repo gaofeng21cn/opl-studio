@@ -1,6 +1,6 @@
 # OPL Studio Architecture
 
-Owner: `one-person-lab-app`
+Owner: `opl-studio` implementation; App contracts retain product authority
 Purpose: `application_host_implementation_boundary`
 State: `active_technical_reference`
 Machine boundary: Human-readable implementation and authority map. Source and
@@ -36,6 +36,12 @@ The two Cordis Hosts have different scopes. Studio owns its App process,
 plugins, GUI, and Codex tool exposure. Framework owns OPL runtime/Package
 composition and projections. The bridge uses public contracts rather than
 sharing registries, currentness, sessions, or internal service graphs.
+
+Pinned MIT upstream GUI source keeps typography, layout, tokens, and ordinary
+interaction in one source cohort. OPL data, identity, and bridge adapters stay
+outside the vendor tree, making upgrades replayable without a parallel design
+system. Source identity and licenses live in `THIRD_PARTY_NOTICES.md`; the
+manifest owns exact versions and file integrity.
 
 ## Studio Application Host
 
@@ -210,11 +216,13 @@ the base image's `node` user, uses `/data` for `HOME`, `CODEX_HOME`, and OPL
 state, and uses `/projects` as the workspace root. The final PID 1 is Node;
 Electron, AionUI, and AionCore are absent.
 
-Those default build arguments establish a locally reproducible candidate, not
-a release freeze. App-owned release tooling must later replace them with the
-accepted source cohort and digest verification before publication. Remote
-exposure also remains inadmissible until an App-owned authentication and network
-boundary exists; Compose therefore publishes host loopback only.
+Default build arguments establish a local source cohort. The Preview workflow
+binds accepted inputs, native per-architecture smoke, attestations, and immutable
+registry identities before publishing a handoff. Cloud mode implements password
+authentication, signed sessions, and CSRF protection; TLS, tenant isolation,
+Workspace activation, and public routing remain Cloud-owned. The local Compose
+entry still publishes loopback only. See [OCI distribution](oci-distribution.md)
+for the operating contract.
 
 ## Runtime Independence
 
@@ -287,8 +295,8 @@ thread adapter.
 
 ## Model And Settings Boundary
 
-The user-facing Settings information architecture and contribution placement
-SSOT is documented in `docs/settings-information-architecture.md`. It keeps
+The Studio implementation of App-owned Settings contribution placement
+is documented in [Settings projection](settings-information-architecture.md). It keeps
 App/Framework package and connection truth authoritative while routing
 declarative settings views into the existing Resources, Services, and
 Capabilities destinations; Studio does not create a second package registry.
@@ -318,5 +326,5 @@ explicit App owner decision and a change to the App shell adapter after the
 relevant App-owned gates pass; only then may the AionUI mainline be retired.
 Candidate docs, tests, package artifacts, screenshots, or local live smoke
 cannot perform that transfer or prove release readiness. The current evaluation
-policy and next safe work route are maintained only in
-[the Active Truth plan](./active/current-state-vs-ideal-gap.md).
+evidence boundaries are maintained in
+[Adoption gaps](./active/current-state-vs-ideal-gap.md).
