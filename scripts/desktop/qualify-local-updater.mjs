@@ -130,6 +130,7 @@ function launchApp({ appPath, feedUrl, stateRoot, homeRoot }) {
       OPL_APP_OPL_BIN: "/usr/bin/true",
       OPL_NATIVE_WORKBENCH_CODEX_CWD: repositoryRoot,
       OPL_NATIVE_WORKBENCH_READ_ONLY: "1",
+      OPL_STUDIO_AION_MIGRATION: "0",
       OPL_DESKTOP_UPDATE_QUALIFICATION_FEED_URL: feedUrl,
       OPL_DESKTOP_UPDATE_QUALIFICATION_AUTOMATIC: "1",
       OPL_DESKTOP_UPDATE_QUALIFICATION_STATE_ROOT: stateRoot
