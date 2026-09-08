@@ -531,7 +531,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(JSON.stringify(typecheckConfig.compilerOptions?.paths?.["@deepseek-ai/dsh-client-ui-primitives"]) === JSON.stringify(primitiveAlias), "typecheck imports must resolve the DSH primitives specifier to the vendored upstream index");
   assert(!fs.existsSync(path.join(root, "src/integrations/deepseek-harness/uiPrimitives.tsx")), "the handwritten DSH primitive shim must stay absent");
   for (const [source, names] of [
-    [appSource, ["MessageText", "Pill"]],
+    [appSource, ["projectUserText", "Pill"]],
     [composerPalette, ["Button", "Input"]],
     [contributionComponents, ["Button", "Pill", "StateDot", "Tooltip"]]
   ]) {

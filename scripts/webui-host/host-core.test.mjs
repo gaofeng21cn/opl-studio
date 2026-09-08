@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "./app-server-transport.mjs";
 import { ChannelBindingStore } from "./channel-bindings.mjs";
@@ -735,4 +735,25 @@ test("Docker projects application.systemInfo.logDir as read-only /data/logs", as
     setLogDirectorySupported: false,
     reasonCode: "docker_log_directory_is_read_only"
   });
+});
+
+
+test("desktop workspace actions invoke the platform only after canonical path validation", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-workspace-native-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(path.join(directory, "report.pdf"), "%PDF-fixture");
+  const calls = [];
+  const core = new OplHostCore({ platform: { accessWorkspacePath: async (request) => { calls.push(request); } } });
+  core.threads.readThread = async () => ({ cwd: directory });
+  assert.deepEqual(await core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "open" }), { accepted: true });
+  await core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "reveal" });
+  assert.deepEqual(calls, [
+    { path: await realpath(path.join(directory, "report.pdf")), action: "open" },
+    { path: await realpath(path.join(directory, "report.pdf")), action: "reveal" }
+  ]);
+  await assert.rejects(core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "../secret.pdf", action: "open" }), (error) => error.code === "invalid_workspace_path");
+  await assert.rejects(core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "download" }), (error) => error.code === "invalid_workspace_action");
+  assert.equal(calls.length, 2);
+  core.platform.accessWorkspacePath = async () => { throw new Error("No associated application"); };
+  await assert.rejects(core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "open" }), /No associated application/);
 });

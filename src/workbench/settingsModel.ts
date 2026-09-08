@@ -29,6 +29,7 @@ export type SettingKey =
   | "notificationEnabled"
   | "artifactPreviewMode"
   | "professionalStarterDefaults"
+  | "fontSize"
   | "theme"
   | "developerDetails";
 
@@ -44,6 +45,7 @@ export type WorkbenchSettings = {
   artifactPreviewMode: "rich_refs_only";
   professionalStarterDefaults: "research_grant_presentation";
   theme: "system" | "light" | "dark";
+  fontSize: number;
   developerDetails: boolean;
 };
 
@@ -62,7 +64,7 @@ export const settingsSections: SettingsSection[] = [
   { id: "workspace", title: "Workspace", keys: ["defaultWorkspace"] },
   { id: "agents_capabilities", title: "Agents & Capabilities", keys: ["agentPermissions", "professionalStarterDefaults"] },
   { id: "runtime_maintenance", title: "Runtime & Maintenance", keys: ["runtimeProfile", "developerDetails"] },
-  { id: "preferences", title: "Preferences", keys: ["locale", "theme", "artifactPreviewMode", "notificationEnabled", "confirmBeforeExecute"] }
+  { id: "preferences", title: "Preferences", keys: ["locale", "theme", "fontSize", "notificationEnabled", "confirmBeforeExecute"] }
 ];
 
 export const settingsDefaults: WorkbenchSettings = {
@@ -77,6 +79,7 @@ export const settingsDefaults: WorkbenchSettings = {
   artifactPreviewMode: "rich_refs_only",
   professionalStarterDefaults: "research_grant_presentation",
   theme: "system",
+  fontSize: 14,
   developerDetails: false
 };
 
@@ -92,6 +95,7 @@ const allowedSettingsValues = {
   artifactPreviewMode: ["rich_refs_only"],
   professionalStarterDefaults: ["research_grant_presentation"],
   theme: ["system", "light", "dark"],
+  fontSize: [12, 13, 14, 15, 16, 17],
   developerDetails: [true, false]
 } as const;
 

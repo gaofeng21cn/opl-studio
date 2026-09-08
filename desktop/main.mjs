@@ -238,6 +238,14 @@ async function createDesktopHost(appLogDirectory) {
     ],
     channelBindingFile: path.join(app.getPath("userData"), "channel-transport-bindings.json"),
     platform: {
+      accessWorkspacePath: async ({ path: filePath, action }) => {
+        if (action === "reveal") {
+          shell.showItemInFolder(filePath);
+          return;
+        }
+        const failure = await shell.openPath(filePath);
+        if (failure) throw new Error(failure);
+      },
       pickFiles: async () => {
         const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"] });
         return result.canceled ? [] : result.filePaths.map((filePath) => ({

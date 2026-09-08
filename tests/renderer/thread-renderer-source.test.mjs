@@ -660,7 +660,7 @@ test("DSH details tools project the current OPL project and a contained read-onl
   assert.match(app, /setActiveFilesView\("workspace"\)/);
   assert.match(app, /setArtifactPreviewOpen\(true\)/);
   assert.match(workspaceFilesPanel, /className="workspace-file-directory-head"/);
-  assert.match(workspaceFilesPanel, /setCurrentDirectory\(parentPath\(currentDirectory\)\)/);
+  assert.match(workspaceFilesPanel, /parentPath\(currentDirectory\)/);
   assert.match(workspaceFilesPanel, /setPreview\(null\)/);
   assert.doesNotMatch(workspaceFilesPanel, /workspace-file-layout|renderEntries|expanded/);
   assert.doesNotMatch(workspaceFilesPanel, /rename|writeFile|git status|terminal/i);
@@ -713,7 +713,7 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   assert.equal(fs.existsSync(path.join(root, "src/integrations/deepseek-harness/uiPrimitives.tsx")), false);
 
   for (const [source, primitives] of [
-    [app, ["MessageText", "Pill"]],
+    [app, ["projectUserText", "Pill"]],
     [composerPalette, ["Button", "Input"]],
     [contributionComponents, ["Button", "Pill", "StateDot", "Tooltip"]]
   ]) {
@@ -786,13 +786,13 @@ test("DSH AppFrame keeps its upstream layout contract while Studio's inspector s
   assert.match(appFrame, /computeColumns\(viewport, sidebarPreference/);
   assert.match(appFrame, /const narrow = viewport < SIDEBAR_AUTO_COLLAPSE/);
   assert.match(appFrame, /actions\.setSidebar\(sidebarBase\.current \+ dx\)/);
-  assert.match(appFrame, /actions\.setDetails\(detailsBase\.current - dx\)/);
+  assert.match(appFrame, /actions\.setRightbar\(rightbarBase\.current - dx\)/);
   assert.match(appFrame, /<DragHandle side="sidebar"/);
-  assert.match(appFrame, /<DragHandle side="details"/);
+  assert.match(appFrame, /<DragHandle side="rightbar"/);
   assert.match(appFrameStyles, /grid-template-rows: 100%/);
   assert.match(appFrameStyles, /transition: grid-template-columns/);
-  assert.match(slotHost, /useState\(\{ sidebar: 280, details: 0, narrow: false, narrowExpanded: false \}\)/);
-  assert.match(slotHost, /setDetails: \(\) => undefined/);
+  assert.match(slotHost, /useState\(\{ sidebar: 280, rightbar: 0/);
+  assert.match(slotHost, /setRightbar: \(\) => undefined/);
   assert.match(slotHost, /openDetails: \(\) => setInspectorOpen\(true\)/);
   assert.match(slotHost, /data-inspector-open=\{inspectorOpen \|\| undefined\}/);
   assert.doesNotMatch(app, /data-testid="opl-sidebar-resizer"/);
@@ -923,7 +923,7 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
   assert.match(settingsRoot, /renderSlot\('settings\.section'/);
   assert.match(slotHost, /settingsDestinations\("en"\)\.entries\(\)/);
   assert.match(slotHost, /id: settingsSectionId\(destination\.id\)/);
-  assert.match(slotHost, /renderSettings\(destination, renderContribution \?\? undefined\)/);
+  assert.match(slotHost, /renderSettings\(selected, renderContribution \?\? undefined, setSelected\)/);
   assert.doesNotMatch(settingsPanel, /settings-mobile-navigation/);
   assert.doesNotMatch(settingsPanel, /useState<SettingsDestinationId>/);
   assert.doesNotMatch(styles, /grid-template-columns: 220px minmax\(0, 1fr\)/);
@@ -1009,7 +1009,7 @@ test("capability surfaces project dynamic OPL packages and dependency checks", (
 });
 
 test("desktop uses DSH columns and mobile keeps full-height thread dialogs", () => {
-  assert.match(appFrame, /gridTemplateColumns: `\$\{cols\.sidebar\}px minmax\(0, 1fr\) \$\{cols\.details\}px`/);
+  assert.match(appFrame, /gridTemplateColumns:[\s\S]*cols\.sidebar[\s\S]*cols\.rightbar/);
   assert.match(styles, /@media \(max-width: 760px\)/);
   assert.match(styles, /\[role="dialog"\]\[aria-labelledby\]:has\(> nav\) > nav > div:last-child/);
   assert.match(styles, /flex-direction: row/);

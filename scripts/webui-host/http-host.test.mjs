@@ -141,6 +141,24 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   const workspaceFile = await post(baseUrl, "/api/threads/workspace/read", { threadId: "thread-idle", relativePath: "workspace-note.md" });
   assert.equal(workspaceFile.status, 200);
   assert.equal(workspaceFile.body.content, "# Workspace note\n");
+  const binary = Buffer.from([0, 255, 10, 128, 0]);
+  await writeFile(path.join(directory, "报告.pdf"), binary);
+  const download = await fetch(`${baseUrl}/api/threads/workspace/download`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ threadId: "thread-idle", relativePath: "报告.pdf" })
+  });
+  assert.equal(download.status, 200);
+  assert.equal(download.headers.get("content-type"), "application/octet-stream");
+  assert.match(download.headers.get("content-disposition"), /attachment;.*filename\*=UTF-8''%E6%8A%A5%E5%91%8A.pdf/);
+  assert.equal(download.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), binary);
+  const byteWindow = await post(baseUrl, "/api/threads/workspace/bytes", { threadId: "thread-idle", relativePath: "报告.pdf", offset: 1, length: 2 });
+  assert.equal(byteWindow.status, 200);
+  assert.deepEqual(Buffer.from(byteWindow.body.data, "base64"), binary.subarray(1, 3));
+  assert.equal(byteWindow.body.eof, false);
+  const unsafeDownload = await post(baseUrl, "/api/threads/workspace/download", { threadId: "thread-idle", relativePath: "../secret.txt" });
+  assert.equal(unsafeDownload.status, 400);
+  assert.equal(unsafeDownload.body.error.code, "invalid_workspace_path");
   const workspaceSearch = await post(baseUrl, "/api/threads/workspace/search", { threadId: "thread-idle", query: "workspace-note" });
   assert.deepEqual(workspaceSearch.body.entries.map((entry) => entry.relativePath), ["workspace-note.md"]);
   const traversal = await post(baseUrl, "/api/threads/workspace/read", { threadId: "thread-idle", relativePath: "../outside.txt" });

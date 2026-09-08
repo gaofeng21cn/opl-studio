@@ -1093,6 +1093,7 @@ export const codexWorkbenchStyles = `
   }
 
   .message-frame {
+    font-size: var(--dsh-content-font-size, 14px);
     width: 100%;
     padding: 0;
     border: 0;
@@ -1128,7 +1129,7 @@ export const codexWorkbenchStyles = `
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    font-size: var(--opl-text-body);
+    font-size: var(--dsh-content-font-size, 14px);
     line-height: var(--opl-leading-relaxed);
   }
 
@@ -5213,5 +5214,41 @@ export const codexWorkbenchStyles = `
     .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav > div:last-child {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+  }
+
+  .opl-settings-slot-root .sss-pop { background: var(--opl-canvas); z-index: 100; min-width: 220px; }
+  /* OPL navigation content inside the unchanged DSH settings shell. */
+  .opl-settings-slot-root [role="dialog"] { width: 1040px; }
+  .opl-settings-slot-root [role="dialog"] > nav { width: 208px; }
+  .opl-settings-slot-root [role="dialog"] > nav button > svg { display: none; }
+  .opl-settings-nav-label { display: flex; align-items: center; gap: 10px; }
+  .opl-settings-nav-label > svg { flex: none; }
+  .settings-detail-header, .settings-content { padding-left: 24px; padding-right: 24px; }
+  .settings-detail-title-row { flex-wrap: wrap; align-items: flex-start; }
+  .settings-subnav { flex-wrap: wrap; }
+  .settings-subnav button { white-space: nowrap; }
+  .settings-subnav button[aria-current="page"] { color: var(--opl-text); background: var(--opl-hover); border-color: var(--opl-text); }
+  .agent-catalog-toolbar { flex-wrap: wrap; }
+  .agent-catalog-toolbar .settings-search-field { flex: 1 1 190px; width: auto; }
+  .segmented-control { flex-shrink: 0; max-width: 100%; }
+  .segmented-control button { white-space: nowrap; flex-shrink: 0; }
+  .workspace-file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 10px; }
+  .workspace-file-selection { display: flex; flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
+  .workspace-file-status { color: var(--opl-muted); overflow-wrap: anywhere; }
+  .workspace-file-row.is-selected { background: var(--opl-hover); outline: 1px solid var(--opl-border); }
+  .workspace-file-actions button { border: 1px solid var(--opl-border); background: var(--opl-canvas); color: var(--opl-text); border-radius: 7px; padding: 6px 9px; }
+  @media (max-width: 640px) {
+    .opl-settings-slot-root [role="dialog"] { width: 100vw; max-width: 100vw; height: 100dvh; border-radius: 0; flex-direction: column; }
+    .opl-settings-slot-root [role="dialog"] > nav { width: 100%; padding: 12px 44px 8px 12px; gap: 0; }
+    .opl-settings-slot-root [role="dialog"] > nav > div:first-child { position: relative; width: auto; height: auto; overflow: visible; padding: 0 0 8px; }
+    .opl-settings-slot-root .sss-title { display: none; }
+    .opl-settings-slot-root [role="dialog"] > nav > div:last-child { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
+    .opl-settings-slot-root [role="dialog"] > nav button { flex: none; padding: 8px 10px; height: 38px; }
+    .opl-settings-nav-label > svg { display: none; }
+    .opl-settings-slot-root [role="dialog"] > nav + div { min-height: 0; width: 100%; }
+    .opl-settings-slot-root [role="dialog"] > nav + div > div:first-child { position: absolute; right: 8px; top: 14px; height: auto; padding: 0; }
+    .settings-detail-header { padding-top: 12px; padding-bottom: 16px; }
+    .settings-detail-header, .settings-content { padding-left: 16px; padding-right: 16px; }
+    .settings-detail-title-row { gap: 12px; }
   }
 `;

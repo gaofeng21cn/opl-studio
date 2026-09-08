@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   eventSourceUrl: "electron://opl",
   platformCapabilities: {
     workspaceRootSelection: true,
+    nativeWorkspaceFileAccess: true,
     codexInstall: true,
     modelAccessSecretInput: true
   },
@@ -42,7 +43,9 @@ contextBridge.exposeInMainWorld("oplStudio", {
   releaseInputs: (cleanupTokens) => invoke("releaseInputs", { cleanupTokens }),
   notifyCompletion: (request) => invoke("notifyCompletion", request),
   listThreadWorkspace: (request) => invoke("listThreadWorkspace", request),
+  readThreadWorkspaceBytes: (request) => invoke("readThreadWorkspaceBytes", request),
   readThreadWorkspaceFile: (request) => invoke("readThreadWorkspaceFile", request),
+  accessThreadWorkspace: (request) => invoke("accessThreadWorkspace", request),
   searchThreadWorkspace: (request) => invoke("searchThreadWorkspace", request),
   setLogDirectory: (request) => invoke("setLogDirectory", request),
   sendMessage: (request) => invoke("sendMessage", request),

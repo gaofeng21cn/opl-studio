@@ -1,0 +1,15 @@
+{
+  "package": "dsh-file-viewer",
+  "version": "0.3.3",
+  "repository": "https://github.com/liguobao/dsh-file-viewer",
+  "license": "MIT",
+  "integrity": "sha512-7oSTZ59WEol7qJ6VlpNmLgt0KSHNeSZLaT6h6w1uv1mH9IyYXBPsodrS/U/26PURT/tfslFiXce1jrW5DqA4lw==",
+  "mode": "unmodified_npm_browser_artifact_only",
+  "hostHalfLoaded": false,
+  "peerPolicy": "original_metadata_preserved_no_peer_override",
+  "files": {
+    "client.js": "40c4bc28b7d330c20f24c864151a89e03377b9e978baf0826e654d74b660d482",
+    "LICENSE": "479f919f6fac94823353ac377bfc37acff66879fae135582b62c41a136c14788",
+    "upstream-package.json": "1bc3f34b4db550e45670cf89fb851a2e7ed457595aaa71f5f4ff597bc23bb155"
+  }
+}

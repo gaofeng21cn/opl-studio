@@ -232,6 +232,7 @@ function serviceStatus(value: string | null): "healthy" | "attention" | "unavail
 
 function serviceStatusLabel(status: ServiceStatusSummary["state"], locale: OplContributionSlotOwner["locale"]): string {
   const labels: Record<ServiceStatusSummary["state"], [string, string]> = {
+    idle: ["尚未运行", "Not running"],
     done: ["运行正常", "Operating normally"],
     warning: ["需要关注", "Needs attention"],
     error: ["当前不可用", "Unavailable"],

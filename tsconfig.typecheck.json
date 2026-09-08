@@ -3,7 +3,12 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "paths": {
-      "@deepseek-ai/dsh-client-ui-primitives": ["src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"]
+      "@deepseek-ai/dsh-client-ui-primitives": [
+        "src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"
+      ],
+      "@deepseek-ai/dsh-util-workspace-path": [
+        "src/vendor/deepseek-harness/packages/util/workspace-path/src/index.ts"
+      ]
     }
   }
 }

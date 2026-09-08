@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
+import { verifyViewerCarrier, viewerCarrierRoot } from "./ecosystem-client-assets.mjs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -265,6 +267,18 @@ export function buildRenderer({
 } = {}) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
+  verifyViewerCarrier();
+  const require = createRequire(import.meta.url);
+  const pluginRoot = path.join(outDir, "ecosystem");
+  fs.mkdirSync(pluginRoot, { recursive: true });
+  for (const [id, name] of [["@deepseek-ai/dsh-client-modules", "dsh-client-modules"], ["@objectivex666/dsh-settings-search", "dsh-settings-search"]]) {
+    fs.copyFileSync(require.resolve(`${id}/client`), path.join(pluginRoot, `${name}.js`));
+    fs.copyFileSync(path.join(root, "node_modules", id, "LICENSE"), path.join(pluginRoot, `${name}.LICENSE`));
+  }
+  fs.copyFileSync(path.join(viewerCarrierRoot, "client.js"), path.join(pluginRoot, "dsh-file-viewer.js"));
+  for (const file of ["LICENSE", "manifest.json", "upstream-package.json"]) {
+    fs.copyFileSync(path.join(viewerCarrierRoot, file), path.join(pluginRoot, `dsh-file-viewer.${file}`));
+  }
   const appProductProfile = readAppProductProfile();
   const modelPolicy = createCodexModelPolicy(appProductProfile);
   const clientCompositionProfile = createClientCompositionPolicy(appProductProfile);

@@ -1,3 +1,4 @@
+import { FontSizeRow } from "../vendor/deepseek-harness/packages/client/ui-theme/src/client/FontSizeRow";
 import {
   AlertCircle,
   Plus,
@@ -113,6 +114,7 @@ type SettingsPanelProps = {
   capabilityError: string;
   onRefreshCapabilities: () => void;
   activeDestination: SettingsDestinationId;
+  onNavigate?: (destination: SettingsDestinationId) => void;
   onRefresh: () => void;
   onRefreshInitialization: () => void;
   setupCapabilities: {
@@ -261,7 +263,7 @@ const navigationCopy = {
   }
 } as const;
 
-function navigationGroups(locale: WorkbenchSettings["locale"]): NavigationGroup[] {
+export function navigationGroups(locale: WorkbenchSettings["locale"]): NavigationGroup[] {
   const copy = navigationCopy[locale];
   return [
     { id: "overview", label: copy.groups.overview, destinations: [{ id: "overview", label: copy.destinations.overview }] },
@@ -551,7 +553,7 @@ export function gatewayModelAccessState(projection: WorkbenchSettingsProjection 
 
 function SettingRow({ label, detail, children }: { label: string; detail?: string; children: ReactNode }) {
   return (
-    <div className="settings-row">
+    <div className="settings-row" data-slot="settings.general.item">
       <div className="settings-row-label">
         <span>{label}</span>
         {detail ? <small>{detail}</small> : null}
@@ -1110,7 +1112,7 @@ function CapabilityDirectory({
             {group.visible.map((item) => (
               <details className="settings-capability-row" key={`${group.id}:${item.id}`}>
                 <summary>
-                  <span className="settings-capability-copy"><strong>{item.name}</strong><small>{item.description || item.detail}</small></span>
+                  <span className="settings-capability-copy"><strong>{item.name}</strong>{item.description && item.description !== item.name ? <small>{item.description}</small> : null}</span>
                   <span className="settings-capability-state"><StatusValue status={item.status} locale={locale} /><ChevronDown aria-hidden="true" size={14} /></span>
                 </summary>
                 <div className="settings-capability-details">
@@ -1560,6 +1562,7 @@ export function SettingsPanel({
   capabilityError,
   onRefreshCapabilities,
   activeDestination,
+  onNavigate,
   onRefresh,
   onRefreshInitialization,
   setupCapabilities,
@@ -1586,8 +1589,8 @@ export function SettingsPanel({
   const locale = settings.locale === "zh" ? "zh-CN" : "en-US";
   const copy = navigationCopy[settings.locale].destinations;
   const [subDestination, setSubDestination] = useState<SettingsDestinationId | null>(null);
-  const activeGroup = groups.find((group) => group.destinations[0]?.id === activeDestination);
-  const selectedDestination = activeGroup?.destinations.some((destination) => destination.id === subDestination)
+  const activeGroup = groups.find((group) => group.destinations.some((destination) => destination.id === activeDestination));
+  const selectedDestination = !onNavigate && activeGroup?.destinations.some((destination) => destination.id === subDestination)
     ? subDestination!
     : activeDestination;
   const projection = model.settingsProjection;
@@ -1679,7 +1682,7 @@ export function SettingsPanel({
     const value = settings[key];
     if (typeof value === "boolean") {
       return (
-        <button className="setting-switch" role="switch" aria-checked={value} type="button" onClick={() => onSettingChange(key, !value)}>
+        <button className="setting-switch" role="switch" aria-checked={value} aria-label={key === "notificationEnabled" ? (settings.locale === "zh" ? "任务完成通知" : "Task completion notifications") : key === "confirmBeforeExecute" ? (settings.locale === "zh" ? "执行前确认" : "Confirm before execute") : (settings.locale === "zh" ? "技术详情" : "Technical details")} type="button" onClick={() => onSettingChange(key, !value)}>
           <span className="setting-switch-track" aria-hidden="true"><span /></span>
           <span>{settingValueLabel(key, value)}</span>
         </button>
@@ -1707,7 +1710,7 @@ export function SettingsPanel({
         <select className="setting-select" data-testid="opl-model-access-entry" aria-label={settings.locale === "zh" ? "会话模型" : "Conversation model"} value={value} onChange={(event) => onSettingChange("modelAccess", event.currentTarget.value)}>
           <option value="__auto">{autoModelLabel(settings.locale)}</option>
           {value !== "__auto" && !modelOptions.some((option) => option.id === value) ? (
-            <option value={value} disabled>{modelLabel(value, settings.locale)} ({settings.locale === "zh" ? "不可用" : "Unavailable"})</option>
+            <option value={value} disabled>{modelLabel(String(value), settings.locale)} ({settings.locale === "zh" ? "不可用" : "Unavailable"})</option>
           ) : null}
           {modelOptions.map((option) => (
             <option key={option.id} value={option.id} disabled={!option.available}>
@@ -2071,7 +2074,7 @@ export function SettingsPanel({
       const webuiStore = projection?.storage.webuiDataVolume;
       return (
         <>
-          <div className="settings-page-summary"><span>{settings.locale === "zh" ? "仅显示可确认的用量；未知不会显示为 0" : "Only confirmed usage is shown; unknown usage is never shown as zero"}</span></div>
+          <div className="settings-page-summary"><span>{settings.locale === "zh" ? "查看工作数据和已安装组件的存储用量" : "Storage used by your work data and installed components"}</span></div>
           <SettingsGroup title={settings.locale === "zh" ? "智能体数据" : "Agent data"}>
             <SettingRow label={settings.locale === "zh" ? "用量统计" : "Usage"} detail={storageReason(agentStore, settings.locale)}>
               <span className="runtime-setting-control">
@@ -2298,7 +2301,7 @@ export function SettingsPanel({
               useStore={(selector) => selector({ preference: settings.theme, revision: 0 })}
               actions={{ sync: () => undefined }}
             />
-            <SettingRow label={settings.locale === "zh" ? "文件预览" : "File previews"}>{renderSettingControl("artifactPreviewMode")}</SettingRow>
+            <FontSizeRow t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSize: settings.fontSize, revision: 0 })} actions={{ sync: () => undefined }} />
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
             <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>
@@ -2359,11 +2362,12 @@ export function SettingsPanel({
             <h1>{copy[selectedDestination]}</h1>
             {activeGroup && activeGroup.destinations.length > 1 ? (
               <nav className="settings-subnav" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} sections`}>
-                {activeGroup.destinations.filter((destination) => destination.id !== selectedDestination).map((destination) => (
+                {activeGroup.destinations.map((destination) => (
                   <button
                     key={destination.id}
                     type="button"
-                    onClick={() => setSubDestination(destination.id)}
+                    aria-current={destination.id === selectedDestination ? "page" : undefined}
+                    onClick={() => onNavigate ? onNavigate(destination.id) : setSubDestination(destination.id)}
                   >
                     {destination.label}
                   </button>

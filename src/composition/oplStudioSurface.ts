@@ -64,7 +64,7 @@ export type OplStudioSurface = {
   detailTabs: readonly OplStudioDetailTab[];
   activeDetailTabId: OplStudioDetailTab["id"];
   openDetailTab(tabId: OplStudioDetailTab["id"]): void;
-  renderSettings(destination: SettingsDestinationId, renderContribution?: RenderSettingsContribution): ReactNode;
+  renderSettings(destination: SettingsDestinationId, renderContribution?: RenderSettingsContribution, onNavigate?: (destination: SettingsDestinationId) => void): ReactNode;
   initializationStatus: "loading" | "ready" | "error";
   initialization: OplInitializeReadback | null;
   refreshInitialization(): void;

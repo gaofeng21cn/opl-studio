@@ -1,8 +1,13 @@
-import { lstat, opendir, open, realpath, stat } from "node:fs/promises";
+import { access, lstat, opendir, open, realpath, stat } from "node:fs/promises";
 import path from "node:path";
+import { constants } from "node:fs";
+import { Readable } from "node:stream";
 import { ThreadAdapterError } from "./thread-adapter.mjs";
 
 const DEFAULT_MAX_ENTRIES = 200;
+const DEFAULT_MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024;
+// Open documents through their registered viewer; executable and link formats remain reveal-only.
+const EXTERNAL_DOCUMENT_EXTENSIONS = new Set("txt md markdown rst log csv tsv json yaml yml toml xml ini conf tex bib pdf doc docx odt rtf xls xlsx ods ppt pptx odp pages numbers key png jpg jpeg gif webp bmp tiff tif heic avif mp3 wav m4a flac ogg mp4 mov m4v webm avi mkv".split(" "));
 const DEFAULT_MAX_PREVIEW_BYTES = 64 * 1024;
 const READ_CHUNK_BYTES = 64 * 1024;
 const MAX_SEARCH_SCANNED_ENTRIES = 5_000;
@@ -215,13 +220,15 @@ function workspaceValue(thread) {
 export function createThreadWorkspaceService({
   threads,
   maxEntries = DEFAULT_MAX_ENTRIES,
-  maxPreviewBytes = DEFAULT_MAX_PREVIEW_BYTES
+  maxPreviewBytes = DEFAULT_MAX_PREVIEW_BYTES,
+  maxDownloadBytes = DEFAULT_MAX_DOWNLOAD_BYTES
 } = {}) {
   if (!threads || typeof threads.readThread !== "function") {
     throw error("thread_adapter_unavailable", "A threads adapter with readThread is required", {}, 503);
   }
   const entryLimit = normalizeLimit(maxEntries, DEFAULT_MAX_ENTRIES, "maxEntries");
   const previewLimit = normalizeLimit(maxPreviewBytes, DEFAULT_MAX_PREVIEW_BYTES, "maxPreviewBytes");
+  const downloadLimit = normalizeLimit(maxDownloadBytes, DEFAULT_MAX_DOWNLOAD_BYTES, "maxDownloadBytes");
 
   async function resolveWorkspace(threadId) {
     const thread = await threads.readThread({ threadId });
@@ -361,6 +368,88 @@ export function createThreadWorkspaceService({
     };
   }
 
+  async function resolveAccess(request = {}) {
+    assertRequestObject(request, "access");
+    const threadId = requiredString(request.threadId, "threadId");
+    if (!["open", "reveal", "download"].includes(request.action)) {
+      throw error("invalid_workspace_action", "Unsupported workspace file action", {}, 400);
+    }
+    const pathInfo = normalizeRelativePath(request.relativePath, { required: request.action === "download" });
+    const root = await resolveWorkspace(threadId);
+    const target = await resolveTarget(root, pathInfo);
+    try {
+      const info = await stat(target);
+      if (!info.isFile() && !info.isDirectory()) {
+        throw error("workspace_not_regular_file", "Workspace path is not a file or directory", {}, 415);
+      }
+      // Application bundles are directories too. Reveal them instead of executing them.
+      const bundle = /\.(app|bundle|framework)$/i.test(target);
+      if (request.action === "open" && (bundle || (info.isFile() && !EXTERNAL_DOCUMENT_EXTENSIONS.has(path.extname(target).slice(1).toLowerCase())))) {
+        throw error("workspace_open_type_unsupported", "This file type must be opened from your file manager", {}, 415);
+      }
+      await access(target, constants.R_OK | (info.isDirectory() ? constants.X_OK : 0));
+      if (request.action === "download" && !info.isFile()) {
+        throw error("workspace_not_regular_file", "Only regular files can be downloaded", {}, 415);
+      }
+      return { threadId, relativePath: pathInfo.relativePath, target, info, root, pathInfo };
+    } catch (reason) {
+      throw mapFsError(reason, { operation: request.action, relativePath: pathInfo.relativePath });
+    }
+  }
+
+  async function openDownloadFile(request = {}) {
+    const resolved = await resolveAccess({ ...request, action: "download" });
+    const { target, threadId, relativePath, root, pathInfo } = resolved;
+    let handle;
+    try {
+      // Retain the checked descriptor for streaming; do not reopen a mutable pathname.
+      handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      const info = await handle.stat();
+      if (!info.isFile()) throw error("workspace_not_regular_file", "Only regular files can be downloaded", {}, 415);
+      const currentTarget = await resolveTarget(root, pathInfo);
+      const currentInfo = await stat(currentTarget);
+      if (currentTarget !== target || currentInfo.dev !== info.dev || currentInfo.ino !== info.ino) {
+        throw error("workspace_path_changed", "Workspace file changed while opening; try again", {}, 409);
+      }
+      if (info.size > downloadLimit) {
+        throw error("workspace_file_too_large", "File exceeds the download limit", { maxDownloadBytes: downloadLimit }, 413);
+      }
+      return { threadId, relativePath, name: path.basename(target), sizeBytes: info.size, handle };
+    } catch (reason) {
+      await handle?.close().catch(() => undefined);
+      throw mapFsError(reason, { operation: "download", relativePath });
+    }
+  }
+
+  async function download(request = {}) {
+    const file = await openDownloadFile(request);
+    const { handle, ...metadata } = file;
+    return {
+      ...metadata,
+      stream: file.sizeBytes ? handle.createReadStream({ start: 0, end: file.sizeBytes - 1 }) : Readable.from([]),
+      close: () => handle.close().catch(() => undefined)
+    };
+  }
+
+  async function readBytes(request = {}) {
+    assertRequestObject(request, "readBytes");
+    const { offset = 0, length = 512 * 1024 } = request;
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(length) || length < 1 || length > 512 * 1024) {
+      throw error("invalid_workspace_range", "Byte range requires non-negative offset and length between 1 and 512 KiB", {}, 400);
+    }
+    const file = await openDownloadFile(request);
+    try {
+      const requested = Math.min(length, Math.max(0, file.sizeBytes - offset));
+      const buffer = Buffer.alloc(requested);
+      const { bytesRead } = requested ? await file.handle.read(buffer, 0, requested, offset) : { bytesRead: 0 };
+      return { data: buffer.subarray(0, bytesRead).toString("base64"), offset, sizeBytes: file.sizeBytes, eof: offset + bytesRead >= file.sizeBytes || bytesRead === 0 };
+    } catch (reason) {
+      throw mapFsError(reason, { operation: "readBytes", relativePath: request.relativePath });
+    } finally {
+      await file.handle.close().catch(() => undefined);
+    }
+  }
+
   async function search(request = {}) {
     assertRequestObject(request, "search");
     const threadId = requiredString(request.threadId, "threadId");
@@ -447,7 +536,7 @@ export function createThreadWorkspaceService({
     };
   }
 
-  return Object.freeze({ list, read, search });
+  return Object.freeze({ list, read, search, resolveAccess, download, readBytes });
 }
 
 export default createThreadWorkspaceService;

@@ -14,7 +14,7 @@ OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
   `dsh-host-plugin-inventory`, `dsh-host-webserver`, `dsh-invariants`,
   `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, and
   `dsh-typert-protocol`, `dsh-client-store`, `dsh-agent-presets`, and
-  `dsh-util-workspace-path`, all at `0.1.2-rc.1`;
+  `dsh-util-workspace-path`, all at `0.1.3-alpha.2`;
 - `use-sync-external-store` `1.2.0` for the vendored renderer closure;
 - Lexical and its history, plain-text, text, and utility modules `0.49.0`
   for the upstream composer (MIT, Meta Platforms, Inc. and affiliates).
@@ -25,7 +25,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `a66e4702047846cdaa10c66c9d3df3951f5ea70d`
+Inspected source ref: `c389f96bf3a9b6807cb71ed6bdad5849be0df6d8`
 
 The complete `src/` trees of eleven GUI packages are vendored byte-for-byte from
 that ref under `src/vendor/deepseek-harness/packages/client/`:
@@ -42,8 +42,8 @@ that ref under `src/vendor/deepseek-harness/packages/client/`:
 - `ui-primitives`
 - `ui-renderer`
 
-The snapshot contains 250 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.1.2-rc.1`), and
+The snapshot contains 336 files, including the upstream `LICENSE`. Its package
+roots, per-file SHA-256 inventory, source package version (`0.1.3-alpha.2`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks local byte parity. OPL changes stay outside the vendor root.
@@ -119,3 +119,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Community client plugins
+
+Studio loads the original browser module of `dsh-file-viewer` 0.3.3 (MIT),
+from https://github.com/liguobao/dsh-file-viewer, through DSH ClientModuleSystem.
+`packages/opl-studio-ecosystem/dsh-file-viewer/manifest.json` records the npm
+integrity and exact payload hashes; the original license and package metadata
+are included. The Host half is not loaded; the public content provider reads
+through Studio's canonical thread workspace bridge. No peer metadata is changed.
+
+`@objectivex666/dsh-settings-search` 1.2.0 is an unmodified, separately loaded
+GPL-3.0 client plugin from https://github.com/objectivex666/dsh-settings-search
+(tag v1.2.0). Its license is included in renderer `plugins/` output. This local
+search version does not introduce an AI provider or credential store.
+Source and installation instructions remain available in that upstream repository.
+The notices and corresponding source availability must accompany distribution;
+these plugins' licenses are not replaced by Studio's MIT license.

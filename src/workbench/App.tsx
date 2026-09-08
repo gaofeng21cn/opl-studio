@@ -1,4 +1,4 @@
-import { Button, MessageText, Modal, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, projectUserText, Modal, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Streamdown } from "streamdown";
 import {
   Activity,
@@ -1228,6 +1228,11 @@ export function App({
     media.addEventListener("change", applyTheme);
     return () => media.removeEventListener("change", applyTheme);
   }, [settings.theme]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--dsh-content-font-size", `${settings.fontSize}px`);
+    document.documentElement.style.setProperty("--opl-content-font-size", `${settings.fontSize}px`);
+  }, [settings.fontSize]);
 
   useEffect(() => {
     if (!codexThreadId || !messages.length) return;
@@ -2843,7 +2848,7 @@ export function App({
           <div className="message-frame">
             {message.role === "assistant" ? (
               <Streamdown controls={assistantMarkdownControls} lineNumbers={false} linkSafety={assistantMarkdownLinkSafety} mode="static">{assistantDisplayMarkdown(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply))}</Streamdown>
-            ) : <MessageText text={message.text || (sendState === "running" ? t.codexWorking : t.waitingReply)} />}
+            ) : <p>{projectUserText(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply), [])}</p>}
           </div>
           {message.role === "assistant" && index === messages.length - 1 && sendState === "running" ? <div className="run-events">{eventFeed.slice(0, 4).reverse().map((item, eventIndex) => <span key={`${item}-${eventIndex}`}>{item}</span>)}</div> : null}
           {message.role === "assistant" ? <span data-testid="opl-codex-reply" hidden /> : null}
@@ -2934,6 +2939,9 @@ export function App({
               locale={settings.locale}
               listWorkspace={bridge.listThreadWorkspace}
               readFile={bridge.readThreadWorkspaceFile}
+              readBytes={bridge.readThreadWorkspaceBytes}
+              accessWorkspace={bridge.accessThreadWorkspace}
+              nativeFileAccess={bridge.platformCapabilities.nativeWorkspaceFileAccess === true}
               searchWorkspace={bridge.searchThreadWorkspace}
             />
           ) : null}
@@ -3014,7 +3022,7 @@ export function App({
     </aside>
   );
 
-  const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode) => (
+  const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void) => (
     <SettingsPanel
       model={model}
       managedUpdate={managedUpdate}
@@ -3037,6 +3045,7 @@ export function App({
       capabilityError={capabilityError}
       onRefreshCapabilities={() => void loadCapabilities()}
       activeDestination={activeDestination}
+      onNavigate={onNavigate}
       onRefresh={() => void loadState(settings.runtimeProfile)}
       onRefreshInitialization={() => { void loadInitialize(); }}
       setupCapabilities={{

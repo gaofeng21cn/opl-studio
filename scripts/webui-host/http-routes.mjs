@@ -1,5 +1,6 @@
 import { ThreadAdapterError } from "./thread-adapter.mjs";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
 
 function json(res, status, value) {
@@ -11,6 +12,7 @@ function json(res, status, value) {
 }
 
 function errorResponse(res, error) {
+  if (res.headersSent) { res.destroy(error); return; }
   const typed = error instanceof ThreadAdapterError
     ? error
     : new ThreadAdapterError(
@@ -135,6 +137,23 @@ async function dispatchApi(req, res, hostCore) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/threads/workspace/download") {
+    const file = await hostCore.threadWorkspace.download(await body(req));
+    try {
+      res.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-disposition": `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(file.name).replace(/['()*]/g, (char) => `%${char.charCodeAt(0).toString(16)}`)}`,
+        "content-length": file.sizeBytes,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      });
+      await pipeline(file.stream, res);
+    } finally {
+      await file.close();
+    }
+    return;
+  }
+
   const postRoutes = new Map([
     ["/api/threads/list", (value) => hostCore.invoke("listThreads", value)],
     ["/api/threads/read", (value) => hostCore.invoke("readThread", value)],
@@ -143,6 +162,7 @@ async function dispatchApi(req, res, hostCore) {
     ["/api/threads/rename", (value) => hostCore.invoke("renameThread", value)],
     ["/api/threads/delete", (value) => hostCore.invoke("deleteThread", value)],
     ["/api/threads/workspace/list", (value) => hostCore.invoke("listThreadWorkspace", value)],
+    ["/api/threads/workspace/bytes", (value) => hostCore.invoke("readThreadWorkspaceBytes", value)],
     ["/api/threads/workspace/read", (value) => hostCore.invoke("readThreadWorkspaceFile", value)],
     ["/api/threads/workspace/search", (value) => hostCore.invoke("searchThreadWorkspace", value)],
     ["/api/threads/archive", (value) => hostCore.invoke("setArchived", { ...value, archived: true })],

@@ -158,6 +158,7 @@ export function installWebTransport(): void {
     eventSourceUrl,
     platformCapabilities: {
       workspaceRootSelection: false,
+      nativeWorkspaceFileAccess: false,
       codexInstall: false,
       modelAccessSecretInput: true
     },
@@ -189,7 +190,27 @@ export function installWebTransport(): void {
       };
     },
     listThreadWorkspace: (request) => postJson("/api/threads/workspace/list", request),
+    readThreadWorkspaceBytes: (request) => postJson("/api/threads/workspace/bytes", request),
     readThreadWorkspaceFile: (request) => postJson("/api/threads/workspace/read", request),
+    accessThreadWorkspace: async (request) => {
+      if (request.action !== "download") throw new WebTransportError("desktop_capability_unavailable", "Download files to open them on this device");
+      const response = await fetch("/api/threads/workspace/download", await authenticatedInit({
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request)
+      }));
+      if (!response.ok) {
+        const value = await response.json();
+        throw new WebTransportError(value.error?.code ?? "workspace_download_failed", value.error?.message ?? "Unable to download workspace file");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = request.relativePath?.split("/").at(-1) ?? "download";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return { accepted: true };
+    },
     searchThreadWorkspace: (request) => postJson("/api/threads/workspace/search", request),
     setLogDirectory: () => Promise.resolve({
       schema: "opl_app_log_directory_update.v1",

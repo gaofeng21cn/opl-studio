@@ -23,7 +23,8 @@ function defaultPlatformServices() {
     pickDirectory: unavailablePlatformCapability("pickDirectory"),
     classifyInputPaths: unavailablePlatformCapability("classifyInputPaths"),
     releaseInputs: async () => undefined,
-    notifyCompletion: async () => undefined
+    notifyCompletion: async () => undefined,
+    accessWorkspacePath: unavailablePlatformCapability("accessWorkspacePath")
   };
 }
 
@@ -221,7 +222,14 @@ export class OplHostCore extends EventEmitter {
       case "notifyCompletion": return this.platform.notifyCompletion(payload);
       case "listThreadWorkspace": return this.threadWorkspace.list(payload);
       case "readThreadWorkspaceFile": return this.threadWorkspace.read(payload);
+      case "readThreadWorkspaceBytes": return this.threadWorkspace.readBytes(payload);
       case "searchThreadWorkspace": return this.threadWorkspace.search(payload);
+      case "accessThreadWorkspace": {
+        if (!["open", "reveal"].includes(payload?.action)) throw new ThreadAdapterError("invalid_workspace_action", "Desktop file action must be open or reveal", {}, 400);
+        const resolved = await this.threadWorkspace.resolveAccess(payload);
+        await this.platform.accessWorkspacePath({ path: resolved.target, action: payload.action });
+        return { accepted: true };
+      }
       case "setLogDirectory": return this.carrierDiagnostics.setLogDirectory?.(payload)
         ?? unsupportedLogDirectoryUpdate();
       case "sendMessage": return this.transport.sendMessage(payload);

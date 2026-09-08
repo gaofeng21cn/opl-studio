@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import test from "node:test";
 import { ThreadAdapterError } from "./thread-adapter.mjs";
 import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
@@ -202,4 +202,72 @@ test("caps search results and marks the response truncated", async (t) => {
   assert.equal(result.truncated, true);
   assert.equal(result.entries[0].relativePath, "match-000.txt");
   assert.equal(result.entries.at(-1).relativePath, "match-099.txt");
+});
+
+
+test("workspace download preserves binary bytes and enforces size, type, and canonical path boundaries", async (t) => {
+  const paths = await fixture();
+  t.after(() => removeFixture(paths));
+  const binary = Buffer.from([0, 255, 1, 2, 128, 0]);
+  await writeFile(path.join(paths.workspace, "报告.pdf"), binary);
+  await writeFile(path.join(paths.workspace, "empty.txt"), "");
+  const { service } = serviceFor(paths.workspace, { maxDownloadBytes: 6 });
+  for (const [relativePath, expected] of [["报告.pdf", binary], ["empty.txt", Buffer.alloc(0)]]) {
+    const file = await service.download({ threadId: "thread-1", relativePath });
+    try {
+      const chunks = [];
+      for await (const chunk of file.stream) chunks.push(chunk);
+      assert.deepEqual(Buffer.concat(chunks), expected);
+      assert.equal(file.sizeBytes, expected.length);
+      assert.equal(file.name, relativePath);
+    } finally { await file.close(); }
+  }
+  for (const [relativePath, code] of [
+    ["../secret.txt", "invalid_workspace_path"],
+    ["escape/secret.txt", "workspace_path_outside"],
+    ["nested", "workspace_not_regular_file"],
+    ["nested/beta.md", "workspace_file_too_large"]
+  ]) {
+    await assert.rejects(service.download({ threadId: "thread-1", relativePath }), (error) => error.code === code);
+  }
+});
+
+test("native file access resolves documents and folders but leaves executable formats reveal-only", async (t) => {
+  const paths = await fixture();
+  t.after(() => removeFixture(paths));
+  await writeFile(path.join(paths.workspace, "run.sh"), "echo unsafe");
+  await mkdir(path.join(paths.workspace, "Runner.app"));
+  const { service } = serviceFor(paths.workspace);
+  const document = await service.resolveAccess({ threadId: "thread-1", relativePath: "alpha.txt", action: "open" });
+  assert.equal(document.target, await realpath(path.join(paths.workspace, "alpha.txt")));
+  const folder = await service.resolveAccess({ threadId: "thread-1", action: "open" });
+  assert.equal(folder.target, await realpath(paths.workspace));
+  for (const relativePath of ["run.sh", "Runner.app"]) {
+    await assert.rejects(service.resolveAccess({ threadId: "thread-1", relativePath, action: "open" }), (error) => error.code === "workspace_open_type_unsupported");
+    const revealed = await service.resolveAccess({ threadId: "thread-1", relativePath, action: "reveal" });
+    assert.equal(revealed.target, await realpath(path.join(paths.workspace, relativePath)));
+  }
+  await assert.rejects(service.resolveAccess({ threadId: "thread-1", relativePath: "escape", action: "reveal" }), (error) => error.code === "workspace_path_outside");
+  await assert.rejects(service.resolveAccess({ threadId: "thread-1", relativePath: "alpha.txt", action: "execute" }), (error) => error.code === "invalid_workspace_action");
+});
+
+
+test("bounded byte windows support plugin viewers without exposing paths beyond the canonical workspace", async (t) => {
+  const paths = await fixture();
+  t.after(() => removeFixture(paths));
+  const binary = Buffer.from([0, 255, 128, 12, 0, 6]);
+  await writeFile(path.join(paths.workspace, "binary.pdf"), binary);
+  const { service } = serviceFor(paths.workspace);
+  const window = await service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 1, length: 3 });
+  assert.deepEqual(window, { data: binary.subarray(1, 4).toString("base64"), offset: 1, sizeBytes: 6, eof: false });
+  const end = await service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 4, length: 512 * 1024 });
+  assert.deepEqual(Buffer.from(end.data, "base64"), binary.subarray(4));
+  assert.equal(end.eof, true);
+  const beyond = await service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 50, length: 1 });
+  assert.equal(beyond.data, "");
+  assert.equal(beyond.eof, true);
+  for (const range of [{offset:-1}, {offset:0.5}, {length:0}, {length:512*1024+1}]) {
+    await assert.rejects(service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", ...range }), (error) => error.code === "invalid_workspace_range");
+  }
+  await assert.rejects(service.readBytes({ threadId: "thread-1", relativePath: "escape/secret.txt" }), (error) => error.code === "workspace_path_outside");
 });

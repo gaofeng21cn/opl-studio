@@ -323,6 +323,14 @@ export type CodexPickedInput = {
   previewUrl?: string;
 };
 
+export type ThreadWorkspaceBytes = { data: string; offset: number; sizeBytes: number; eof: boolean };
+
+export type ThreadWorkspaceAccessRequest = {
+  threadId: string;
+  relativePath?: string;
+  action: "open" | "reveal" | "download";
+};
+
 export type ThreadWorkspaceEntry = {
   name: string;
   relativePath: string;
@@ -438,6 +446,7 @@ export type CodexApiKeyConfigurationResult =
 
 export type OplPlatformCapabilities = {
   workspaceRootSelection: boolean;
+  nativeWorkspaceFileAccess?: boolean;
   codexInstall: boolean;
   modelAccessSecretInput: boolean;
 };
@@ -523,7 +532,7 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "searchThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -598,7 +607,9 @@ export type OplBridge = CodexThreadAdapterBridge & {
   releaseInputs(cleanupTokens: readonly string[]): Promise<void>;
   notifyCompletion(request: { threadId: string; turnId: string; title: string; body: string }): Promise<void>;
   listThreadWorkspace(request: { threadId: string; relativePath?: string }): Promise<ThreadWorkspaceListing>;
+  readThreadWorkspaceBytes(request: { threadId: string; relativePath: string; offset?: number; length?: number }): Promise<ThreadWorkspaceBytes>;
   readThreadWorkspaceFile(request: { threadId: string; relativePath: string }): Promise<ThreadWorkspaceFile>;
+  accessThreadWorkspace(request: ThreadWorkspaceAccessRequest): Promise<{ accepted: boolean }>;
   searchThreadWorkspace(request: { threadId: string; query: string }): Promise<ThreadWorkspaceSearch>;
   setLogDirectory(request: { path: string }): Promise<AppLogDirectoryUpdateResult>;
   sendMessage(request: CodexMessageRequest): Promise<CodexMessageResponse>;
@@ -1672,6 +1683,7 @@ export function createBrowserBridge(): OplBridge {
   return {
     platformCapabilities: {
       workspaceRootSelection: candidate?.platformCapabilities?.workspaceRootSelection === true,
+      nativeWorkspaceFileAccess: candidate?.platformCapabilities?.nativeWorkspaceFileAccess === true,
       codexInstall: candidate?.platformCapabilities?.codexInstall === true,
       modelAccessSecretInput: candidate?.platformCapabilities?.modelAccessSecretInput === true
     },
@@ -1791,11 +1803,19 @@ export function createBrowserBridge(): OplBridge {
       }
       return candidate.listThreadWorkspace(request);
     },
+    readThreadWorkspaceBytes(request) {
+      if (!candidate?.readThreadWorkspaceBytes) return Promise.reject(new Error("Workspace byte access is unavailable in this host"));
+      return candidate.readThreadWorkspaceBytes(request);
+    },
     readThreadWorkspaceFile(request) {
       if (!candidate?.readThreadWorkspaceFile) {
         return Promise.reject(new Error("Thread workspace file preview is unavailable in this host"));
       }
       return candidate.readThreadWorkspaceFile(request);
+    },
+    accessThreadWorkspace(request) {
+      if (!candidate?.accessThreadWorkspace) return Promise.reject(new Error("Workspace file actions are unavailable in this host"));
+      return candidate.accessThreadWorkspace(request);
     },
     searchThreadWorkspace(request) {
       if (!candidate?.searchThreadWorkspace) {
