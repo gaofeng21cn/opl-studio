@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "./app-server-transport.mjs";
 import { ChannelBindingStore } from "./channel-bindings.mjs";
-import { CodexThreadAdapter } from "./thread-adapter.mjs";
+import { AionMigration, MigratedThreadAdapter } from "./aion-migration.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const defaultWorkspaceRoot = process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD
@@ -53,7 +53,10 @@ export class OplCodexNative extends EventEmitter {
       channelBindingStore
     });
     this.transport.channelBindingStore ??= channelBindingStore;
-    this.threads = new CodexThreadAdapter(this.transport);
+    this.migration = new AionMigration({ transport: this.transport, env: transport && !env.OPL_AIONUI_DATA_DIR
+      ? { ...env, OPL_STUDIO_AION_MIGRATION: "0" } : env });
+    this.threads = new MigratedThreadAdapter(this.transport, this.migration);
+    this.transport.migrationContextForThread = (threadId) => this.migration.context(threadId);
     this.channelCallbackAdapter = typeof this.transport.createChannelCallbackAdapter === "function"
       ? this.transport.createChannelCallbackAdapter()
       : null;
@@ -83,6 +86,7 @@ export class OplCodexNative extends EventEmitter {
     try {
       await this.transport.start();
       this.appServerError = null;
+      await this.migration.start();
     } catch (error) {
       this.appServerError = {
         code: error.code ?? "app_server_unavailable",

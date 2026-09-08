@@ -1384,7 +1384,10 @@ export function deriveThreadMessages(value: unknown): WorkbenchThreadMessage[] {
     .filter((record): record is Record<string, unknown> => Boolean(record))
     .flatMap((record) => asRecordArray(record.turns));
   const turnItems = turns.flatMap((turn) => asRecordArray(turn.items ?? turn.messages));
-  return [...direct, ...turnItems]
+  const imported = [payload, thread]
+    .filter((record): record is Record<string, unknown> => Boolean(record))
+    .flatMap((record) => asRecordArray(asRecord(record.importedHistory)?.messages));
+  return [...imported, ...direct, ...turnItems]
     .map(messageFromRecord)
     .filter((message): message is WorkbenchThreadMessage => Boolean(message));
 }

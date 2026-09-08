@@ -40,7 +40,14 @@ export type ThreadListRequest = {
   searchTerm?: string;
 };
 
-export type ThreadListResult = { data: CodexThread[]; nextCursor: null };
+export type AionMigrationSummary = {
+  schema: "opl_studio_aion_migration.v1";
+  complete: boolean;
+  entries: Array<{ sourceConversationId: string; threadId: string; workspace?: string; pinned: boolean; pinnedAt?: number; sortOrder?: number }>;
+  ui: Array<{ key: string; value: unknown }>;
+  diagnostics: Array<{ code: string }>;
+};
+export type ThreadListResult = { data: CodexThread[]; nextCursor: null; migration?: AionMigrationSummary };
 export type ThreadReadRequest = { threadId: string; includeTurns?: boolean };
 export type ThreadResumeRequest = { threadId: string };
 export type ThreadForkRequest = { threadId: string; throughTurnId?: string };

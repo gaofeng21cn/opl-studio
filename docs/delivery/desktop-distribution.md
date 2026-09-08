@@ -73,3 +73,23 @@ For public macOS builds, `APPLE_KEYCHAIN_PROFILE` selects an existing notarytool
 electron-builder. Staple the final DMG, regenerate its feed hash, and run the release qualification against
 the anonymous GitHub asset URL after publication. The dedicated Preview feed remains independent of
 the ordinary App's Stable feed.
+
+The Full wrapper defaults the release and updater versions to Studio's
+`package.json` and forwards build arguments to the App-owned builder:
+
+```bash
+OPL_APP_REPO_ROOT=/path/to/one-person-lab-app npm run build:full -- \
+  --out-dir /path/to/studio-release/full --skip-gui-build
+```
+
+`--skip-gui-build` requires an already built Studio App at the builder's expected
+output path. Seal the Standard ZIP, blockmap, DMG, and both update feeds in a
+separate release directory before building Full; the App builder refreshes the
+GUI output and removes its temporary update feeds. Finalize both DMGs with the
+App-owned `scripts/notarize-macos-dmg.ts`, then refresh the Standard DMG's feed
+size and SHA-512 and the Full public manifest's final size and SHA-256. Keep the
+Standard updater ZIP bound to the stapled Standard App. Full is appended to the
+same release with `scripts/studio-full-release-adapter.ts`, preserving all
+sealed Standard assets and update metadata. For a combined OCI release, follow
+the [publication order](../oci-distribution.md#publication-order) before creating
+the desktop release tag.

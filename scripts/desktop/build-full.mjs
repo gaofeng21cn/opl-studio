@@ -16,7 +16,11 @@ if (qualifyOnly) {
 if (!appRoot) {
   throw new Error("Studio Full build requires OPL_APP_REPO_ROOT pointing to the canonical one-person-lab-app checkout");
 }
-const args = ["--experimental-strip-types", path.join(path.resolve(appRoot), "scripts/build-full-first-install-package.ts")];
+const args = [
+  "--experimental-strip-types",
+  path.join(path.resolve(appRoot), "scripts/build-full-first-install-package.ts"),
+  ...process.argv.slice(2),
+];
 const result = spawnSync(process.execPath, args, {
   cwd: path.resolve(appRoot),
   env: fullBuildEnvironment({ appRoot, studioRoot: root }),

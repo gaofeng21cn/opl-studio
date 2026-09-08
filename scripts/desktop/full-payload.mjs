@@ -27,11 +27,14 @@ export function readFullPayloadCarrier() {
 export function fullBuildEnvironment({ appRoot, studioRoot = root } = {}) {
   if (!appRoot) throw new Error("OPL_APP_REPO_ROOT is required for Studio Full builds");
   const carrier = readFullPayloadCarrier();
+  const { version } = JSON.parse(fs.readFileSync(path.join(studioRoot, "package.json"), "utf8"));
   return {
     ...process.env,
     OPL_APP_REPO_ROOT: path.resolve(appRoot),
     OPL_FULL_GUI_ROOT: path.resolve(studioRoot),
     OPL_FULL_CARRIER_ID: carrier.carrier_id,
+    OPL_RELEASE_VERSION: version,
+    OPL_UPDATER_VERSION: version,
   };
 }
 

@@ -32,10 +32,22 @@ display consumes App Server lineage and events without owning scheduling.
 
 Switching continuity is evaluated by daily App outcomes, not every AionUI
 feature. With the same `CODEX_HOME`, canonical Codex threads remain available
-through App Server list/resume. AionUI-only SQLite conversation records, local
-ordering, and unsent drafts are not automatically imported; a future migration
-must be a bounded importer from that source, without creating another thread
-owner.
+through App Server list/resume, including paginated history. On startup the Host
+reads AionUI SQLite or legacy JSON through a read-only source adapter, retains
+private source snapshots, links existing Codex identities, and creates Codex
+threads for other historical conversations. Imported messages are displayed as
+source history and supplied as application context when continuing; new turns
+remain owned by App Server. Persisted pin/order and available locale/theme
+settings migrate without overwriting existing Studio settings. The upstream
+composer draft is memory-only and cannot be recovered after the old process
+exits. Browser-origin-only expansion state is not a conversation-loss condition.
+
+macOS discovers the established App data locations. Docker reads the mounted
+legacy data directory (`OPL_AIONUI_DATA_DIR` can select an explicit read-only
+mount); an image cannot access an old volume that the operator has not mounted.
+The original source remains untouched, retries reuse recorded bindings, and
+deleted Studio conversations are not reimported. A partial import is reported
+in the conversation directory and resumes on a subsequent startup.
 
 Workspace browsing, search, and external opening or Web download are the
 minimum file outcome. Rich preview is optional. Generic features first reuse

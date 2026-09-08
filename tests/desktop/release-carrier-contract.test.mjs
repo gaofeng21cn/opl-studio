@@ -1,11 +1,47 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+test("Full build delegates the Studio version and CLI arguments to the App builder", async () => {
+  const appRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-full-delegation-"));
+  try {
+    await mkdir(path.join(appRoot, "scripts"));
+    await writeFile(path.join(appRoot, "scripts/build-full-first-install-package.ts"), `
+      console.log(JSON.stringify({
+        args: process.argv.slice(2),
+        version: process.env.OPL_RELEASE_VERSION,
+        updaterVersion: process.env.OPL_UPDATER_VERSION,
+        carrier: process.env.OPL_FULL_CARRIER_ID,
+        guiRoot: process.env.OPL_FULL_GUI_ROOT
+      }));
+    `);
+    const result = spawnSync(process.execPath, [
+      path.join(root, "scripts/desktop/build-full.mjs"), "--out-dir", path.join(appRoot, "full"), "--skip-gui-build",
+    ], {
+      encoding: "utf8",
+      env: { ...process.env, OPL_APP_REPO_ROOT: appRoot, OPL_RELEASE_VERSION: "26.5.1", OPL_UPDATER_VERSION: "26.5.1" },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout.split("\n")[0]);
+    const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+    assert.deepEqual(receipt, {
+      args: ["--out-dir", path.join(appRoot, "full"), "--skip-gui-build"],
+      version: pkg.version,
+      updaterVersion: pkg.version,
+      carrier: "opl-studio",
+      guiRoot: root,
+    });
+  } finally {
+    await rm(appRoot, { recursive: true, force: true });
+  }
+});
 
 test("Studio declares one branded preview carrier for the App-owned desktop release kernel", async () => {
   const carrier = JSON.parse(await readFile(path.join(root, "contracts/desktop-release-carrier.json"), "utf8"));

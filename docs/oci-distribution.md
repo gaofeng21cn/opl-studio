@@ -109,3 +109,26 @@ hardening on the current Docker host. The hosted Preview workflow additionally
 proves public anonymous exact-digest access, registry identity, native
 dual-architecture runtime behavior, and supply-chain identity. It does not prove
 Cloud activation or Stable adoption.
+
+## Publication Order
+
+For a joint desktop and OCI release, first commit the matching `package.json`
+and lockfile version to canonical Studio `main`, then dispatch
+`studio-webui-preview.yml` from `main`. Its source gate accepts numeric
+`major.minor.patch` versions and requires the matching Git release tag to be
+unused. The workflow freezes `github.sha`, publishes the immutable OCI version
+and source tags, and emits the handoff; it does not create a Git tag or GitHub
+Release. Wait for the entire OCI workflow to succeed before creating the
+desktop release tag at that exact Studio commit. Preserve the handoff alongside
+the desktop release evidence. An existing immutable OCI version or source tag
+must be reconciled before retrying publication.
+
+## Existing AionUI Data
+
+Keep the Studio data volume persistent. For a separate legacy volume, add
+`-v OLD_AIONUI_VOLUME:/aionui-legacy:ro` and
+`-e OPL_AIONUI_DATA_DIR=/aionui-legacy` to the existing container configuration.
+The Host imports on startup and preserves the source. If the old data already
+lives under `/data`, discovery is automatic. An unmounted volume cannot be
+discovered from inside the new container. For an old multi-user database,
+`OPL_AIONUI_USER_ID` selects one user's records; histories are never mixed.

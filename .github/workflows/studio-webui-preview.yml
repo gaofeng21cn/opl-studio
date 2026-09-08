@@ -36,7 +36,17 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/main
           version="$(node -p 'require("./package.json").version')"
-          test "$version" = 0.1.6
+          VERSION="$version" node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const version = process.env.VERSION;
+          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version ?? "")) {
+            throw new Error("Studio publication requires a numeric major.minor.patch version.");
+          }
+          if (lock.version !== version || lock.packages?.[""]?.version !== version) {
+            throw new Error("Studio package and lockfile versions must match before publishing.");
+          }
+          NODE
           if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null 2>&1; then
             echo "Git tag v${version} already exists; increment the Studio version before publishing." >&2
             exit 1

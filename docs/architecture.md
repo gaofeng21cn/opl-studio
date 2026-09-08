@@ -272,6 +272,15 @@ permissions, model catalog, and turn state. Native consumes the App Server
 thread/turn/event flow; `localStorage` is limited to UI selection, settings,
 and unsent drafts.
 
+The native Host's startup AionUI importer reads old SQLite/JSON without mutating
+the source, saves a private immutable source snapshot, and records only its
+binding to an App Server thread. Legacy messages are an `importedHistory`
+projection, never fabricated canonical turns. Continuations add this source
+history through `turn/start.additionalContext`; paginated native turns use
+`thread/turns/list` and `thread/items/list`. Existing native identities reuse
+their canonical history without replaying the AionUI cache. The import index
+also retains deletion tombstones and a process lock for restart continuity.
+
 Electron and WebUI use one standard adapter for `thread/list`, `thread/read`,
 `thread/resume`, `thread/fork`, `thread/archive`, and `thread/unarchive`.
 `parentThreadId`, `agentRole`, `agentNickname`, subagent source kinds,
