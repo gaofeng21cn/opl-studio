@@ -18,6 +18,7 @@ export const rendererSourcePaths = [
   "src/workbench/ProjectProgressPanel.tsx",
   "src/workbench/SettingsPanel.tsx",
   "src/workbench/WorkspaceFilesPanel.tsx",
+  "src/integrations/deepseek-harness/EcosystemFilePreview.tsx",
   "src/workbench/codexWorkbenchStyles.ts",
   "src/workbench/threads/ThreadDetailPopover.tsx",
   "src/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",

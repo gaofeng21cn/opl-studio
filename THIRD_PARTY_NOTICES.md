@@ -27,8 +27,8 @@ Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
 Inspected source ref: `c389f96bf3a9b6807cb71ed6bdad5849be0df6d8`
 
-The complete `src/` trees of eleven GUI packages are vendored byte-for-byte from
-that ref under `src/vendor/deepseek-harness/packages/client/`:
+The complete `src/` trees of eighteen client packages are vendored byte-for-byte
+from that ref under `src/vendor/deepseek-harness/packages/client/`:
 
 - `ui-layout`
 - `ui-sidebar`
@@ -41,8 +41,19 @@ that ref under `src/vendor/deepseek-harness/packages/client/`:
 - `ui-theme`
 - `ui-primitives`
 - `ui-renderer`
+- `ui-sidebar-files`
+- `ui-sidebar-textpreview`
+- `ui-sidebar-right`
+- `ui-deliverables`
+- `ui-open-in-app`
+- `ui-dockkit`
+- `resources`
 
-The snapshot contains 336 files, including the upstream `LICENSE`. Its package
+The upstream `packages/util/workspace-path/src` helpers are also vendored from
+the same ref because this commit adds the file resource address ABI after the
+published `0.1.3-alpha.2` package. Renderer imports use these source helpers.
+
+The snapshot contains 338 files, including the upstream `LICENSE`. Its package
 roots, per-file SHA-256 inventory, source package version (`0.1.3-alpha.2`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
@@ -53,7 +64,7 @@ The live One Person Lab composition directly renders upstream `AppFrame`,
 `AgentPresetSeat`, `ModelSelect`, and `SettingsRoot`.
 `SlotCore` and the pinned `ui-renderer` source for `createSlotRenderer()` provide
 registration, disposal, and entry error isolation. OPL components import `Button`, `Pill`, `Input`, `Tooltip`,
-`StateDot`, `MessageText`, and icons directly from the vendored upstream
+`StateDot`, `projectUserText`, and icons directly from the vendored upstream
 `@deepseek-ai/dsh-client-ui-primitives` index. User-visible identity uses the
 RC2 brand slots with the text `OPL` / `One Person Lab`; no OPL logo, parallel
 type scale, layout, color system, primitive control, or icon is introduced. The

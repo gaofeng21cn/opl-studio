@@ -51,6 +51,10 @@ App 的安装、进程状态或载体等价。若未来需要显示独立 App，
 
 ## 当前实现与剩余边界
 
+主导航按概览、账户与模型、连接与访问、工作区、智能体与能力、运行与维护、偏好、关于分组。组内二级导航始终保留当前页，选中状态使用 `aria-current`；能力贡献跟随实际二级目的地渲染。窄屏使用横向导航，页面内容独立滚动。
+
+通用设置搜索复用 `@objectivex666/dsh-settings-search` 本地搜索插件，Studio 适配主要目的地、子页和偏好项，并补足方向键、Enter、焦点定位与清空按钮名称。外观和字号直接复用 DSH 控件；字号持久化后作用于会话内容。插件来源与版本选择见[生态客户端](ecosystem-client-plugins.md)。
+
 - 已实现：只有 App placement policy 明确准入的 view 语义才嵌入既有设置页；`service_status` 进入服务
   状态，Fleet telemetry/doctor 使用这一通用类型；微信连接视图归入资源与连接且不成为顶级设置项；
   `activity_log` 继续隐藏；智能体页保留官方/全部筛选并提供 App-owned 的添加入口。

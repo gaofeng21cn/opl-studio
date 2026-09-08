@@ -1,23 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, ExternalLink, File, Folder, FolderOpen, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, File, Folder, FolderOpen, LoaderCircle, Search } from "lucide-react";
 import { EcosystemFilePreview } from "../integrations/deepseek-harness/EcosystemFilePreview";
+import { WorkspaceFilesTree } from "../integrations/deepseek-harness/WorkspaceFilesTree";
 import type {
   ThreadWorkspaceBytes,
   ThreadWorkspaceAccessRequest,
   ThreadWorkspaceEntry,
-  ThreadWorkspaceFile,
   ThreadWorkspaceListing,
   ThreadWorkspaceSearch
 } from "../bridge/oplBridge";
 
 type WorkspaceFilesPanelProps = {
   threadId?: string;
+  workspace: string;
   locale: "zh" | "en";
   nativeFileAccess: boolean;
   accessWorkspace(request: ThreadWorkspaceAccessRequest): Promise<{ accepted: boolean }>;
   listWorkspace(request: { threadId: string; relativePath?: string }): Promise<ThreadWorkspaceListing>;
   readBytes(request: { threadId: string; relativePath: string; offset?: number; length?: number }): Promise<ThreadWorkspaceBytes>;
-  readFile(request: { threadId: string; relativePath: string }): Promise<ThreadWorkspaceFile>;
   searchWorkspace(request: { threadId: string; query: string }): Promise<ThreadWorkspaceSearch>;
 };
 
@@ -35,6 +35,7 @@ function fileSize(sizeBytes?: number): string {
 
 export function WorkspaceFilesPanel({
   threadId,
+  workspace,
   locale,
   nativeFileAccess,
   accessWorkspace,
@@ -42,8 +43,7 @@ export function WorkspaceFilesPanel({
   readBytes,
   searchWorkspace
 }: WorkspaceFilesPanelProps) {
-  const [listings, setListings] = useState<Map<string, ThreadWorkspaceListing>>(() => new Map());
-  const [currentDirectory, setCurrentDirectory] = useState("");
+  const [focusedDirectory, setFocusedDirectory] = useState("");
   const generation = useRef(0);
   const [selected, setSelected] = useState<ThreadWorkspaceEntry | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -51,7 +51,7 @@ export function WorkspaceFilesPanel({
   const [preview, setPreview] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ThreadWorkspaceSearch | null>(null);
-  const [loadingPath, setLoadingPath] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -59,45 +59,34 @@ export function WorkspaceFilesPanel({
     setSelected(null);
     setActionBusy(false);
     setActionMessage("");
-    setListings(new Map());
-    setCurrentDirectory("");
+    setFocusedDirectory("");
     setPreview(null);
     setQuery("");
     setSearchResult(null);
+    setSearching(false);
     setError("");
-    if (!threadId) return;
-    let active = true;
-    setLoadingPath("");
-    void listWorkspace({ threadId }).then((listing) => {
-      if (!active) return;
-      setListings(new Map([["", listing]]));
-      setLoadingPath(null);
-    }, (reason) => {
-      if (!active) return;
-      setError(String(reason instanceof Error ? reason.message : reason));
-      setLoadingPath(null);
-    });
-    return () => { active = false; };
-  }, [listWorkspace, threadId]);
+  }, [threadId, workspace]);
 
   useEffect(() => {
     if (!threadId || !query.trim()) {
       setSearchResult(null);
+      setSearching(false);
       return;
     }
     let active = true;
+    setSearchResult(null);
+    setSearching(true);
     const timer = window.setTimeout(() => {
       setError("");
-      setLoadingPath("search");
       void searchWorkspace({ threadId, query: query.trim() }).then((result) => {
         if (!active) return;
         setSearchResult(result);
         setError("");
-        setLoadingPath(null);
+        setSearching(false);
       }, (reason) => {
         if (!active) return;
         setError(String(reason instanceof Error ? reason.message : reason));
-        setLoadingPath(null);
+        setSearching(false);
       });
     }, 180);
     return () => {
@@ -114,7 +103,6 @@ export function WorkspaceFilesPanel({
         openFolder: "打开当前文件夹",
         download: "下载文件",
         text: "预览文件",
-        refresh: "刷新文件列表",
         downloadStarted: "已交给浏览器保存",
         opened: "已交给系统打开",
         revealed: "已在文件管理器中显示",
@@ -124,8 +112,7 @@ export function WorkspaceFilesPanel({
         noMatches: "没有匹配的文件",
         truncated: "结果已达到显示上限",
         workspace: "工作区",
-        back: "返回上一级",
-        backToFiles: "返回文件列表"
+        back: "返回工作区根目录"
       }
     : {
         search: "Search files and folders",
@@ -134,7 +121,6 @@ export function WorkspaceFilesPanel({
         openFolder: "Open current folder",
         download: "Download file",
         text: "Preview file",
-        refresh: "Refresh file list",
         downloadStarted: "Sent to your browser to save",
         opened: "Sent to the system to open",
         revealed: "Shown in file manager",
@@ -144,39 +130,13 @@ export function WorkspaceFilesPanel({
         noMatches: "No matching files",
         truncated: "Results reached the display limit",
         workspace: "Workspace",
-        back: "Back one level",
-        backToFiles: "Back to files"
+        back: "Back to workspace root"
       };
 
   function openFile(entry: ThreadWorkspaceEntry) {
     if (!threadId || entry.kind !== "file") return;
     setError("");
     setPreview(entry.relativePath);
-  }
-
-  async function openDirectory(entry: ThreadWorkspaceEntry) {
-    if (!threadId || entry.kind !== "directory") return;
-    const requestGeneration = generation.current;
-    setPreview(null);
-    setSelected(null);
-    setActionMessage("");
-    setQuery("");
-    setError("");
-    if (listings.has(entry.relativePath)) {
-      setCurrentDirectory(entry.relativePath);
-      return;
-    }
-    setLoadingPath(entry.relativePath);
-    try {
-      const listing = await listWorkspace({ threadId, relativePath: entry.relativePath });
-      if (generation.current !== requestGeneration) return;
-      setListings((current) => new Map(current).set(entry.relativePath, listing));
-      setCurrentDirectory(entry.relativePath);
-    } catch (reason) {
-      if (generation.current === requestGeneration) setError(String(reason instanceof Error ? reason.message : reason));
-    } finally {
-      if (generation.current === requestGeneration) setLoadingPath(null);
-    }
   }
 
   async function accessPath(action: ThreadWorkspaceAccessRequest["action"], relativePath: string) {
@@ -198,35 +158,22 @@ export function WorkspaceFilesPanel({
     }
   }
 
-  async function refreshDirectory() {
-    if (!threadId) return;
-    const requestGeneration = generation.current;
-    setLoadingPath(currentDirectory);
-    setError("");
-    setQuery("");
-    setSelected(null);
-    setPreview(null);
-    setActionMessage("");
-    try {
-      const listing = await listWorkspace({ threadId, relativePath: currentDirectory });
-      if (generation.current === requestGeneration) setListings(new Map([[currentDirectory, listing]]));
-    } catch (reason) {
-      if (generation.current === requestGeneration) setError(String(reason instanceof Error ? reason.message : reason));
-    } finally {
-      if (generation.current === requestGeneration) setLoadingPath(null);
-    }
-  }
+  const listTreeWorkspace = useCallback(async (request: { threadId: string; relativePath?: string }) => {
+    const relativePath = [focusedDirectory, request.relativePath].filter(Boolean).join("/");
+    const listing = await listWorkspace({ threadId: request.threadId, relativePath });
+    if (listing.threadId !== request.threadId || listing.relativePath !== relativePath) throw new Error("Workspace listing identity changed");
+    return { ...listing, relativePath: request.relativePath ?? "" };
+  }, [focusedDirectory, listWorkspace]);
+  const treeWorkspace = focusedDirectory ? `${workspace.replace(/[\\/]+$/, "")}/${focusedDirectory}` : workspace;
+  const visibleSearchEntries = searchResult?.entries ?? [];
 
-  const currentEntries = listings.get(currentDirectory)?.entries ?? [];
-  const visibleSearchEntries = useMemo(() => searchResult?.entries ?? [], [searchResult]);
-
-  if (!threadId) return <p className="context-empty">{copy.empty}</p>;
+  if (!threadId || !workspace) return <p className="context-empty">{copy.empty}</p>;
 
   return (
     <section className="workspace-files" data-testid="opl-thread-workspace-files">
       {error ? <p className="workspace-file-error" role="alert">{error}</p> : null}
       {actionMessage ? <p className="workspace-file-status" role="status">{actionMessage}</p> : null}
-      {selected ? <div className="workspace-file-selection">
+      {selected && !preview ? <div className="workspace-file-selection">
         <strong title={selected.relativePath}>{selected.name}</strong>
         <small>{fileSize(selected.sizeBytes)}</small>
         <div className="workspace-file-actions">
@@ -234,7 +181,7 @@ export function WorkspaceFilesPanel({
             <button type="button" disabled={actionBusy} onClick={() => void accessPath("open", selected.relativePath)}><ExternalLink size={14} aria-hidden="true" />{copy.open}</button>
             <button type="button" disabled={actionBusy} onClick={() => void accessPath("reveal", selected.relativePath)}><FolderOpen size={14} aria-hidden="true" />{copy.reveal}</button>
           </> : <button type="button" disabled={actionBusy} onClick={() => void accessPath("download", selected.relativePath)}>{actionBusy ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}{copy.download}</button>}
-          {!preview ? <button type="button" disabled={loadingPath === selected.relativePath} onClick={() => void openFile(selected)}>{copy.text}</button> : null}
+          {!preview ? <button type="button" onClick={() => openFile(selected)}>{copy.text}</button> : null}
         </div>
       </div> : null}
       {preview ? (
@@ -251,25 +198,24 @@ export function WorkspaceFilesPanel({
       ) : (
         <>
           <header className="workspace-file-directory-head">
-            {currentDirectory ? <button type="button" aria-label={copy.back} title={copy.back} onClick={() => void openDirectory({ name: "", relativePath: parentPath(currentDirectory), kind: "directory" })}><ChevronLeft aria-hidden="true" size={16} /></button> : <Folder aria-hidden="true" size={15} />}
-            <strong>{currentDirectory ? currentDirectory.split("/").at(-1) : copy.workspace}</strong>
-            <button type="button" aria-label={copy.refresh} title={copy.refresh} disabled={loadingPath !== null} onClick={() => void refreshDirectory()}><RefreshCw aria-hidden="true" size={14} /></button>
-            {nativeFileAccess ? <button type="button" aria-label={copy.openFolder} title={copy.openFolder} disabled={actionBusy} onClick={() => void accessPath("open", currentDirectory)}><FolderOpen aria-hidden="true" size={14} /></button> : null}
+            {focusedDirectory ? <button type="button" aria-label={copy.back} title={copy.back} onClick={() => { setFocusedDirectory(""); setSelected(null); }}><ChevronLeft aria-hidden="true" size={16} /></button> : <Folder aria-hidden="true" size={15} />}
+            <strong title={focusedDirectory || workspace}>{focusedDirectory || copy.workspace}</strong>
+            {nativeFileAccess ? <button type="button" aria-label={copy.openFolder} title={copy.openFolder} disabled={actionBusy} onClick={() => void accessPath("open", focusedDirectory)}><FolderOpen aria-hidden="true" size={14} /></button> : null}
           </header>
           <label className="workspace-file-search">
             <Search aria-hidden="true" size={14} />
             <input aria-label={copy.search} value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={copy.search} />
-            {loadingPath === "search" ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : null}
+            {searching ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : null}
           </label>
-          <div className="workspace-file-list">
-            {(query.trim() ? visibleSearchEntries : currentEntries).map((entry) => (
+          {query.trim() ? <div className="workspace-file-list">
+            {visibleSearchEntries.map((entry) => (
               <button
                 key={entry.relativePath}
                 className={`workspace-file-row${selected?.relativePath === entry.relativePath ? " is-selected" : ""}`}
                 aria-pressed={entry.kind === "file" ? selected?.relativePath === entry.relativePath : undefined}
                 type="button"
                 onClick={() => {
-                  if (entry.kind === "directory") void openDirectory(entry);
+                  if (entry.kind === "directory") { setFocusedDirectory(entry.relativePath); setQuery(""); setSelected(null); setActionMessage(""); setError(""); }
                   else { setSelected(entry); setActionMessage(""); setError(""); }
                 }}
                 disabled={entry.kind === "symlink"}
@@ -277,12 +223,23 @@ export function WorkspaceFilesPanel({
               >
                 {entry.kind === "directory" ? <Folder aria-hidden="true" size={15} /> : <File aria-hidden="true" size={15} />}
                 <span><strong>{entry.name}</strong>{query.trim() ? <small>{parentPath(entry.relativePath)}</small> : null}</span>
-                {loadingPath === entry.relativePath ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : entry.kind === "directory" ? <ChevronRight aria-hidden="true" size={14} /> : entry.sizeBytes !== undefined ? <small>{fileSize(entry.sizeBytes)}</small> : null}
+                {entry.kind === "directory" ? <ChevronRight aria-hidden="true" size={14} /> : entry.sizeBytes !== undefined ? <small>{fileSize(entry.sizeBytes)}</small> : null}
               </button>
             ))}
             {query.trim() && searchResult && !visibleSearchEntries.length ? <p className="context-empty">{copy.noMatches}</p> : null}
-            {(query.trim() ? searchResult?.truncated : listings.get(currentDirectory)?.truncated) ? <p className="context-empty">{copy.truncated}</p> : null}
-          </div>
+            {searchResult?.truncated ? <p className="context-empty">{copy.truncated}</p> : null}
+          </div> : <WorkspaceFilesTree
+            threadId={threadId}
+            workspace={treeWorkspace}
+            locale={locale}
+            listWorkspace={listTreeWorkspace}
+            onOpenFile={(path) => {
+              const relativePath = [focusedDirectory, path].filter(Boolean).join("/");
+              setSelected({ name: path.split("/").at(-1) ?? path, relativePath, kind: "file" });
+              setActionMessage("");
+              setError("");
+            }}
+          />}
         </>
       )}
     </section>

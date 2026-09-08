@@ -727,9 +727,9 @@ function PackageCatalog({
           <Search aria-hidden="true" size={14} />
           <input aria-label={locale === "zh" ? "搜索智能体与工作流" : "Search agents and workflows"} value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={locale === "zh" ? "搜索智能体与工作流" : "Search agents and workflows"} />
         </label>
-        <div className="segmented-control" aria-label={locale === "zh" ? "目录范围" : "Catalog scope"}>
-          <button type="button" data-active={scope === "official"} onClick={() => setScope("official")}>{locale === "zh" ? "官方" : "Official"}</button>
-          <button type="button" data-active={scope === "all"} onClick={() => setScope("all")}>{locale === "zh" ? "全部" : "All"}</button>
+        <div className="segmented-control" role="group" aria-label={locale === "zh" ? "目录范围" : "Catalog scope"}>
+          <button type="button" data-active={scope === "official"} aria-pressed={scope === "official"} onClick={() => setScope("official")}>{locale === "zh" ? "官方" : "Official"}</button>
+          <button type="button" data-active={scope === "all"} aria-pressed={scope === "all"} onClick={() => setScope("all")}>{locale === "zh" ? "全部" : "All"}</button>
         </div>
         <button
           ref={installTriggerRef}
@@ -1690,9 +1690,9 @@ export function SettingsPanel({
     }
     if (key === "locale") {
       return (
-        <div className="segmented-control" data-testid="opl-locale-toggle" aria-label="Language">
-          <button type="button" data-active={value === "zh"} onClick={() => onSettingChange("locale", "zh")}>中文</button>
-          <button type="button" data-active={value === "en"} onClick={() => onSettingChange("locale", "en")}>English</button>
+        <div className="segmented-control" role="group" data-testid="opl-locale-toggle" aria-label={settings.locale === "zh" ? "语言" : "Language"}>
+          <button type="button" data-active={value === "zh"} aria-pressed={value === "zh"} onClick={() => onSettingChange("locale", "zh")}>中文</button>
+          <button type="button" data-active={value === "en"} aria-pressed={value === "en"} onClick={() => onSettingChange("locale", "en")}>English</button>
         </div>
       );
     }
@@ -2295,13 +2295,13 @@ export function SettingsPanel({
         <>
           <SettingsGroup title={settings.locale === "zh" ? "界面" : "Interface"}>
             <SettingRow label={settings.locale === "zh" ? "语言" : "Language"}>{renderSettingControl("locale")}</SettingRow>
-            <AppearanceRow
+            <div className="settings-appearance" data-slot="settings.general.item"><AppearanceRow
               t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key}
               setTheme={(theme) => onSettingChange("theme", theme)}
               useStore={(selector) => selector({ preference: settings.theme, revision: 0 })}
               actions={{ sync: () => undefined }}
-            />
-            <FontSizeRow t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSize: settings.fontSize, revision: 0 })} actions={{ sync: () => undefined }} />
+            /></div>
+            <div className="settings-font-size" data-slot="settings.general.item"><FontSizeRow t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSize: settings.fontSize, revision: 0 })} actions={{ sync: () => undefined }} /></div>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
             <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>

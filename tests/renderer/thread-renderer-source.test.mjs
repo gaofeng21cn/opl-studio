@@ -603,9 +603,9 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(slotHost, /key === "conversation\.input\.plan"/);
   assert.match(slotHost, /<StudioPermissionSelect/);
   assert.match(slotHost, /function EmptyAttachmentSlot\(\) \{ return null; \}/);
-  assert.match(slotHost, /addImages=\{studio\.addComposerImages\}/);
-  assert.match(slotHost, /draftImages=/);
-  assert.match(slotHost, /removeImage=\{studio\.removeComposerImage\}/);
+  assert.match(slotHost, /addFiles=\{studio\.addComposerImages\}/);
+  assert.match(slotHost, /resolveDraftAttachments=/);
+  assert.match(slotHost, /removeAttachment=\{studio\.removeComposerImage\}/);
   assert.match(slotHost, /function HeroActionsSlot\(\)/);
   for (const method of ["readCodexCapabilities", "readCodexPermissionProfiles", "pickFiles", "pickDirectory", "setLogDirectory"]) {
     assert.match(desktopPreload, new RegExp(`${method}:`));
@@ -660,7 +660,8 @@ test("DSH details tools project the current OPL project and a contained read-onl
   assert.match(app, /setActiveFilesView\("workspace"\)/);
   assert.match(app, /setArtifactPreviewOpen\(true\)/);
   assert.match(workspaceFilesPanel, /className="workspace-file-directory-head"/);
-  assert.match(workspaceFilesPanel, /parentPath\(currentDirectory\)/);
+  assert.match(workspaceFilesPanel, /<WorkspaceFilesTree/);
+  assert.match(app, /workspace=\{currentSession\?\.workspace \?\? ""\}/);
   assert.match(workspaceFilesPanel, /setPreview\(null\)/);
   assert.doesNotMatch(workspaceFilesPanel, /workspace-file-layout|renderEntries|expanded/);
   assert.doesNotMatch(workspaceFilesPanel, /rename|writeFile|git status|terminal/i);

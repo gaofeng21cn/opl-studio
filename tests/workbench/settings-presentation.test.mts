@@ -205,8 +205,7 @@ test("settings uses the selected destination as the single page heading", () => 
   assert.match(settingsSource, /<h1>\{copy\[selectedDestination\]\}<\/h1>/);
   assert.doesNotMatch(settingsSource, /<h1>\{activeGroup\?\.label \?\? copy\[selectedDestination\]\}<\/h1>/);
   assert.match(settingsSource, /activeGroup\.destinations\.map/);
-  assert.match(settingsSource, /aria-current=\{destination.id === selectedDestination/);
-  assert.doesNotMatch(settingsSource, /aria-current=\{destination\.id === selectedDestination \? "page" : undefined\}/);
+  assert.match(settingsSource, /aria-current=\{destination\.id === selectedDestination \? "page" : undefined\}/);
 });
 
 test("Gateway account identity and usage render only from a real account projection", () => {

@@ -1,0 +1,25 @@
+async (page) => {
+  const assert = (condition, label) => { if (!condition) throw new Error(label); };
+  await page.getByRole("button", { name: "nested", exact: true }).click();
+  await page.getByRole("button", { name: "报告 #?.pdf", exact: true }).waitFor();
+  await page.getByRole("button", { name: "报告 #?.pdf", exact: true }).click();
+  assert((await page.evaluate(() => window.treeEvidence.opened))[0] === "nested/报告 #?.pdf", "encoded resource address");
+  assert(await page.getByText("条目太多，只显示了一部分。").isVisible(), "truncation marker");
+  await page.getByRole("button", { name: "missing", exact: true }).click();
+  await page.getByText("这个目录不在了。可能已被移动或删除。").waitFor();
+  await page.getByRole("button", { name: "重新读取", exact: true }).click();
+  await page.getByRole("button", { name: "报告 #?.pdf", exact: true }).waitFor();
+  assert((await page.evaluate(() => window.treeEvidence.calls.filter((call) => call === "thread-one:nested").length)) === 2, "refresh expanded directory");
+  await page.getByRole("button", { name: "slow", exact: true }).click();
+  await page.getByText("正在读取…").waitFor();
+  await page.getByRole("button", { name: "Switch task", exact: true }).click();
+  await page.getByRole("button", { name: "nested", exact: true }).waitFor();
+  await page.evaluate(() => window.treeEvidence.release());
+  assert(await page.getByRole("button", { name: "报告 #?.pdf", exact: true }).count() === 0, "stale task result suppressed");
+  const outside = await page.evaluate(() => window.treeEvidence.relativeListing("thread-two", "/workspace-elsewhere/private", new AbortController().signal));
+  assert(!outside.ok && outside.error.code === "workspace-file/outside-workspace", "outside path rejected");
+  const order = await page.locator("[data-files-root] button").allTextContents();
+  assert(order.join(",") === ",missing,nested,slow,file2.txt,file10.txt", "directory-first natural order");
+  assert(await page.getByRole("button", { name: "escape", exact: true }).count() === 0, "symlink cannot open");
+  return { status: "passed", calls: await page.evaluate(() => window.treeEvidence.calls) };
+};

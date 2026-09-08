@@ -7,6 +7,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | 直接使用官方 `createClientModuleSystem` 装载客户端 factory，React 由 Studio 单实例提供 |
+| DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
 | [dsh-file-viewer](https://github.com/liguobao/dsh-file-viewer) | npm 0.3.3，MIT | 使用未修改的浏览器构建及公开 `registerContentProvider`；Markdown、CSV、图片、PDF 等格式由社区插件呈现 |
 | [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.2.0，GPL-3.0 | 使用仅依赖 slots/locale 的本地设置搜索；查询设置页与已渲染选项 |
 
@@ -18,4 +19,8 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 加载器使用显式审阅的随包客户端列表。它不自动扫描、安装或激活任意外部 npm 包，也不替代 Framework 管理的 OPL Package 图。后续插件应先核对许可证、真实注入依赖和 owner 边界，再加入载体并验证真实界面。
 
-本轮验证包括 workspace provider 的二进制窗口、跨任务/越界拒绝、取消、响应一致性与符号链接测试；独立浏览器运行确认官方 ModuleLoader 进入 live 模式、社区 Markdown/CSV 实际渲染、本地设置搜索实际生成结果、Markdown 中脚本未执行。PDF、图片等功能来自上游插件，仍须以最终 Studio 载体的实际文件样本验证后才能声明相应验收完成。
+客户端静态构建从 `ecosystem/` 加载；`plugins/` 路由由 DSH Host 的插件服务占用。Web 复用已有 ClientModuleSystem，Desktop 仅在需要时初始化官方模块运行时。
+
+社区检索也确认 [AKS1st/dock-git](https://github.com/AKS1st/dock-git) 提供 Git 历史、差异、暂存、提交、推送和分支功能，采用 MIT。它依赖 `dock-base` 的工作台布局和另一组 Cordis/React peer，目前保留为可选适配候选，尚未集成或完成 Studio 运行验收。Git 不需要由 OPL 从头开发，但包存在与可直接安装是两个不同结论。
+
+验证覆盖 workspace provider 的二进制窗口、跨任务/越界拒绝、取消、响应一致性与符号链接。整页 WebUI 在隔离工作区确认官方文件树、社区 Markdown/CSV、PNG 图片和单页 PDF 实际渲染，PDF canvas 非空；浏览器下载与源文件逐字节一致。设置搜索完成更新、诊断和字号跳转，聊天文本和图片附件完成模拟 turn。独立 Markdown 样本还验证了脚本未执行。这些是本地源码运行证据，不替代安装包或发布验收。

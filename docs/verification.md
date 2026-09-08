@@ -38,7 +38,7 @@ is the command owner.
 | `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
 | `npm run validate:client-conformance` | Fresh four-repository Host -> App -> Studio/AionUI compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |
-| `npm run verify:dsh-gui` | Byte parity of the pinned DSH `v0.1.2-rc.1` GUI source manifest |
+| `npm run verify:dsh-gui` | Byte parity of the pinned DSH GUI source manifest |
 | `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
 | `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
 | `npm run test:dsh-upgrade` | No-write DSH status/preflight command and scoped-package binding tests |

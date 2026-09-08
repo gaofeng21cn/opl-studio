@@ -10,6 +10,7 @@ below explains one part of that arrangement without becoming another authority.
 | Start using or developing Studio | [English README](../README.md), [中文入口](../README.zh-CN.md) | One public entry maintained as a language pair |
 | Change implementation boundaries | [Architecture](architecture.md) | Host, bridge, renderer, ownership, and durable design rationale |
 | Place a Settings contribution | [Settings projection](settings-information-architecture.md) | Studio rendering of App-owned placement policy |
+| Reuse generic DSH plugins | [Ecosystem clients](ecosystem-client-plugins.md) | Reviewed official/community plugins, source provenance, and canonical workspace adapters |
 | Select verification | [Verification](verification.md) | Commands, prerequisites, and what their results prove |
 | Build and qualify macOS distribution | [Desktop distribution](delivery/desktop-distribution.md) | Desktop bundle, updater, bootstrap, and release qualification |
 | Operate the OCI carrier | [OCI distribution](oci-distribution.md) | Immutable-image lifecycle, authentication, and Cloud handoff |

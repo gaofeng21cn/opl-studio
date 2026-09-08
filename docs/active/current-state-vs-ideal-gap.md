@@ -30,6 +30,20 @@ providers, Team orchestration, AionCore integration, and custom assistant
 catalogs are not automatic Studio parity requirements. Codex-native subagent
 display consumes App Server lineage and events without owning scheduling.
 
+Switching continuity is evaluated by daily App outcomes, not every AionUI
+feature. With the same `CODEX_HOME`, canonical Codex threads remain available
+through App Server list/resume. AionUI-only SQLite conversation records, local
+ordering, and unsent drafts are not automatically imported; a future migration
+must be a bounded importer from that source, without creating another thread
+owner.
+
+Workspace browsing, search, and external opening or Web download are the
+minimum file outcome. Rich preview is optional. Generic features first reuse
+official or community DSH plugins; a dedicated Git workbench, storage deletion
+UI, and AionUI-specific providers remain nonblocking unless App explicitly
+admits them. Studio's maintained feature plugins focus on OPL research
+progress, maps, and canonical owner adapters.
+
 Public Preview distribution and a selected local Studio carrier do not transfer
 Stable adoption, runtime or Package authority, professional quality, or artifact
 acceptance. The retired private cross-thread protocol, host queue, delivery

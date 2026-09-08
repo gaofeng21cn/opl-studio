@@ -833,7 +833,7 @@
     ],
     "vendored_source_root": "src/vendor/deepseek-harness",
     "source_manifest": "src/composition/deepseekHarnessSourceManifest.json",
-    "vendored_file_count": 336,
+    "vendored_file_count": 338,
     "byte_identical": true,
     "byte_identical_to_pinned_ref": true,
     "vendored_package_roots": [
@@ -854,7 +854,8 @@
       "packages/client/ui-deliverables/src",
       "packages/client/ui-open-in-app/src",
       "packages/client/ui-dockkit/src",
-      "packages/client/resources/src"
+      "packages/client/resources/src",
+      "packages/util/workspace-path/src"
     ],
     "ui_primitives_index": "packages/client/ui-primitives/src/index.ts",
     "direct_ui_primitives": [
@@ -1025,7 +1026,7 @@
       "renderer_testids": [
         "opl-files-results-panel",
         "opl-thread-workspace-files",
-        "opl-thread-workspace-preview",
+        "opl-ecosystem-file-preview",
         "opl-input-files-list",
         "opl-artifact-preview-panel"
       ]

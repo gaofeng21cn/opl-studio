@@ -4970,23 +4970,24 @@ export const codexWorkbenchStyles = `
 
     .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav {
       width: 100%;
-      height: 148px;
+      height: auto;
+      flex: none;
       gap: 8px;
       padding: 14px 12px 0;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav > div:last-child {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      display: flex;
       flex-direction: row;
-      overflow: visible;
+      overflow-x: auto;
       padding-bottom: 8px;
       gap: 4px;
     }
 
     .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav button {
-      width: 100%;
+      width: auto;
+      flex: none;
       min-width: 0;
       padding-inline: 8px;
     }
@@ -5205,24 +5206,18 @@ export const codexWorkbenchStyles = `
     }
   }
 
-  @media (max-width: 480px) {
-    .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav {
-      flex: 0 0 226px;
-      height: 226px;
-    }
-
-    .opl-studio-dsh-root [role="dialog"][aria-labelledby]:has(> nav) > nav > div:last-child {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
   .opl-settings-slot-root .sss-pop { background: var(--opl-canvas); z-index: 100; min-width: 220px; }
   /* OPL navigation content inside the unchanged DSH settings shell. */
   .opl-settings-slot-root [role="dialog"] { width: 1040px; }
   .opl-settings-slot-root [role="dialog"] > nav { width: 208px; }
+  .opl-settings-slot-root [role="dialog"] > nav + div > div:last-child { padding: 0 0 24px; }
   .opl-settings-slot-root [role="dialog"] > nav button > svg { display: none; }
-  .opl-settings-nav-label { display: flex; align-items: center; gap: 10px; }
+  .opl-settings-slot-root [role="dialog"] > nav button { min-height: 40px; height: auto; }
+  .opl-settings-nav-label { display: flex; align-items: center; gap: 10px; white-space: normal; line-height: 20px; }
   .opl-settings-nav-label > svg { flex: none; }
+  .settings-appearance button { flex: 1 1 0; min-width: 0; padding: 14px 8px; border-radius: 8px; }
+  .settings-font-size [class*="arrows_"] { opacity: 1; }
+  .settings-font-size [class*="stepper_"] { min-width: 88px; padding-right: 20px; }
   .settings-detail-header, .settings-content { padding-left: 24px; padding-right: 24px; }
   .settings-detail-title-row { flex-wrap: wrap; align-items: flex-start; }
   .settings-subnav { flex-wrap: wrap; }
@@ -5241,10 +5236,12 @@ export const codexWorkbenchStyles = `
     .opl-settings-slot-root [role="dialog"] { width: 100vw; max-width: 100vw; height: 100dvh; border-radius: 0; flex-direction: column; }
     .opl-settings-slot-root [role="dialog"] > nav { width: 100%; padding: 12px 44px 8px 12px; gap: 0; }
     .opl-settings-slot-root [role="dialog"] > nav > div:first-child { position: relative; width: auto; height: auto; overflow: visible; padding: 0 0 8px; }
+    .opl-settings-slot-root .sss-wrap { margin-right: 34px; }
     .opl-settings-slot-root .sss-title { display: none; }
     .opl-settings-slot-root [role="dialog"] > nav > div:last-child { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
     .opl-settings-slot-root [role="dialog"] > nav button { flex: none; padding: 8px 10px; height: 38px; }
     .opl-settings-nav-label > svg { display: none; }
+    .opl-settings-nav-label { white-space: nowrap; }
     .opl-settings-slot-root [role="dialog"] > nav + div { min-height: 0; width: 100%; }
     .opl-settings-slot-root [role="dialog"] > nav + div > div:first-child { position: absolute; right: 8px; top: 14px; height: auto; padding: 0; }
     .settings-detail-header { padding-top: 12px; padding-bottom: 16px; }

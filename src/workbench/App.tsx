@@ -2936,9 +2936,9 @@ export function App({
           {activeFilesView === "workspace" ? (
             <WorkspaceFilesPanel
               threadId={codexThreadId}
+              workspace={currentSession?.workspace ?? ""}
               locale={settings.locale}
               listWorkspace={bridge.listThreadWorkspace}
-              readFile={bridge.readThreadWorkspaceFile}
               readBytes={bridge.readThreadWorkspaceBytes}
               accessWorkspace={bridge.accessThreadWorkspace}
               nativeFileAccess={bridge.platformCapabilities.nativeWorkspaceFileAccess === true}

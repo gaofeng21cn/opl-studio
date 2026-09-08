@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
+import { ChevronLeft } from "lucide-react";
 import { createEcosystemLocale, loadEcosystemClient } from "./ecosystemClients";
 import { createEcosystemWorkspaceProvider, type EcosystemContentProvider, type EcosystemWorkspaceBridge } from "./ecosystemWorkspaceProvider";
 
@@ -68,7 +69,7 @@ export function EcosystemFilePreview(props: EcosystemFilePreviewProps) {
     <style>{`.opl-ecosystem-file-preview .dsfv-panel{--dsfv-bottom-clearance:0px}.opl-ecosystem-file-preview .dsfv-titlebar{flex-wrap:wrap;gap:6px;padding:8px}.opl-ecosystem-file-preview .dsfv-titlebar-path{min-width:0;flex:1 1 100%}.opl-ecosystem-file-preview .dsfv-path,.opl-ecosystem-file-preview .dsfv-back-btn,.opl-ecosystem-file-preview .dsfv-close{display:none}.opl-ecosystem-file-preview .dsfv-titlebar-actions{flex-wrap:wrap}`}</style>
     <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
       <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={props.relativePath}>{props.relativePath.split("/").at(-1)}</strong>
-      <button type="button" onClick={props.onClose}>{props.locale === "zh" ? "返回文件列表" : "Back to files"}</button>
+      <button type="button" aria-label={props.locale === "zh" ? "返回文件列表" : "Back to files"} title={props.locale === "zh" ? "返回文件列表" : "Back to files"} onClick={props.onClose}><ChevronLeft aria-hidden="true" size={18} /></button>
     </header>
     {error ? <p role="alert">{error}</p> : mount ? <mount.Component {...mount.props} /> : <p role="status">{props.locale === "zh" ? "正在加载文件预览…" : "Loading file preview…"}</p>}
   </section>;

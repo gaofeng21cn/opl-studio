@@ -29,6 +29,7 @@ import {
 } from "../integrations/deepseek-harness/runtimeShim";
 import App from "../workbench/App";
 import { createEcosystemLocale, mountSettingsSearch } from "../integrations/deepseek-harness/ecosystemClients";
+import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../integrations/deepseek-harness/ecosystemSettingsSearch";
 import { settingsDestinations, settingsSubDestinations, type SettingsDestinationId } from "../workbench/SettingsPanel";
 import { autoModelLabel, reasoningLabel } from "../workbench/modelPolicy";
 import { ProjectedContribution } from "./contributionComponents";
@@ -851,6 +852,20 @@ function ShellOverlaySlot() {
   </>;
 }
 
+function settingsSearchTargets(locale: "zh" | "en"): SettingsSearchTarget[] {
+  const pages = settingsDestinations(locale);
+  const targets = pages.flatMap((page) => [
+    { label: page.label, pageLabel: page.label, subpageLabel: settingsSubDestinations(page.id, locale).length > 1 ? settingsSubDestinations(page.id, locale)[0].label : undefined },
+    ...settingsSubDestinations(page.id, locale).filter((item) => item.label !== page.label)
+      .map((item) => ({ label: item.label, pageLabel: page.label, subpageLabel: settingsSubDestinations(page.id, locale).length > 1 ? item.label : undefined })),
+  ]);
+  const preferencePage = pages.find((page) => page.id === "preferences")!.label;
+  return [...targets, ...(locale === "zh"
+    ? ["语言", "外观", "字号大小", "任务完成通知", "执行前确认"]
+    : ["Language", "Appearance", "Font size", "Task completion notifications", "Confirm before execute"]
+  ).map((label) => ({ label, pageLabel: preferencePage, rowLabel: label }))];
+}
+
 function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) {
   const studio = useStudio();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -859,6 +874,9 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
   localeRef.current = studio.locale;
   const searchLocale = useRef(createEcosystemLocale(() => localeRef.current));
   useEffect(() => { searchLocale.current.refresh(); }, [studio.locale]);
+  useEffect(() => rootRef.current
+    ? installSettingsSearchInteraction(rootRef.current, () => settingsSearchTargets(localeRef.current), () => localeRef.current)
+    : undefined, []);
   useEffect(() => {
     let active = true;
     let dispose: (() => void) | undefined;
@@ -868,21 +886,27 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
       slots: {
         entries(name) {
           const locale = localeRef.current;
-          if (name === "settings.section") return settingsDestinations(locale).map((item, order) => ({ options: {
-            id: Object.keys(aliases).find((key) => aliases[key] === item.id) ?? settingsSectionId(item.id), label: item.label, order
-          } }));
+          if (name === "settings.section") return settingsDestinations(locale).flatMap((page, order) => [
+            { options: { id: Object.keys(aliases).find((key) => aliases[key] === page.id) ?? settingsSectionId(page.id), label: page.label, order: order * 10 } },
+            ...settingsSubDestinations(page.id, locale).filter((item) => item.label !== page.label)
+              .map((item, index) => ({ options: { id: `${settingsSectionId(item.id)}-search`, label: item.label, order: order * 10 + index + 1 } })),
+          ]);
           if (name === "settings.plugins.tab" || name === "web-ui.plugin.item") {
             const primary = name === "settings.plugins.tab" ? "agents" : "workspace";
             return settingsSubDestinations(primary, locale).map((item, order) => ({ options: { id: item.id, label: item.label, order } }));
           }
           if (name === "settings.general.item") return (locale === "zh"
-            ? ["语言", "外观", "字体大小", "任务完成通知", "执行前确认"]
+            ? ["语言", "外观", "字号大小", "任务完成通知", "执行前确认"]
             : ["Language", "Appearance", "Font size", "Task completion notifications", "Confirm before execute"]
-          ).map((label, order) => ({ options: { id: `preference-${order}`, label, order } }));
+          ).map((label, order) => ({ options: { id: order === 2 ? "font-size 字体大小 字号" : `preference-${order}`, label, order } }));
           return [];
         },
         subscribe: (_name, listener) => searchLocale.current.subscribe(listener),
-        register: (options, Component) => slotHost.core.register({ ...options, registrant: "@objectivex666/dsh-settings-search" } as any, Component as any),
+        register: (options, Component) => {
+          const { locale: namespace, ...registration } = options;
+          const translate = searchLocale.current.bind(String(namespace));
+          return slotHost.core.register({ ...registration, registrant: "@objectivex666/dsh-settings-search" } as any, ((props: Record<string, unknown>) => <Component {...props} t={translate} />) as any);
+        },
         inject: (_name, activate) => activate(),
       }
     }).then((cleanup) => { if (active) dispose = cleanup; else cleanup(); })
