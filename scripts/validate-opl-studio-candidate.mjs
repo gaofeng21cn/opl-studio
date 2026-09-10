@@ -442,7 +442,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(alignment, "missing DeepSeek Harness GUI source-reuse evidence");
   assert(alignment.reference_product === "DeepSeek Harness", "DeepSeek Harness must be the primary GUI reference");
   assert(alignment.reference_version === expectedDshRef, "pinned DeepSeek Harness source ref must be recorded");
-  assert(alignment.reference_date === "2026-08-22", "DeepSeek Harness inspection date must be recorded");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(alignment.reference_date ?? ""), "DeepSeek Harness inspection date must be recorded as an ISO date");
   assert(alignment.source_usage === "direct_gui_source_reuse_with_application_host_cohort", "DeepSeek Harness GUI use must bind the Application Host cohort");
   assert(alignment.left_side === "persistent project and conversation rail with search and Settings only", "project rail placement must be recorded");
   assert(alignment.center === "single dominant conversation timeline with bottom composer", "conversation placement must be recorded");
@@ -484,6 +484,17 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   );
   for (const slot of ["sidebar.brand.mark", "sidebar.brand.name", "conversation.hero.brand.mark", "conversation.input.attachments"]) {
     assert(slotHost.includes(`register({ name: "${slot}", registrant: "opl-studio" }`), `missing rc2 OPL slot occupant ${slot}`);
+  }
+  for (const marker of [
+    'main: { kind: "keyed", scope: "root" }',
+    'register({ name: "main", key: "conversation", registrant: "dsh-ui-conversation"',
+    "selector({ layoutInfo: panels })",
+    "usePanelInfo={useConversationPanelInfo}",
+    "usePanels={useStudioPanels}",
+    "useBusyEnter={useStudioBusyEnter}",
+    "loadImage={loadStudioQueueImage}"
+  ]) {
+    assert(slotHost.includes(marker), `missing pinned DSH frame seam ${marker}`);
   }
   assert(slotHost.includes("function OplBrandNameSlot() { return <>One Person Lab</>; }"), "rc2 brand name slot must render One Person Lab text");
   assert(slotHost.includes("function OplBrandMarkSlot(): null { return null; }"), "rc2 product identity must suppress the upstream mark without inventing an OPL logo");

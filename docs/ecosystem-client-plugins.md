@@ -13,7 +13,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 设置搜索选择 1.2.0 是明确的功能范围选择。核对的 1.9.0 增加独立模型设置、API Key 存储与直连推理；Studio 尚未提供与唯一模型/凭据 owner 一致的适配，因此不装载那些功能。搜索插件本身及许可证随载体保留，未复制改写其实现。
 
-文件查看器 0.3.3 发布包的可选 DSH peer 范围不接纳 `0.1.3-alpha.2` 预发布版本。Studio 没有覆盖 peer 或假称完整 Node 插件兼容：仅从固定 npm 原包提取未经修改的浏览器文件，保留 npm SRI、逐文件 SHA-256、原 package.json 和许可证；不加载其 Host 半部。同步入口为 `node scripts/ecosystem-client-assets.mjs --sync`，无参数执行字节验证。生成文件位于 `packages/opl-studio-ecosystem/dsh-file-viewer`。
+文件查看器 0.3.3 发布包的可选 DSH peer 范围不接纳 `0.1.5-rc.1` 预发布版本。Studio 没有覆盖 peer 或假称完整 Node 插件兼容：仅从固定 npm 原包提取未经修改的浏览器文件，保留 npm SRI、逐文件 SHA-256、原 package.json 和许可证；不加载其 Host 半部。同步入口为 `node scripts/ecosystem-client-assets.mjs --sync`，无参数执行字节验证。生成文件位于 `packages/opl-studio-ecosystem/dsh-file-viewer`。
 
 `EcosystemFilePreview` 把插件的 `conversation.view` 接到现有文件面板。`ecosystemWorkspaceProvider` 只识别绑定当前 canonical thread 的 `opl-workspace://` locator；实际目录与字节读取仍经原 workspace bridge，复用 cwd、路径和符号链接校验。插件需要的大窗口由适配器拆成最多 512 KiB 的读取，不引入通用任意路径 RPC。原有外部打开及下载继续可用。
 

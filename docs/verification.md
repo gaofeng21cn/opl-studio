@@ -135,6 +135,12 @@ static-index authorization, renderer binding, and composer submission must all
 be checked together; package installation or GUI byte parity does not prove
 these behavioral seams.
 
+Every direct `@deepseek-ai/dsh-*` runtime dependency must appear in the cohort;
+the binding check rejects omissions as well as package/lock version drift.
+For `0.1.5-rc.1`, the keyed `main` slot uses `conversation` as its fallback
+entry, while `activePanelId: null` denotes the current conversation. A non-null
+panel id suppresses the workspace tree's current-session selection.
+
 ## Rendered WebUI Acceptance
 
 ```bash
@@ -146,6 +152,12 @@ App Server, checks the wide and narrow layouts, the three on-demand context
 tabs, all App-owned settings destinations, and Settings modal focus
 containment/restoration. It writes screenshots and an exact source/renderer/DSH
 cohort receipt under ignored `out/acceptance/`.
+
+The same gate switches between existing sessions and checks the selected row,
+then opens a running turn, checks the localized busy-send label, queues a
+message without starting or steering a turn, and verifies accelerated Enter
+sends `turn/steer` to the selected canonical thread and turn in the fake App
+Server's request log.
 
 This is local rendered candidate evidence. It does not establish human Pixel
 approval, screen-reader qualification, a packaged or installed carrier, active

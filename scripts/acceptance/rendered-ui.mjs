@@ -63,6 +63,7 @@ const opl = {
 
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-rendered-acceptance-"));
 const cliRoot = path.join(tempRoot, "playwright");
+const appServerLog = path.join(tempRoot, "app-server.jsonl");
 await mkdir(cliRoot, { recursive: true });
 let host;
 
@@ -72,7 +73,7 @@ try {
     command: process.execPath,
     args: [fixture],
     cwd: tempRoot,
-    env: { ...process.env, FAKE_APP_SERVER_INCLUDE_PROJECTLESS: "1" },
+    env: { ...process.env, FAKE_APP_SERVER_INCLUDE_PROJECTLESS: "1", FAKE_APP_SERVER_LOG: appServerLog },
     requestTimeoutMs: 2_000,
     turnTimeoutMs: 2_000
   });
@@ -217,6 +218,66 @@ try {
   }`, cliRoot);
   assert.deepEqual(submitted, { completed: true, draft: "" });
 
+  // Exercise the adapter through the rendered tree and the real Host transport:
+  // a mounted conversation must remain selected, and busy submission must retain
+  // localized labels and the distinct queue/steer delivery behavior.
+  await cli(["resize", "1440", "900"], cliRoot);
+  await evaluate(`() => {
+    const group = document.querySelector('[role="tree"][aria-label="会话"] [role="treeitem"][aria-expanded="false"]');
+    group?.click();
+    return true;
+  }`, cliRoot);
+  const selection = [];
+  for (const threadId of ["thread-idle", "thread-source", "thread-running"]) {
+    const selected = await evaluate(`async () => {
+      const label = ${JSON.stringify(`Thread ${threadId}`)};
+      const row = Array.from(document.querySelectorAll('[role="treeitem"][aria-selected]')).find(row => row.textContent.includes(label));
+      if (!row) throw new Error('Missing session row: ' + label);
+      row.click();
+      const deadline = Date.now() + 5000;
+      while (document.querySelector('main strong')?.textContent !== label && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+      return {
+        header: document.querySelector('main strong')?.textContent,
+        selected: Array.from(document.querySelectorAll('[role="treeitem"][aria-selected="true"]')).map(row => row.textContent.includes(label))
+      };
+    }`, cliRoot);
+    assert.deepEqual(selected, { header: `Thread ${threadId}`, selected: [true] });
+    selection.push({ threadId, ...selected });
+  }
+  const requestFrames = async () => (await readFile(appServerLog, "utf8")).trim().split("\n")
+    .map(line => JSON.parse(line)).filter(frame => frame.direction === "client_to_server");
+  const beforeQueue = (await requestFrames()).length;
+  const queuedText = "DSH busy queue regression";
+  const steerText = "DSH busy steer regression";
+  await evaluate(`() => { document.querySelector('[data-composer-input]').focus(); return true; }`, cliRoot);
+  await cli(["type", queuedText], cliRoot);
+  const busyLabel = await evaluate(`() => ({
+    localized: Boolean(document.querySelector('button[aria-label="排队发送"]:not(:disabled)')),
+    rawKey: Boolean(document.querySelector('button[aria-label^="input.send."]'))
+  })`, cliRoot);
+  assert.deepEqual(busyLabel, { localized: true, rawKey: false });
+  await evaluate(`() => { document.querySelector('button[aria-label="排队发送"]').click(); return true; }`, cliRoot);
+  const queued = await evaluate(`async () => {
+    const deadline = Date.now() + 5000;
+    while (!document.querySelector('button[aria-label="编辑排队消息"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    return {
+      visible: document.body.innerText.includes(${JSON.stringify(queuedText)}),
+      editable: Boolean(document.querySelector('button[aria-label="编辑排队消息"]')),
+      running: Boolean(document.querySelector('button[aria-label="停止"]')),
+      draft: document.querySelector('[data-composer-input]').innerText.trim()
+    };
+  }`, cliRoot);
+  assert.deepEqual(queued, { visible: true, editable: true, running: true, draft: "" });
+  assert.equal((await requestFrames()).slice(beforeQueue).some(frame => ["turn/start", "turn/steer"].includes(frame.method)), false, "queue must wait for the running turn");
+  await evaluate(`() => { document.querySelector('[data-composer-input]').focus(); return true; }`, cliRoot);
+  await cli(["type", steerText], cliRoot);
+  await cli(["press", process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"], cliRoot);
+  const steered = (await requestFrames()).find(frame => frame.method === "turn/steer" && frame.params?.input?.some(item => item.text === steerText));
+  assert.ok(steered, "accelerated Enter must steer through the App Server transport");
+  assert.equal(steered.params.threadId, "thread-running");
+  assert.equal(steered.params.expectedTurnId, "turn-running");
+  const busySubmission = { busyLabel, queued, steer: { threadId: steered.params.threadId, turnId: steered.params.expectedTurnId } };
+
   await mkdir(outputRoot, { recursive: true });
   const wideOutput = path.join(outputRoot, "webui-1440x900.png");
   const narrowOutput = path.join(outputRoot, "webui-400x800.png");
@@ -238,7 +299,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { wide, contextMenu, sidebarRecent, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted },
+    assertions: { wide, contextMenu, sidebarRecent, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }

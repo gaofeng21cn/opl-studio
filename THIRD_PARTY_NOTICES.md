@@ -9,13 +9,16 @@ OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
 - `@deepseek-ai/cordis-plugin-include` `1.0.7`;
 - `@deepseek-ai/cordis-plugin-loader` `1.0.3`;
 - `@deepseek-ai/dsh-app-boot`, `dsh-brand`, `dsh-client-modules`,
-  `dsh-client-ui-primitives`, `dsh-client-ui-slots`, `dsh-client-web`,
+  `dsh-client-ui-primitives`, `dsh-client-ui-slots`, `dsh-client-ui-dockkit`,
+  `dsh-client-web`,
   `dsh-home-paths`, `dsh-host-frontend-static`,
   `dsh-host-plugin-inventory`, `dsh-host-webserver`, `dsh-invariants`,
   `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, and
   `dsh-typert-protocol`, `dsh-client-store`, `dsh-agent-presets`, and
-  `dsh-util-workspace-path`, all at `0.1.3-alpha.2`;
+  `dsh-util-workspace-path`, all at `0.1.5-rc.1`;
 - `use-sync-external-store` `1.2.0` for the vendored renderer closure;
+- `zustand` `4.4.7` and `immer` `10.2.0` for the DSH client store runtime
+  closure (MIT, pmndrs and Michel Weststrate);
 - Lexical and its history, plain-text, text, and utility modules `0.49.0`
   for the upstream composer (MIT, Meta Platforms, Inc. and affiliates).
 
@@ -25,7 +28,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `c389f96bf3a9b6807cb71ed6bdad5849be0df6d8`
+Inspected source ref: `183f08e9c6dde7e36cd2318eaee70b0da08fb35e`
 
 The complete `src/` trees of eighteen client packages are vendored byte-for-byte
 from that ref under `src/vendor/deepseek-harness/packages/client/`:
@@ -42,7 +45,7 @@ from that ref under `src/vendor/deepseek-harness/packages/client/`:
 - `ui-primitives`
 - `ui-renderer`
 - `ui-sidebar-files`
-- `ui-sidebar-textpreview`
+- `ui-sidebar-documentpreview`
 - `ui-sidebar-right`
 - `ui-deliverables`
 - `ui-open-in-app`
@@ -50,11 +53,10 @@ from that ref under `src/vendor/deepseek-harness/packages/client/`:
 - `resources`
 
 The upstream `packages/util/workspace-path/src` helpers are also vendored from
-the same ref because this commit adds the file resource address ABI after the
-published `0.1.3-alpha.2` package. Renderer imports use these source helpers.
+the same ref so renderer imports resolve to the pinned source helpers.
 
-The snapshot contains 338 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.1.3-alpha.2`), and
+The snapshot contains 394 files, including the upstream `LICENSE`. Its package
+roots, per-file SHA-256 inventory, source package version (`0.1.5-rc.1`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks local byte parity. OPL changes stay outside the vendor root.

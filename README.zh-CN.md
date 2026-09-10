@@ -27,7 +27,7 @@ OPL Studio 是 One Person Lab 面向下一代体验打造的第一方应用宿�
 Codex 后端、OPL App 产品模型、由 OPL Framework 管理的运行时和软件包投影，
 以及桌面端与 WebUI 共用的渲染器整合在一个工作台中。
 
-Studio 固定使用 DeepSeek Harness（DSH）`v0.1.2-rc.1` 的应用骨架和配套 GUI
+Studio 固定使用 DeepSeek Harness（DSH）`v0.1.5-rc.1` 的应用骨架和配套 GUI
 源码。DSH 提供 Cordis 应用宿主、插件生命周期、布局系统、基础 UI 组件和交互
 能力；OPL 提供产品身份、Codex 集成、Framework 桥接层、产品策略和第一方插件。
 

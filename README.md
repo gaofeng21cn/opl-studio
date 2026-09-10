@@ -28,7 +28,7 @@ combines a persistent Codex backend, the OPL App product model, Framework-owned
 runtime and Package projections, and a shared desktop/WebUI renderer in one
 workbench.
 
-Studio is built on a pinned DeepSeek Harness (DSH) `v0.1.2-rc.1` application
+Studio is built on a pinned DeepSeek Harness (DSH) `v0.1.5-rc.1` application
 skeleton and GUI source cohort. DSH supplies the Cordis application host,
 plugin lifecycle, layout system, UI primitives, and interaction foundations.
 OPL supplies the product identity, Codex integration, Framework bridge, product

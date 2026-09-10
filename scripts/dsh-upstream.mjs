@@ -44,6 +44,14 @@ function assertPackageAlignment(packageJson, packageLock, cohort) {
     ["package.json", packageJson?.dependencies ?? {}],
     ["package-lock.json", packageLock?.packages?.[""]?.dependencies ?? {}]
   ];
+  const cohortNames = new Set(cohort.map(({ name }) => name));
+  for (const [source, dependencies] of dependencySources) {
+    for (const name of Object.keys(dependencies)) {
+      if (name.startsWith("@deepseek-ai/dsh-")) {
+        assert(cohortNames.has(name), `${source} DSH dependency ${name} is missing from the package cohort`);
+      }
+    }
+  }
   for (const { name, version } of cohort) {
     for (const [source, dependencies] of dependencySources) {
       assert(dependencies?.[name] === version, `${source} DSH dependency ${name} must be ${version}`);
