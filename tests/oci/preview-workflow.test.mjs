@@ -10,17 +10,18 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   assert.equal(workflow.permissions.packages, "write");
   assert.equal(workflow.permissions["id-token"], "write");
   const sourceGate = workflow.jobs["source-gate"];
-  const cohortCheckouts = sourceGate.steps.filter((step) => step.name?.startsWith("Check out canonical "));
-  assert.deepEqual(cohortCheckouts.slice(1).map((step) => ({
+  const cohortCheckouts = sourceGate.steps.filter((step) => step.name?.startsWith("Check out pinned "));
+  assert.deepEqual(cohortCheckouts.map((step) => ({
     repository: step.with.repository,
     ref: step.with.ref,
     path: step.with.path
   })), [
-    { repository: "gaofeng21cn/one-person-lab", ref: "main", path: ".cohort/framework" },
-    { repository: "gaofeng21cn/one-person-lab-app", ref: "main", path: ".cohort/app" },
-    { repository: "gaofeng21cn/opl-aion-shell", ref: "main", path: ".cohort/aionui" }
+    { repository: "gaofeng21cn/one-person-lab", ref: "${{ steps.pinned-cohort.outputs.framework_ref }}", path: ".cohort/framework" },
+    { repository: "gaofeng21cn/one-person-lab-app", ref: "${{ steps.pinned-cohort.outputs.app_ref }}", path: ".cohort/app" },
+    { repository: "gaofeng21cn/opl-aion-shell", ref: "${{ steps.pinned-cohort.outputs.aionui_ref }}", path: ".cohort/aionui" }
   ]);
   const sourceValidation = sourceGate.steps.find((step) => step.name === "Install and validate source");
+  assert.match(sourceValidation.run, /validate:client-conformance -- --pinned-cohort/);
   assert.deepEqual(sourceValidation.env, {
     OPL_FRAMEWORK_REPO: "${{ github.workspace }}/.cohort/framework",
     OPL_APP_REPO: "${{ github.workspace }}/.cohort/app",

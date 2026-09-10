@@ -40,6 +40,16 @@ function refEvidence(repo, remote, ref = `${remote}/main`) {
   return { commit, tree, wire_commit: wireCommit };
 }
 
+function pinnedRefEvidence(repo, declared, name) {
+  const commit = declared?.[`${name}_commit`];
+  const tree = declared?.[`${name}_tree`];
+  assert.match(commit ?? "", /^[0-9a-f]{40}$/, `${name} pinned commit is invalid`);
+  assert.match(tree ?? "", /^[0-9a-f]{40}$/, `${name} pinned tree is invalid`);
+  assert.equal(git(repo, "rev-parse", `${commit}^{commit}`), commit);
+  assert.equal(git(repo, "rev-parse", `${commit}^{tree}`), tree, `${name} pinned tree differs`);
+  return { commit, tree, source: "declared_release_cohort" };
+}
+
 function writeBlobTree(root, file, contents) {
   const target = path.join(root, file);
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -113,10 +123,18 @@ for (const [name, repo] of Object.entries(repos)) {
   assert.ok(fs.existsSync(repo), `${name} checkout is unavailable at ${repo}`);
 }
 
+const candidateEvidence = JSON.parse(
+  fs.readFileSync(path.join(studioRoot, "src/candidateContractEvidence.json"), "utf8")
+);
+const declaredExternalCohort = candidateEvidence.candidate_runtime_qualification?.external_cohort;
+const pinnedCohort = process.argv.includes("--pinned-cohort");
+const externalRefEvidence = (name) => pinnedCohort
+  ? pinnedRefEvidence(repos[name], declaredExternalCohort, name)
+  : refEvidence(repos[name], "origin");
 const cohort = {
-  framework: refEvidence(repos.framework, "origin"),
-  app: refEvidence(repos.app, "origin"),
-  aionui: refEvidence(repos.aionui, "origin"),
+  framework: externalRefEvidence("framework"),
+  app: externalRefEvidence("app"),
+  aionui: externalRefEvidence("aionui"),
   studio_main: refEvidence(studioCanonical, "origin"),
   studio_candidate: {
     commit: git(studioRoot, "rev-parse", "HEAD"),
@@ -124,10 +142,6 @@ const cohort = {
     dirty: git(studioRoot, "status", "--porcelain", "--untracked-files=no").length > 0
   }
 };
-const candidateEvidence = JSON.parse(
-  fs.readFileSync(path.join(studioRoot, "src/candidateContractEvidence.json"), "utf8")
-);
-const declaredExternalCohort = candidateEvidence.candidate_runtime_qualification?.external_cohort;
 assert.deepEqual(declaredExternalCohort, {
   framework_commit: cohort.framework.commit,
   framework_tree: cohort.framework.tree,
@@ -135,7 +149,7 @@ assert.deepEqual(declaredExternalCohort, {
   app_tree: cohort.app.tree,
   aionui_commit: cohort.aionui.commit,
   aionui_tree: cohort.aionui.tree
-}, "candidate evidence external cohort differs from the canonical conformance cohort");
+}, "candidate evidence external cohort differs from the selected conformance cohort");
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "opl-client-conformance-"));
 try {
@@ -144,7 +158,7 @@ try {
     "src/kernel/contract-validation.ts",
     "src/kernel/json-record.ts"
   ]) {
-    writeBlobTree(temporary, file, readBlob(repos.framework, "origin/main", file));
+    writeBlobTree(temporary, file, readBlob(repos.framework, cohort.framework.commit, file));
   }
   const frameworkProducer = await importFresh(path.join(temporary, "src/read-models/operator/app-state-ui-contributions.ts"));
   const hostProjection = frameworkProducer.buildAppUiContributionsProjection({
@@ -161,7 +175,7 @@ try {
   assert.equal(hostProjection.contribution_count, 3);
 
   const aionParserPath = "packages/desktop/src/common/types/opl/uiContributions.ts";
-  writeBlobTree(temporary, aionParserPath, readBlob(repos.aionui, "origin/main", aionParserPath));
+  writeBlobTree(temporary, aionParserPath, readBlob(repos.aionui, cohort.aionui.commit, aionParserPath));
   const aionParser = await importFresh(path.join(temporary, aionParserPath));
   const studioProjectionModule = await importFresh(path.join(studioRoot, "src/composition/contributionProjection.ts"));
   const clientCordisModule = await importFresh(path.join(studioRoot, "src/composition/clientCordis.ts"));
@@ -175,10 +189,10 @@ try {
   const aionProjection = aionParser.readOplUiContributionsProjection(hostState);
   assert.deepEqual(studioProjection, aionProjection, "Studio and AionUI projection semantics differ");
 
-  const appProfile = JSON.parse(readBlob(repos.app, "origin/main", "contracts/app-product-profile.json"));
+  const appProfile = JSON.parse(readBlob(repos.app, cohort.app.commit, "contracts/app-product-profile.json"));
   const aionProfile = JSON.parse(readBlob(
     repos.aionui,
-    "origin/main",
+    cohort.aionui.commit,
     "packages/desktop/src/common/config/oplProductProfile/oplProductProfile.generated.json"
   ));
   const appComposition = appProfile.delivery_topology.minimum_complete_product.composition_model;
@@ -211,7 +225,7 @@ try {
     );
   }
 
-  const appGuiContract = JSON.parse(readBlob(repos.app, "origin/main", "contracts/app-gui-product-contract.json"));
+  const appGuiContract = JSON.parse(readBlob(repos.app, cohort.app.commit, "contracts/app-gui-product-contract.json"));
   const actionContract = findActionContract(appGuiContract, "package_contribution_execute");
   assert.ok(actionContract, "App action contract is missing package_contribution_execute");
   assert.deepEqual(actionContract.required_payload_fields, ["package_id", "ref", "input", "confirmed"]);
@@ -229,7 +243,7 @@ try {
 
   const aionActionSource = readBlob(
     repos.aionui,
-    "origin/main",
+    cohort.aionui.commit,
     "packages/desktop/src/renderer/components/opl/OplUiContributionSlot.tsx"
   );
   for (const marker of [

@@ -123,6 +123,13 @@ desktop release tag at that exact Studio commit. Preserve the handoff alongside
 the desktop release evidence. An existing immutable OCI version or source tag
 must be reconciled before retrying publication.
 
+The source gate checks out the external commits declared in
+`src/candidateContractEvidence.json` and runs Client conformance with
+`--pinned-cohort`, checking each declared commit/tree pair and reading contracts
+from those exact commits. This keeps qualification and image build inputs equal
+when upstream `main` advances. The conformance command without that flag retains
+its current-main audit behavior.
+
 ## Existing AionUI Data
 
 Keep the Studio data volume persistent. For a separate legacy volume, add

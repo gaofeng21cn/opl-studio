@@ -52,27 +52,42 @@ jobs:
             exit 1
           fi
 
-      - name: Check out canonical Framework cohort
+      - name: Read pinned release cohort
+        id: pinned-cohort
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const evidence = JSON.parse(fs.readFileSync("src/candidateContractEvidence.json", "utf8"));
+          const cohort = evidence.candidate_runtime_qualification?.external_cohort ?? {};
+          for (const name of ["framework", "app", "aionui"]) {
+            const commit = cohort[`${name}_commit`];
+            if (!/^[0-9a-f]{40}$/.test(commit ?? "")) throw new Error(`invalid ${name} cohort`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}_ref=${commit}\n`);
+          }
+          NODE
+
+      - name: Check out pinned Framework cohort
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gaofeng21cn/one-person-lab
-          ref: main
+          ref: ${{ steps.pinned-cohort.outputs.framework_ref }}
           path: .cohort/framework
           persist-credentials: false
 
-      - name: Check out canonical App cohort
+      - name: Check out pinned App cohort
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gaofeng21cn/one-person-lab-app
-          ref: main
+          ref: ${{ steps.pinned-cohort.outputs.app_ref }}
           path: .cohort/app
           persist-credentials: false
 
-      - name: Check out canonical AionUI cohort
+      - name: Check out pinned AionUI cohort
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gaofeng21cn/opl-aion-shell
-          ref: main
+          ref: ${{ steps.pinned-cohort.outputs.aionui_ref }}
           path: .cohort/aionui
           persist-credentials: false
 
@@ -96,7 +111,7 @@ jobs:
           npm ci
           npm run typecheck
           npm run test:oci
-          npm run validate:client-conformance
+          npm run validate:client-conformance -- --pinned-cohort
 
       - name: Export exact cohort
         id: cohort
