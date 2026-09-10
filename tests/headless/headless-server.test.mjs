@@ -45,6 +45,8 @@ test("standalone host serves health and readiness from the shared host core", as
       workspaceRoot: project,
       env: {
         ...process.env,
+        OPL_DATA_DIR: project,
+        OPL_STUDIO_AION_MIGRATION: "0",
         CODEX_APP_SERVER_COMMAND: process.execPath,
         CODEX_APP_SERVER_ARGS: fixture
       },
@@ -87,6 +89,11 @@ test("standalone Node command starts the shared renderer and exits cleanly on SI
       OPL_HEADLESS_PORT: "0",
       OPL_HEADLESS_SHUTDOWN_TIMEOUT_MS: "2000",
       OPL_STUDIO_CODEX_CWD: project,
+      OPL_DATA_DIR: project,
+      // This process-lifecycle fixture must not scan or migrate the user's
+      // installed AionUI history while waiting for its listening receipt.
+      OPL_STUDIO_AION_MIGRATION: "0",
+      DSH_HOME: path.join(project, "dsh-home"),
       CODEX_APP_SERVER_COMMAND: process.execPath,
       CODEX_APP_SERVER_ARGS: fixture
     },
@@ -97,9 +104,16 @@ test("standalone Node command starts the shared renderer and exits cleanly on SI
   });
 
   const lines = readline.createInterface({ input: child.stdout });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4000); });
   const listening = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("headless runner did not listen")), 5_000);
-    child.once("exit", (code) => reject(new Error(`headless runner exited early: ${code}`)));
+    // Cold profile/module initialization runs in a separate Node process. Keep
+    // a bounded startup budget with room for concurrent package qualification.
+    const timeout = setTimeout(() => reject(new Error(`headless runner did not listen within 15s: ${stderr}`)), 15_000);
+    child.once("exit", (code) => {
+      clearTimeout(timeout);
+      reject(new Error(`headless runner exited early: ${code}: ${stderr}`));
+    });
     lines.on("line", (line) => {
       const value = JSON.parse(line);
       if (value.status === "headless_server_listening") {
