@@ -91,6 +91,12 @@ unless `--app-path` allows a real `Info.plist` readback. Its receipt always keep
 runtime is recorded as a typed blocker instead of being hidden behind a shell fallback. The harness deletes
 the temporary VM by default; use `--keep-vm` only for local debugging.
 
+The clean-VM harness copies the runner's system and default CA trust into a temporary
+guest file and binds its digest before launch. `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`
+carry that trust to the test App and its children, with TLS verification enabled.
+This supports the runner's network trust without changing the shipped bundle or
+persisting certificates in the guest keychain.
+
 `npm run qualify:desktop:fixture-vm -- --dmg <local DMG>` installs the same exact DMG into the clean Tart
 base and drives the packaged Host with the synthetic App Server and Framework fixtures in
 `tests/fixtures/studio-vm-fixture`. The installed bundle, native preload bridge, Host, renderer and slots

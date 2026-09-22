@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import tls from "node:tls";
 import { fileURLToPath } from "node:url";
 import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 import {
@@ -38,15 +39,35 @@ function sha256File(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
+export async function prepareRunnerTrustBundle(directory, getCertificates = tls.getCACertificates) {
+  const system = getCertificates("system");
+  if (system.length === 0) return null;
+  const certificates = [...new Set([...getCertificates("default"), ...system])];
+  const contents = certificates.join("\n");
+  const file = path.join(directory, "runner-system-ca.pem");
+  await writeFile(file, contents, { mode: 0o600 });
+  return {
+    file,
+    source: "runner_node_system_and_default_trust",
+    certificateCount: certificates.length,
+    sha256: createHash("sha256").update(contents).digest("hex"),
+    tlsVerificationDisabled: false,
+    scope: "transient_guest_process_environment"
+  };
+}
+
 export function buildGuestLaunchCommand({
   appExecutable,
   logPath,
   codexBinary = null,
   frameworkSourceArchive = null,
   frameworkRef = null,
+  caBundle = null,
   allowActions = false
 }) {
   return [
+    caBundle ? `NODE_EXTRA_CA_CERTS=${shellQuote(caBundle)}` : null,
+    caBundle ? `SSL_CERT_FILE=${shellQuote(caBundle)}` : null,
     codexBinary ? `OPL_CODEX_BIN=${shellQuote(codexBinary)}` : null,
     frameworkSourceArchive ? `OPL_SOURCE_ARCHIVE_URL=${shellQuote(`file://${frameworkSourceArchive}`)}` : null,
     frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
@@ -200,6 +221,7 @@ async function qualifyCleanVm(options) {
   const guestCodexRoot = `/tmp/opl-studio-clean-${process.pid}-codex`;
   const guestCodexBinary = `${guestCodexRoot}/package/vendor/aarch64-apple-darwin/bin/codex`;
   const guestFrameworkArchive = `/tmp/opl-studio-clean-${process.pid}-framework.tar.gz`;
+  const guestCaBundle = `/tmp/opl-studio-clean-${process.pid}-system-ca.pem`;
   const guestApp = `/Applications/${productName}.app`;
   const guestLog = `/tmp/opl-studio-clean-${process.pid}.log`;
   let tartProcess;
@@ -321,12 +343,20 @@ async function qualifyCleanVm(options) {
         invariant(actualVersion === expectedVersion, `external Codex version mismatch: expected ${expectedVersion}, got ${actualVersion || "<empty>"}`);
       }
 
+      const trust = await prepareRunnerTrustBundle(runRoot);
+      if (trust) {
+        scpToGuest(options, ip, trust.file, guestCaBundle);
+        guestRun(options, ip, `test "$(shasum -a 256 ${shellQuote(guestCaBundle)} | awk '{print $1}')" = ${shellQuote(trust.sha256)}`);
+        const { file, ...receipt } = trust;
+        checks.trust = { ...receipt, guestCopyVerified: true };
+      }
       const launch = buildGuestLaunchCommand({
         appExecutable: `${guestApp}/Contents/MacOS/${productName}`,
         logPath: guestLog,
         codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
         frameworkSourceArchive: options.frameworkSourceArchive ? guestFrameworkArchive : null,
         frameworkRef: options.frameworkRef,
+        caBundle: trust ? guestCaBundle : null,
         allowActions: options.allowActions
       });
       guestRun(options, ip, launch);

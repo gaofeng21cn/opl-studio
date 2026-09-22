@@ -1,15 +1,42 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
 import {
   buildGuestLaunchCommand,
+  prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
 } from "../../scripts/desktop/qualify-clean-vm.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
+
+test("clean VM hands verified runner trust to the launched App and child processes", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-vm-trust-"));
+  try {
+    const trust = await prepareRunnerTrustBundle(directory, (kind) => kind === "system" ? ["system-ca", "shared-ca"] : ["default-ca", "shared-ca"]);
+    assert.equal(fs.readFileSync(trust.file, "utf8"), "default-ca\nshared-ca\nsystem-ca");
+    assert.equal(trust.certificateCount, 3);
+    assert.equal(fs.statSync(trust.file).mode & 0o777, 0o600);
+    assert.equal(trust.tlsVerificationDisabled, false);
+    const app = path.join(directory, "fake App");
+    const result = path.join(directory, "environment");
+    const caBundle = path.join(directory, "guest's CA.pem");
+    fs.writeFileSync(app, `#!/bin/sh\n/bin/sh -c 'printf "%s\\n%s\\n%s" "$NODE_EXTRA_CA_CERTS" "$SSL_CERT_FILE" "${'$'}{NODE_TLS_REJECT_UNAUTHORIZED-unset}"' > "$TRUST_RESULT"\n`, { mode: 0o700 });
+    const launch = buildGuestLaunchCommand({ appExecutable: app, logPath: path.join(directory, "app.log"), caBundle });
+    const env = { ...process.env, TRUST_RESULT: result };
+    delete env.NODE_TLS_REJECT_UNAUTHORIZED;
+    const child = spawnSync("/bin/sh", ["-c", `${launch}\nwait`], { env, encoding: "utf8" });
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(fs.readFileSync(result, "utf8"), `${caBundle}\n${caBundle}\nunset`);
+    assert.equal(await prepareRunnerTrustBundle(directory, () => []), null);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("clean VM and Gateway qualification remain candidate-only surfaces", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
