@@ -516,8 +516,11 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async readThread(threadId, includeTurns = false) {
-    const response = await this.request("thread/read", { threadId, includeTurns });
-    return includeTurns ? this.hydrateThreadHistory(response) : response;
+    const response = await this.request("thread/read", { threadId, includeTurns: false });
+    if (!includeTurns) return response;
+    // Paginated threads must not load the full transcript before paging it again.
+    if (response.thread?.historyMode === "paginated") return this.hydrateThreadHistory(response);
+    return this.request("thread/read", { threadId, includeTurns: true });
   }
 
   async resumeThread(threadId, overrides = {}) {

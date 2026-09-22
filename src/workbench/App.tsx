@@ -891,6 +891,11 @@ export function App({
   const [messages, setMessages] = useState<ChatMessage[]>(createIntroMessages());
   const [eventFeed, setEventFeed] = useState<string[]>(["bridge.preview_only"]);
   const [codexThreadId, setCodexThreadId] = useState<string | undefined>(persistedUi.metadata.selectedThreadId);
+  const [historyPage, setHistoryPage] = useState<{ threadId?: string; end: number } | null>(null);
+  useEffect(() => setHistoryPage(null), [codexThreadId]);
+  const historyEnd = historyPage?.threadId === codexThreadId && historyPage !== null
+    ? Math.min(historyPage.end, messages.length) : messages.length;
+  const historyStart = Math.max(0, historyEnd - 40);
   const selectedThreadIdRef = useRef<string | undefined>(persistedUi.metadata.selectedThreadId);
   const reconcileSequenceRef = useRef(new Map<string, number>());
   const trackedTurnIdsRef = useRef(new Map<string, string>());
@@ -1200,11 +1205,11 @@ export function App({
 
   useEffect(() => {
     if (!codexThreadId || !messages.length) return;
-    globalThis.requestAnimationFrame?.(() => {
-      const conversation = conversationRef.current;
-      if (conversation) conversation.scrollTop = conversation.scrollHeight;
+    const frame = globalThis.requestAnimationFrame?.(() => {
+      conversationRef.current?.scrollIntoView({ block: historyEnd === messages.length ? "end" : "start" });
     });
-  }, [codexThreadId, messages.length]);
+    return () => { if (frame !== undefined) globalThis.cancelAnimationFrame?.(frame); };
+  }, [codexThreadId, historyStart, historyEnd]);
 
   function updateUiMetadata(next: Partial<WorkbenchUiMetadata>) {
     setUiMetadata((current) => {
@@ -2435,6 +2440,7 @@ export function App({
     const pendingId = `assistant-${Date.now()}`;
     const pendingMessage: ChatMessage = { id: pendingId, role: "assistant", text: "" };
     const pendingMessages = messagesRef.current.concat([userMessage, pendingMessage]);
+    setHistoryPage(null);
     pendingAssistantIdRef.current = pendingId;
     messagesRef.current = pendingMessages;
     setMessages(pendingMessages);
@@ -2851,13 +2857,23 @@ export function App({
     setSettings(writeSettings({ modelAccess, reasoningLevel }));
   }
 
+  const historyControls = messages.length > 40 ? (
+    <nav style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap", padding: "12px 0" }} aria-label={settings.locale === "zh" ? "会话历史分页" : "Conversation history pages"}>
+      <button type="button" disabled={historyStart === 0} onClick={() => setHistoryPage({ threadId: codexThreadId, end: historyStart })}><ChevronLeft size={16} />{settings.locale === "zh" ? "更早消息" : "Earlier"}</button>
+      <span>{historyStart + 1}-{historyEnd} / {messages.length}</span>
+      <button type="button" disabled={historyEnd === messages.length} onClick={() => setHistoryPage(historyEnd + 40 >= messages.length ? null : { threadId: codexThreadId, end: historyEnd + 40 })}>{settings.locale === "zh" ? "后续消息" : "Later"}<ArrowRight size={16} /></button>
+      <button type="button" disabled={historyEnd === messages.length} onClick={() => setHistoryPage(null)}>{settings.locale === "zh" ? "最新消息" : "Latest"}</button>
+    </nav>
+  ) : null;
+
   const studioConversationBody = (
     <div className="opl-dsh-thread" ref={conversationRef as never}>
       {(threadDirectoryStatus === "error" || modelCatalogStatus === "error") && <div role="status" data-testid="opl-codex-recovery"><p>{threadDirectoryError || modelCatalogError}</p><button type="button" onClick={() => void retryStartup().catch(error => setThreadActionError(String(error)))}>{settings.locale === "zh" ? "重试连接" : "Retry connection"}</button><a href="https://github.com/gaofeng21cn/opl-studio/issues/new" target="_blank" rel="noreferrer">{settings.locale === "zh" ? "报告启动问题" : "Report startup issue"}</a></div>}
       <CodexServerRequestPanel requests={pendingServerRequests} locale={settings.locale} error={pendingServerRequestError} onRespond={(request, response) => void respondToServerRequest(request, response)} />
       {threadActionError ? <p className="thread-read-error" role="alert">{threadActionError}</p> : null}
       <SubagentsPanel key={codexThreadId ?? "new"} threadId={codexThreadId} threads={allThreads} messages={messages} locale={settings.locale} onOpen={openCanonicalThreadRef} />
-      {messages.map((message, index) => (
+      {historyControls}
+      {messages.slice(historyStart, historyEnd).map((message, index) => (
         <article key={message.id} data-testid={message.role === "assistant" ? "opl-conversation-event" : undefined} className={`message ${message.role}${message.subagent ? " subagent" : ""}`}>
           {message.role === "system" ? <span className="message-label">{message.subagent ? (settings.locale === "zh" ? "子智能体" : "Subagent") : t.runtime}</span> : null}
           <div className="message-frame">
@@ -2865,10 +2881,11 @@ export function App({
               <Streamdown controls={assistantMarkdownControls} lineNumbers={false} linkSafety={assistantMarkdownLinkSafety} mode="static">{assistantDisplayMarkdown(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply))}</Streamdown>
             ) : <p>{projectUserText(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply), [])}</p>}
           </div>
-          {message.role === "assistant" && index === messages.length - 1 && sendState === "running" ? <div className="run-events">{eventFeed.slice(0, 4).reverse().map((item, eventIndex) => <span key={`${item}-${eventIndex}`}>{item}</span>)}</div> : null}
+          {message.role === "assistant" && historyStart + index === messages.length - 1 && sendState === "running" ? <div className="run-events">{eventFeed.slice(0, 4).reverse().map((item, eventIndex) => <span key={`${item}-${eventIndex}`}>{item}</span>)}</div> : null}
           {message.role === "assistant" ? <span data-testid="opl-codex-reply" hidden /> : null}
         </article>
       ))}
+      {historyControls}
     </div>
   );
 

@@ -999,7 +999,6 @@ test("desktop uses DSH columns and mobile keeps full-height thread dialogs", () 
   assert.match(styles, /@media \(max-width: 760px\)/);
   assert.match(styles, /\[role="dialog"\]\[aria-labelledby\]:has\(> nav\) > nav > div:last-child/);
   assert.match(styles, /flex-direction: row/);
-  assert.match(app, /conversation\.scrollTop = conversation\.scrollHeight/);
   assert.match(slotHost, /<WorkspaceBrowser/);
   assert.match(styles, /\.thread-detail-popover,\s*\.thread-confirmation-dialog \{\s*inset: 0;/s);
   assert.match(styles, /height: 100dvh/);

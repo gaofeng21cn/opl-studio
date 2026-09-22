@@ -100,3 +100,20 @@ test("repeated cursors and mismatched items fail instead of exposing incomplete 
     await assert.rejects(transport.readThread("source", true), (error) => error.code === "invalid_app_server_response");
   }
 });
+
+
+test("history reads inspect metadata first and only request inline history for legacy threads", async () => {
+  const { transport, calls } = transportFixture();
+  await transport.readThread("source", true);
+  assert.deepEqual(calls.filter(call => call.method === "thread/read"), [
+    { method: "thread/read", params: { threadId: "source", includeTurns: false } }
+  ]);
+  const legacyCalls = [];
+  const turns = [{ id: "old-turn", items: [{ id: "old-item" }] }];
+  transport.request = async (method, params) => {
+    legacyCalls.push({ method, params });
+    return { thread: { id: "legacy", turns: params.includeTurns ? turns : [] } };
+  };
+  assert.deepEqual((await transport.readThread("legacy", true)).thread.turns, turns);
+  assert.deepEqual(legacyCalls.map(call => call.params.includeTurns), [false, true]);
+});
