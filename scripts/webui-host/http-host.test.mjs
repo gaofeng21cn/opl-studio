@@ -296,8 +296,10 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
       || (frame.method === "thread/read" && frame.params?.threadId === chat.body.threadId)
     ))
     .map((frame) => frame.method);
-  assert.deepEqual(canonicalLaunchSequence, ["thread/start", "turn/start", "turn/completed", "thread/read"]);
-  const canonicalRead = frames.slice(chatThreadStartIndex).find((frame) => frame.method === "thread/read");
+  assert.deepEqual(canonicalLaunchSequence, ["thread/start", "turn/start", "turn/completed", "thread/read", "thread/read"]);
+  const canonicalReads = frames.slice(chatThreadStartIndex).filter((frame) => frame.method === "thread/read" && frame.params?.threadId === chat.body.threadId);
+  assert.deepEqual(canonicalReads.map(frame => frame.params.includeTurns), [false, true]);
+  const canonicalRead = canonicalReads[1];
   assert.equal(canonicalRead.direction, "client_to_server");
   assert.equal(canonicalRead.params.threadId, chat.body.threadId);
   assert.equal(canonicalRead.params.includeTurns, true);

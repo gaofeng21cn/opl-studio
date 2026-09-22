@@ -27,6 +27,14 @@ const threads = new Map([
 if (includeProjectlessThread) {
   threads.set("thread-recent", thread("thread-recent", { type: "idle" }, [], [], { cwd: "", isTemporaryWorkspace: true, projectKey: null, updatedAt: 3 }));
 }
+if (process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1') {
+  for (const [id, count] of [['thread-source', 100], ['thread-idle', 40], ['thread-unloaded', 41]]) {
+    threads.get(id).turns = Array.from({ length: count }, (_, index) => turn(`${id}-turn-${index}`, 'completed', [
+      { type: 'agentMessage', id: `${id}-message-${index}`, text: `History message ${index + 1} of ${count}` }
+    ]));
+  }
+  threads.get('thread-subagent').turns = [];
+}
 let nextThread = 1;
 let nextTurn = 1;
 let lifecycleClosed = false;
@@ -167,10 +175,13 @@ async function handle(frame) {
     const turnId = `turn-created-${nextTurn++}`;
     const target = threads.get(params.threadId);
     target.status = { type: "active", activeFlags: [] };
-    target.turns.push(turn(turnId, "inProgress"));
+    const items = process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1'
+      ? [{ type: 'userMessage', id: `user-${turnId}`, content: params.input }]
+      : [];
+    target.turns.push(turn(turnId, "inProgress", items));
     send({ id, result: { turn: turn(turnId, "inProgress") } });
     if (emitPendingApproval) send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
-    setTimeout(() => completeTurn(params.threadId, turnId), 10);
+    setTimeout(() => completeTurn(params.threadId, turnId), process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
     return;
   }
   if (method === "turn/steer") {

@@ -891,6 +891,11 @@ export function App({
   const [messages, setMessages] = useState<ChatMessage[]>(createIntroMessages());
   const [eventFeed, setEventFeed] = useState<string[]>(["bridge.preview_only"]);
   const [codexThreadId, setCodexThreadId] = useState<string | undefined>(persistedUi.metadata.selectedThreadId);
+  const [historyPage, setHistoryPage] = useState<{ threadId?: string; end: number } | null>(null);
+  useEffect(() => setHistoryPage(null), [codexThreadId]);
+  const historyEnd = historyPage?.threadId === codexThreadId && historyPage !== null
+    ? Math.min(historyPage.end, messages.length) : messages.length;
+  const historyStart = Math.max(0, historyEnd - 40);
   const selectedThreadIdRef = useRef<string | undefined>(persistedUi.metadata.selectedThreadId);
   const reconcileSequenceRef = useRef(new Map<string, number>());
   const trackedTurnIdsRef = useRef(new Map<string, string>());
@@ -1200,11 +1205,11 @@ export function App({
 
   useEffect(() => {
     if (!codexThreadId || !messages.length) return;
-    globalThis.requestAnimationFrame?.(() => {
-      const conversation = conversationRef.current;
-      if (conversation) conversation.scrollTop = conversation.scrollHeight;
+    const frame = globalThis.requestAnimationFrame?.(() => {
+      conversationRef.current?.scrollIntoView({ block: historyEnd === messages.length ? "end" : "start" });
     });
-  }, [codexThreadId, messages.length]);
+    return () => { if (frame !== undefined) globalThis.cancelAnimationFrame?.(frame); };
+  }, [codexThreadId, historyStart, historyEnd]);
 
   function updateUiMetadata(next: Partial<WorkbenchUiMetadata>) {
     setUiMetadata((current) => {
@@ -2435,6 +2440,7 @@ export function App({
     const pendingId = `assistant-${Date.now()}`;
     const pendingMessage: ChatMessage = { id: pendingId, role: "assistant", text: "" };
     const pendingMessages = messagesRef.current.concat([userMessage, pendingMessage]);
+    setHistoryPage(null);
     pendingAssistantIdRef.current = pendingId;
     messagesRef.current = pendingMessages;
     setMessages(pendingMessages);
@@ -2851,11 +2857,6 @@ export function App({
     setSettings(writeSettings({ modelAccess, reasoningLevel }));
   }
 
-  const [historyPage, setHistoryPage] = useState<{ threadId?: string; end: number } | null>(null);
-  useEffect(() => setHistoryPage(null), [codexThreadId]);
-  const historyEnd = historyPage?.threadId === codexThreadId && historyPage !== null
-    ? Math.min(historyPage.end, messages.length) : messages.length;
-  const historyStart = Math.max(0, historyEnd - 40);
   const historyControls = messages.length > 40 ? (
     <nav style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap", padding: "12px 0" }} aria-label={settings.locale === "zh" ? "会话历史分页" : "Conversation history pages"}>
       <button type="button" disabled={historyStart === 0} onClick={() => setHistoryPage({ threadId: codexThreadId, end: historyStart })}><ChevronLeft size={16} />{settings.locale === "zh" ? "更早消息" : "Earlier"}</button>

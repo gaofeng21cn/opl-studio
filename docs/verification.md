@@ -389,3 +389,14 @@ Framework's `tests/built/workbench-temporal.test.mjs`, with the same explicit
 `OPL_TEST_TEMPORAL_ADDRESS`, checks overlap and an actual one-minute timeout.
 These are functional integration evidence. Installed bundle, VM, updater,
 signing, publication and active-shell adoption remain separate gates.
+
+## Conversation History Interaction
+
+After `npm run build:webui`, run `node tests/renderer/history-pagination.fixture.mjs`.
+Open its loopback URL in a fresh browser session and execute
+`tests/renderer/history-pagination.mount-check.js` with Playwright CLI `run-code`.
+The fixture uses the shipped shared renderer and HTTP host with synthetic
+Codex/Framework services. It covers 0/40/41-message boundaries, complete history
+reachability, keyboard pagination, local submission from an older page, passive
+completion while reading history, and thread switching. It does not prove native
+Desktop packaging or real provider connectivity.
