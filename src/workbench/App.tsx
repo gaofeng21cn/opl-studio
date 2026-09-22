@@ -109,6 +109,7 @@ import {
 import { ThreadDetailPopover } from "./threads/ThreadDetailPopover";
 import { ThreadLifecycleConfirmationDialog } from "./threads/ThreadLifecycleConfirmationDialog";
 import type { ThreadLifecycleAction } from "./threads/ThreadLifecycleConfirmationDialog";
+import { ConversationMessages } from "./ConversationMessages";
 import { assistantDisplayMarkdown } from "./messageDisplay";
 import {
   ComposerCapabilityPalette,
@@ -2117,7 +2118,15 @@ export function App({
       if (completedThreadId) void reconcileCanonicalThread(completedThreadId, "turn-completed", expectedTurnId).catch(() => undefined);
     }
     if (!pendingAssistantIdRef.current) return;
-    if ((method === "item/agentMessage/delta" || method === "item/completed") && !isEventForActiveTurn(params, activeTurnRef.current)) return;
+    if ((method === "item/started" || method === "item/agentMessage/delta" || method === "item/completed") && !isEventForActiveTurn(params, activeTurnRef.current)) return;
+    if (method === "item/started") {
+      const item = params.item as Record<string, unknown> | undefined;
+      if (item?.type === "agentMessage") setMessages(items => items.map(message => message.id === pendingAssistantIdRef.current
+        ? { ...message, text: typeof item.text === "string" ? item.text : "", itemId: typeof item.id === "string" ? item.id : undefined, turnId: activeTurnRef.current?.turnId,
+            presentation: item.phase === "commentary" ? "progress" : undefined }
+        : message));
+      return;
+    }
     if (method === "item/agentMessage/delta") {
       const delta = eventDelta(event);
       if (!delta) return;
@@ -2129,8 +2138,10 @@ export function App({
     if (method === "item/completed") {
       const completedText = eventCompletedText(event);
       if (!completedText) return;
+      const completedItem = params.item as Record<string, unknown> | undefined;
       setMessages((items) => items.map((item) => item.id === pendingAssistantIdRef.current
-        ? { ...item, role: "assistant", text: completedText }
+        ? { ...item, role: "assistant", text: completedText, itemId: typeof completedItem?.id === "string" ? completedItem.id : undefined, turnId: activeTurnRef.current?.turnId,
+            presentation: completedItem?.phase === "commentary" ? "progress" : undefined }
         : item));
     }
   }), [bridge]);
@@ -2873,18 +2884,16 @@ export function App({
       {threadActionError ? <p className="thread-read-error" role="alert">{threadActionError}</p> : null}
       <SubagentsPanel key={codexThreadId ?? "new"} threadId={codexThreadId} threads={allThreads} messages={messages} locale={settings.locale} onOpen={openCanonicalThreadRef} />
       {historyControls}
-      {messages.slice(historyStart, historyEnd).map((message, index) => (
-        <article key={message.id} data-testid={message.role === "assistant" ? "opl-conversation-event" : undefined} className={`message ${message.role}${message.subagent ? " subagent" : ""}`}>
-          {message.role === "system" ? <span className="message-label">{message.subagent ? (settings.locale === "zh" ? "子智能体" : "Subagent") : t.runtime}</span> : null}
+      <ConversationMessages threadId={codexThreadId} activeTurnId={activeTurnId ?? undefined}
+        messages={messages} start={historyStart} end={historyEnd} running={sendState === "running"}
+        locale={settings.locale} events={eventFeed} renderContent={(message) => <>
           <div className="message-frame">
             {message.role === "assistant" ? (
               <Streamdown controls={assistantMarkdownControls} lineNumbers={false} linkSafety={assistantMarkdownLinkSafety} mode="static">{assistantDisplayMarkdown(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply))}</Streamdown>
             ) : <p>{projectUserText(message.text || (sendState === "running" ? t.codexWorking : t.waitingReply), [])}</p>}
           </div>
-          {message.role === "assistant" && historyStart + index === messages.length - 1 && sendState === "running" ? <div className="run-events">{eventFeed.slice(0, 4).reverse().map((item, eventIndex) => <span key={`${item}-${eventIndex}`}>{item}</span>)}</div> : null}
           {message.role === "assistant" ? <span data-testid="opl-codex-reply" hidden /> : null}
-        </article>
-      ))}
+        </>} />
       {historyControls}
     </div>
   );

@@ -400,3 +400,12 @@ Codex/Framework services. It covers 0/40/41-message boundaries, complete history
 reachability, keyboard pagination, local submission from an older page, passive
 completion while reading history, and thread switching. It does not prove native
 Desktop packaging or real provider connectivity.
+
+For execution disclosures, start the same fixture with
+`FAKE_APP_SERVER_EXECUTION_DETAILS=1 FAKE_APP_SERVER_PENDING_APPROVAL=1` and run
+`tests/renderer/execution-details.mount-check.js` with Playwright CLI `run-code`.
+It checks unmounted default-collapsed bodies, visible final answers and failure
+summaries, full evidence expansion, keyboard controls, paging and thread-scoped
+choices, streaming-to-canonical continuity, and operable approval/input panels.
+`bun test tests/workbench/conversation-details.test.mts` covers protocol-only
+classification, retained source text, and current-turn progress isolation.

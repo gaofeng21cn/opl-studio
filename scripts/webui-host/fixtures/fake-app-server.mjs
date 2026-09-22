@@ -35,6 +35,23 @@ if (process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1') {
   }
   threads.get('thread-subagent').turns = [];
 }
+const executionDetails = process.env.FAKE_APP_SERVER_EXECUTION_DETAILS === '1';
+if (executionDetails) {
+  threads.get('thread-source').turns = Array.from({ length: 25 }, (_, index) => turn(`detail-turn-${index}`, 'completed', [
+    { id: `user-${index}`, type: 'userMessage', content: [{ type: 'text', text: `Task ${index + 1}` }] },
+    { id: `progress-${index}`, type: 'agentMessage', phase: 'commentary', text: `Checking task ${index + 1}` },
+    { id: `tool-${index}`, type: 'commandExecution', status: index === 24 ? 'failed' : 'completed', aggregatedOutput: index === 24 ? 'Input unavailable\nTRACE DETAIL retained for inspection' : `LOG BODY ${index + 1}\nOriginal tool evidence` },
+    { id: `final-${index}`, type: 'agentMessage', phase: 'final_answer', text: `## Answer ${index + 1}\n\nFinal prose stays visible.` }
+  ]));
+  // Repeated item IDs in a different thread must not share display state.
+  threads.get('thread-idle').turns = [turn('detail-turn-24', 'completed', [
+    { id: 'tool-24', type: 'commandExecution', status: 'completed', aggregatedOutput: 'OTHER THREAD BODY' }
+  ])];
+  threads.get('thread-running').turns = [turn('turn-running', 'inProgress', [
+    { id: 'current-progress', type: 'agentMessage', phase: 'commentary', text: 'Current progress outside details' },
+    { id: 'current-tool', type: 'commandExecution', status: 'inProgress', aggregatedOutput: 'RUNNING TOOL BODY' }
+  ])];
+}
 let nextThread = 1;
 let nextTurn = 1;
 let lifecycleClosed = false;
@@ -180,8 +197,17 @@ async function handle(frame) {
       : [];
     target.turns.push(turn(turnId, "inProgress", items));
     send({ id, result: { turn: turn(turnId, "inProgress") } });
+    if (executionDetails) {
+      send({ method: 'turn/started', params: { threadId: params.threadId, turn: turn(turnId, 'inProgress') } });
+      const progress = { id: `progress-${turnId}`, type: 'agentMessage', phase: 'commentary', text: '' };
+      target.turns.at(-1).items.push({ ...progress, text: 'Streaming progress remains visible after update' });
+      send({ method: 'item/started', params: { threadId: params.threadId, turnId, item: progress } });
+      setTimeout(() => send({ method: 'item/agentMessage/delta', params: { threadId: params.threadId, turnId, itemId: progress.id, delta: 'Streaming progress remains visible' } }), 200);
+      setTimeout(() => send({ method: 'item/agentMessage/delta', params: { threadId: params.threadId, turnId, itemId: progress.id, delta: ' after update' } }), 1800);
+      send({ id: 'input-1', method: 'item/tool/requestUserInput', params: { threadId: params.threadId, turnId, questions: [{ id: 'fixture-question', header: 'Fixture input', question: 'Choose the synthetic test input' }] } });
+    }
     if (emitPendingApproval) send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
-    setTimeout(() => completeTurn(params.threadId, turnId), process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
+    setTimeout(() => completeTurn(params.threadId, turnId), executionDetails ? 4000 : process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
     return;
   }
   if (method === "turn/steer") {

@@ -295,6 +295,19 @@ Opening a conversation performs a read-only
 ID. It does not import, copy, synchronize, or rewrite Codex history. Resume is
 an explicit lifecycle action and is not required merely to view history.
 
+The shared conversation renderer defaults protocol-typed tool/process output,
+subagent activity, and assistant `commentary` items to collapsed disclosures.
+Final answers and unclassified messages remain expanded; classification never
+infers a phase or failure from prose. Failed execution summaries remain visible,
+and pending approval/input requests stay in their existing independent panel.
+While a turn runs, its status and latest available commentary excerpt are shown
+outside the disclosures. Individual choices survive pagination, updates, and
+thread switches during the mounted workbench session, keyed by thread/turn/item;
+expand/collapse-all applies to the current thread's loaded details. It does not
+persist message content or choices across reloads. Collapsed bodies are unmounted;
+canonical history, model context, and execution/approval behavior are unchanged.
+This is shared Desktop/WebUI presentation, not backend lazy loading.
+
 Studio exposes no private cross-thread orchestration layer: it has no separate
 proposal/dispatch/wait protocol, host queue, delivery ledger, bilateral
 coordination receipt, client-executed dynamic tool set, or cross-host handoff
