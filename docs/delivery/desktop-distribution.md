@@ -120,7 +120,11 @@ Packaged Preview checks for App and eligible Framework updates daily in the main
 download silently and install after normal Host shutdown; an explicit update restart waits for an idle
 Codex transport. Framework background apply stages Base and delegates installed official Package updates
 to their native carriers. The idle lease holds new Codex requests until Package refresh finishes, and the
-About page reports maintenance progress or retry state. Failed and busy runs retry after five minutes.
+About page reports maintenance progress or retry state. A failed or incomplete run waits 24 hours
+before another automatic attempt; only an idle-lease deferral retries after five minutes. The next
+attempt is persisted before external work and after completion, so a crash or cold start cannot reset
+the delay. Legacy failed receipts without a timestamp migrate to a single 24-hour cooldown. Explicit
+manual updates remain available through the existing update actions.
 
 Before starting its persistent App Server, Preview supplies a fresh `OPL_APP_PROCESS_INSTANCE_ID` and
 calls `opl update activate --json`. Framework owns verification, pending generation activation and rollback.

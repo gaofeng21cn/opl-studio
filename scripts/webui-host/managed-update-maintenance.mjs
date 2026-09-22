@@ -18,10 +18,11 @@ export function createManagedUpdateMaintenance({
   opl, codex, stateFile, onStateChange = () => {}, checkAppUpdate = async () => {},
   now = Date.now, schedule = setTimeout, unschedule = clearTimeout
 }) {
-  let state = { schema: "opl_studio_update_maintenance.v1", status: "idle", lastCompletedAt: null, reloadPending: false };
+  let state = { schema: "opl_studio_update_maintenance.v1", status: "idle", lastCompletedAt: null, nextAttemptAt: null, reloadPending: false };
   let timer;
   let inFlight;
   let stopped = false;
+  let started = false;
   const emit = (next) => {
     state = { ...state, ...next };
     onStateChange({ ...state });
@@ -34,7 +35,10 @@ export function createManagedUpdateMaintenance({
     await fs.rename(temporary, stateFile);
   };
   const run = async () => {
-    emit({ status: "checking", errorCode: null });
+    // Reserve the next automatic attempt before invoking an external writer.
+    // Failure, process exit and restart must not create an unbounded apply loop.
+    emit({ status: "checking", errorCode: null, nextAttemptAt: now() + DAY });
+    await persist();
     // Desktop feed failures must not prevent Framework/package maintenance.
     try { await checkAppUpdate(); } catch { emit({ appUpdateStatus: "failed" }); }
     await opl.runManagedUpdate("check");
@@ -63,12 +67,13 @@ export function createManagedUpdateMaintenance({
         return { reloaded: reload };
       });
       if (lease.status === "deferred") {
-        emit({ status: "deferred", reasonCode: lease.reasonCode });
+        emit({ status: "deferred", reasonCode: lease.reasonCode, nextAttemptAt: now() + RETRY });
+        await persist();
         return;
       }
       emit({ reloaded: lease.result.reloaded });
     }
-    emit({ status: "completed", lastCompletedAt: now(), reasonCode: null });
+    emit({ status: "completed", lastCompletedAt: now(), nextAttemptAt: now() + DAY, reasonCode: null });
     await persist();
   };
   const controller = {
@@ -76,32 +81,43 @@ export function createManagedUpdateMaintenance({
     async runNow() {
       if (stopped) return controller.snapshot();
       inFlight ??= run().catch(async (error) => {
-        emit({ status: "failed", errorCode: error.code ?? "managed_update_failed" });
+        emit({ status: "failed", errorCode: error.code ?? "managed_update_failed", nextAttemptAt: now() + DAY });
         try { await persist(); } catch { /* Keep the live failure state if receipt storage is unavailable. */ }
       }).finally(() => { inFlight = null; });
       await inFlight;
       return controller.snapshot();
     },
     async start() {
+      if (started || stopped) return;
+      started = true;
       if (stateFile) {
         try {
           const saved = JSON.parse(await fs.readFile(stateFile, "utf8"));
+          if (saved.schema !== state.schema) throw new Error("Invalid maintenance receipt");
           if (Number.isFinite(saved.lastCompletedAt) && saved.lastCompletedAt <= now()) {
             state.lastCompletedAt = saved.lastCompletedAt;
           }
           state.reloadPending = saved.reloadPending === true;
-          if (["completed", "failed", "applying", "deferred"].includes(saved.status)) state.status = saved.status;
+          if (["completed", "failed", "checking", "applying", "deferred"].includes(saved.status)) state.status = saved.status;
+          if (Number.isFinite(saved.nextAttemptAt)) {
+            state.nextAttemptAt = Math.min(saved.nextAttemptAt, now() + DAY);
+          } else if (["failed", "checking", "applying"].includes(state.status)) {
+            // Old failures have no timestamp. Migrate once without replaying
+            // the failing mutation 30 seconds after every cold start.
+            state.nextAttemptAt = now() + DAY;
+            await persist();
+          }
         } catch { /* A missing or invalid receipt causes a fresh check. */ }
       }
       const tick = async () => {
         await controller.runNow();
         if (!stopped) {
-          timer = schedule(tick, state.status === "completed" ? DAY : RETRY);
+          timer = schedule(tick, Math.max(30_000, (state.nextAttemptAt ?? now() + DAY) - now()));
           timer?.unref?.();
         }
       };
-      const remaining = state.status !== "completed" || state.reloadPending || state.lastCompletedAt === null
-        ? 30_000 : Math.max(30_000, DAY - (now() - state.lastCompletedAt));
+      const dueAt = state.nextAttemptAt ?? (state.lastCompletedAt === null ? now() : state.lastCompletedAt + DAY);
+      const remaining = Math.max(30_000, dueAt - now());
       timer = schedule(tick, remaining);
       timer?.unref?.();
     },

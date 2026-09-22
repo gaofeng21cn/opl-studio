@@ -124,3 +124,89 @@ test("failed Codex refresh survives restart and retries even when packages are a
   assert.equal(refreshes, 2);
   await restored.close();
 });
+
+test("failed automatic apply keeps its daily cooldown across repeated cold starts", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-maintenance-cooldown-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "state.json");
+  const day = 24 * 60 * 60_000;
+  let time = 100_000;
+  let timer;
+  let applies = 0;
+  const options = {
+    stateFile, now: () => time,
+    schedule: (callback, delay) => { timer = { callback, delay }; return timer; }, unschedule: () => {},
+    opl: { runManagedUpdate: async (operation) => {
+      if (operation === "plan") return { managed_update: { components: [component("opl_packages")] } };
+      if (operation === "apply") {
+        applies++;
+        const saved = JSON.parse(await fs.readFile(stateFile, "utf8"));
+        assert.equal(saved.nextAttemptAt, time + day);
+        return { managed_update: { execution: { status: "partial_failure" } } };
+      }
+      return {};
+    } },
+    codex: { transport: new CodexAppServerTransport() }
+  };
+  const initial = createManagedUpdateMaintenance(options);
+  await initial.start();
+  assert.equal(timer.delay, 30_000);
+  await timer.callback();
+  assert.equal(initial.snapshot().status, "failed");
+  assert.equal(timer.delay, day);
+  await initial.close();
+  for (let i = 1; i <= 3; i++) {
+    time += 5 * 60_000;
+    const restored = createManagedUpdateMaintenance(options);
+    await restored.start();
+    assert.equal(timer.delay, day - i * 5 * 60_000);
+    await restored.close();
+  }
+  assert.equal(applies, 1);
+});
+
+test("legacy failed receipts migrate once and an interrupted attempt keeps its reservation", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-maintenance-legacy-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "state.json");
+  const day = 24 * 60 * 60_000;
+  let time = 100_000;
+  let delay;
+  const options = { stateFile, now: () => time,
+    schedule: (_, value) => { delay = value; return 1; }, unschedule: () => {},
+    opl: { runManagedUpdate: () => assert.fail("must not replay mutation on start") }, codex: {} };
+  for (const status of ["failed", "checking", "applying"]) {
+    await fs.writeFile(stateFile, JSON.stringify({ schema: "opl_studio_update_maintenance.v1", status }));
+    const first = createManagedUpdateMaintenance(options);
+    await first.start();
+    assert.equal(delay, day);
+    await first.close();
+    time += 60_000;
+    const restarted = createManagedUpdateMaintenance(options);
+    await restarted.start();
+    assert.equal(delay, day - 60_000);
+    await restarted.close();
+  }
+});
+
+test("only an idle-lease deferral uses the short automatic retry", async () => {
+  let timer;
+  const transport = new CodexAppServerTransport();
+  transport.activeTurns.add("active");
+  const maintenance = createManagedUpdateMaintenance({
+    now: () => 10_000,
+    schedule: (callback, delay) => { timer = { callback, delay }; return timer; }, unschedule: () => {},
+    opl: { runManagedUpdate: async (operation) => {
+      assert.notEqual(operation, "apply");
+      return { managed_update: { components: [component("opl_packages")] } };
+    } }, codex: { transport }
+  });
+  await maintenance.start();
+  const firstTimer = timer;
+  await maintenance.start();
+  assert.equal(timer, firstTimer);
+  await timer.callback();
+  assert.equal(maintenance.snapshot().status, "deferred");
+  assert.equal(timer.delay, 5 * 60_000);
+  await maintenance.close();
+});
