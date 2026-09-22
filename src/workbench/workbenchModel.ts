@@ -44,6 +44,11 @@ export type WorkbenchThreadMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   text: string;
+  turnId?: string;
+  itemId?: string;
+  presentation?: "execution" | "progress";
+  executionStatus?: string;
+  failureSummary?: string;
   subagent?: {
     type: "collabAgentToolCall" | "subAgentActivity";
     agentRole?: string;
@@ -1362,6 +1367,15 @@ function messageFromRecord(record: Record<string, unknown>, index: number): Work
     : type === "subagentactivity"
       ? "subAgentActivity"
       : null;
+  const status = firstString(record, ["status", "state"]);
+  const failed = status === "failed" || status === "error" || status === "declined"
+    || (typeof record.exitCode === "number" && record.exitCode !== 0)
+    || Boolean(record.error) || asRecord(record.result)?.isError === true;
+  const failureText = textFromContent(record.error) || firstString(record, ["text", "message", "aggregatedOutput"]) || status || "";
+  const execution = {
+    ...(status ? { executionStatus: status } : {}),
+    ...(failed ? { failureSummary: failureText.split("\n")[0].slice(0, 240) } : {})
+  };
   if (subagentType) {
     const agent = nestedRecord(record, ["agent", "subAgent", "sub_agent"]);
     const agentRole = firstString(record, ["agentRole", "agent_role"]) ?? firstString(agent, ["role", "agentRole", "agent_role"]) ?? undefined;
@@ -1375,6 +1389,8 @@ function messageFromRecord(record: Record<string, unknown>, index: number): Work
       id: firstString(record, ["id", "itemId", "item_id", "callId", "call_id"]) ?? `subagent-item-${index}`,
       role: "system",
       text,
+      presentation: "execution",
+      ...execution,
       subagent: { type: subagentType, agentRole, agentNickname, status: status ?? undefined,
         childThreadIds: [...new Set([...asStringArray(record.receiverThreadIds), ...Object.keys(asRecord(record.agentsStates) ?? {})])]
           .filter(id => /^[0-9A-Za-z-]+$/.test(id)) }
@@ -1389,14 +1405,21 @@ function messageFromRecord(record: Record<string, unknown>, index: number): Work
         ? "system"
         : null;
   if (!role) return null;
-  const text = firstString(record, ["text", "message", "output_text", "aggregatedOutput", "command", "query"])
+  let text = firstString(record, ["text", "message", "output_text", "aggregatedOutput", "command", "query"])
     ?? textFromContent(record.content ?? record.parts ?? record.items ?? record.result)
     ?? "";
+  if (!text.trim() && failed) text = textFromContent(record.error) || failureText || "Execution unsuccessful";
   if (!text.trim()) return null;
   return {
     id: firstString(record, ["id", "itemId", "item_id", "messageId", "message_id"]) ?? `thread-message-${index}`,
     role,
-    text
+    text,
+    ...execution,
+    ...(role === "system" && ["commandexecution", "filechange", "mcptoolcall", "tool", "process", "diff", "file", "websearch"].includes(type)
+      ? { presentation: "execution" as const }
+      : role === "assistant" && record.phase === "commentary"
+        ? { presentation: "progress" as const }
+        : {})
   };
 }
 
@@ -1409,12 +1432,17 @@ export function deriveThreadMessages(value: unknown): WorkbenchThreadMessage[] {
   const turns = [payload, thread]
     .filter((record): record is Record<string, unknown> => Boolean(record))
     .flatMap((record) => asRecordArray(record.turns));
-  const turnItems = turns.flatMap((turn) => asRecordArray(turn.items ?? turn.messages));
+  const turnItems = turns.flatMap((turn) => asRecordArray(turn.items ?? turn.messages)
+    .map((item) => ({ ...item, turnId: firstString(turn, ["id"]) ?? undefined })));
   const imported = [payload, thread]
     .filter((record): record is Record<string, unknown> => Boolean(record))
     .flatMap((record) => asRecordArray(asRecord(record.importedHistory)?.messages));
   return [...imported, ...direct, ...turnItems]
-    .map(messageFromRecord)
+    .map((record, index) => {
+      const message = messageFromRecord(record, index);
+      const turnId = firstString(record, ["turnId"]);
+      return message && turnId ? { ...message, turnId } : message;
+    })
     .filter((message): message is WorkbenchThreadMessage => Boolean(message));
 }
 

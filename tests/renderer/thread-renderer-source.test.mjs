@@ -200,7 +200,7 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.doesNotMatch(app, /const resumed = thread\.status === "unloaded"/);
   assert.match(app, /async function resumeThreadAndOpen/);
   assert.match(app, /thread-read-error/);
-  assert.match(app, /message\.subagent \? " subagent"/);
+  assert.match(fs.readFileSync(new URL("../../src/workbench/ConversationMessages.tsx", import.meta.url), "utf8"), /message\.subagent \? " subagent"/);
   assert.match(model, /"collabAgentToolCall" \| "subAgentActivity"/);
   assert.match(model, /type === "collabagenttoolcall"/);
   assert.match(model, /type === "subagentactivity"/);

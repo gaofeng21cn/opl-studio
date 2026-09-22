@@ -1125,6 +1125,54 @@ export const codexWorkbenchStyles = `
     color: var(--opl-text);
   }
 
+  .message.system.execution-message .message-frame {
+    border-left-color: var(--opl-border);
+    color: var(--opl-text);
+  }
+
+  .execution-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 8px 0;
+  }
+
+  .execution-toggle, .execution-controls button {
+    width: fit-content;
+    min-height: 32px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--opl-muted);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .execution-toggle:hover, .execution-controls button:hover {
+    background: var(--opl-hover);
+    color: var(--opl-text);
+  }
+
+  .execution-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 6px 8px;
+    color: var(--opl-muted);
+    text-align: left;
+  }
+
+  .execution-toggle:focus-visible, .execution-controls button:focus-visible {
+    outline: 2px solid var(--opl-accent);
+    outline-offset: 3px;
+  }
+
+  .execution-status { font-size: 12px; }
+  .execution-failure { color: var(--opl-danger); overflow-wrap: anywhere; }
+  .conversation-progress { margin: 12px 0; }
+  .conversation-progress p { margin: 4px 0; overflow-wrap: anywhere; }
+
   .message-frame p {
     margin: 0;
     white-space: pre-wrap;
