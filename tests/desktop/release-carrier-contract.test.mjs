@@ -76,7 +76,7 @@ test("Studio declares one branded preview carrier for the App-owned desktop rele
     }
   );
   assert.equal(pkg.dependencies["electron-updater"], "6.8.9");
-  assert.equal(pkg.devDependencies.electron, "43.4.0");
+  assert.equal(pkg.devDependencies.electron, "44.0.0");
   assert.equal(pkg.devDependencies["electron-builder"], "26.15.3");
   assert.equal(builder.appId, carrier.bundle_id);
   assert.equal(builder.productName, carrier.product_name);
