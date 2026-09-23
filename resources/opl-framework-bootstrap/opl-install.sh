@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-OPL_FRAMEWORK_SOURCE_REF=${OPL_FRAMEWORK_SOURCE_REF:-452cdecaefbef0bc73d5c43251d82a1e1e530dff}
-OPL_INSTALL_BRANCH=${OPL_INSTALL_BRANCH:-452cdecaefbef0bc73d5c43251d82a1e1e530dff}
+OPL_FRAMEWORK_SOURCE_REF=${OPL_FRAMEWORK_SOURCE_REF:-0cd2325eae4df36c1db882c7a51a19a95661c281}
+OPL_INSTALL_BRANCH=${OPL_INSTALL_BRANCH:-0cd2325eae4df36c1db882c7a51a19a95661c281}
 OPL_INSTALL_SOURCE_MODE=${OPL_INSTALL_SOURCE_MODE:-archive}
-OPL_SOURCE_ARCHIVE_URL=${OPL_SOURCE_ARCHIVE_URL:-https://github.com/gaofeng21cn/one-person-lab/archive/452cdecaefbef0bc73d5c43251d82a1e1e530dff.tar.gz}
+OPL_SOURCE_ARCHIVE_URL=${OPL_SOURCE_ARCHIVE_URL:-https://github.com/gaofeng21cn/one-person-lab/archive/0cd2325eae4df36c1db882c7a51a19a95661c281.tar.gz}
 export OPL_FRAMEWORK_SOURCE_REF OPL_INSTALL_BRANCH OPL_INSTALL_SOURCE_MODE OPL_SOURCE_ARCHIVE_URL
 
-OPL_INSTALL_SCRIPT_URL=${OPL_INSTALL_SCRIPT_URL:-https://raw.githubusercontent.com/gaofeng21cn/one-person-lab/452cdecaefbef0bc73d5c43251d82a1e1e530dff/install.sh}
+OPL_INSTALL_SCRIPT_URL=${OPL_INSTALL_SCRIPT_URL:-https://raw.githubusercontent.com/gaofeng21cn/one-person-lab/0cd2325eae4df36c1db882c7a51a19a95661c281/install.sh}
 OPL_LOCAL_APP_PATH=${OPL_LOCAL_APP_PATH:-/Applications/One Person Lab.app}
 OPL_APP_RELEASE_REPO=${OPL_APP_RELEASE_REPO:-gaofeng21cn/one-person-lab-app}
 OPL_APP_DOCS_REF=${OPL_APP_DOCS_REF:-main}
