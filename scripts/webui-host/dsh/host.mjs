@@ -2,10 +2,11 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   boot,
-  healProfilesModuleFallback,
+  createRuntimeResolution,
   initProfile,
   loadOverlayPatches,
   loadProfile,
+  PluginPackages,
   resolveProfileDir
 } from "@deepseek-ai/dsh-app-boot";
 import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
@@ -23,7 +24,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   const profileDir = resolveProfileDir(profileName, dshHome);
   initProfile(profileDir, []);
   const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
-  await healProfilesModuleFallback({ installAnchor, profile: dshProfile, home: dshHome });
+  const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
   const patches = [
     ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
     ...dshProfile.layers.flatMap((layer) => layer.patches),
@@ -33,12 +34,13 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
     profileName,
     profilePath,
     patches,
-    (ctx) => {
+    async (ctx) => {
       ctx.provide(OPL_STUDIO_HOST_OPTIONS_SERVICE, Object.freeze({
         ...options,
         dshHome,
         dshProfileDir: profileDir
       }));
+      await ctx.plugin(PluginPackages, { resolution });
     },
     pathToFileURL(path.join(profileDir, "package.json")).href
   );

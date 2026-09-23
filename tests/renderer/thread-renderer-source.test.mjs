@@ -744,7 +744,8 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
 
 test("Studio boots as the pinned DSH Application Host while Codex remains the thread owner", () => {
   assert.match(dshHost, /initProfile\(profileDir, \[\]\)/);
-  assert.match(dshHost, /healProfilesModuleFallback/);
+  assert.match(dshHost, /createRuntimeResolution\(\{ installAnchor, profile: dshProfile, home: dshHome \}\)/);
+  assert.match(dshHost, /ctx\.plugin\(PluginPackages, \{ resolution \}\)/);
   assert.match(dshHost, /loadOverlayPatches/);
   assert.doesNotMatch(dshProfile, /dsh-base/);
   for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-host-core", "plugin-inventory"]) {
@@ -933,7 +934,7 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
 
 test("Settings directly reuses DSH appearance controls and applies the selected palette", () => {
   assert.match(settingsPanel, /from "\.\.\/vendor\/deepseek-harness\/packages\/client\/ui-theme\/src\/client\/AppearanceRow"/);
-  assert.match(settingsPanel, /<AppearanceRow/);
+  assert.match(settingsPanel, /<StudioAppearanceRow/);
   assert.match(app, /document\.body\.toggleAttribute\("data-ds-dark-theme", dark\)/);
   assert.match(app, /matchMedia\?\.\("\(prefers-color-scheme: dark\)"\)/);
   assert.match(settings, /theme: "system" \| "light" \| "dark"/);

@@ -13,7 +13,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 设置搜索选择 1.2.0 是明确的功能范围选择。核对的 1.9.0 增加独立模型设置、API Key 存储与直连推理；Studio 尚未提供与唯一模型/凭据 owner 一致的适配，因此不装载那些功能。搜索插件本身及许可证随载体保留，未复制改写其实现。
 
-文件查看器 0.3.3 发布包的可选 DSH peer 范围不接纳 `0.1.6-alpha.1` 预发布版本。Studio 没有覆盖 peer 或假称完整 Node 插件兼容：仅从固定 npm 原包提取未经修改的浏览器文件，保留 npm SRI、逐文件 SHA-256、原 package.json 和许可证；不加载其 Host 半部。同步入口为 `node scripts/ecosystem-client-assets.mjs --sync`，无参数执行字节验证。生成文件位于 `packages/opl-studio-ecosystem/dsh-file-viewer`。
+文件查看器 0.3.3 发布包的可选 DSH peer 范围不接纳 `0.1.7-alpha.2` 预发布版本。Studio 没有覆盖 peer 或假称完整 Node 插件兼容：仅从固定 npm 原包提取未经修改的浏览器文件，保留 npm SRI、逐文件 SHA-256、原 package.json 和许可证；不加载其 Host 半部。同步入口为 `node scripts/ecosystem-client-assets.mjs --sync`，无参数执行字节验证。生成文件位于 `packages/opl-studio-ecosystem/dsh-file-viewer`。
 
 `EcosystemFilePreview` 把插件的 `conversation.view` 接到现有文件面板。`ecosystemWorkspaceProvider` 只识别绑定当前 canonical thread 的 `opl-workspace://` locator；实际目录与字节读取仍经原 workspace bridge，复用 cwd、路径和符号链接校验。插件需要的大窗口由适配器拆成最多 512 KiB 的读取，不引入通用任意路径 RPC。原有外部打开及下载继续可用。
 
@@ -27,7 +27,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 ## DSH sandbox reuse boundary
 
-At the pinned `0.1.6-alpha.1` source, `dsh-sandbox` defines subprocess
+At the pinned `0.1.7-alpha.2` source, `dsh-sandbox` defines subprocess
 confinement and per-call escalation; `dsh-sandbox-local` supplies platform
 backends (macOS Seatbelt, Linux bubblewrap/Landlock, Windows restricted tokens).
 These share the host kernel/filesystem and do not replace a container or VM.
@@ -55,9 +55,9 @@ and symlink denial, child-process confinement, cancellation, denied escalation,
 and fail-closed unavailable backend behavior. Do not advertise this as active
 sandbox enforcement until those tests run against the actual packaged carrier.
 
-Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/0a15e36e7f82b6ed45af6fa9759f29b40dcd965d/packages/sandbox/sandbox),
-[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/0a15e36e7f82b6ed45af6fa9759f29b40dcd965d/packages/sandbox/sandbox-local),
-[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/0a15e36e7f82b6ed45af6fa9759f29b40dcd965d/packages/sandbox/sandbox-policy).
+Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/00102833dfaee1da9f48a3a8eae9d34005a75218/packages/sandbox/sandbox),
+[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/00102833dfaee1da9f48a3a8eae9d34005a75218/packages/sandbox/sandbox-local),
+[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/00102833dfaee1da9f48a3a8eae9d34005a75218/packages/sandbox/sandbox-policy).
 
 ## 计划任务、记忆与数据管理
 
@@ -74,8 +74,8 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 | 领域记忆引用 | 同页按需读取；没有 refs 不等于没有记忆能力 |
 | 数据管理 | Settings → 工作区 → 数据与存储：只读用量与可预览清理 |
 
-官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/0a15e36e7f82b6ed45af6fa9759f29b40dcd965d/packages/schedule/schedule)
-及 [`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/0a15e36e7f82b6ed45af6fa9759f29b40dcd965d/packages/client/ui-schedule)
+官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/00102833dfaee1da9f48a3a8eae9d34005a75218/packages/schedule/schedule)
+及 [`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/00102833dfaee1da9f48a3a8eae9d34005a75218/packages/client/ui-schedule)
 的执行端依赖 DSH root Agent/session；`cofy-x/dsh-cron`、`squirrel20/dsh-cron` 和
 `Whale-Zhang/dsh-cron-tasks` 的后端同样依赖 DSH Agent/session，因此整套后端都不
 采用。任务定义、调度、队列窗口、清理范围、revision 与确认语义归 Framework 公开

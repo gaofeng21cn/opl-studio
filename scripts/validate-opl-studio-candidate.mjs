@@ -328,7 +328,7 @@ function assertApplicationHost(evidence) {
   const httpRoutes = read("scripts/webui-host/http-routes.mjs");
   assert(httpRoutes.includes('import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static"'), "Studio auth routes must reuse the pinned DSH static-serving primitive");
   assert(httpRoutes.includes("webAuth.requireSession(req)"), "Studio static fallback must require the canonical WebUI session");
-  for (const marker of ["initProfile(profileDir, [])", "healProfilesModuleFallback", "loadProfile", "loadOverlayPatches", "boot("]) {
+  for (const marker of ["initProfile(profileDir, [])", "createRuntimeResolution", "PluginPackages", "loadProfile", "loadOverlayPatches", "boot("]) {
     assert(hostBoot.includes(marker), `DSH Host boot is missing ${marker}`);
   }
   assert(toolPlugin.includes('inject = ["webServer", "tools"]'), "DSH Tool MCP plugin must consume the native DSH tool registry");

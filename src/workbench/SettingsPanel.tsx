@@ -63,6 +63,9 @@ import {
 import { AppearanceRow } from "../vendor/deepseek-harness/packages/client/ui-theme/src/client/AppearanceRow";
 import { en as themeEn, zh as themeZh, type ThemeKey } from "../vendor/deepseek-harness/packages/client/ui-theme/src/client/locales";
 
+const StudioAppearanceRow = AppearanceRow as (props: Pick<Parameters<typeof AppearanceRow>[0], "t" | "setTheme" | "useStore" | "actions">) => ReturnType<typeof AppearanceRow>;
+const StudioFontSizeRow = FontSizeRow as (props: Pick<Parameters<typeof FontSizeRow>[0], "t" | "setFontSize" | "useStore" | "actions">) => ReturnType<typeof FontSizeRow>;
+
 export type { SettingsActionRequest } from "./settingsActions";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
@@ -2319,13 +2322,13 @@ export function SettingsPanel({
         <>
           <SettingsGroup title={settings.locale === "zh" ? "界面" : "Interface"}>
             <SettingRow label={settings.locale === "zh" ? "语言" : "Language"}>{renderSettingControl("locale")}</SettingRow>
-            <div className="settings-appearance" data-slot="settings.general.item"><AppearanceRow
+            <div className="settings-appearance" data-slot="settings.general.item"><StudioAppearanceRow
               t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key}
               setTheme={(theme) => onSettingChange("theme", theme)}
               useStore={(selector) => selector({ preference: settings.theme, revision: 0 })}
               actions={{ sync: () => undefined }}
             /></div>
-            <div className="settings-font-size" data-slot="settings.general.item"><FontSizeRow t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSize: settings.fontSize, revision: 0 })} actions={{ sync: () => undefined }} /></div>
+            <div className="settings-font-size" data-slot="settings.general.item"><StudioFontSizeRow t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSize: settings.fontSize, revision: 0 })} actions={{ sync: () => undefined }} /></div>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
             <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>

@@ -25,7 +25,7 @@ RUN npm ci --ignore-scripts \
   && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS codex-builder
-ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.154.0
+ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.156.1
 RUN npm install --global --prefix /opt/codex "${OPL_CODEX_NPM_SPEC}" \
   && npm cache clean --force
 

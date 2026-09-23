@@ -89,6 +89,7 @@ try {
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth,
     viewport: [window.innerWidth, window.innerHeight]
   })`, cliRoot);
+  if (!wide.root) throw new Error(`renderer did not mount: ${(await cli(["console", "error"], cliRoot)).stdout}`);
   assert.deepEqual(wide.viewport, [1440, 900]);
   assert.equal(wide.title, "One Person Lab");
   assert.equal(wide.brand, true);
@@ -223,16 +224,39 @@ try {
   // localized labels and the distinct queue/steer delivery behavior.
   await cli(["resize", "1440", "900"], cliRoot);
   await evaluate(`() => {
-    const group = document.querySelector('[role="tree"][aria-label="会话"] [role="treeitem"][aria-expanded="false"]');
+    const group = document.querySelector('.opl-workspace-browser-seat [role="treeitem"][aria-expanded="false"]');
     group?.click();
     return true;
   }`, cliRoot);
+  const sessionMenu = await evaluate(`async () => {
+    const deadline = Date.now() + 5000;
+    let row;
+    while (!row && Date.now() < deadline) {
+      row = document.querySelector('.opl-workspace-browser-seat [data-row-key^="session:"]');
+      if (!row) await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const trigger = row?.querySelector('button[aria-label]');
+    trigger?.click();
+    await new Promise(requestAnimationFrame);
+    return {
+      rowFound: Boolean(row),
+      triggerFound: Boolean(trigger),
+      items: Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent?.trim())
+    };
+  }`, cliRoot);
+  assert.deepEqual(sessionMenu, { rowFound: true, triggerFound: true, items: ["分叉会话", "归档会话"] });
+  await cli(["press", "Escape"], cliRoot);
   const selection = [];
   for (const threadId of ["thread-idle", "thread-source", "thread-running"]) {
     const selected = await evaluate(`async () => {
       const label = ${JSON.stringify(`Thread ${threadId}`)};
-      const row = Array.from(document.querySelectorAll('[role="treeitem"][aria-selected]')).find(row => row.textContent.includes(label));
-      if (!row) throw new Error('Missing session row: ' + label);
+      const rowDeadline = Date.now() + 5000;
+      let row;
+      while (!row && Date.now() < rowDeadline) {
+        row = Array.from(document.querySelectorAll('[role="treeitem"][aria-selected]')).find(item => item.textContent.includes(label));
+        if (!row) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      if (!row) throw new Error('Missing session row: ' + label + '; visible rows=' + Array.from(document.querySelectorAll('[role="treeitem"]')).map(item => item.textContent?.trim()).join(' | '));
       row.click();
       const deadline = Date.now() + 5000;
       while (document.querySelector('main strong')?.textContent !== label && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));

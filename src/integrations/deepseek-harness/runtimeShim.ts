@@ -46,7 +46,8 @@ export type SessionListState = {
 export type WorkspaceListState = {
   phase: "idle" | "loading" | "ready" | "error";
   items: WorkspaceView[];
-  archivedSessionIds: ReadonlySet<SessionId>;
+  archivedSessionIds: readonly SessionId[];
+  pinnedSessionIds: readonly SessionId[];
 };
 
 export type SubagentDescendantSummary = { runningCount: number };
