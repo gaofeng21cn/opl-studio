@@ -87,6 +87,7 @@ COPY --from=renderer-builder --chown=node:node /app/scripts/headless ./scripts/h
 COPY --from=renderer-builder --chown=node:node /app/scripts/webui-host ./scripts/webui-host
 
 ENV NODE_ENV=production \
+  NARB_DISABLE_NATIVE_CACHE=1 \
   HOME=/data \
   CODEX_HOME=/data/codex \
   OPL_DATA_DIR=/data \

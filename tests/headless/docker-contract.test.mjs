@@ -29,6 +29,7 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/package\.json \.\/package\.json/);
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/node_modules \.\/node_modules/);
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/packages \.\/packages/);
+  assert.match(runtime, /NARB_DISABLE_NATIVE_CACHE=1/);
   assert.doesNotMatch(runtime, /org\.opencontainers\.image\.licenses/);
   assert.match(runtime, /USER node/);
   assert.match(runtime, /VOLUME \["\/data", "\/projects"\]/);
