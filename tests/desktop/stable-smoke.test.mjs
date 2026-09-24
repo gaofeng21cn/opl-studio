@@ -87,6 +87,14 @@ test("Framework readiness waits for background Official Profile installation", a
   const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], timeoutMs: 0, evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } }) });
   assert.equal(missing.status, "failed");
   assert.deepEqual(missing.missingRootPackageIds, ["mas"]);
+
+  let failedReads = 0;
+  const failed = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], timeoutMs: 1500, evaluate: async () => {
+    failedReads += 1;
+    return { readback: { exitCode: 3 }, app_state: { agent_packages: { directory: { entries: [] } } } };
+  } });
+  assert.equal(failedReads, 1);
+  assert.equal(failed.status, "failed");
 });
 
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {

@@ -58,6 +58,8 @@ export async function runFrameworkReadiness({ evaluate, projection = null, expec
         const refreshed = await evaluate(`window.oplStudio.readState('fast')`);
         refreshedProjection = projectFrameworkReadiness(refreshed, expectedRootPackageIds);
         if (refreshedProjection.missingRootPackageIds.length === 0) break;
+        if ((refreshedProjection.initializeExitCode !== null && refreshedProjection.initializeExitCode !== 0)
+          || (refreshedProjection.stateExitCode !== null && refreshedProjection.stateExitCode !== 0)) break;
         const delay = Math.min(1000, deadline - Date.now());
         if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       } while (Date.now() < deadline);
