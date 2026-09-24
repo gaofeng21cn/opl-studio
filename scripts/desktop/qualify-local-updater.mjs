@@ -184,6 +184,15 @@ async function stopApp(running) {
   }
 }
 
+export async function assertHostUpdaterPlanDisabled(appPath) {
+  const file = path.join(appPath, "Contents", "Resources", "preview-handoff.json");
+  let plan;
+  try { plan = JSON.parse(await readFile(file, "utf8")); }
+  catch (error) { if (error.code === "ENOENT") return; throw error; }
+  invariant(plan?.schema === "opl_studio_preview_handoff_plan.v1" && typeof plan.enabled === "boolean", "Invalid packaged Preview handoff plan");
+  invariant(plan.enabled === false, "Terminal Preview may only run in isolated Tart VMs; host local updater qualification is forbidden");
+}
+
 export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot, identity = "preview", productName = identity === "stable" ? "One Person Lab" : defaultProductName, expectedTargetVersion,
   buildNextTarget = false, buildSuccessor = buildNextTarget, builderConfig = productName === "One Person Lab" ? "electron-builder.stable.yml" : "electron-builder.yml",
   receiptPath: explicitReceiptPath } = {}) {
@@ -225,6 +234,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot, id
 
     const sourceApp = baseAppPath ?? path.join(baseOutput, `mac-${process.arch}`, `${productName}.app`);
     invariant((await stat(sourceApp)).isDirectory(), "base App bundle is missing");
+    await assertHostUpdaterPlanDisabled(sourceApp);
     await cp(sourceApp, installedApp, { recursive: true, verbatimSymlinks: true });
     const plist = path.join(installedApp, "Contents", "Info.plist");
     invariant(plistValue(plist, "CFBundleIdentifier") === bundleIdentifier, "base App qualification identity mismatch");
@@ -234,6 +244,15 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot, id
     invariant(metadata?.version === targetVersion, "target updater metadata version mismatch");
     invariant(typeof metadata?.path === "string" && metadata.path.endsWith(".zip"), "target updater ZIP metadata is missing");
     invariant((await stat(path.join(targetOutput, metadata.path))).isFile(), "target updater ZIP is missing");
+
+    // HOME and Electron state redirection do not isolate /Applications. Inspect
+    // the actual signed target before Squirrel can launch its handoff helper.
+    const targetInspection = path.join(runRoot, "target-inspection");
+    await mkdir(targetInspection);
+    await run("/usr/bin/ditto", ["-x", "-k", path.join(targetOutput, metadata.path), targetInspection], "target updater safety inspection");
+    const targetApp = path.join(targetInspection, `${productName}.app`);
+    invariant((await stat(targetApp)).isDirectory(), "target updater ZIP product bundle is missing");
+    await assertHostUpdaterPlanDisabled(targetApp);
 
     feed = await createFeedServer(targetOutput);
     running = launchApp({ appPath: installedApp, feedUrl: feed.url, stateRoot: electronStateRoot, homeRoot, productName });

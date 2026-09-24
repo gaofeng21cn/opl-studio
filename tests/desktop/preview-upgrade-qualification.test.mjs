@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { loadPreviewCheckpoint, selectPreviewBaselines, validatePreviewUpgradeReceipt } from "../../scripts/desktop/stable-qualify-preview-upgrade.mjs";
 import { qualifyPrepublicationUpdate } from "../../scripts/desktop/macos-distribution.mjs";
+import { assertHostUpdaterPlanDisabled } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const target = { bundleId: "cn.onepersonlab.opl", productName: "One Person Lab", teamId: "SVVC4TA784", version: "26.9.2491", sha256: "a".repeat(64), size: 123, url: "https://github.com/gaofeng21cn/one-person-lab-app/releases/download/v26.9.24/One-Person-Lab-26.9.24-mac-arm64.dmg" };
 const release = (version, extra = {}) => ({ tag_name: `v${version}`, draft: false, prerelease: false, assets: [{ name: `one-person-lab-preview-${version}-mac-arm64.dmg`, digest: `sha256:${"b".repeat(64)}` }], ...extra });
@@ -52,4 +53,17 @@ test("Preview checkpoint admission verifies exact sealed bytes before VM prepara
   assert.equal(loadPreviewCheckpoint(root, hash(bytes)).assets.length, 5);
   fs.writeFileSync(path.join(root, "assets", names[1]), "substitution");
   assert.throws(() => loadPreviewCheckpoint(root, hash(bytes)), /Checkpoint bytes differ/);
+});
+
+test("direct host updater rejects enabled packaged handoff plans and malformed plans", async (context) => {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), "opl-local-updater-plan-test-")); context.after(() => fs.rmSync(app, { recursive: true, force: true }));
+  await assertHostUpdaterPlanDisabled(app);
+  const resources = path.join(app, "Contents", "Resources"); fs.mkdirSync(resources, { recursive: true });
+  const file = path.join(resources, "preview-handoff.json");
+  fs.writeFileSync(file, JSON.stringify({ schema: "opl_studio_preview_handoff_plan.v1", enabled: false }));
+  await assertHostUpdaterPlanDisabled(app);
+  fs.writeFileSync(file, JSON.stringify({ schema: "opl_studio_preview_handoff_plan.v1", enabled: true, target }));
+  await assert.rejects(assertHostUpdaterPlanDisabled(app), /isolated Tart VMs/);
+  fs.writeFileSync(file, JSON.stringify({ enabled: false }));
+  await assert.rejects(assertHostUpdaterPlanDisabled(app), /Invalid packaged/);
 });
