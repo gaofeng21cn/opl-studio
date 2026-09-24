@@ -204,7 +204,7 @@ async function waitForIp(vmName, timeoutMs = 120_000) {
   throw new Error(`timed out waiting for Tart IP for ${vmName}`);
 }
 
-async function qualifyCleanVm(options) {
+export async function qualifyCleanVm(options) {
   invariant(options.attach || process.platform === "darwin", "Studio clean VM qualification requires macOS host");
   invariant(Number.isInteger(options.cdpPort) && options.cdpPort > 1024, "CDP port must be a valid host port");
   if (!options.attach) {
@@ -295,6 +295,13 @@ async function qualifyCleanVm(options) {
         identity: installIdentity
       };
       invariant(checks.install.passed, `installed Preview identity mismatch: ${JSON.stringify(installIdentity)}`);
+      if (typeof options.verifyInstalledApp === "function") {
+        checks.distribution = await options.verifyInstalledApp({
+          guestRun: (command) => guestRun(options, ip, command),
+          guestApp,
+          identity: installIdentity
+        });
+      }
 
       if (options.frameworkSourceArchive) {
         scpToGuest(options, ip, options.frameworkSourceArchive, guestFrameworkArchive);
@@ -379,7 +386,7 @@ async function qualifyCleanVm(options) {
         actual: checks.install?.identity ?? null,
         app: guestApp
       };
-    const smoke = await runPreviewSmoke({
+    const smoke = await (options.runSmoke ?? runPreviewSmoke)({
       evaluate: (expression) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
       waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
       options: {

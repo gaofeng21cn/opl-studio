@@ -2213,5 +2213,16 @@
       "path": "packages/util/workspace-path/src/index.ts",
       "sha256": "b4cb5c1a6e6249731a2e2a8dec2970f4ed92e3f73f49606bfc688607882086f6"
     }
+  ],
+  "build_overlays": [
+    {
+      "id": "opl-settings-host-navigation",
+      "source": "scripts/dsh-settings-navigation-overlay.mjs",
+      "source_sha256": "95ee6c676d5524887b3b0928e620bd686371677ca49e34c948174d159ce4f5bb",
+      "target": "packages/client/ui-settings-general/src/client/SettingsRoot.tsx",
+      "target_upstream_sha256": "6a0fe6d492ab2aeed06123d7bc1ae6fe78b6c76a26e9d1611a9c8c79dfcc7603",
+      "application": "bun_build_onLoad_exact_anchor",
+      "purpose": "optional_validated_navigation_request_uses_native_settings_open_and_selection_state"
+    }
   ]
 }

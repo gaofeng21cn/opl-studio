@@ -63,16 +63,17 @@ function resolvePythonBin(runtimeHome) {
   }
 }
 
-function runtimeRoot(homeDir) {
+function runtimeRoot(homeDir, identity = "preview") {
+  if (identity === "stable") return path.join(homeDir, "Library", "Application Support", "OPL", "runtime");
   return path.join(homeDir, "Library", "Application Support", "opl-studio", "runtime");
 }
 
-function runtimeHome(homeDir) {
-  return path.join(runtimeRoot(homeDir), ACTIVE_RUNTIME_DIR);
+function runtimeHome(homeDir, identity) {
+  return path.join(runtimeRoot(homeDir, identity), ACTIVE_RUNTIME_DIR);
 }
 
-function pointerPath(homeDir) {
-  return path.join(runtimeRoot(homeDir), ACTIVE_RUNTIME_POINTER);
+function pointerPath(homeDir, identity) {
+  return path.join(runtimeRoot(homeDir, identity), ACTIVE_RUNTIME_POINTER);
 }
 
 function assertRuntimePackageRoot(packageRoot) {
@@ -92,7 +93,7 @@ function isUsableRuntime(candidate) {
   }
 }
 
-function resolvePayload(resourcesPath) {
+function resolvePayload(resourcesPath, identity) {
   const resourceRoot = path.join(resourcesPath, FULL_RUNTIME_RESOURCE_DIR);
   const manifestPath = path.join(resourceRoot, "manifest", FULL_RUNTIME_MANIFEST);
   const manifest = readJsonRecord(manifestPath);
@@ -101,7 +102,7 @@ function resolvePayload(resourcesPath) {
     manifest.carrier?.schema !== "opl_app_full_payload_carrier_profile.v1"
     || manifest.carrier?.carrier_id !== "opl-studio"
     || manifest.carrier?.runtime_resource_dir !== FULL_RUNTIME_RESOURCE_DIR
-    || manifest.carrier?.runtime_install_root_template !== "~/Library/Application Support/opl-studio/runtime/current"
+    || manifest.carrier?.runtime_install_root_template !== (identity === "stable" ? "~/Library/Application Support/OPL/runtime/current" : "~/Library/Application Support/opl-studio/runtime/current")
     || manifest.carrier?.codex_carrier !== "opl_codex_native"
     || manifest.carrier?.full_runtime_codex_payload_allowed !== false
   ) {
@@ -114,7 +115,7 @@ function resolvePayload(resourcesPath) {
     throw new Error("Studio Full runtime payload is incomplete");
   }
   assertRuntimePackageRoot(path.join(payloadRoot, "opl"));
-  return { version, payloadRoot, manifestPath, manifestSha256: sha256File(manifestPath) };
+  return { version, payloadRoot, manifestPath, manifestSha256: sha256File(manifestPath), markerName: identity === "stable" ? ".opl-full-runtime-installed.json" : INSTALL_MARKER };
 }
 
 function resolveStandardBootstrap(resourcesPath) {
@@ -143,8 +144,8 @@ function resolveStandardBootstrap(resourcesPath) {
   return { manifest, manifestPath, installerPath };
 }
 
-function markerMatches(target, manifestSha256) {
-  return readJsonRecord(path.join(target, INSTALL_MARKER))?.manifest_sha256 === manifestSha256;
+function markerMatches(target, manifestSha256, markerName = INSTALL_MARKER) {
+  return readJsonRecord(path.join(target, markerName))?.manifest_sha256 === manifestSha256;
 }
 
 async function makeOwnerWritable(root) {
@@ -180,7 +181,7 @@ async function removeQuarantine(root, platform) {
 }
 
 async function installPayload({ payload, target, platform }) {
-  if (isUsableRuntime(target) && markerMatches(target, payload.manifestSha256)) return;
+  if (isUsableRuntime(target) && markerMatches(target, payload.manifestSha256, payload.markerName)) return;
   await fs.promises.mkdir(path.dirname(target), { recursive: true });
   const suffix = `${process.pid}-${Date.now()}`;
   const temporary = `${target}.tmp-${suffix}`;
@@ -194,7 +195,7 @@ async function installPayload({ payload, target, platform }) {
   });
   await makeOwnerWritable(temporary);
   await removeQuarantine(temporary, platform);
-  await fs.promises.writeFile(path.join(temporary, INSTALL_MARKER), `${JSON.stringify({
+  await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
     version: payload.version,
     manifest_sha256: payload.manifestSha256,
     installed_at: new Date().toISOString()
@@ -210,8 +211,8 @@ async function installPayload({ payload, target, platform }) {
   }
 }
 
-function writePointer(homeDir, runtime, version, manifestSha256, source) {
-  const target = pointerPath(homeDir);
+function writePointer(homeDir, runtime, version, manifestSha256, source, identity) {
+  const target = pointerPath(homeDir, identity);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, `${JSON.stringify({
     runtime_version: version,
@@ -340,13 +341,13 @@ function installedRuntimeVersion(runtime) {
   return typeof value === "string" && value.trim() ? value.trim() : ACTIVE_RUNTIME_DIR;
 }
 
-export function activateInstalledStudioRuntime({ homeDir = os.homedir(), env = process.env } = {}) {
-  const target = runtimeHome(homeDir);
+export function activateInstalledStudioRuntime({ homeDir = os.homedir(), env = process.env, identity = "preview" } = {}) {
+  const target = runtimeHome(homeDir, identity);
   if (!isUsableRuntime(target)) return null;
   assertRuntimePackageRoot(path.join(target, "opl"));
-  const marker = readJsonRecord(path.join(target, INSTALL_MARKER));
+  const marker = readJsonRecord(path.join(target, identity === "stable" ? ".opl-full-runtime-installed.json" : INSTALL_MARKER));
   return {
-    version: installedRuntimeVersion(target),
+    version: marker?.version ?? installedRuntimeVersion(target),
     runtimeHome: target,
     manifestSha256: typeof marker?.manifest_sha256 === "string" ? marker.manifest_sha256 : null,
     source: "installed_runtime",
@@ -359,17 +360,18 @@ export async function ensureStudioDesktopRuntime({
   resourcesPath = process.resourcesPath,
   homeDir = os.homedir(),
   env = process.env,
-  platform = process.platform
+  platform = process.platform,
+  identity = "preview"
 } = {}) {
   if (env.OPL_APP_OPL_BIN || env.OPL_COMMAND || env.OPL_FRAMEWORK_PACKAGE_ROOT) return null;
-  if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env });
-  const payload = resolvePayload(resourcesPath);
+  if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env, identity });
+  const payload = resolvePayload(resourcesPath, identity);
   if (payload) {
-    const installed = activateInstalledStudioRuntime({ homeDir, env });
+    const installed = activateInstalledStudioRuntime({ homeDir, env, identity });
     if (installed && await supportsRuntimeActivation(installed.env)) return installed;
-    const target = runtimeHome(homeDir);
+    const target = runtimeHome(homeDir, identity);
     await installPayload({ payload, target, platform });
-    writePointer(homeDir, target, payload.version, payload.manifestSha256, "packaged_payload");
+    writePointer(homeDir, target, payload.version, payload.manifestSha256, "packaged_payload", identity);
     return {
       version: payload.version,
       runtimeHome: target,
@@ -379,16 +381,20 @@ export async function ensureStudioDesktopRuntime({
     };
   }
 
-  const installed = activateInstalledStudioRuntime({ homeDir, env });
+  const installed = activateInstalledStudioRuntime({ homeDir, env, identity });
   if (installed && await supportsRuntimeActivation(installed.env)) return installed;
+  if (identity === "stable") {
+    const previewInstalled = activateInstalledStudioRuntime({ homeDir, env, identity:"preview" });
+    if (previewInstalled && await supportsRuntimeActivation(previewInstalled.env)) return previewInstalled;
+  }
   const standard = resolveStandardBootstrap(resourcesPath);
   if (!standard) return null;
-  const identity = installedFrameworkIdentity(homeDir);
-  const existingManagedIdentity = (identity?.schema === "opl_framework_installed_source_identity.v1" || identity?.ownerUpdated)
-    && /^[0-9a-f]{40}$/.test(identity.framework_sha ?? "")
+  const frameworkIdentity = installedFrameworkIdentity(homeDir);
+  const existingManagedIdentity = (frameworkIdentity?.schema === "opl_framework_installed_source_identity.v1" || frameworkIdentity?.ownerUpdated)
+    && /^[0-9a-f]{40}$/.test(frameworkIdentity.framework_sha ?? "")
     && installedFrameworkEnvironment(homeDir, env) !== null;
   const existingManagedRuntime = existingManagedIdentity && (
-    identity.ownerUpdated || identity.framework_sha === standard.manifest.framework_ref
+    frameworkIdentity.ownerUpdated || frameworkIdentity.framework_sha === standard.manifest.framework_ref
     || fs.existsSync(path.join(installedFrameworkRoot(homeDir), ".git"))
     || fs.lstatSync(installedFrameworkRoot(homeDir)).isSymbolicLink()
     || await supportsRuntimeActivation(installedFrameworkEnvironment(homeDir, env))

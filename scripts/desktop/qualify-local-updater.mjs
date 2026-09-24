@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const productName = "One Person Lab Preview";
+const defaultProductName = "One Person Lab Preview";
 const fakeAppServer = path.join(repositoryRoot, "scripts", "webui-host", "fixtures", "fake-app-server.mjs");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -42,7 +42,7 @@ async function run(executable, args, label) {
   invariant(exitCode === 0, `${label} failed with ${exitCode}`);
 }
 
-async function buildApp({ output, version, bundleIdentifier, zip }) {
+async function buildApp({ output, version, bundleIdentifier, zip, builderConfig = "electron-builder.yml" }) {
   const builder = path.join(repositoryRoot, "node_modules", ".bin", "electron-builder");
   const architecture = process.arch;
   invariant(architecture === "arm64" || architecture === "x64", `unsupported macOS architecture ${architecture}`);
@@ -52,7 +52,7 @@ async function buildApp({ output, version, bundleIdentifier, zip }) {
     "--publish",
     "never",
     "--config",
-    path.join(repositoryRoot, "electron-builder.yml"),
+    path.join(repositoryRoot, builderConfig),
     `--config.directories.output=${output}`,
     `--config.extraMetadata.version=${version}`,
     `--config.appId=${bundleIdentifier}`
@@ -117,7 +117,7 @@ async function createFeedServer(root) {
   };
 }
 
-function launchApp({ appPath, feedUrl, stateRoot, homeRoot }) {
+function launchApp({ appPath, feedUrl, stateRoot, homeRoot, productName = defaultProductName }) {
   const executable = path.join(appPath, "Contents", "MacOS", productName);
   const child = spawn(executable, [], {
     cwd: repositoryRoot,
@@ -184,12 +184,15 @@ async function stopApp(running) {
   }
 }
 
-export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } = {}) {
+export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot, identity = "preview", productName = identity === "stable" ? "One Person Lab" : defaultProductName, expectedTargetVersion,
+  buildNextTarget = false, buildSuccessor = buildNextTarget, builderConfig = productName === "One Person Lab" ? "electron-builder.stable.yml" : "electron-builder.yml",
+  receiptPath: explicitReceiptPath } = {}) {
   invariant(process.platform === "darwin", "local packaged updater qualification requires macOS");
   const pkg = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8"));
-  invariant(Boolean(baseAppPath) === Boolean(targetArtifactsRoot), "existing updater qualification requires both base App and target artifacts");
+  invariant(!buildSuccessor || Boolean(baseAppPath) && !targetArtifactsRoot, "successor qualification requires one signed base App and creates its own target artifacts");
+  invariant(buildSuccessor || Boolean(baseAppPath) === Boolean(targetArtifactsRoot), "existing updater qualification requires both base App and target artifacts");
   const baseVersion = baseAppPath ? plistValue(path.join(baseAppPath, "Contents", "Info.plist"), "CFBundleShortVersionString") : pkg.version;
-  const targetVersion = baseAppPath ? pkg.version : nextPatchVersion(baseVersion);
+  const targetVersion = expectedTargetVersion ?? (buildSuccessor || !baseAppPath ? nextPatchVersion(baseVersion) : pkg.version);
   const runRoot = await mkdtemp(path.join(os.tmpdir(), "opl-desktop-updater-qualification-"));
   const bundleIdentifier = baseAppPath ? plistValue(path.join(baseAppPath, "Contents", "Info.plist"), "CFBundleIdentifier")
     : `cn.onepersonlab.opl.studio.preview.updaterqualification.run${process.pid}`;
@@ -200,7 +203,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
   const homeRoot = path.join(runRoot, "home");
   const electronStateRoot = path.join(runRoot, "electron-state");
   const globalShipItCache = path.join(os.homedir(), "Library", "Caches", `${bundleIdentifier}.ShipIt`);
-  const receiptPath = path.join(repositoryRoot, "out", "macos-desktop-updater-qualification.json");
+  const receiptPath = explicitReceiptPath ?? path.join(repositoryRoot, "out", "macos-desktop-updater-qualification.json");
   let feed;
   let running;
   let relaunched;
@@ -212,8 +215,12 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
     await mkdir(electronStateRoot, { recursive: true });
     if (!baseAppPath) {
       await run(process.execPath, [path.join(repositoryRoot, "scripts", "build-desktop.mjs")], "desktop build");
-      await buildApp({ output: baseOutput, version: baseVersion, bundleIdentifier, zip: true });
-      await buildApp({ output: targetOutput, version: targetVersion, bundleIdentifier, zip: true });
+      await buildApp({ output: baseOutput, version: baseVersion, bundleIdentifier, zip: true, builderConfig });
+      await buildApp({ output: targetOutput, version: targetVersion, bundleIdentifier, zip: true, builderConfig });
+    } else if (buildSuccessor) {
+      // This proves the signed candidate can install an ordinary future update.
+      // It never claims that an old AionUI or Preview binary reached the candidate.
+      await buildApp({ output: targetOutput, version: targetVersion, bundleIdentifier, zip: true, builderConfig });
     }
 
     const sourceApp = baseAppPath ?? path.join(baseOutput, `mac-${process.arch}`, `${productName}.app`);
@@ -229,7 +236,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
     invariant((await stat(path.join(targetOutput, metadata.path))).isFile(), "target updater ZIP is missing");
 
     feed = await createFeedServer(targetOutput);
-    running = launchApp({ appPath: installedApp, feedUrl: feed.url, stateRoot: electronStateRoot, homeRoot });
+    running = launchApp({ appPath: installedApp, feedUrl: feed.url, stateRoot: electronStateRoot, homeRoot, productName });
     const initialWindow = await waitForReady(running);
     const initialStatus = await invokeUpdater(running, "status", 10_000);
     invariant(initialStatus.currentVersion === baseVersion, "running base App reported the wrong version");
@@ -259,7 +266,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
       "Squirrel.Mac App replacement"
     );
 
-    relaunched = launchApp({ appPath: installedApp, feedUrl: feed.url, stateRoot: electronStateRoot, homeRoot });
+    relaunched = launchApp({ appPath: installedApp, feedUrl: feed.url, stateRoot: electronStateRoot, homeRoot, productName });
     const relaunchedWindow = await waitForReady(relaunched);
     const relaunchedStatus = await invokeUpdater(relaunched, "status", 10_000);
     invariant(relaunchedStatus.currentVersion === targetVersion, "relaunched App did not report the installed target version");
@@ -275,6 +282,10 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
       qualificationBundleIdentifier: bundleIdentifier,
       baseVersion,
       targetVersion,
+      productName,
+      qualificationScope: buildSuccessor ? "signed_candidate_to_synthetic_next_version" : "existing_or_fixture_same_identity_update",
+      legacyAionMigrationProven: false,
+      previewHandoffProven: false,
       initialWindow,
       initialStatus,
       checked,
@@ -296,6 +307,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot } =
     await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
     return receipt;
   } catch (error) {
+    await mkdir(path.dirname(receiptPath), { recursive: true });
     await writeFile(receiptPath, `${JSON.stringify({ status: "failed", baseVersion, targetVersion,
       error: error.message, output: running?.readOutput(), messages: running?.messages.slice(-12) }, null, 2)}\n`);
     throw error;

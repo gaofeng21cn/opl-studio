@@ -1016,7 +1016,12 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
   const renderContribution = useCallback((options?: { only?: string }) => (
     renderSlot("settings.section", studio.contributionOwner, options)
   ), [renderSlot, studio.contributionOwner]);
-  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
+  const requestedSettings = studio.settingsNavigation;
+  const requestedPrimary = requestedSettings?.destination
+    ? settingsDestinations(studio.locale).find(primary => settingsSubDestinations(primary.id, studio.locale).some(item => item.id === requestedSettings.destination))?.id
+    : undefined;
+  const navigationRequest = requestedSettings ? { sectionId: requestedPrimary ? settingsSectionId(requestedPrimary) : undefined, revision: requestedSettings.revision } : undefined;
+  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
 }
 
 function SettingsTriggerSlot({ wide }: { wide: boolean }) {
@@ -1032,10 +1037,17 @@ function settingsSectionId(destination: SettingsDestinationId): string {
 }
 
 function SettingsMainSlot({ destination, close }: { destination: SettingsDestinationId; close?: () => void }) {
+  const studio = useStudio();
   const renderContribution = useContext(SettingsContributionSlotContext);
   const [selected, setSelected] = useState(destination);
   useEffect(() => setSelected(destination), [destination]);
-  return <>{useStudio().renderSettings(selected, renderContribution ?? undefined, setSelected, close)}</>;
+  useEffect(() => {
+    const requested = studio.settingsNavigation?.destination;
+    if (requested && settingsSubDestinations(destination, studio.locale).some(item => item.id === requested)) {
+      setSelected(requested);
+    }
+  }, [destination, studio.settingsNavigation?.revision]);
+  return <>{studio.renderSettings(selected, renderContribution ?? undefined, setSelected, close)}</>;
 }
 
 function firstRunItemLabel(itemId: string, fallback: string | undefined, locale: "zh" | "en"): string {

@@ -1,8 +1,23 @@
 # macOS Desktop Distribution Evidence
 
-`opl-studio` remains the side-by-side successor candidate. Its current bundle identity is
-`cn.onepersonlab.opl.studio.preview`; this evidence does not adopt it as the active release shell or replace the
-installed AionUI-based App.
+`opl-studio` implements both the existing Preview identity and the selected
+successor Stable carrier. Source selection is separate from a completed public
+upgrade: release and installed-state receipts prove that transition.
+
+| Build | Identity and feed | Existing user state |
+| --- | --- | --- |
+| Preview | `cn.onepersonlab.opl.studio.preview`, `opl-studio` Releases | Existing `opl-studio` userData |
+| Stable | `cn.onepersonlab.opl`, `one-person-lab-app` Releases | Existing `One Person Lab` userData and Framework/Codex owner state |
+
+`electron-builder.stable.yml` and the App controller supply the Stable display
+version and strictly increasing updater version. Preview keeps its own version
+sequence. Its packaged `preview-handoff.json` stays disabled until an exact
+Stable target is available. The terminal bridge downloads that target, checks
+its digest and publisher signature, waits for the old App to exit, retains its
+installation backup, and imports allowlisted shell state before showing the
+normal renderer. Conflicting drafts remain visible. Conflicting channel bindings
+stop migration instead of reassigning a canonical thread. Framework, Codex Home,
+and credentials stay with their owners.
 
 ## Carrier transition constraints
 

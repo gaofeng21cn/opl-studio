@@ -1,5 +1,13 @@
-appId: cn.onepersonlab.opl.studio.preview
-productName: One Person Lab Preview
+appId: cn.onepersonlab.opl
+productName: One Person Lab
+executableName: One Person Lab
+protocols:
+  - name: One Person Lab
+    schemes:
+      - opl
+extraMetadata:
+  name: One Person Lab
+  oplReleaseChannel: stable
 asar: true
 npmRebuild: false
 directories:
@@ -10,6 +18,12 @@ files:
   - scripts/webui-host/**/*
   - package.json
 extraResources:
+  - from: resources/opl-official-profile
+    to: opl-official-profile
+    filter:
+      - official-profile-package-apply.ts
+      - app-product-profile.json
+      - manifest.json
   - from: resources/opl-branding
     to: branding
     filter:
@@ -20,8 +34,6 @@ extraResources:
     filter:
       - opl-install.sh
       - manifest.json
-  - from: resources/preview-handoff.json
-    to: preview-handoff.json
 mac:
   icon: assets/branding/opl-studio.icns
   category: public.app-category.developer-tools
@@ -33,24 +45,35 @@ mac:
 dmg:
   format: ULFO
 win:
+  extraResources:
+    - from: resources/opl-wsl-host
+      to: opl-wsl-host
   icon: assets/branding/opl-studio.png
   target:
     - nsis
     - zip
 nsis:
-  guid: a1f6388a-3f9a-5543-b06c-e3debfa55a91
+  guid: 427792ec-b878-5efa-a09e-f4e17d0b65a9
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  differentialPackage: true
 linux:
   icon: assets/branding/opl-studio.png
   category: Development
   maintainer: Feng Gao <gaofeng21cn@hotmail.com>
-  executableName: one-person-lab-preview
+  executableName: one-person-lab
   target:
     - deb
 deb:
+  packageName: one-person-lab
   afterRemove: scripts/desktop/linux-after-remove.sh
-artifactName: one-person-lab-preview-${version}-${os}-${arch}.${ext}
+artifactName: One-Person-Lab-${env.OPL_RELEASE_VERSION}-${os}-${arch}.${ext}
 publish:
   provider: github
   owner: gaofeng21cn
-  repo: opl-studio
+  repo: one-person-lab-app
 afterPack: scripts/desktop/write-app-update-config.mjs

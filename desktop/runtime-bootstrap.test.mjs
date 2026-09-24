@@ -113,6 +113,29 @@ test("packaged Full runtime rejects a carrier manifest that can embed a second C
     /carrier manifest/
   );
 });
+test("Stable Full preserves the official runtime root while Preview keeps its own carrier", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-stable-runtime-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const resourcesPath = createPayload(root, { runtime_install_root_template: "~/Library/Application Support/OPL/runtime/current" });
+  const result = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: "linux", identity: "stable" });
+  assert.equal(result.runtimeHome, path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current"));
+  assert.equal(activateInstalledStudioRuntime({ homeDir, identity: "preview", env: {} }), null);
+  assert.equal(activateInstalledStudioRuntime({ homeDir, identity: "stable", env: {} }).version, "0.2.0");
+});
+test("Stable Standard can reuse Preview Full in place without copying owner data", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-preview-reuse-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const resourcesPath = createPayload(root);
+  const preview = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: "linux" });
+  fs.writeFileSync(preview.env.OPL_APP_OPL_BIN, '#!/bin/sh\nprintf \'{"help":{"command":"update activate"}}\\n\'\n');
+  const standard = createStandardBootstrap(path.join(root, "standard"), { installerBody: "#!/bin/bash\nexit 91\n" });
+  const stable = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: standard, homeDir, env: {}, platform: "linux", identity: "stable" });
+  assert.equal(stable.runtimeHome, preview.runtimeHome);
+  assert.equal(stable.env.OPL_FRAMEWORK_PACKAGE_ROOT, preview.env.OPL_FRAMEWORK_PACKAGE_ROOT);
+  assert.equal(fs.existsSync(path.join(homeDir, "Library", "Application Support", "OPL", "runtime")), false);
+});
 
 test("packaged Standard reuses the exact installed Framework identity without rerunning its installer", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-standard-runtime-test-"));

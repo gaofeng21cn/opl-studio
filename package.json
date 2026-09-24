@@ -177,6 +177,9 @@
     "test": "npm run test:source",
     "test:full": "npm run test:source && npm run validate:state-model && npm run smoke:webui && npm run smoke:visual && npm run package && npm run validate:package",
     "test:features": "bun test tests/workbench/feature-status.test.mts tests/workbench/feature-fixtures.test.mts tests/workbench/studio-vm-fixture.test.mts && node --test scripts/webui-host/workspace-git.test.mjs && node --test scripts/webui-host/workbench-task-executor.test.mjs",
-    "test:workbench-services": "node scripts/acceptance/workbench-services.mjs"
+    "test:workbench-services": "node scripts/acceptance/workbench-services.mjs",
+    "build-mac": "node scripts/desktop/build-release.mjs",
+    "build-mac:arm64": "node scripts/desktop/build-release.mjs arm64",
+    "build-mac:x64": "node scripts/desktop/build-release.mjs x64"
   }
 }

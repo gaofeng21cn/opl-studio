@@ -42,7 +42,7 @@ test("Studio afterPack writes the dedicated GitHub updater identity", () => {
   }), { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" });
   assert.throws(
     () => buildAppUpdateConfig({ publish: { provider: "github", owner: "other", repo: "other" } }),
-    /dedicated gaofeng21cn\/opl-studio GitHub feed/
+    /dedicated identity-bound GitHub feed/
   );
 });
 

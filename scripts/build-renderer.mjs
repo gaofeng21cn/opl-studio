@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
+import { createDeepLinkPolicy } from "../desktop/deep-links.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const templatePath = path.join(root, "src", "renderer-shell.html");
@@ -280,6 +281,11 @@ export function buildRenderer({
     fs.copyFileSync(path.join(viewerCarrierRoot, file), path.join(pluginRoot, `dsh-file-viewer.${file}`));
   }
   const appProductProfile = readAppProductProfile();
+  const deepLinkPolicy = createDeepLinkPolicy(
+    JSON.parse(fs.readFileSync(path.join(appRepoRoot, "contracts/app-gui-product-contract.json"), "utf8")),
+    JSON.parse(fs.readFileSync(path.join(appRepoRoot, "contracts/app-settings-control-plane.json"), "utf8"))
+  );
+  fs.writeFileSync(path.join(outDir, "deep-link-policy.json"), `${JSON.stringify(deepLinkPolicy, null, 2)}\n`);
   const modelPolicy = createCodexModelPolicy(appProductProfile);
   const clientCompositionProfile = createClientCompositionPolicy(appProductProfile);
   const clientCompositionPolicy = clientCompositionProfile.delivery_topology.minimum_complete_product.composition_model;
@@ -309,7 +315,7 @@ export function buildRenderer({
   const hasStylesheet = fs.existsSync(emittedCssPath);
   if (hasStylesheet) fs.renameSync(emittedCssPath, cssPath);
 
-  const policyScript = `<script>globalThis.__OPL_CODEX_MODEL_POLICY__=${JSON.stringify(modelPolicy).replaceAll("<", "\\u003c")};globalThis.__OPL_CLIENT_COMPOSITION_POLICY__=${JSON.stringify(clientCompositionProfile).replaceAll("<", "\\u003c")};</script>`;
+  const policyScript = `<script>globalThis.__OPL_CODEX_MODEL_POLICY__=${JSON.stringify(modelPolicy).replaceAll("<", "\\u003c")};globalThis.__OPL_CLIENT_COMPOSITION_POLICY__=${JSON.stringify(clientCompositionProfile).replaceAll("<", "\\u003c")};globalThis.__OPL_DEEP_LINK_POLICY__=${JSON.stringify(deepLinkPolicy).replaceAll("<", "\\u003c")};</script>`;
   const html = fs.readFileSync(templatePath, "utf8")
     .replace("</head>", hasStylesheet ? `  <link rel="stylesheet" href="./${cssName}" />\n</head>` : "</head>")
     .replace("<body>", `<body>\n  ${policyScript}`)

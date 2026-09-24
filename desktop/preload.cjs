@@ -2,11 +2,21 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 const invoke = (method, payload = {}) => ipcRenderer.invoke("opl:invoke", { method, payload });
 const subscriptions = new Map();
+let pendingDeepLinksRequested = false;
 
 function subscribeEvents(listener) {
   const wrapped = (_event, payload) => listener(payload);
   subscriptions.set(listener, wrapped);
   ipcRenderer.on("opl:event", wrapped);
+  if (!pendingDeepLinksRequested) {
+    pendingDeepLinksRequested = true;
+    void invoke("readPendingDeepLinks").then((pending) => {
+      if (!Array.isArray(pending)) return;
+      for (const payload of pending) {
+        for (const subscriber of subscriptions.values()) subscriber(null, { method: "desktop/deep-link", params: payload });
+      }
+    }).catch(() => { pendingDeepLinksRequested = false; });
+  }
   return () => {
     const active = subscriptions.get(listener);
     if (active) ipcRenderer.removeListener("opl:event", active);

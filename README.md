@@ -17,7 +17,7 @@
 <!--
 Owner: `one-person-lab-app`
 Purpose: `public_native_product_entry`
-State: `public_preview_release_active_active_shell_adoption_separate`
+State: `studio_stable_transition_in_progress`
 Machine boundary: Human-readable Studio entry. App product and adoption truth stays in one-person-lab-app contracts; runtime and Package truth stays in OPL Framework; domain truth stays with domain owners. A public Preview does not by itself adopt Studio as the Stable App shell or establish production readiness.
 -->
 
@@ -66,10 +66,12 @@ versions or update channels. Full does not embed Codex; Studio resolves an
 exact external Codex carrier through the App-owned launch and qualification
 contract.
 
-> **Preview boundary:** the public package is intended for internal evaluation.
-> Studio does not become the Stable OPL App shell until the App owner completes
-> the separate clean-VM, equivalence, and adoption gates. AionUI remains the
-> current Stable App shell during that transition.
+> **Stable transition:** the next OPL App release is being prepared on Studio.
+> The Stable build preserves the existing App identity and update feed. A final
+> Preview bridge will carry Preview users to the exact signed Stable release,
+> retaining their settings, drafts, and canonical thread references. Until both
+> published upgrade paths are verified, the public AionUI and Preview releases
+> remain the installed baselines. See [Desktop distribution](./docs/delivery/desktop-distribution.md).
 
 Windows, Linux, and standalone Headless WebUI have development qualification
 paths. OCI Preview uses a separate publication workflow and immutable Cloud

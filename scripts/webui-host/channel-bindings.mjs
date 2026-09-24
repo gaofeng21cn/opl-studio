@@ -62,7 +62,7 @@ function emptyDocument() {
   return { schema: BINDING_SCHEMA, entries: [] };
 }
 
-function validatedDocument(value, filePath) {
+export function validatedChannelBindings(value, filePath) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ChannelBindingError("channel_binding_state_invalid", "channel binding state must be an object", { filePath });
   }
@@ -162,7 +162,7 @@ export class ChannelBindingStore {
       throw error;
     }
     try {
-      return validatedDocument(JSON.parse(source), this.filePath);
+      return validatedChannelBindings(JSON.parse(source), this.filePath);
     } catch (error) {
       if (error instanceof ChannelBindingError) throw error;
       throw new ChannelBindingError(

@@ -1,4 +1,5 @@
 import { actionReceiptView, type ActionReceiptView } from "./actionReceiptView";
+import { resolveDeepLinkDestination } from "./deepLinkNavigation";
 import { SubagentsPanel } from "./SubagentsPanel";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { featureRefsWithCodexStatus } from "./featureModel";
@@ -610,6 +611,7 @@ type WorkbenchUiMetadata = {
 };
 
 type WorkbenchDrafts = {
+  recovered?: Record<string, string>;
   prompts: Record<string, string>;
 };
 
@@ -759,7 +761,8 @@ function readPersistedWorkbenchUi(): { metadata: WorkbenchUiMetadata; drafts: Wo
         layout: "default"
       },
       drafts: {
-        prompts: drafts?.prompts && typeof drafts.prompts === "object" ? drafts.prompts : {}
+        prompts: drafts?.prompts && typeof drafts.prompts === "object" ? drafts.prompts : {},
+        recovered: drafts?.recovered && typeof drafts.recovered === "object" ? drafts.recovered : {}
       }
     };
   } catch {
@@ -906,6 +909,7 @@ export function App({
   const [threadActionError, setThreadActionError] = useState("");
   const [lifecycleConfirmation, setLifecycleConfirmation] = useState<{ thread: WorkbenchThreadItem; action: ThreadLifecycleAction } | null>(null);
   const [settings, setSettings] = useState<WorkbenchSettings>(() => readSettings());
+  const [settingsNavigation, setSettingsNavigation] = useState<{ destination?: SettingsDestinationId; revision: number }>();
   const settingsRef = useRef(settings);
   const [codexCatalog, setCodexCatalog] = useState<CodexModelCatalogEntry[]>([]);
   const [modelCatalogStatus, setModelCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -2054,6 +2058,17 @@ export function App({
     if (method === "desktop/navigate" && (params.view === "conversation" || params.view === "runtime")) {
       setPrimaryView(params.view);
     }
+    if (method === "desktop/deep-link") {
+      const destination = resolveDeepLinkDestination(params);
+      if (destination?.kind === "settings") {
+        setSettingsNavigation(current => ({ destination: destination.destination, revision: (current?.revision ?? 0) + 1 }));
+      } else if (destination?.kind === "conversation") {
+        setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 }));
+        setPrimaryView("conversation");
+        updateUiMetadata({ threadScope: destination.scope });
+        void loadThreadDirectory(false, destination.scope);
+      }
+    }
     if (method === "desktop/new-task") {
       startNewChat();
     }
@@ -2900,6 +2915,13 @@ export function App({
 
   const studioComposerAccessory = (
     <>
+      {Object.keys(drafts.recovered ?? {}).length > 0 ? <details data-testid="opl-recovered-drafts">
+        <summary>{settings.locale === "zh" ? "从 Preview 保留的其他草稿" : "Additional drafts recovered from Preview"}</summary>
+        {Object.entries(drafts.recovered ?? {}).map(([id, text]) => <div key={id}>
+          <pre style={{ whiteSpace:"pre-wrap", maxHeight:160, overflow:"auto" }}>{text}</pre>
+          <button type="button" onClick={() => updatePrompt(prompt ? `${prompt}\n\n${text}` : text)}>{settings.locale === "zh" ? "追加到当前草稿" : "Append to current draft"}</button>
+        </div>)}
+      </details> : null}
       {composerSelections.length ? (
         <div className="composer-selections" aria-label={settings.locale === "zh" ? "已添加的内容" : "Added content"}>
           {composerSelections.map((selection) => <span key={selection.id} className="composer-selection" data-status={selection.attachment?.status} title={selection.detail}>{selection.attachment?.status === "pending" ? <LoaderCircle aria-hidden="true" size={13} className="spin" /> : selection.attachment?.status === "error" ? <AlertTriangle aria-hidden="true" size={13} /> : <FileText aria-hidden="true" size={13} />}<span>{selection.label}</span><button type="button" aria-label={`${settings.locale === "zh" ? "移除" : "Remove"} ${selection.label}`} onClick={() => removeComposerSelection(selection.id)}><X aria-hidden="true" size={12} /></button></span>)}
@@ -3242,6 +3264,7 @@ export function App({
     activeDetailTabId: activeContextTab,
     openDetailTab: requestDetails,
     renderSettings: renderStudioSettings,
+    settingsNavigation,
     initializationStatus: initializeStatus,
     initialization: initializeReadback,
     refreshInitialization: () => { void loadInitialize(); },

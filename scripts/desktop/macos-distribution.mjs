@@ -134,7 +134,7 @@ export async function prepareMacUpdateFeed({ outRoot } = {}) {
   return result;
 }
 
-function dedicatedPublicFeedUrl(value) {
+function dedicatedPublicFeedUrl(value, identity = "preview") {
   invariant(typeof value === "string" && value, "public update feed URL is required");
   let url;
   try {
@@ -146,8 +146,8 @@ function dedicatedPublicFeedUrl(value) {
   invariant(!url.username && !url.password && !url.search && !url.hash, "public update feed URL must not contain credentials, query, or fragment");
   invariant(url.hostname === "github.com", "public update feed must use GitHub Releases");
   invariant(
-    /^\/gaofeng21cn\/opl-studio\/releases\/download\/[^/]+\/$/.test(url.pathname),
-    "public update feed must target one gaofeng21cn/opl-studio release"
+    new RegExp(`^/gaofeng21cn/${identity === "stable" ? "one-person-lab-app" : "opl-studio"}/releases/download/[^/]+/$`).test(url.pathname),
+    "public update feed must target one identity-bound OPL release"
   );
   return url;
 }
@@ -186,11 +186,12 @@ export async function validateMacPublicUpdateFeed({
   outRoot,
   publicFeedUrl,
   expectedVersion,
+  identity = "preview",
   fetchImpl = globalThis.fetch
 } = {}) {
   invariant(outRoot, "outRoot is required");
   invariant(typeof fetchImpl === "function", "public update feed requires fetch");
-  const baseUrl = dedicatedPublicFeedUrl(publicFeedUrl);
+  const baseUrl = dedicatedPublicFeedUrl(publicFeedUrl, identity);
   const localFeed = await validateMacUpdateFeed({ outRoot, expectedVersion });
   const primaryBytes = await readFile(path.join(outRoot, "latest-mac.yml"));
   const compatibilityBytes = await readFile(path.join(outRoot, "latest-arm64-mac.yml"));
@@ -274,13 +275,18 @@ export async function qualifyMacDistribution({
   packageFile = path.join(repositoryRoot, "package.json"),
   requireReleaseTrust = false,
   requirePublicFeed = false,
+  identity = process.env.OPL_DESKTOP_RELEASE_IDENTITY ?? "preview",
+  expectedVersion = process.env.OPL_UPDATER_VERSION,
   publicFeedUrl = process.env.OPL_DESKTOP_PUBLIC_UPDATE_FEED_URL,
   fetchImpl = globalThis.fetch
 } = {}) {
   invariant(process.platform === "darwin", "macOS distribution qualification requires macOS");
   const pkg = JSON.parse(await readFile(packageFile, "utf8"));
+  invariant(["preview", "stable"].includes(identity), "unknown desktop release identity");
+  const machineVersion = identity === "stable" ? expectedVersion : pkg.version;
+  invariant(semver.valid(machineVersion), "release controller must provide the Stable updater version");
   const feed = await prepareMacUpdateFeed({ outRoot });
-  invariant(feed.version === pkg.version, `feed version ${feed.version} does not match package version ${pkg.version}`);
+  invariant(feed.version === machineVersion, `feed version ${feed.version} does not match expected version ${machineVersion}`);
   const zip = feed.artifacts.find((entry) => entry.name.endsWith(".zip"));
   const dmg = feed.artifacts.find((entry) => entry.name.endsWith(".dmg"));
   invariant(zip && dmg, "qualified feed must bind one ZIP and one DMG");
@@ -297,24 +303,28 @@ export async function qualifyMacDistribution({
     const buildVersion = plistValue(infoPlist, "CFBundleVersion");
     const bundleIdentifier = plistValue(infoPlist, "CFBundleIdentifier");
     const productName = plistValue(infoPlist, "CFBundleDisplayName");
-    invariant(version === pkg.version && buildVersion === pkg.version, "App bundle version does not match update feed");
+    invariant(version === machineVersion && buildVersion === machineVersion, "App bundle version does not match update feed");
+    invariant(bundleIdentifier === (identity === "stable" ? "cn.onepersonlab.opl" : "cn.onepersonlab.opl.studio.preview"), "App bundle identity mismatch");
+    invariant(productName === (identity === "stable" ? "One Person Lab" : "One Person Lab Preview"), "App product name mismatch");
 
     const signature = signatureDetails(appPath);
     invariant(signature.valid, "updater ZIP App signature is invalid");
     invariant(signature.authority?.startsWith("Developer ID Application:"), "updater ZIP App is not Developer ID signed");
-    invariant(signature.teamIdentifier, "updater ZIP App has no TeamIdentifier");
+    invariant(signature.teamIdentifier === "SVVC4TA784", "updater ZIP publisher does not match OPL");
     invariant(signature.hardenedRuntime, "updater ZIP App does not enable hardened runtime");
 
     const appUpdate = parse(await readFile(path.join(appPath, "Contents", "Resources", "app-update.yml"), "utf8"));
     invariant(appUpdate?.provider === "github", "App update provider must be GitHub");
-    invariant(appUpdate?.owner === "gaofeng21cn" && appUpdate?.repo === "opl-studio", "App must use the dedicated opl-studio updater feed");
+    invariant(appUpdate?.owner === "gaofeng21cn" && appUpdate?.repo === (identity === "stable" ? "one-person-lab-app" : "opl-studio"), "App must use its identity-bound updater feed");
 
     const trust = trustResult(appPath, path.join(outRoot, dmg.name));
     const releaseTrustAccepted = trust.gatekeeperAccepted && trust.appStapled && trust.dmgStapled;
     // The App release executor calls this on sealed signed bytes before publish.
     // A failed real Squirrel replacement must stop that job, not create a bad release.
     const prepublicationUpdate = requireReleaseTrust && !requirePublicFeed && releaseTrustAccepted
-      ? await qualifyPreviousSignedUpdate({ outRoot, targetVersion: pkg.version, targetSignature: signature, extractionRoot, fetchImpl })
+      ? (identity === "stable"
+        ? await qualifyLocalUpdater({ baseAppPath: appPath, buildNextTarget: true, identity: "stable" })
+        : await qualifyPreviousSignedUpdate({ outRoot, targetVersion: machineVersion, targetSignature: signature, extractionRoot, fetchImpl }))
       : null;
     let publicFeed = {
       schema: "opl_public_desktop_update_feed_qualification.v1",
@@ -327,7 +337,8 @@ export async function qualifyMacDistribution({
         publicFeed = await validateMacPublicUpdateFeed({
           outRoot,
           publicFeedUrl,
-          expectedVersion: pkg.version,
+          expectedVersion: machineVersion,
+          identity,
           fetchImpl
         });
       } catch (error) {

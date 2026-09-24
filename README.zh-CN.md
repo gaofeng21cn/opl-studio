@@ -17,7 +17,7 @@
 <!--
 Owner: `one-person-lab-app`
 Purpose: `public_native_product_entry`
-State: `public_preview_release_active_active_shell_adoption_separate`
+State: `studio_stable_transition_in_progress`
 Machine boundary: Human-readable Studio entry. App product and adoption truth stays in one-person-lab-app contracts; runtime and Package truth stays in OPL Framework; domain truth stays with domain owners. A public Preview does not by itself adopt Studio as the Stable App shell or establish production readiness.
 -->
 
@@ -61,9 +61,10 @@ Standard 和 Full 是同一版本的两种载荷规格，不是两个产品版�
 更新通道。Full 不内置 Codex；Studio 会按照 App 管理的启动与验收合同，定位
 与版本严格匹配的外部 Codex 可执行程序。
 
-> **预览版边界：**公开安装包用于预览版内测。只有 App 负责人完成独立的纯净
-> 虚拟机验收、功能等价验证和采用门禁后，Studio 才能成为正式版 OPL App 的
-> 应用外壳。在完成切换之前，AionUI 仍是当前正式版的应用外壳。
+> **正式版切换：**下一个 OPL App 版本正在改用 Studio。正式版构建保留现有
+> App 身份和更新源；最后一个 Preview 过渡版本将把用户迁移到经过签名验证的
+> 准确正式版，同时保留设置、草稿和规范线程引用。两条公开升级路径完成验收前，
+> 已发布的 AionUI 和 Preview 仍是安装基线，详见 [桌面分发](./docs/delivery/desktop-distribution.md)。
 
 Windows、Linux 和独立 WebUI 已有开发验收路径。OCI Preview 使用独立发布
 工作流和不可变 Cloud 交接记录，详见 [OCI 分发](./docs/oci-distribution.md)。

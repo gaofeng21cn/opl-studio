@@ -36,6 +36,13 @@ test("desktop runtime resolution preserves explicit executable overrides", () =>
   assert.equal(resolved.OPL_CODEX_BIN, "/managed/codex");
   assert.equal(resolved.OPL_APP_OPL_BIN, "/managed/opl");
 });
+test("Aion standalone Codex remains discoverable with the same custom CODEX_HOME", () => {
+  const codexHome = "/Users/opl/custom-codex";
+  const binary = path.join(codexHome, "packages", "standalone", "current", "codex");
+  const env = resolveDesktopRuntimeEnvironment({ env: { PATH: "/usr/bin", CODEX_HOME: codexHome }, homeDir: "/Users/opl", readDirectory: () => [], executable: candidate => candidate === binary });
+  assert.equal(env.OPL_CODEX_BIN, binary);
+  assert.equal(env.CODEX_HOME, codexHome);
+});
 
 test("Finder launches prefer the Homebrew Framework OPL over an older Node-version shim", () => {
   const homeDir = "/Users/opl";

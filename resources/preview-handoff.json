@@ -1,0 +1,5 @@
+{
+  "schema": "opl_studio_preview_handoff_plan.v1",
+  "enabled": false,
+  "targetUserDataRoot": "~/Library/Application Support/One Person Lab"
+}

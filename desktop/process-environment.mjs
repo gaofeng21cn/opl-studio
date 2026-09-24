@@ -94,7 +94,8 @@ export function resolveDesktopRuntimeEnvironment({
   const resolved = { ...env, PATH: searchDirectories.join(path.delimiter) };
 
   if (!resolved.OPL_CODEX_BIN && !resolved.CODEX_APP_SERVER_COMMAND) {
-    const codex = findExecutable("codex", searchDirectories, executable);
+    const codex = [env.CODEX_CLI_PATH, env.CODEX_BIN].filter(Boolean).find(executable)
+      ?? findExecutable("codex", [path.join(env.CODEX_HOME || homeDir, ...(env.CODEX_HOME ? [] : [".codex"]), "packages", "standalone", "current"), ...searchDirectories], executable);
     if (codex) resolved.OPL_CODEX_BIN = codex;
   }
   if (!resolved.OPL_APP_OPL_BIN && !resolved.OPL_COMMAND) {

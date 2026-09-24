@@ -1,0 +1,30 @@
+{
+  "schema": "opl_app_desktop_release_carrier.v1",
+  "owner_repo": "gaofeng21cn/opl-studio",
+  "carrier_id": "opl-studio",
+  "product_name": "One Person Lab",
+  "bundle_id": "cn.onepersonlab.opl",
+  "release_role": "active_stable",
+  "release_repository": "gaofeng21cn/one-person-lab-app",
+  "package_manager": "npm",
+  "commands": {
+    "install": "npm ci",
+    "build_macos": "npm run build-mac:arm64",
+    "qualify_distribution": "npm run qualify:desktop:mac",
+    "qualify_updater": "npm run qualify:desktop:updater:local",
+    "qualify_prepublication": "node scripts/desktop/macos-distribution.mjs --require-release-trust",
+    "qualify_public_release": "node scripts/desktop/macos-distribution.mjs --require-release-trust --require-public-feed"
+  },
+  "artifact_name_template": "One-Person-Lab-${env.OPL_RELEASE_VERSION}-${os}-${arch}.${ext}",
+  "entitlements": null,
+  "carrier_specific_payload": [
+    "studio_renderer",
+    "app_state_action_bridge"
+  ],
+  "full_payload_contract": "contracts/full-payload-carrier.stable.json",
+  "full_artifact_name_template": "One-Person-Lab-Full-${version}-${arch}.dmg",
+  "full_package_kind": "opl_full_first_install_macos_arm64",
+  "full_builder": "OPL_APP_REPO_ROOT/scripts/build-full-first-install-package.ts",
+  "full_builder_entry": "npm run build:full",
+  "full_qualification_entry": "npm run qualify:full"
+}

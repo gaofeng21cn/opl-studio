@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readDshBinding } from "./dsh-upstream.mjs";
+import { settingsNavigationOverlayManifest, verifySettingsNavigationOverlay, SETTINGS_ROOT_SOURCE } from "./dsh-settings-navigation-overlay.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const vendorRoot = path.join(root, "src", "vendor", "deepseek-harness");
@@ -47,6 +48,7 @@ function expectedInventory() {
 }
 
 function verifyLocal(manifest) {
+  verifySettingsNavigationOverlay(root, manifest);
   const expected = new Map(manifest.files.map((entry) => [entry.path, entry.sha256]));
   const actualPaths = filesUnder(vendorRoot)
     .map((filePath) => relativeTo(vendorRoot, filePath));
@@ -150,6 +152,7 @@ function sync(sourceRoot) {
       "dsh_agent_loop",
       "dsh_credentials"
     ],
+    build_overlays: [settingsNavigationOverlayManifest(root, files.find(entry => entry.path === SETTINGS_ROOT_SOURCE)?.sha256)],
     files
   };
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
