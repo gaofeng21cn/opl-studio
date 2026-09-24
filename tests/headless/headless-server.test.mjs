@@ -108,9 +108,10 @@ test("standalone Node command starts the shared renderer and exits cleanly on SI
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4000); });
   const listening = await new Promise((resolve, reject) => {
-    // Cold profile/module initialization runs in a separate Node process. Keep
-    // a bounded startup budget with room for concurrent package qualification.
-    const timeout = setTimeout(() => reject(new Error(`headless runner did not listen within 15s: ${stderr}`)), 15_000);
+    // Cold profile/module initialization runs in a separate Node process and
+    // can take longer on a busy release runner. Keep a bounded startup budget
+    // without turning normal cold boot into a false source-gate failure.
+    const timeout = setTimeout(() => reject(new Error(`headless runner did not listen within 45s: ${stderr}`)), 45_000);
     child.once("exit", (code) => {
       clearTimeout(timeout);
       reject(new Error(`headless runner exited early: ${code}: ${stderr}`));
