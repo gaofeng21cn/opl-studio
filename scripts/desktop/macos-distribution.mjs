@@ -270,6 +270,19 @@ function dmgFormat(dmgPath) {
   return command("/usr/bin/plutil", ["-extract", "Format", "raw", "-o", "-", "-"], { input: imageInfo }).stdout.trim();
 }
 
+export async function qualifyPrepublicationUpdate({ handoffPlan, requireReleaseTrust, requirePublicFeed, releaseTrustAccepted,
+  previewUpgradeVmReceipt, previewVersion, previewZipSha256, runLocalUpdater }) {
+  if (!requireReleaseTrust || requirePublicFeed || !releaseTrustAccepted) return null;
+  if (handoffPlan?.enabled === true) {
+    invariant(previewUpgradeVmReceipt, "Terminal Preview must be qualified in isolated Tart VMs; host local updater execution is forbidden");
+    const { validatePreviewUpgradeReceipt } = await import("./stable-qualify-preview-upgrade.mjs");
+    return validatePreviewUpgradeReceipt(JSON.parse(await readFile(previewUpgradeVmReceipt, "utf8")), {
+      previewVersion, previewZipSha256, target: handoffPlan.target
+    });
+  }
+  return runLocalUpdater();
+}
+
 export async function qualifyMacDistribution({
   outRoot = path.join(repositoryRoot, "out"),
   packageFile = path.join(repositoryRoot, "package.json"),
@@ -278,6 +291,7 @@ export async function qualifyMacDistribution({
   identity = process.env.OPL_DESKTOP_RELEASE_IDENTITY ?? "preview",
   expectedVersion = process.env.OPL_UPDATER_VERSION,
   publicFeedUrl = process.env.OPL_DESKTOP_PUBLIC_UPDATE_FEED_URL,
+  previewUpgradeVmReceipt = process.env.OPL_PREVIEW_UPGRADE_VM_RECEIPT,
   fetchImpl = globalThis.fetch
 } = {}) {
   invariant(process.platform === "darwin", "macOS distribution qualification requires macOS");
@@ -319,13 +333,18 @@ export async function qualifyMacDistribution({
 
     const trust = trustResult(appPath, path.join(outRoot, dmg.name));
     const releaseTrustAccepted = trust.gatekeeperAccepted && trust.appStapled && trust.dmgStapled;
+    const handoffPlanPath = path.join(appPath, "Contents", "Resources", "preview-handoff.json");
+    const handoffPlan = identity === "preview"
+      ? await readFile(handoffPlanPath, "utf8").then(JSON.parse).catch((error) => { if (error.code === "ENOENT") return null; throw error; })
+      : null;
     // The App release executor calls this on sealed signed bytes before publish.
     // A failed real Squirrel replacement must stop that job, not create a bad release.
-    const prepublicationUpdate = requireReleaseTrust && !requirePublicFeed && releaseTrustAccepted
-      ? (identity === "stable"
+    const prepublicationUpdate = await qualifyPrepublicationUpdate({ handoffPlan, requireReleaseTrust, requirePublicFeed, releaseTrustAccepted,
+      previewUpgradeVmReceipt, previewVersion: machineVersion, previewZipSha256: await digest(path.join(outRoot, zip.name), "sha256", "hex"),
+      runLocalUpdater: async () => identity === "stable"
         ? await qualifyLocalUpdater({ baseAppPath: appPath, buildNextTarget: true, identity: "stable" })
-        : await qualifyPreviousSignedUpdate({ outRoot, targetVersion: machineVersion, targetSignature: signature, extractionRoot, fetchImpl }))
-      : null;
+        : await qualifyPreviousSignedUpdate({ outRoot, targetVersion: machineVersion, targetSignature: signature, extractionRoot, fetchImpl })
+    });
     let publicFeed = {
       schema: "opl_public_desktop_update_feed_qualification.v1",
       qualified: false,
