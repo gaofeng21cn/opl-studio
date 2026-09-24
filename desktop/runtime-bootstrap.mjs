@@ -12,6 +12,9 @@ const STANDARD_BOOTSTRAP_INSTALLER = "opl-install.sh";
 const INSTALL_MARKER = ".opl-studio-full-runtime-installed.json";
 const ACTIVE_RUNTIME_DIR = "current";
 const ACTIVE_RUNTIME_POINTER = "current.json";
+const OFFICIAL_PROFILE_INTENT = ".official-profile-first-install-intent.json";
+const OFFICIAL_PROFILE_ATTEMPT = ".official-profile-first-install-attempt.json";
+const OFFICIAL_PROFILE_COMPLETE = ".official-profile-first-install-complete";
 const SYSTEM_PATH_ENTRIES = process.platform === "win32"
   ? []
   : ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
@@ -290,6 +293,51 @@ function installedFrameworkIdentity(homeDir) {
   return readJsonRecord(path.join(root, ".opl-framework-installed-source-identity.json"));
 }
 
+function officialProfileStateDirectory(homeDir, env) {
+  if (env.OPL_STATE_DIR?.trim()) return path.resolve(env.OPL_STATE_DIR);
+  const data = env.OPL_DATA_DIR?.trim();
+  return data
+    ? path.join(path.resolve(data), "opl", "state")
+    : path.join(homeDir, "Library", "Application Support", "OPL", "state");
+}
+
+/**
+ * The Standard installer creates the Framework runtime before the packaged
+ * App can capture its first-install admission. Persist the admission before
+ * that installer runs so the runtime itself is not mistaken for an existing
+ * user installation on the first Stable launch.
+ */
+export function captureStableOfficialProfileIntent({ homeDir = os.homedir(), env = process.env, platform = process.platform } = {}) {
+  if (platform !== "darwin") return { status: "skipped", reason: "non_macos" };
+  const stateDir = officialProfileStateDirectory(homeDir, env);
+  const completePath = path.join(stateDir, OFFICIAL_PROFILE_COMPLETE);
+  const attemptPath = path.join(stateDir, OFFICIAL_PROFILE_ATTEMPT);
+  const intentPath = path.join(stateDir, OFFICIAL_PROFILE_INTENT);
+  if ([completePath, attemptPath, intentPath].some((file) => fs.existsSync(file))) {
+    return { status: "skipped", reason: "existing_official_profile_marker", stateDir };
+  }
+  const existingRuntime = [
+    path.join(homeDir, ".opl", "one-person-lab"),
+    path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current"),
+    path.join(homeDir, "Library", "Application Support", "opl-studio", "runtime", "current")
+  ].some((file) => fs.existsSync(file));
+  if (existingRuntime || fs.existsSync(stateDir)) {
+    return { status: "skipped", reason: "existing_owner_runtime_or_preferences", stateDir };
+  }
+  fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+  try {
+    fs.writeFileSync(intentPath, `${JSON.stringify({
+      schema: "opl_studio_official_profile_first_install_intent.v1",
+      intent: "first_install",
+      captured_before_runtime_bootstrap: true,
+      recorded_at: new Date().toISOString()
+    })}\n`, { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+  return { status: "captured", stateDir, intentPath };
+}
+
 function frameworkAtRef(homeDir, frameworkRef) {
   const identity = installedFrameworkIdentity(homeDir);
   return installedFrameworkEnvironment(homeDir, {}) !== null
@@ -400,6 +448,7 @@ export async function ensureStudioDesktopRuntime({
     || await supportsRuntimeActivation(installedFrameworkEnvironment(homeDir, env))
   );
   if (!existingManagedRuntime) {
+    if (identity === "stable") captureStableOfficialProfileIntent({ homeDir, env, platform });
     await runBootstrapInstaller(standard.installerPath, { ...env, HOME: homeDir });
   }
   const installedEnv = installedFrameworkEnvironment(homeDir, env);

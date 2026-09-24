@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { activateInstalledStudioRuntime, ensureStudioDesktopRuntime } from "./runtime-bootstrap.mjs";
+import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime } from "./runtime-bootstrap.mjs";
 
 function createPayload(root, overrides = {}) {
   const resourcesPath = path.join(root, "Resources");
@@ -225,6 +225,41 @@ chmod +x "$HOME/.local/bin/opl"
   assert.equal(result.source, "packaged_standard_bootstrap");
   assert.equal(result.version, frameworkRef);
   assert.equal(result.env.OPL_APP_OPL_BIN, path.join(homeDir, ".local", "bin", "opl"));
+});
+
+test("Stable macOS captures Official Profile intent before the Standard installer creates Framework state", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-stable-first-install-intent-test-"));
+  const homeDir = path.join(root, "home");
+  const frameworkRef = "f".repeat(40);
+  const installerBody = `#!/bin/bash
+set -euo pipefail
+mkdir -p "$HOME/.opl/one-person-lab" "$HOME/.local/bin"
+printf '{"name":"opl-framework"}\n' > "$HOME/.opl/one-person-lab/package.json"
+printf '{"schema":"opl_framework_installed_source_identity.v1","framework_sha":"${frameworkRef}","install_mode":"archive","identity_source":"install_ref"}\n' > "$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json"
+printf '#!/bin/sh\nexit 0\n' > "$HOME/.local/bin/opl"
+chmod +x "$HOME/.local/bin/opl"
+`;
+  const resourcesPath = createStandardBootstrap(root, { frameworkRef, installerBody });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin" },
+    platform: "darwin",
+    identity: "stable"
+  });
+
+  assert.equal(result.version, frameworkRef);
+  const intentPath = path.join(homeDir, "Library", "Application Support", "OPL", "state", ".official-profile-first-install-intent.json");
+  assert.deepEqual(JSON.parse(fs.readFileSync(intentPath, "utf8")), {
+    schema: "opl_studio_official_profile_first_install_intent.v1",
+    intent: "first_install",
+    captured_before_runtime_bootstrap: true,
+    recorded_at: JSON.parse(fs.readFileSync(intentPath, "utf8")).recorded_at
+  });
+  assert.equal(captureStableOfficialProfileIntent({ homeDir, env: {}, platform: "darwin" }).status, "skipped");
 });
 
 test("packaged Standard rejects installer byte drift before execution", async (t) => {
