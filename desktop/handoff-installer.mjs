@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import semver from 'semver';
 import { digest, privateJson, atomicJson, readPreviewHandoff, validateTarget, PUBLISHER_TEAM_ID, STABLE_BUNDLE_ID } from './preview-handoff.mjs';
 
 const run = (command, args) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], timeout: 120_000 });
-function plist(bundle, key) { return run('/usr/bin/plutil', ['-extract',key,'raw','-o','-',path.join(bundle,'Contents/Info.plist')]).trim(); }
 function preserveFailedBundle(bundle) {
   const preserved = `${bundle}.failed-${randomUUID()}`;
   fs.renameSync(bundle, preserved);
@@ -21,14 +20,23 @@ export function ensureVerifiedStaging({ source, staged, version, verify = verify
   verify(staged,{ exactVersion:version });
   return staged;
 }
-export function verifyApp(bundle, { minimumVersion, exactVersion, requireStaple = true } = {}) {
-  run('/usr/bin/codesign', ['--verify','--deep','--strict',bundle]);
+export function verifyApp(bundle, { minimumVersion, exactVersion, requireNotarization = true, execute = spawnSync } = {}) {
+  const command = (executable, args) => {
+    const result = execute(executable, args, { encoding:'utf8', stdio:['ignore','pipe','pipe'], timeout:120_000 });
+    if (result.error || result.status !== 0) throw new Error(`handoff_distribution_check_failed: ${path.basename(executable)}`);
+    return result;
+  };
+  command('/usr/bin/codesign', ['--verify','--deep','--strict',bundle]);
   // A designated requirement binds both bundle and publisher, not just an optional team string.
-  run('/usr/bin/codesign', ['--verify','-R',`identifier "${STABLE_BUNDLE_ID}" and anchor apple generic and certificate leaf[subject.OU] = "${PUBLISHER_TEAM_ID}"`,bundle]);
-  if (requireStaple) run('/usr/bin/xcrun', ['stapler','validate',bundle]);
-  run('/usr/sbin/spctl', ['--assess','--type','execute',bundle]);
-  const version = plist(bundle,'CFBundleShortVersionString');
-  if (plist(bundle,'CFBundleIdentifier') !== STABLE_BUNDLE_ID || !semver.valid(version)
+  command('/usr/bin/codesign', ['--verify','-R',`identifier "${STABLE_BUNDLE_ID}" and anchor apple generic and certificate leaf[subject.OU] = "${PUBLISHER_TEAM_ID}"`,bundle]);
+  // Gatekeeper is present on customer Macs; stapler requires developer tools.
+  // Capture its verbose assessment (written to stderr) and require Apple's
+  // notarization verdict for new target bytes. CI separately verifies stapling.
+  const assessment = command('/usr/sbin/spctl', ['--assess','--type','execute','--verbose=2',bundle]);
+  if (requireNotarization && !/^source=Notarized Developer ID\s*$/m.test(`${assessment.stdout ?? ''}\n${assessment.stderr ?? ''}`)) throw new Error('handoff_notarization_not_verified');
+  const value = key => command('/usr/bin/plutil', ['-extract',key,'raw','-o','-',path.join(bundle,'Contents/Info.plist')]).stdout.trim();
+  const version = value('CFBundleShortVersionString');
+  if (value('CFBundleIdentifier') !== STABLE_BUNDLE_ID || !semver.valid(version)
     || (exactVersion && version !== exactVersion) || (minimumVersion && semver.lt(version,minimumVersion))) throw new Error('handoff_bundle_identity_mismatch');
   return { version, bundleId: STABLE_BUNDLE_ID, teamId: PUBLISHER_TEAM_ID };
 }
@@ -57,7 +65,6 @@ export async function prepareTarget({ target, transactionRoot, fetchImpl = fetch
     fs.renameSync(tmp,dmg);
   }
   run('/usr/bin/hdiutil',['verify',dmg]);
-  run('/usr/bin/xcrun',['stapler','validate',dmg]);
   const mount = path.join(transactionRoot,'mount');
   fs.mkdirSync(mount,{ recursive:true });
   run('/usr/bin/hdiutil',['attach','-readonly','-nobrowse','-mountpoint',mount,dmg]);
@@ -94,11 +101,11 @@ export function commitPreparedTarget({ transactionRoot, selfBundle, targetUserDa
   // An existing newer valid stable target must never be downgraded.
   let existing;
   if (fs.existsSync(targetApp)) {
-    try { existing = verify(targetApp, { requireStaple:false }); }
+    try { existing = verify(targetApp, { requireNotarization:false }); }
     catch {
       // Only a prior owned, journaled replacement may recover from its retained backup.
       if (!hadJournal || journal.stage !== 'prepared' || !fs.existsSync(journal.backup)) throw new Error('handoff_existing_target_untrusted');
-      const backupIdentity = verify(journal.backup,{ requireStaple:false });
+      const backupIdentity = verify(journal.backup,{ requireNotarization:false });
       preserveFailedBundle(targetApp);
       fs.renameSync(journal.backup,targetApp);
       existing = backupIdentity;
@@ -121,7 +128,7 @@ export function commitPreparedTarget({ transactionRoot, selfBundle, targetUserDa
       throw error;
     }
   }
-  journal = { ...journal, stage:'installed', version:verify(targetApp,{ minimumVersion:target.version, requireStaple: !existing || semver.lt(existing.version,target.version) }).version };
+  journal = { ...journal, stage:'installed', version:verify(targetApp,{ minimumVersion:target.version, requireNotarization: !existing || semver.lt(existing.version,target.version) }).version };
   atomicJson(receiptPath,journal);
   atomicJson(path.join(targetUserDataRoot,'handoff','incoming.json'),handoff);
   return { appPath:targetApp, version:journal.version, digest:handoff.digest };
