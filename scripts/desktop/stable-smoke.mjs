@@ -81,14 +81,27 @@ export async function runFrameworkReadiness({ evaluate, expectedRootPackageIds =
 export async function runStableSmoke(context) {
   invariant(!context.turnRequest && !context.options?.requireCodexTurn && !context.options?.codexTurnPrompt && !context.options?.codexTurnHookFile,
     "Stable clean VM qualification forbids model generation and turn hooks");
+  const phaseTimeoutMs = Math.min(
+    Number.isFinite(context.options?.phaseTimeoutMs) && context.options.phaseTimeoutMs > 0 ? context.options.phaseTimeoutMs : 120_000,
+    context.options?.timeoutMs ?? 120_000
+  );
+  const progress = typeof context.progress === "function" ? context.progress : () => {};
+  const evaluatePhase = (expression) => context.evaluate(expression, phaseTimeoutMs);
+  const options = { ...context.options, ...STABLE_PRODUCT, requireGatewaySetup: true, requireCodexTurn: false, phaseTimeoutMs, progress };
+  progress({ phase: "stable-smoke", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
   invariant(context.credentials, "Stable clean VM qualification requires the dedicated Gateway account");
-  const options = { ...context.options, ...STABLE_PRODUCT, requireGatewaySetup: true, requireCodexTurn: false };
-  const preview = await runPreviewSmoke({ ...context, options, turnRequest: null });
+  const preview = await runPreviewSmoke({ ...context, evaluate: evaluatePhase, options, turnRequest: null });
   const checks = { ...preview.checks };
   if (preview.status === "passed") {
-    checks.codexReadiness = await runCodexReadiness(context);
-    checks.frameworkReadiness = await runFrameworkReadiness({ ...context, expectedRootPackageIds: options.expectedRootPackageIds, timeoutMs: options.timeoutMs });
-    checks.runtimeRefresh = await runRuntimeRefresh({ ...context, timeoutMs: options.timeoutMs });
+    progress({ phase: "codex-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
+    checks.codexReadiness = await runCodexReadiness({ evaluate: evaluatePhase });
+    progress({ phase: "codex-readiness", status: checks.codexReadiness.status, at: new Date().toISOString() });
+    progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
+    checks.frameworkReadiness = await runFrameworkReadiness({ evaluate: evaluatePhase, expectedRootPackageIds: options.expectedRootPackageIds, timeoutMs: phaseTimeoutMs });
+    progress({ phase: "framework-readiness", status: checks.frameworkReadiness.status, at: new Date().toISOString(), missing: checks.frameworkReadiness.missingRootPackageIds });
+    progress({ phase: "runtime-refresh", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
+    checks.runtimeRefresh = await runRuntimeRefresh({ evaluate: evaluatePhase, timeoutMs: phaseTimeoutMs });
+    progress({ phase: "runtime-refresh", status: checks.runtimeRefresh.status, at: new Date().toISOString() });
   }
   const status = preview.status === "passed" && checks.codexReadiness?.status === "passed" && checks.frameworkReadiness?.status === "passed" && checks.runtimeRefresh?.status === "passed" ? "passed" : "failed";
   return {

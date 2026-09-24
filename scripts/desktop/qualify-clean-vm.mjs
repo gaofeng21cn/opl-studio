@@ -228,6 +228,17 @@ export async function qualifyCleanVm(options) {
   let tunnel;
   let ip = null;
   let smokeInputs = { credentials: null, turnRequest: null };
+  const phaseTimeoutMs = Math.min(
+    Number.isFinite(options.phaseTimeoutMs) && options.phaseTimeoutMs > 0 ? options.phaseTimeoutMs : 120_000,
+    options.timeoutMs
+  );
+  const progressEvents = [];
+  const progress = (event) => {
+    const value = { ...event, at: event?.at ?? new Date().toISOString() };
+    progressEvents.push(value);
+    try { options.progress?.(value); } catch {}
+    process.stderr.write(`[opl-studio-clean-vm] ${JSON.stringify(value)}\n`);
+  };
   const checks = {
     codex: options.codexPlatformPackageTarball
       ? {
@@ -366,10 +377,13 @@ export async function qualifyCleanVm(options) {
         caBundle: trust ? guestCaBundle : null,
         allowActions: options.allowActions
       });
+      progress({ phase: "guest-launch", status: "started" });
       guestRun(options, ip, launch);
       tunnel = spawn("ssh", ["-N", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: "ignore" });
     }
+    progress({ phase: "page-ready", status: "started" });
     await waitForPageReady({ port: options.cdpPort, timeoutMs: 45_000 });
+    progress({ phase: "page-ready", status: "passed" });
     smokeInputs = await loadPreviewSmokeInputs(options);
     const identity = options.attach
       ? (options.appPath
@@ -387,8 +401,8 @@ export async function qualifyCleanVm(options) {
         app: guestApp
       };
     const smoke = await (options.runSmoke ?? runPreviewSmoke)({
-      evaluate: (expression) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs: options.timeoutMs }),
-      waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: options.timeoutMs }),
+      evaluate: (expression, timeoutMs = phaseTimeoutMs) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs }),
+      waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: phaseTimeoutMs }),
       options: {
         ...options,
         captureScreenshot: options.screenshotsDir
@@ -400,9 +414,11 @@ export async function qualifyCleanVm(options) {
       },
       credentials: smokeInputs.credentials,
       turnRequest: smokeInputs.turnRequest,
-      identity
+      identity,
+      progress
     });
     checks.smoke = smoke;
+    progress({ phase: "smoke", status: smoke.status, phaseTimeoutMs, blockers: smoke.blockers });
     checks.startup = smoke.checks.startup;
     checks.runtime = smoke.checks.runtime;
     if (options.frameworkSourceArchive && ip) {
@@ -425,6 +441,7 @@ export async function qualifyCleanVm(options) {
       reason: "clean_vm_harness_does_not_mutate_or_require_public_release"
     };
   } catch (error) {
+    progress({ phase: "clean-vm", status: "failed", error: redactSecrets(error instanceof Error ? error.message : String(error), [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password].filter(Boolean)) });
     const secretValues = [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password, smokeInputs?.turnRequest?.prompt].filter(Boolean);
     checks.failure = { detail: redactSecrets(error instanceof Error ? error.message : String(error), secretValues) };
     if (ip) checks.guestLog = redactSecrets(guestRun(options, ip, `tail -120 ${guestLog}`, { allowFailure: true }).stdout, secretValues);
@@ -444,6 +461,8 @@ export async function qualifyCleanVm(options) {
     carrier: options.carrier,
     package: { dmg: options.dmg, bundleIdentifier: bundleId, productName },
     checks,
+    phaseTimeoutMs,
+    progressEvents,
     cleanVmReady: false,
     releaseReady: false,
     activeShellAdopted: false,

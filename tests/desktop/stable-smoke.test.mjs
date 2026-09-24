@@ -20,6 +20,18 @@ test("Stable VM rejects every generative probe before invoking the renderer", as
   }
 });
 
+test("Stable smoke forwards a bounded phase timeout and emits readiness progress", async () => {
+  const events = [];
+  const context = {
+    credentials: null,
+    options: { timeoutMs: 10_000, phaseTimeoutMs: 25 },
+    progress: (event) => events.push(event),
+    evaluate: async (_expression, timeoutMs) => { assert.equal(timeoutMs, 25); return {}; }
+  };
+  await assert.rejects(runStableSmoke(context), /dedicated Gateway account/);
+  assert.ok(events.some((event) => event.phase === "stable-smoke" && event.status === "started"));
+});
+
 test("Framework readiness requires owner-projected installed Official Profile roots", async () => {
   const readback = { initializeExitCode: 0, stateExitCode: 0, launchReady: true, packageDirectoryPresent: true, packages: [{ id: "mas", present: true, installed: true }] };
   assert.equal((await runFrameworkReadiness({ evaluate: async () => readback, expectedRootPackageIds: ["mas"] })).status, "passed");

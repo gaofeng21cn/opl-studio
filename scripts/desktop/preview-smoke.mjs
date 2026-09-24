@@ -441,17 +441,30 @@ export async function runPreviewSmoke({
     requireGatewaySetup: options.requireGatewaySetup === true,
     requireCodexTurn: options.requireCodexTurn === true
   };
+  const phaseTimeoutMs = Math.min(
+    Number.isFinite(options.phaseTimeoutMs) && options.phaseTimeoutMs > 0 ? options.phaseTimeoutMs : 120_000,
+    smokeOptions.timeoutMs
+  );
+  const phaseEvents = [];
+  const progress = typeof options.progress === "function" ? options.progress : () => {};
+  const phaseEvaluate = (expression) => evaluate(expression, phaseTimeoutMs);
+  const markPhase = (name, status, detail = {}) => {
+    const event = { phase: name, status, at: new Date().toISOString(), ...detail };
+    phaseEvents.push(event);
+    try { progress(event); } catch {}
+  };
   const secretValues = [credentials?.email, credentials?.password, turnRequest?.prompt].filter(Boolean);
   const checks = { identity: identity ?? { status: "unavailable", reason: "carrier_did_not_supply_identity" } };
   try {
-    const ready = typeof waitForReady === "function" ? await waitForReady() : await evaluate("({readyState:document.readyState,root:!!document.getElementById('root'),bridge:!!window.oplStudio})");
+    markPhase("startup", "started", { timeoutMs: phaseTimeoutMs });
+    const ready = typeof waitForReady === "function" ? await waitForReady() : await phaseEvaluate("({readyState:document.readyState,root:!!document.getElementById('root'),bridge:!!window.oplStudio})");
     checks.startup = {
       status: ready?.readyState === "complete" && ready?.root === true && ready?.bridge === true ? "passed" : "partial",
       readyState: ready?.readyState ?? null,
       root: ready?.root === true,
       bridge: ready?.bridge === true
     };
-    const initial = await evaluate(`(async()=>{const state=await window.oplStudio.readState("fast"); const startupErrors=(document.body?.innerText||"").split(/\\n+/).map((line)=>line.trim()).filter((line)=>/无法连接|AppServerTransportError|spawn (?:codex|opl) ENOENT|Error invoking remote method/.test(line)).slice(0,8); return {state,bridgeKeys:Object.keys(window.oplStudio).sort(),startupErrors};})()`);
+    const initial = await phaseEvaluate(`(async()=>{const state=await window.oplStudio.readState("fast"); const startupErrors=(document.body?.innerText||"").split(/\\n+/).map((line)=>line.trim()).filter((line)=>/无法连接|AppServerTransportError|spawn (?:codex|opl) ENOENT|Error invoking remote method/.test(line)).slice(0,8); return {state,bridgeKeys:Object.keys(window.oplStudio).sort(),startupErrors};})()`);
     checks.startup.appServerErrors = Array.isArray(initial?.startupErrors)
       ? initial.startupErrors.map((error) => redactSecrets(error, secretValues))
       : [];
@@ -459,24 +472,34 @@ export async function runPreviewSmoke({
       status: initial?.bridgeKeys?.includes("readState") && initial?.bridgeKeys?.includes("sendMessage") ? "passed" : "partial",
       methods: Array.isArray(initial?.bridgeKeys) ? initial.bridgeKeys.filter((key) => ["readState", "sendMessage", "loginGatewayAccount", "readNativeAppUpdateStatus"].includes(key)) : []
     };
+    markPhase("startup", checks.startup.status, { bridge: checks.bridge.status });
     checks.runtime = {};
     for (const profile of smokeOptions.runtimeProfiles.map(normalizeRuntimeProfile)) {
+      markPhase(`runtime:${profile}`, "started", { timeoutMs: phaseTimeoutMs });
       const bridgeProfile = profileBridgeValue(profile);
-      const state = await evaluate(`window.oplStudio.readState(${JSON.stringify(bridgeProfile)})`);
+      const state = await phaseEvaluate(`window.oplStudio.readState(${JSON.stringify(bridgeProfile)})`);
       checks.runtime[profile] = {
         ...readbackSummary(state, secretValues),
         bridgeProfile,
         status: state?.readback?.exitCode === 0 || state?.readback?.status === 0 ? "passed" : "partial"
       };
+      markPhase(`runtime:${profile}`, checks.runtime[profile].status, { exitCode: checks.runtime[profile].exitCode, timedOut: checks.runtime[profile].timedOut });
     }
+    markPhase("ui", "started", { timeoutMs: phaseTimeoutMs });
     checks.ui = await runUiInteractions({
-      evaluate,
+      evaluate: phaseEvaluate,
       capture: options.captureScreenshot,
-      timeoutMs: smokeOptions.timeoutMs
+      timeoutMs: phaseTimeoutMs
     });
-    checks.gateway = await runGatewayHook({ evaluate, credentials, timeoutMs: smokeOptions.timeoutMs });
-    checks.codexTurn = await runCodexTurnHook({ evaluate, request: turnRequest, secretValues });
+    markPhase("ui", checks.ui?.root && checks.ui?.runtime?.panel ? "passed" : "failed", { runtimePanel: checks.ui?.runtime?.panel === true });
+    markPhase("gateway", "started", { timeoutMs: phaseTimeoutMs, credentials: Boolean(credentials) });
+    checks.gateway = await runGatewayHook({ evaluate: phaseEvaluate, credentials, timeoutMs: phaseTimeoutMs });
+    markPhase("gateway", checks.gateway.status, { errorCode: checks.gateway.errorCode ?? null, modelAccessSource: checks.gateway.projection?.modelAccessSource ?? null });
+    markPhase("codex", "started", { timeoutMs: phaseTimeoutMs, generation: false });
+    checks.codexTurn = await runCodexTurnHook({ evaluate: phaseEvaluate, request: turnRequest, secretValues });
+    markPhase("codex", checks.codexTurn.status, { generation: false });
   } catch (error) {
+    markPhase("smoke", "failed", { error: sanitizeError(error, secretValues) });
     checks.failure = { detail: sanitizeError(error, secretValues) };
   }
   const requiredRuntimePassed = smokeOptions.runtimeProfiles.every((profile) => checks.runtime?.[normalizeRuntimeProfile(profile)]?.status === "passed");
@@ -509,6 +532,8 @@ export async function runPreviewSmoke({
     carrier: smokeOptions.carrier,
     package: { productName: smokeOptions.productName, bundleId: smokeOptions.bundleId },
     checks,
+    phaseTimeoutMs,
+    phaseEvents,
     hooks: {
       gatewaySetup: checks.gateway?.status ?? "unavailable",
       codexTurn: checks.codexTurn?.status ?? "unavailable"

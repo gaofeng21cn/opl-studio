@@ -82,6 +82,26 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.ok(evaluated.some((expression) => expression.includes('waitForGone')));
 });
 
+test("Preview smoke bounds every phase and records progress when a bridge read stalls", async () => {
+  const progress = [];
+  const receipt = await runPreviewSmoke({
+    identity: { status: "passed" },
+    options: { runtimeProfiles: ["standard"], timeoutMs: 10_000, phaseTimeoutMs: 25, progress: (event) => progress.push(event) },
+    waitForReady: async () => ({ readyState: "complete", root: true, bridge: true }),
+    evaluate: async (expression, timeoutMs) => {
+      assert.equal(timeoutMs, 25);
+      if (expression.includes("Object.keys(window.oplStudio)")) {
+        return { bridgeKeys: ["readState", "sendMessage"], startupErrors: [] };
+      }
+      throw new Error("readState phase stalled");
+    }
+  });
+  assert.equal(receipt.status, "partial");
+  assert.equal(receipt.phaseTimeoutMs, 25);
+  assert.ok(progress.some((event) => event.phase === "runtime:standard" && event.status === "started"));
+  assert.equal(receipt.checks.failure.detail, "readState phase stalled");
+});
+
 test("Preview smoke never serializes supplied secrets into diagnostics", async () => {
   const secretValues = ["user@example.com", "password-value", "prompt-value"];
   assert.equal(redactSecrets("password-value and prompt-value", secretValues), "[REDACTED] and [REDACTED]");
