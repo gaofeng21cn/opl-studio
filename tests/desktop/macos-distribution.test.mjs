@@ -46,13 +46,14 @@ test("Studio afterPack writes the dedicated GitHub updater identity", () => {
   );
 });
 
-test("Studio afterPack writes app-update.yml inside the single packaged app", async () => {
+test("afterPack writes app-update.yml inside the single packaged app", async () => {
   const appOutDir = await mkdtemp(path.join(os.tmpdir(), "opl-app-update-hook-test-"));
   const appDir = path.join(appOutDir, "One Person Lab Preview.app");
   await mkdir(path.join(appDir, "Contents"), { recursive: true });
 
   const outputPath = writeAppUpdateConfig({
     appOutDir,
+    platform: "darwin",
     builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
   });
 
@@ -62,11 +63,12 @@ test("Studio afterPack writes app-update.yml inside the single packaged app", as
   assert.equal(existsSync(path.join(appOutDir, "Contents", "Resources", "app-update.yml")), false);
 });
 
-test("Studio afterPack rejects missing or ambiguous packaged apps", async () => {
+test("afterPack rejects missing or ambiguous packaged apps", async () => {
   const emptyOutDir = await mkdtemp(path.join(os.tmpdir(), "opl-app-update-hook-empty-"));
   assert.throws(
     () => writeAppUpdateConfig({
       appOutDir: emptyOutDir,
+      platform: "darwin",
       builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
     }),
     /exactly one top-level \.app/
@@ -78,6 +80,7 @@ test("Studio afterPack rejects missing or ambiguous packaged apps", async () => 
   assert.throws(
     () => writeAppUpdateConfig({
       appOutDir: ambiguousOutDir,
+      platform: "darwin",
       builderConfig: { publish: { provider: "github", owner: "gaofeng21cn", repo: "opl-studio" } }
     }),
     /exactly one top-level \.app/
