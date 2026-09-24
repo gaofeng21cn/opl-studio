@@ -57,7 +57,7 @@ test("Framework readiness reuses the Standard runtime projection without a secon
   assert.equal(result.status, "passed");
 });
 
-test("Framework readiness refreshes a background Official Profile projection once", async () => {
+test("Framework readiness waits for background Official Profile installation", async () => {
   const incomplete = {
     initializeExitCode: 0,
     stateExitCode: 0,
@@ -77,11 +77,16 @@ test("Framework readiness refreshes a background Official Profile projection onc
   const result = await runFrameworkReadiness({
     projection: incomplete,
     expectedRootPackageIds: ["mas"],
-    evaluate: async () => { reads += 1; return completeState; }
+    timeoutMs: 1500,
+    evaluate: async () => { reads += 1; return reads === 1 ? { readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } } : completeState; }
   });
-  assert.equal(reads, 1);
+  assert.equal(reads, 2);
   assert.equal(result.status, "passed");
   assert.deepEqual(result.missingRootPackageIds, []);
+
+  const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], timeoutMs: 0, evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } }) });
+  assert.equal(missing.status, "failed");
+  assert.deepEqual(missing.missingRootPackageIds, ["mas"]);
 });
 
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {
