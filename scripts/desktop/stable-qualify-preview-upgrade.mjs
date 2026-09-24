@@ -154,7 +154,10 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
     const credentials = { email: fs.readFileSync(options.emailFile, "utf8").trim(), password: fs.readFileSync(options.passwordFile, "utf8") };
     const port = 19349;
     const receipt = await qualifyUpgradeVm({ vm, route: "preview", user: options.user, sshKey: options.sshKey, cdpPort: port, timeoutMs: 900_000, networkMode: "controlled_exact_candidate", targetVersion: target.version, previewTargetVersion: candidate.checkpoint.source.version, launchEnvironment, out: path.join(artifactRoot, "upgrade.json"), verifyTarget: async () => {
-      const smoke = await runStableSmoke({ evaluate: (expression) => evaluatePageStable({ port, expression, timeoutMs: 240_000 }), waitForReady: () => waitForPageReady({ port, timeoutMs: 120_000 }), credentials, turnRequest: null, identity: { status: "passed" }, options: { carrier: "macos-dmg", runtimeProfiles: ["standard"], timeoutMs: 180_000, expectedRootPackageIds: [] } });
+      const productProfile = json(options.productProfile);
+      const expectedRootPackageIds = productProfile.official_profile?.desired_root_package_ids;
+      invariant(Array.isArray(expectedRootPackageIds) && expectedRootPackageIds.length > 0, "App-owned Official Profile roots are missing");
+      const smoke = await runStableSmoke({ evaluate: (expression) => evaluatePageStable({ port, expression, timeoutMs: 240_000 }), waitForReady: () => waitForPageReady({ port, timeoutMs: 120_000 }), credentials, turnRequest: null, identity: { status: "passed" }, options: { carrier: "macos-dmg", runtimeProfiles: ["standard"], timeoutMs: 180_000, expectedRootPackageIds } });
       writeJson(path.join(artifactRoot, "target-smoke.json"), smoke); validateStableRuntimeEvidence(smoke);
       const readGuestJson = (relative) => JSON.parse(guest(`cat "$HOME/Library/Application Support/${relative}"`).stdout);
       const incoming = readGuestJson("One Person Lab/handoff/incoming.json");
@@ -186,7 +189,7 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
 }
 
 export function parsePreviewUpgradeArgs(argv) {
-  const keys = { "--checkpoint-root": "checkpointRoot", "--checkpoint-sha256": "checkpointSha256", "--source-vm": "sourceVm", "--guest-user": "user", "--ssh-key": "sshKey", "--artifacts": "artifacts", "--framework-source-archive": "frameworkArchive", "--framework-ref": "frameworkRef", "--codex-platform-package-tarball": "codexTarball", "--codex-version": "codexVersion", "--gateway-account-email-file": "emailFile", "--gateway-account-password-file": "passwordFile" };
+  const keys = { "--checkpoint-root": "checkpointRoot", "--checkpoint-sha256": "checkpointSha256", "--source-vm": "sourceVm", "--guest-user": "user", "--ssh-key": "sshKey", "--artifacts": "artifacts", "--framework-source-archive": "frameworkArchive", "--framework-ref": "frameworkRef", "--codex-platform-package-tarball": "codexTarball", "--codex-version": "codexVersion", "--gateway-account-email-file": "emailFile", "--gateway-account-password-file": "passwordFile", "--product-profile": "productProfile" };
   const options = { user: "admin", sshKey: path.join(os.homedir(), ".ssh/opl_first_run_tart_ed25519") };
   for (let index = 0; index < argv.length; index++) { invariant(keys[argv[index]] && argv[index + 1], `Invalid argument ${argv[index]}`); options[keys[argv[index]]] = argv[++index]; }
   for (const key of Object.values(keys)) invariant(options[key], `Missing Preview qualification input: ${key}`);
