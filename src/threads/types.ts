@@ -41,10 +41,11 @@ export type ThreadListRequest = {
 };
 
 export type AionMigrationSummary = {
-  schema: "opl_studio_aion_migration.v1";
+  schema: "opl_studio_shell_migration.v2" | "opl_studio_aion_migration.v1";
   complete: boolean;
   entries: Array<{ sourceConversationId: string; threadId: string; workspace?: string; pinned: boolean; pinnedAt?: number; sortOrder?: number }>;
   ui: Array<{ key: string; value: unknown }>;
+  sourceInventory?: Array<{ id: string; kind: string; path: string; status: string; conversationCount?: number }>;
   diagnostics: Array<{ code: string }>;
 };
 export type ThreadListResult = { data: CodexThread[]; nextCursor: null; migration?: AionMigrationSummary };
