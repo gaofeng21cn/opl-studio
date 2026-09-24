@@ -93,7 +93,8 @@ async function qualifyBaseline(options, candidate, tag, transient) {
     const guestNode = `env ELECTRON_RUN_AS_NODE=1 ${quote(executable)}`;
     guest("mkdir -p /tmp/opl-upgrade-assets /tmp/opl-upgrade-codex");
     for (const item of candidate.assets) copy(item.file, `/tmp/opl-upgrade-assets/${item.name}`);
-    const fixture = { schema: "opl_studio_upgrade_network_fixture.v1", created_at: new Date().toISOString(), releases: [{ repository, tag: candidate.identity.release.tag, assets: candidate.assets.map(({ name: assetName, size, sha256 }) => ({ name: assetName, size, sha256, path: `/tmp/opl-upgrade-assets/${assetName}` })) }] };
+    const fixtureAssets = candidate.assets.filter((item) => !item.name.endsWith(".blockmap") || item.name.includes(candidate.identity.release.version));
+    const fixture = { schema: "opl_studio_upgrade_network_fixture.v1", created_at: new Date().toISOString(), releases: [{ repository, tag: candidate.identity.release.tag, assets: fixtureAssets.map(({ name: assetName, size, sha256 }) => ({ name: assetName, size, sha256, path: `/tmp/opl-upgrade-assets/${assetName}` })) }] };
     const fixturePath = path.join(baselineRoot, "network-manifest.json"); writeJson(fixturePath, fixture);
     copy(fixturePath, "/tmp/opl-upgrade-network.json");
     copy(path.join(path.dirname(fileURLToPath(import.meta.url)), "stable-upgrade-network.mjs"), "/tmp/stable-upgrade-network.mjs");
