@@ -90,15 +90,20 @@ export async function runStableSmoke(context) {
   const options = { ...context.options, ...STABLE_PRODUCT, requireGatewaySetup: true, requireCodexTurn: false, phaseTimeoutMs, progress };
   progress({ phase: "stable-smoke", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
   invariant(context.credentials, "Stable clean VM qualification requires the dedicated Gateway account");
+  // Read the Framework projection before the Gateway mutation. The Gateway
+  // model-access action can restart the Host transport; validating readiness
+  // first keeps the two owner readbacks independent and leaves a bounded
+  // diagnostic if either transport is unhealthy.
+  progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
+  const frameworkReadiness = await runFrameworkReadiness({ evaluate: evaluatePhase, expectedRootPackageIds: context.options?.expectedRootPackageIds, timeoutMs: phaseTimeoutMs });
+  progress({ phase: "framework-readiness", status: frameworkReadiness.status, at: new Date().toISOString(), missing: frameworkReadiness.missingRootPackageIds });
   const preview = await runPreviewSmoke({ ...context, evaluate: evaluatePhase, options, turnRequest: null });
   const checks = { ...preview.checks };
+  checks.frameworkReadiness = frameworkReadiness;
   if (preview.status === "passed") {
     progress({ phase: "codex-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
     checks.codexReadiness = await runCodexReadiness({ evaluate: evaluatePhase });
     progress({ phase: "codex-readiness", status: checks.codexReadiness.status, at: new Date().toISOString() });
-    progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
-    checks.frameworkReadiness = await runFrameworkReadiness({ evaluate: evaluatePhase, expectedRootPackageIds: options.expectedRootPackageIds, timeoutMs: phaseTimeoutMs });
-    progress({ phase: "framework-readiness", status: checks.frameworkReadiness.status, at: new Date().toISOString(), missing: checks.frameworkReadiness.missingRootPackageIds });
     progress({ phase: "runtime-refresh", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
     checks.runtimeRefresh = await runRuntimeRefresh({ evaluate: evaluatePhase, timeoutMs: phaseTimeoutMs });
     progress({ phase: "runtime-refresh", status: checks.runtimeRefresh.status, at: new Date().toISOString() });
