@@ -8,7 +8,11 @@ import { qualifyUpgradeVm } from "./stable-upgrade-vm.mjs";
 import { runStableSmoke, validateStableRuntimeEvidence } from "./stable-smoke.mjs";
 import { evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 
-export const LEGACY_BASELINE_TAGS = Object.freeze(["v26.9.23", "v26.9.22"]);
+// v26.8.8 is the oldest retained public arm64 Stable with the legacy
+// latest-arm64 feed/check-on-start behavior; v26.9.23 is the immediate
+// predecessor. Earlier retained source tags do not have downloadable original
+// arm64 bytes in the public release and require a separate archived artifact.
+export const LEGACY_BASELINE_TAGS = Object.freeze(["v26.8.8", "v26.9.23"]);
 const repository = "gaofeng21cn/one-person-lab-app";
 const quote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 const digest = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
