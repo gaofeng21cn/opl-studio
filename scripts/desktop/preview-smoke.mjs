@@ -198,6 +198,35 @@ function readbackSummary(state, secretValues) {
   };
 }
 
+export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
+  const outer = state?.app_state ?? state;
+  const root = outer?.app_state ?? outer;
+  const packages = root?.agent_packages;
+  const entries = packages?.directory?.entries;
+  const result = {
+    initializeExitCode: state?.readback?.exitCode ?? state?.readback?.status ?? null,
+    stateExitCode: state?.readback?.exitCode ?? state?.readback?.status ?? null,
+    launchReady: root?.system_initialize?.setup_flow?.ready_to_launch === true
+      || state?.readback?.exitCode === 0
+      || state?.readback?.status === 0,
+    packageDirectoryPresent: Array.isArray(entries),
+    packageSource: packages?.source ?? null,
+    packages: Array.isArray(entries)
+      ? entries.map((entry) => ({
+        id: entry.package_id ?? null,
+        present: entry.installed === true || entry.presence?.present === true,
+        installed: entry.installed === true || entry.presence?.installed === true,
+        role: entry.package_role ?? null
+      }))
+      : []
+  };
+  return {
+    ...result,
+    expectedRootPackageIds,
+    missingRootPackageIds: expectedRootPackageIds.filter((id) => !result.packages.some((entry) => entry.id === id && entry.present && entry.installed))
+  };
+}
+
 async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   const uiTimeoutMs = Math.min(timeoutMs, 10_000);
   const result = await evaluate(`(async()=>{
@@ -437,6 +466,7 @@ export async function runPreviewSmoke({
     productName: options.productName || PREVIEW_PRODUCT.productName,
     bundleId: options.bundleId || PREVIEW_PRODUCT.bundleId,
     runtimeProfiles: options.runtimeProfiles?.length ? options.runtimeProfiles : DEFAULT_RUNTIME_PROFILES,
+    expectedRootPackageIds: Array.isArray(options.expectedRootPackageIds) ? options.expectedRootPackageIds : [],
     timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
     requireGatewaySetup: options.requireGatewaySetup === true,
     requireCodexTurn: options.requireCodexTurn === true
@@ -464,7 +494,7 @@ export async function runPreviewSmoke({
       root: ready?.root === true,
       bridge: ready?.bridge === true
     };
-    const initial = await phaseEvaluate(`(async()=>{const state=await window.oplStudio.readState("fast"); const startupErrors=(document.body?.innerText||"").split(/\\n+/).map((line)=>line.trim()).filter((line)=>/无法连接|AppServerTransportError|spawn (?:codex|opl) ENOENT|Error invoking remote method/.test(line)).slice(0,8); return {state,bridgeKeys:Object.keys(window.oplStudio).sort(),startupErrors};})()`);
+    const initial = await phaseEvaluate(`(()=>{const startupErrors=(document.body?.innerText||"").split(/\\n+/).map((line)=>line.trim()).filter((line)=>/无法连接|AppServerTransportError|spawn (?:codex|opl) ENOENT|Error invoking remote method/.test(line)).slice(0,8); return {bridgeKeys:Object.keys(window.oplStudio).sort(),startupErrors};})()`);
     checks.startup.appServerErrors = Array.isArray(initial?.startupErrors)
       ? initial.startupErrors.map((error) => redactSecrets(error, secretValues))
       : [];
@@ -481,6 +511,7 @@ export async function runPreviewSmoke({
       checks.runtime[profile] = {
         ...readbackSummary(state, secretValues),
         bridgeProfile,
+        frameworkProjection: profile === "standard" ? projectFrameworkReadiness(state, smokeOptions.expectedRootPackageIds ?? []) : null,
         status: state?.readback?.exitCode === 0 || state?.readback?.status === 0 ? "passed" : "partial"
       };
       markPhase(`runtime:${profile}`, checks.runtime[profile].status, { exitCode: checks.runtime[profile].exitCode, timedOut: checks.runtime[profile].timedOut });

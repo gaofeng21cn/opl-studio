@@ -41,6 +41,22 @@ test("Framework readiness requires owner-projected installed Official Profile ro
   assert.equal((await runFrameworkReadiness({ evaluate: async () => ({ ...readback, launchReady: false }), expectedRootPackageIds: ["mas"] })).status, "failed");
 });
 
+test("Framework readiness reuses the Standard runtime projection without a second bridge read", async () => {
+  const projection = {
+    initializeExitCode: 0,
+    stateExitCode: 0,
+    launchReady: true,
+    packageDirectoryPresent: true,
+    packages: [{ id: "mas", present: true, installed: true }]
+  };
+  const result = await runFrameworkReadiness({
+    projection,
+    expectedRootPackageIds: ["mas"],
+    evaluate: async () => { throw new Error("duplicate Framework bridge read"); }
+  });
+  assert.equal(result.status, "passed");
+});
+
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {
   let expression;
   const receipt = await runCodexReadiness({ evaluate: async (value) => { expression = value; return { modelListValid: true, threadListValid: true, modelCount: 0, simulated: false }; } });

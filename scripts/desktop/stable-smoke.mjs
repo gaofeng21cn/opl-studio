@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runPreviewSmoke } from "./preview-smoke.mjs";
+import { projectFrameworkReadiness, runPreviewSmoke } from "./preview-smoke.mjs";
 
 export const STABLE_PRODUCT = Object.freeze({ productName: "One Person Lab", bundleId: "cn.onepersonlab.opl" });
 
@@ -47,7 +47,20 @@ export async function runRuntimeRefresh({ evaluate, timeoutMs }) {
   return { ...result, status: result?.panelReady === true && result?.buttonReadyBefore === true && result?.clicked === true && result?.busyObserved === true && result?.buttonReadyAfter === true && result?.errorVisible === false ? "passed" : "failed" };
 }
 
-export async function runFrameworkReadiness({ evaluate, expectedRootPackageIds = [], timeoutMs = 120_000 }) {
+export async function runFrameworkReadiness({ evaluate, projection = null, expectedRootPackageIds = [], timeoutMs = 120_000 }) {
+  if (projection) {
+    const missing = expectedRootPackageIds.filter((id) => !projection.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
+    return {
+      ...projection,
+      expectedRootPackageIds,
+      missingRootPackageIds: missing,
+      status: projection.initializeExitCode === 0
+        && projection.stateExitCode === 0
+        && projection.launchReady === true
+        && projection.packageDirectoryPresent === true
+        && missing.length === 0 ? "passed" : "failed"
+    };
+  }
   const result = await evaluate(`(async()=>{
     const expected=${JSON.stringify(expectedRootPackageIds)};
     const deadline=Date.now()+${Number(timeoutMs)};
@@ -93,14 +106,15 @@ export async function runStableSmoke(context) {
   const options = { ...context.options, ...STABLE_PRODUCT, requireGatewaySetup: true, requireCodexTurn: false, phaseTimeoutMs, progress };
   progress({ phase: "stable-smoke", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
   invariant(context.credentials, "Stable clean VM qualification requires the dedicated Gateway account");
-  // Read the Framework projection before the Gateway mutation. The Gateway
-  // model-access action can restart the Host transport; validating readiness
-  // first keeps the two owner readbacks independent and leaves a bounded
-  // diagnostic if either transport is unhealthy.
-  progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
-  const frameworkReadiness = await runFrameworkReadiness({ evaluate: evaluatePhase, expectedRootPackageIds: context.options?.expectedRootPackageIds, timeoutMs: phaseTimeoutMs });
-  progress({ phase: "framework-readiness", status: frameworkReadiness.status, at: new Date().toISOString(), missing: frameworkReadiness.missingRootPackageIds });
   const preview = await runPreviewSmoke({ ...context, evaluate: evaluatePhase, options, turnRequest: null });
+  progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs });
+  const frameworkReadiness = await runFrameworkReadiness({
+    evaluate: evaluatePhase,
+    projection: preview.checks.runtime?.standard?.frameworkProjection,
+    expectedRootPackageIds: context.options?.expectedRootPackageIds,
+    timeoutMs: phaseTimeoutMs
+  });
+  progress({ phase: "framework-readiness", status: frameworkReadiness.status, at: new Date().toISOString(), missing: frameworkReadiness.missingRootPackageIds });
   const checks = { ...preview.checks };
   checks.frameworkReadiness = frameworkReadiness;
   if (preview.status === "passed") {
