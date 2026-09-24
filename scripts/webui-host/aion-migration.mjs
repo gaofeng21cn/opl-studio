@@ -5,7 +5,7 @@ import path from "node:path";
 import { readAionMigrationSnapshot } from "./aion-migration-source.mjs";
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
 
-const SCHEMA = "opl_studio_aion_migration.v1";
+const SCHEMA = "opl_studio_shell_migration.v2";
 const keyFor = (conversation) => createHash("sha256").update(JSON.stringify([conversation.sourceUserId, conversation.id])).digest("hex");
 
 function messageText(value) {
@@ -44,7 +44,7 @@ export class AionMigration {
       ?? path.join(env.OPL_DATA_DIR ?? env.HOME ?? os.homedir(), ".opl-studio", "aion-migration");
     this.file = path.join(this.directory, "index.json");
     this.snapshotReader = snapshotReader;
-    this.document = { schema: SCHEMA, entries: [], ui: [], diagnostics: [], complete: true };
+    this.document = { schema: SCHEMA, entries: [], ui: [], sourceInventory: [], diagnostics: [], complete: true };
     this.histories = new Map();
     this.ready = null;
     this.operation = Promise.resolve();
@@ -81,7 +81,9 @@ export class AionMigration {
     if (this.env.OPL_STUDIO_AION_MIGRATION === "0") return;
     try {
       const saved = JSON.parse(await readFile(this.file, "utf8"));
-      if (saved.schema !== SCHEMA || !Array.isArray(saved.entries)) throw new Error("invalid migration index");
+      if (![SCHEMA, "opl_studio_aion_migration.v1"].includes(saved.schema) || !Array.isArray(saved.entries)) throw new Error("invalid migration index");
+      saved.schema = SCHEMA;
+      saved.sourceInventory ??= [];
       this.document = saved;
     } catch (error) {
       if (error.code !== "ENOENT") {
@@ -96,6 +98,9 @@ export class AionMigration {
     }
     const snapshot = this.snapshotReader({ env: this.env, homeDir: this.env.HOME ?? os.homedir(), sourceUserId: this.env.OPL_AIONUI_USER_ID });
     if (snapshot.ui.length) this.document.ui = snapshot.ui;
+    this.document.sourceInventory = snapshot.sources.map(({ id, kind, path: sourcePath, status, conversationCount }) => ({
+      id, kind, path: sourcePath, status, conversationCount
+    }));
     this.document.diagnostics = [...this.document.diagnostics.filter((entry) => entry.code === "migration-history-unreadable"), ...snapshot.diagnostics];
     this.document.complete = snapshot.complete;
     for (const conversation of snapshot.conversations) {

@@ -283,6 +283,16 @@ async function createDesktopHost(appLogDirectory) {
   hostEnvironment.OPL_APP_VERSION ??= packageMetadata.oplReleaseVersion ?? app.getVersion();
   hostEnvironment.OPL_STUDIO_LOG_ROOT = app.getPath("logs");
   hostEnvironment.OPL_STUDIO_DATA_ROOT = app.getPath("userData");
+  // A canonical App launch imports both the legacy desktop store and the
+  // isolated Studio Preview store before the Codex Host exposes threads.
+  if (app.isPackaged && process.env.OPL_STUDIO_SHELL_MIGRATION !== "0") {
+    const sourceRoots = [
+      path.join(homeDir, "Library", "Application Support", "One Person Lab"),
+      path.join(homeDir, "Library", "Application Support", "opl-studio"),
+      path.join(homeDir, "Library", "Application Support", "One Person Lab Preview")
+    ];
+    hostEnvironment.OPL_SHELL_MIGRATION_SOURCE_DIRS = sourceRoots.join(path.delimiter);
+  }
   const hostOptions = {
     workspaceRoot: desktopCodexWorkspaceRoot(),
     env: hostEnvironment,

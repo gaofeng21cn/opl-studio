@@ -1926,7 +1926,7 @@ export function App({
       const activeProjects = active ? deriveThreadDirectory(active) : threadProjects;
       const archivedProjects = archived ? deriveThreadDirectory(archived) : archivedThreadProjects;
       const migration = active?.migration ?? archived?.migration;
-      if (migration?.schema === "opl_studio_aion_migration.v1") {
+      if (migration?.schema === "opl_studio_shell_migration.v2" || migration?.schema === "opl_studio_aion_migration.v1") {
         const visibleIds = new Set([...activeProjects, ...archivedProjects].flatMap((project) => project.threads.map((thread) => thread.id)));
         const imported = migration.entries.filter((entry) => visibleIds.has(entry.threadId) && !uiMetadata.aionMigratedThreadIds?.includes(entry.threadId));
         if (!sessionStorage()?.getItem(SETTINGS_STORAGE_KEY) && migration.ui.length) {

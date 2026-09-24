@@ -55,7 +55,7 @@ export class OplCodexNative extends EventEmitter {
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
     this.transport.channelBindingStore ??= channelBindingStore;
-    this.migration = new AionMigration({ transport: this.transport, env: transport && !env.OPL_AIONUI_DATA_DIR
+    this.migration = new AionMigration({ transport: this.transport, env: transport && !env.OPL_AIONUI_DATA_DIR && !env.OPL_SHELL_MIGRATION_SOURCE_DIRS
       ? { ...env, OPL_STUDIO_AION_MIGRATION: "0" } : env });
     this.threads = new MigratedThreadAdapter(this.transport, this.migration);
     this.transport.migrationContextForThread = (threadId) => this.migration.context(threadId);

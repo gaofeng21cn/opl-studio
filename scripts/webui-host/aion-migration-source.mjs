@@ -42,14 +42,16 @@ function readJson(file, limits) {
 // Roots include userData, the data/config subdirectories, and CLI symlinks.
 export function discoverAionMigrationSources({ env = process.env, homeDir = os.homedir(), platform = process.platform, roots } = {}) {
   const explicitRoot = string(env.OPL_AIONUI_DATA_DIR)?.trim();
+  const explicitRoots = string(env.OPL_SHELL_MIGRATION_SOURCE_DIRS)?.split(path.delimiter).map((value) => value.trim()).filter(Boolean) ?? [];
   const candidates = roots ?? (explicitRoot ? [explicitRoot] : [
     ...(platform === 'darwin' ? ['One Person Lab', 'OnePersonLab', 'AionUi', 'AionUI'].map((name) => path.join(homeDir, 'Library/Application Support', name)) : []),
+    ...(platform === 'darwin' ? ['opl-studio', 'One Person Lab Preview'].map((name) => path.join(homeDir, 'Library/Application Support', name)) : []),
     path.join(homeDir, '.opl-app-data'), path.join(homeDir, '.opl-app-config'),
     path.join(homeDir, '.aionui'), path.join(homeDir, '.aionui-config'),
     path.join(homeDir, '.aionui-web'), path.join(homeDir, '.opl-server'),
     path.join(homeDir, '.local/share/one-person-lab/webui/data'),
     ...(platform === 'linux' ? ['/data', env.AIONUI_DATA_DIR, env.OPL_DATA_DIR].filter(Boolean) : []),
-  ]);
+  ]).concat(explicitRoots);
   const sources = [];
   const seen = new Set();
   const add = (file, kind, priority) => {
