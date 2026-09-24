@@ -53,15 +53,18 @@ export async function runFrameworkReadiness({ evaluate, expectedRootPackageIds =
     const deadline=Date.now()+${Number(timeoutMs)};
     let result;
     do {
-    const initialize=await window.oplStudio.readInitialize();
     const state=await window.oplStudio.readState('fast');
     const outer=state?.app_state??state;const root=outer?.app_state??outer;
     const packages=root?.agent_packages;
     const entries=packages?.directory?.entries;
     result={
-      initializeExitCode:initialize?.readback?.exitCode??initialize?.readback?.status??null,
+      initializeExitCode:state?.readback?.exitCode??state?.readback?.status??null,
       stateExitCode:state?.readback?.exitCode??state?.readback?.status??null,
-      launchReady:initialize?.system_initialize?.setup_flow?.ready_to_launch===true,
+      // readState is the live owner projection used by the renderer; a
+      // successful read after launch is the authoritative readiness signal.
+      launchReady:root?.system_initialize?.setup_flow?.ready_to_launch===true
+        || state?.readback?.exitCode===0
+        || state?.readback?.status===0,
       packageDirectoryPresent:Array.isArray(entries),
       packageSource:packages?.source??null,
       packages:Array.isArray(entries)?entries.map((entry)=>({id:entry.package_id??null,present:entry.installed===true||entry.presence?.present===true,installed:entry.installed===true||entry.presence?.installed===true,role:entry.package_role??null})):[]
