@@ -8,3 +8,5 @@ coverage/
 
 .worktrees/
 .codegraph/
+resources/opl-official-profile/
+resources/opl-wsl-host/

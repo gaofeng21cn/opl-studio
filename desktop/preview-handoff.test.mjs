@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createPreviewHandoff, readPreviewHandoff, writePreviewHandoff, mergeShellStorage, normalizeStorageSnapshot, mergeChannelBindings, atomicJson } from './preview-handoff.mjs';
-import { commitPreparedTarget } from './handoff-installer.mjs';
+import { commitPreparedTarget, ensureVerifiedStaging } from './handoff-installer.mjs';
 const target = { productName:'One Person Lab',bundleId:'cn.onepersonlab.opl',version:'26.9.2491',url:'https://github.com/gaofeng21cn/one-person-lab-app/releases/download/v26.9.24/One-Person-Lab-26.9.24-mac-arm64.dmg',size:1234,sha256:'a'.repeat(64),teamId:'SVVC4TA784' };
 const handoff = storage => createPreviewHandoff({ source:{ bundleId:'cn.onepersonlab.opl.studio.preview',version:'0.1.19' },target,storage });
 const temp = t => { const root=fs.mkdtempSync(path.join(os.tmpdir(),'opl-handoff-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root; };
@@ -62,4 +62,36 @@ test('newer installed App is retained',t=>{const f=fixture(t,'26.9.2591');assert
 test('verification failure after rename restores the old executable',t=>{
   const f=fixture(t);const verify=f.args.hooks.verifyApp;let installedReads=0;f.args.hooks.verifyApp=(p,o)=>{if(p===f.installed && ++installedReads===2)throw new Error('injected_verify_failure');return verify(p,o);};
   assert.throws(()=>commitPreparedTarget(f.args),/injected_verify_failure/);assert.equal(fs.readFileSync(path.join(f.installed,'version'),'utf8'),'26.9.2391');
+});
+test('partial copy left by interruption is preserved and rebuilt on retry',t=>{
+  const f=fixture(t);const staged=path.join(f.apps,'.partial.app');fs.mkdirSync(staged);fs.writeFileSync(path.join(staged,'incomplete'),'partial bytes');
+  assert.equal(ensureVerifiedStaging({source:f.staged,staged,version:target.version,verify:f.args.hooks.verifyApp,copy:f.args.hooks.copy}),staged);
+  assert.equal(fs.readFileSync(path.join(staged,'version'),'utf8'),target.version);
+  const preserved=fs.readdirSync(f.apps).find(name=>name.startsWith('.partial.app.failed-'));
+  assert.ok(preserved);assert.equal(fs.readFileSync(path.join(f.apps,preserved,'incomplete'),'utf8'),'partial bytes');
+});
+test('crash after moving original App to backup resumes the same prepared transaction',t=>{
+  const f=fixture(t);const value=JSON.parse(fs.readFileSync(path.join(f.tx,'handoff.json')));
+  const backup=path.join(f.apps,`.One Person Lab.previous-${value.digest.slice(0,16)}.app`);
+  const staged=path.join(f.apps,`.One Person Lab.incoming-${value.digest.slice(0,16)}.app`);
+  f.args.hooks.copy(f.staged,staged);
+  atomicJson(path.join(f.tx,'install.json'),{schema:'opl_preview_install.v1',digest:value.digest,stage:'prepared',targetApp:f.installed,backup,staged});
+  fs.renameSync(f.installed,backup);
+  assert.equal(commitPreparedTarget(f.args).version,target.version);
+  assert.equal(fs.readFileSync(path.join(backup,'version'),'utf8'),'26.9.2391');
+});
+test('journaled invalid target after interrupted replacement recovers backup and finishes',t=>{
+  const f=fixture(t);const value=JSON.parse(fs.readFileSync(path.join(f.tx,'handoff.json')));
+  const backup=path.join(f.apps,`.One Person Lab.previous-${value.digest.slice(0,16)}.app`);
+  const staged=path.join(f.apps,`.One Person Lab.incoming-${value.digest.slice(0,16)}.app`);
+  atomicJson(path.join(f.tx,'install.json'),{schema:'opl_preview_install.v1',digest:value.digest,stage:'prepared',targetApp:f.installed,backup,staged});
+  fs.renameSync(f.installed,backup);fs.mkdirSync(f.installed);fs.writeFileSync(path.join(f.installed,'incomplete'),'bad replacement');
+  assert.equal(commitPreparedTarget(f.args).version,target.version);
+  assert.equal(fs.readFileSync(path.join(backup,'version'),'utf8'),'26.9.2391');
+  assert.ok(fs.readdirSync(f.apps).some(name=>name.startsWith('One Person Lab.app.failed-')));
+});
+test('untrusted target without an owned prepared journal is never replaced',t=>{
+  const f=fixture(t);fs.unlinkSync(path.join(f.installed,'version'));
+  assert.throws(()=>commitPreparedTarget(f.args),/existing_target_untrusted/);
+  assert.ok(fs.existsSync(f.installed));assert.equal(fs.existsSync(path.join(f.tx,'install.json')),false);
 });

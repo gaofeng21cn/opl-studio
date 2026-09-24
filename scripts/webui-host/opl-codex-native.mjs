@@ -34,6 +34,7 @@ export class OplCodexNative extends EventEmitter {
     transport,
     channelBindingFile,
     dshToolMcp,
+    canonicalThreadHost,
     env = process.env
   } = {}) {
     super();
@@ -50,7 +51,8 @@ export class OplCodexNative extends EventEmitter {
       cwd: workspaceRoot,
       env: childEnv,
       args: codexArgsWithDshToolMcp(baseArgs, connection),
-      channelBindingStore
+      channelBindingStore,
+      ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
     this.transport.channelBindingStore ??= channelBindingStore;
     this.migration = new AionMigration({ transport: this.transport, env: transport && !env.OPL_AIONUI_DATA_DIR

@@ -1,11 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import semver from 'semver';
 import { digest, privateJson, atomicJson, readPreviewHandoff, validateTarget, PUBLISHER_TEAM_ID, STABLE_BUNDLE_ID } from './preview-handoff.mjs';
 
 const run = (command, args) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], timeout: 120_000 });
 function plist(bundle, key) { return run('/usr/bin/plutil', ['-extract',key,'raw','-o','-',path.join(bundle,'Contents/Info.plist')]).trim(); }
+function preserveFailedBundle(bundle) {
+  const preserved = `${bundle}.failed-${randomUUID()}`;
+  fs.renameSync(bundle, preserved);
+  return preserved;
+}
+export function ensureVerifiedStaging({ source, staged, version, verify = verifyApp, copy = (from,to) => run('/usr/bin/ditto',[from,to]) }) {
+  if (fs.existsSync(staged)) {
+    try { verify(staged,{ exactVersion:version }); return staged; }
+    catch { preserveFailedBundle(staged); }
+  }
+  copy(source,staged);
+  verify(staged,{ exactVersion:version });
+  return staged;
+}
 export function verifyApp(bundle, { minimumVersion, exactVersion, requireStaple = true } = {}) {
   run('/usr/bin/codesign', ['--verify','--deep','--strict',bundle]);
   // A designated requirement binds both bundle and publisher, not just an optional team string.
@@ -50,8 +65,7 @@ export async function prepareTarget({ target, transactionRoot, fetchImpl = fetch
   try {
     const source = path.join(mount,'One Person Lab.app');
     verifyApp(source,{ exactVersion:target.version });
-    if (!fs.existsSync(staged)) run('/usr/bin/ditto',[source,staged]);
-    verifyApp(staged,{ exactVersion:target.version });
+    ensureVerifiedStaging({ source,staged,version:target.version });
   } finally { run('/usr/bin/hdiutil',['detach',mount]); }
   return staged;
 }
@@ -66,23 +80,32 @@ export function commitPreparedTarget({ transactionRoot, selfBundle, targetUserDa
   verify(selfBundle,{ exactVersion:target.version });
   const targetApp = path.join(applicationsRoot,'One Person Lab.app');
   const receiptPath = path.join(transactionRoot,'install.json');
-  let journal = fs.existsSync(receiptPath) ? privateJson(receiptPath) : {
+  const hadJournal = fs.existsSync(receiptPath);
+  let journal = hadJournal ? privateJson(receiptPath) : {
     schema:'opl_preview_install.v1', digest:handoff.digest, stage:'prepared',
     targetApp, backup:path.join(applicationsRoot,`.One Person Lab.previous-${handoff.digest.slice(0,16)}.app`),
     staged:path.join(applicationsRoot,`.One Person Lab.incoming-${handoff.digest.slice(0,16)}.app`)
   };
-  if (journal.digest !== handoff.digest || journal.targetApp !== targetApp) throw new Error('handoff_install_journal_mismatch');
+  if (journal.schema !== 'opl_preview_install.v1' || !['prepared','installed'].includes(journal.stage)
+    || journal.digest !== handoff.digest || journal.targetApp !== targetApp) throw new Error('handoff_install_journal_mismatch');
   const expectedBackup = path.join(applicationsRoot,`.One Person Lab.previous-${handoff.digest.slice(0,16)}.app`);
   const expectedStage = path.join(applicationsRoot,`.One Person Lab.incoming-${handoff.digest.slice(0,16)}.app`);
   if (journal.backup !== expectedBackup || journal.staged !== expectedStage) throw new Error('handoff_install_path_mismatch');
   // An existing newer valid stable target must never be downgraded.
   let existing;
   if (fs.existsSync(targetApp)) {
-    try { existing = verify(targetApp, { requireStaple:false }); } catch { throw new Error('handoff_existing_target_untrusted'); }
+    try { existing = verify(targetApp, { requireStaple:false }); }
+    catch {
+      // Only a prior owned, journaled replacement may recover from its retained backup.
+      if (!hadJournal || journal.stage !== 'prepared' || !fs.existsSync(journal.backup)) throw new Error('handoff_existing_target_untrusted');
+      const backupIdentity = verify(journal.backup,{ requireStaple:false });
+      preserveFailedBundle(targetApp);
+      fs.renameSync(journal.backup,targetApp);
+      existing = backupIdentity;
+    }
   }
   if (!existing || semver.lt(existing.version,target.version)) {
-    if (!fs.existsSync(journal.staged)) copy(selfBundle,journal.staged);
-    verify(journal.staged,{ exactVersion:target.version });
+    ensureVerifiedStaging({ source:selfBundle,staged:journal.staged,version:target.version,verify,copy });
     atomicJson(receiptPath,journal);
     if (fs.existsSync(targetApp)) {
       if (fs.existsSync(journal.backup)) throw new Error('handoff_backup_collision');
@@ -93,7 +116,7 @@ export function commitPreparedTarget({ transactionRoot, selfBundle, targetUserDa
       verify(targetApp,{ exactVersion:target.version });
     } catch (error) {
       // Preserve failed bytes and restore the only previous install, never delete it.
-      if (fs.existsSync(targetApp)) fs.renameSync(targetApp,`${journal.staged}.failed-${Date.now()}`);
+      if (fs.existsSync(targetApp)) preserveFailedBundle(targetApp);
       if (fs.existsSync(journal.backup)) fs.renameSync(journal.backup,targetApp);
       throw error;
     }

@@ -51,7 +51,7 @@ function fixture() {
     close: async () => { child.emit("close", 0); }
   };
   const proxy = () => createWindowsGuestHost({ windowsRuntime: runtime, resourcesPath: "C:\\App\\resources", userDataPath: "C:\\UserData",
-    version: "26.9.24", instanceId: "instance", verifyPayload: () => {}, readFile: () => JSON.stringify({ schema: "opl_studio_windows_guest_host.v1", platform: "linux", arch: "x64",
+    version: "26.9.24", instanceId: "instance", canonicalThreadHost: "NATIVE-WINDOWS", verifyPayload: () => {}, readFile: () => JSON.stringify({ schema: "opl_studio_windows_guest_host.v1", platform: "linux", arch: "x64",
       entry: "desktop/windows-guest-host.mjs", shell_ref: "a".repeat(40), package_lock_sha256: "b".repeat(64) }),
     platform: {
       pickFiles: async () => [{ kind: "file", name: "a b.pdf", path: "C:\\files\\a b.pdf" }],
@@ -74,6 +74,7 @@ test("guest stdio proxy retains Linux Framework/Codex ownership and forwards eve
   assert.equal(fx.bootOptions().env.CODEX_HOME, "/home/opl/.codex");
   assert.equal(fx.bootOptions().workspaceRoot, "/home/opl/code");
   assert.equal(fx.bootOptions().env.OPL_CODEX_BIN, "/usr/local/bin/codex");
+  assert.equal(fx.bootOptions().canonicalThreadHost, "NATIVE-WINDOWS");
   assert.equal(fx.bootOptions().channelBindingFile, "/mnt/c/UserData/channel-transport-bindings.json");
   assert.equal(fx.bootOptions().env.OPL_AIONUI_DATA_DIR, "/mnt/c/UserData");
   const files = await proxy.invoke("pickFiles");

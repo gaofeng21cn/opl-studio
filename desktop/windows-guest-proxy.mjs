@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import os from "node:os";
 import { createGuestRpc } from "./windows-guest-rpc.mjs";
 
 const nativeMethods = new Set(["beginWindowDrag", "pickFiles", "pickDirectory", "classifyInputPaths", "releaseInputs", "notifyCompletion", "accessWorkspacePath"]);
@@ -32,7 +33,7 @@ export function verifyGuestPayloadFiles(root, manifest) {
 }
 
 export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, userDataPath, env = process.env,
-  version, instanceId, platform = {}, nativeUpdater, carrierDiagnostics, candidateActionAllowlist = [],
+  version, instanceId, canonicalThreadHost = os.hostname(), platform = {}, nativeUpdater, carrierDiagnostics, candidateActionAllowlist = [],
   readFile = fs.readFileSync, verifyPayload = verifyGuestPayloadFiles } = {}) {
   const runtime = await windowsRuntime.ensureReady();
   const hostRoot = path.join(resourcesPath, "opl-wsl-host");
@@ -85,9 +86,16 @@ export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, us
   };
   child.once("error", disconnected);
   child.once("close", disconnected);
-  const initialized = await rpc.request("initialize", { version, instanceId,
-    identity: runtime.identity, guestDataRoot,
-    channelBindingFile: `${guestDataRoot}/channel-transport-bindings.json`, candidateActionAllowlist });
+  let initialized;
+  try {
+    initialized = await rpc.request("initialize", { version, instanceId, canonicalThreadHost,
+      identity: runtime.identity, guestDataRoot,
+      channelBindingFile: `${guestDataRoot}/channel-transport-bindings.json`, candidateActionAllowlist });
+  } catch (cause) {
+    child.stdin.end();
+    await windowsRuntime.close();
+    throw cause;
+  }
   capabilities = initialized.capabilities;
   codexCapabilities = initialized.codex;
   core.invoke = (method, payload = {}) => rpc.request("invoke", { method, payload });

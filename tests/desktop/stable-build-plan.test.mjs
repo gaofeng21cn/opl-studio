@@ -93,7 +93,11 @@ test('Windows guest Host requires its Linux dependency closure and exact source 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-wsl-host-'));
   try {
     const shellRef = 'a'.repeat(40);
-    const names = ['package.json', 'package-lock.json', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs', 'scripts/webui-host/host-core.mjs', 'node_modules/@deepseek-ai/cordis/package.json'];
+    const names = ['package.json', 'package-lock.json', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs',
+      'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
+      'runtime/node/lib/node_modules/npm/bin/npm-cli.js', 'runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex', 'runtime/opl-install.sh',
+      'scripts/webui-host/host-core.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
+      'resources/opl-official-profile/official-profile-package-apply.ts', 'node_modules/@deepseek-ai/cordis/package.json'];
     for (const name of names) {
       fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
       fs.writeFileSync(path.join(root, name), '{}');
@@ -101,6 +105,8 @@ test('Windows guest Host requires its Linux dependency closure and exact source 
     const manifest = { schema: 'opl_studio_windows_guest_host.v1', platform: 'linux', arch: 'x64',
       entry: 'desktop/windows-guest-host.mjs', shell_ref: shellRef,
       package_lock_sha256: crypto.createHash('sha256').update('{}').digest('hex'),
+      bootstrap: { node: { root: 'runtime/node', version: '24.21.0' }, codex: { path: 'runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex', version: '0.144.5' },
+        framework_ref: 'b'.repeat(40), framework_installer: 'runtime/opl-install.sh' },
       files: names.sort((a, b) => a.localeCompare(b)).map(name => ({ path: name, sha256: crypto.createHash('sha256').update('{}').digest('hex') })) };
     fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify(manifest));
     assert.equal(validateWslHostPayload(root, shellRef).shell_ref, shellRef);

@@ -48,7 +48,9 @@ export async function qualifyUpgradeVm(options) {
   try {
     guest(`test ! -e /tmp/opl-cutover-active-run && touch /tmp/opl-cutover-active-run`);
     if (options.networkMode === "controlled_exact_candidate") guest("test -f /tmp/cert.pem && /usr/bin/curl -fsS https://github.com/gaofeng21cn/one-person-lab-app/releases/latest >/dev/null");
-    const trustEnvironment = options.networkMode === "controlled_exact_candidate" ? "env NODE_EXTRA_CA_CERTS=/tmp/cert.pem " : "";
+    const variables = { ...(options.networkMode === "controlled_exact_candidate" ? { NODE_EXTRA_CA_CERTS: "/tmp/cert.pem" } : {}), ...(options.launchEnvironment ?? {}) };
+    invariant(Object.keys(variables).every((key) => ["NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "OPL_CODEX_BIN", "OPL_SOURCE_ARCHIVE_URL", "OPL_FRAMEWORK_SOURCE_COMMIT", "OPL_NATIVE_WORKBENCH_READ_ONLY"].includes(key)), "Unexpected guest launch environment");
+    const trustEnvironment = `env ${Object.entries(variables).map(([key, value]) => `${key}=${quote(value)}`).join(" ")} `;
     guest(`nohup ${trustEnvironment}${quote(`${sourceBundle}/Contents/MacOS/${product}`)} --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 >/tmp/opl-upgrade-app.log 2>&1 & echo $!`);
     tunnel = spawn("ssh", [...sshBase, "-N", "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.user}@${ip}`], { stdio: "ignore" });
     await waitForPageTarget({ port: options.cdpPort, timeoutMs: 120_000 });
@@ -84,6 +86,9 @@ export async function qualifyUpgradeVm(options) {
     invariant(plistVersion(stableBundle) === options.targetVersion, "Squirrel replacement or Preview handoff did not install exact Studio Stable");
     guest(`/usr/bin/codesign --verify --deep --strict ${quote(stableBundle)} && /usr/bin/codesign --verify -R 'identifier "cn.onepersonlab.opl" and anchor apple generic and certificate leaf[subject.OU] = "SVVC4TA784"' ${quote(stableBundle)} && /usr/sbin/spctl --assess --type execute ${quote(stableBundle)}`);
     receipt.checks.installedIdentity = { version: options.targetVersion, bundleId: "cn.onepersonlab.opl", teamId: "SVVC4TA784", signatureVerified: true, gatekeeperAccepted: true };
+    await pause(3000);
+    guest("pkill -TERM -f '^/Applications/One Person Lab.app/Contents/MacOS/One Person Lab( |$)'", true);
+    await pause(2000);
     guest(`nohup ${trustEnvironment}${quote(`${stableBundle}/Contents/MacOS/One Person Lab`)} --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 >/tmp/opl-upgrade-stable.log 2>&1 & echo $!`);
     await waitForPageTarget({ port: options.cdpPort, timeoutMs: 120_000 });
     const readback = await evaluate(`(async()=>{const status=await window.oplStudio.readNativeAppUpdateStatus();return {status,bridge:typeof window.oplStudio.readState==='function',draft:localStorage.getItem('opl.studio.drafts.v2'),settings:localStorage.getItem('opl.studio.settings.v1')};})()`);
@@ -95,6 +100,7 @@ export async function qualifyUpgradeVm(options) {
       receipt.checks.previewShellStoragePreserved = true;
     }
     receipt.checks.runtimeVersion = readback.status.currentVersion;
+    if (options.verifyTarget) receipt.checks.targetReadiness = await options.verifyTarget({ evaluate, guest });
     receipt.status = "passed";
   } catch (error) { receipt.failure = { message: error.message }; }
   finally {

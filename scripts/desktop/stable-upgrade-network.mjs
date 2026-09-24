@@ -26,6 +26,9 @@ export function loadUpgradeNetworkManifest(manifestPath) {
       const pathname = `/${release.repository}/releases/download/${release.tag}/${asset.name}`;
       invariant(!files.has(pathname), "Duplicate release asset path");
       files.set(pathname, { file, size: asset.size, sha256: asset.sha256, name: asset.name });
+      const latestPath = `/${release.repository}/releases/latest/download/${asset.name}`;
+      invariant(!files.has(latestPath), "Duplicate latest release asset path");
+      files.set(latestPath, { file, size: asset.size, sha256: asset.sha256, name: asset.name });
       return { name: asset.name, size: asset.size, digest: `sha256:${asset.sha256}`, browser_download_url: `https://github.com${pathname}` };
     });
     return { repository: release.repository, tag_name: release.tag, name: release.tag, draft: false, prerelease: false, html_url: `https://github.com/${release.repository}/releases/tag/${release.tag}`, published_at: manifest.created_at, assets };

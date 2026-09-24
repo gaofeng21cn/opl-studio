@@ -20,7 +20,8 @@ export function atomicJson(file, value) {
 }
 export function privateJson(file, limit = 64 * 1024 * 1024) {
   const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > limit || stat.uid !== process.getuid()) throw new Error('handoff_file_not_private_regular_file');
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > limit
+    || (typeof process.getuid === 'function' && stat.uid !== process.getuid())) throw new Error('handoff_file_not_private_regular_file');
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 export function validateTarget(target) {

@@ -13,7 +13,8 @@ const record = value => value && typeof value === "object" && !Array.isArray(val
 const error = code => Object.assign(new Error(`Existing OPL Windows runtime is unavailable (${code}).`), { code });
 
 export function validateWindowsRuntimeIdentity(value) {
-  if (!record(value) || value.schema !== "opl_linux_runtime_inspection.v1" || value.protocol_version !== 1
+  const studio = value?.schema === "opl_studio_linux_runtime_inspection.v1";
+  if (!record(value) || (!studio && value.schema !== "opl_linux_runtime_inspection.v1") || value.protocol_version !== 1
     || value.logical_distribution !== DISTRIBUTION || value.physical_distribution !== DISTRIBUTION
     || value.guest_user !== USER || value.architecture !== "x86_64" || value.wsl2 !== true
     || value.codex_home !== "/home/opl/.codex" || value.workspace_root !== "/home/opl/code"
@@ -21,7 +22,9 @@ export function validateWindowsRuntimeIdentity(value) {
     || typeof value.guest_install_id !== "string" || !value.guest_install_id.trim()
     || !Number.isSafeInteger(value.distribution_generation) || value.distribution_generation < 1
     || !Number.isSafeInteger(value.active_operation_count) || value.active_operation_count < 0) throw error("wsl_identity_mismatch");
-  if (typeof value.codex_path !== "string" || !value.codex_path.startsWith("/opt/opl/carrier/store/sha256/")
+  if (typeof value.codex_path !== "string" || (studio
+      ? value.codex_path !== "/opt/opl/studio-runtime/codex-root/vendor/x86_64-unknown-linux-musl/bin/codex"
+      : !value.codex_path.startsWith("/opt/opl/carrier/store/sha256/"))
     || value.codex_realpath !== value.codex_path || value.codex_command_path !== "/usr/local/bin/codex"
     || value.codex_command_digest !== value.codex_digest
     || typeof value.framework_path !== "string" || !value.framework_path.startsWith("/home/opl/")
@@ -63,7 +66,8 @@ export function buildWindowsRuntimeCommand(kind, args, token) {
 // Reuse the existing App-owned guest and its public execution ABI. This adapter
 // never provisions, unregisters, globally stops WSL, or copies credential/thread stores.
 export function createWindowsRuntime({ userDataPath, env = process.env, spawnImpl = spawn,
-  readFile = fs.readFileSync, platform = process.platform, timeoutMs = 30_000 } = {}) {
+  readFile = fs.readFileSync, platform = process.platform, timeoutMs = 30_000,
+  resourcesPath, resumeExecutable, onProgress, provisioner } = {}) {
   if (platform !== "win32") throw error("wsl_wrong_host");
   if (typeof userDataPath !== "string" || !userDataPath) throw error("wsl_user_data_path_missing");
   const executable = path.win32.join(env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows", "System32", "wsl.exe");
@@ -115,8 +119,17 @@ export function createWindowsRuntime({ userDataPath, env = process.env, spawnImp
     get identity() { return identity; },
     async ensureReady() {
       readyPromise ??= (async () => {
-        const receipt = readWindowsRuntimeReceipt(userDataPath, readFile);
-        const result = await collected(guestArgs([`${BOOTSTRAP}opl-runtime-inspect`, "--json"]));
+        let receipt;
+        try { receipt = readWindowsRuntimeReceipt(userDataPath, readFile); }
+        catch (cause) {
+          if (cause.code !== "wsl_existing_install_receipt_unavailable" || !resourcesPath) throw cause;
+          const factory = provisioner ?? (await import("./windows-provisioning.mjs")).createWindowsProvisioner;
+          receipt = await factory({ userDataPath, resourcesPath, env, spawnImpl, platform, resumeExecutable, onProgress }).ensureReady();
+        }
+        const inspection = receipt.schema === "opl_studio_linux_runtime_inspection.v1"
+          ? ["/usr/local/bin/node", "/opt/opl/studio-bootstrap/inspect.mjs", "--json"]
+          : [`${BOOTSTRAP}opl-runtime-inspect`, "--json"];
+        const result = await collected(guestArgs(inspection));
         if (result.exitCode !== 0) throw error("wsl_inspection_failed");
         let fresh;
         try { fresh = validateWindowsRuntimeIdentity(JSON.parse(result.stdout)); }

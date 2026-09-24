@@ -20,6 +20,7 @@ import { atomicJson } from "./preview-handoff.mjs";
 import { createDeepLinkDelivery, extractDeepLinkPayloadFromArgv } from "./deep-links.mjs";
 import { createWindowsRuntime } from "./windows-runtime.mjs";
 import { createWindowsGuestHost } from "./windows-guest-proxy.mjs";
+import { importLegacyChannelBindings } from "./legacy-channel-bindings.mjs";
 import {
   configureDesktopUpdaterQualification,
   configureDesktopUpdaterQualificationState,
@@ -230,7 +231,11 @@ async function createDesktopHost(appLogDirectory) {
   desktopUpdater = updater;
   const homeDir = app.getPath("home");
   const windowsRuntime = app.isPackaged && stableIdentity && process.platform === "win32"
-    ? createWindowsRuntime({ userDataPath: app.getPath("userData"), env: process.env }) : null;
+    ? createWindowsRuntime({
+      userDataPath: app.getPath("userData"), resourcesPath: process.resourcesPath,
+      resumeExecutable: process.execPath, env: process.env,
+      onProgress: (progress) => sendDesktopRendererEvent("desktop/runtime-setup", progress)
+    }) : null;
   if (windowsRuntime) await windowsRuntime.ensureReady();
   const officialProfileAdmission = app.isPackaged && stableIdentity && !windowsRuntime && !updaterQualificationEnabled
     ? captureOfficialProfileAdmission({ homeDir, env: process.env }) : null;
@@ -457,7 +462,10 @@ app.whenReady().then(async () => {
     }
     return;
   }
-  if (stableIdentity) importedHandoff = await importPendingHandoff({ app });
+  if (stableIdentity) {
+    importLegacyChannelBindings({ userDataRoot: app.getPath("userData") });
+    importedHandoff = await importPendingHandoff({ app });
+  }
   const appLogDirectory = createAppLogDirectoryController({ electronApp: app });
   await appLogDirectory.restore();
   createWindow();
