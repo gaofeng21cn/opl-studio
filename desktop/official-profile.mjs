@@ -21,6 +21,11 @@ function safeMessage(error, env) {
   return message.replace(/\b(?:Bearer|Basic)\s+[^\s,;]+/gi, "[REDACTED]").replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"']+/gi, "[REDACTED_URL]").split(/\r?\n/, 1)[0].slice(0, 1024);
 }
 
+function frameworkCoreReady(result) {
+  const exitCode = result?.readback?.exitCode ?? result?.readback?.status;
+  return exitCode === 0;
+}
+
 export function officialProfileStateDirectory({ homeDir = os.homedir(), env = process.env } = {}) {
   if (env.OPL_STATE_DIR?.trim()) return path.resolve(env.OPL_STATE_DIR);
   const data = env.OPL_DATA_DIR?.trim() || env.AIONUI_DATA_DIR?.trim();
@@ -130,8 +135,7 @@ export function startOfficialProfileFirstInstall({ admission, resourcesPath, env
       let ready = false;
       do {
         const result = await readInitialize();
-        const exitCode = result?.readback?.exitCode ?? result?.readback?.status;
-        if (exitCode === 0 && result?.system_initialize?.setup_flow?.ready_to_launch === true) { ready = true; break; }
+        if (frameworkCoreReady(result)) { ready = true; break; }
         if (readinessTimeoutMs <= 0 || Date.now() >= deadline) break;
         await delay(Math.min(1000, Math.max(0, deadline - Date.now())));
       } while (Date.now() < deadline);

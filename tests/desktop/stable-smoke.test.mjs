@@ -57,6 +57,33 @@ test("Framework readiness reuses the Standard runtime projection without a secon
   assert.equal(result.status, "passed");
 });
 
+test("Framework readiness refreshes a background Official Profile projection once", async () => {
+  const incomplete = {
+    initializeExitCode: 0,
+    stateExitCode: 0,
+    launchReady: true,
+    packageDirectoryPresent: true,
+    packages: [{ id: "mas", present: false, installed: false }]
+  };
+  const completeState = {
+    readback: { exitCode: 0 },
+    app_state: {
+      agent_packages: {
+        directory: { entries: [{ package_id: "mas", installed: true, presence: { present: true, installed: true } }] }
+      }
+    }
+  };
+  let reads = 0;
+  const result = await runFrameworkReadiness({
+    projection: incomplete,
+    expectedRootPackageIds: ["mas"],
+    evaluate: async () => { reads += 1; return completeState; }
+  });
+  assert.equal(reads, 1);
+  assert.equal(result.status, "passed");
+  assert.deepEqual(result.missingRootPackageIds, []);
+});
+
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {
   let expression;
   const receipt = await runCodexReadiness({ evaluate: async (value) => { expression = value; return { modelListValid: true, threadListValid: true, modelCount: 0, simulated: false }; } });

@@ -388,7 +388,11 @@ async function createDesktopHost(appLogDirectory) {
     core.applyOfficialProfileWhenReady = (initialize) => startOfficialProfileFirstInstall({
       ...officialOptions, readInitialize: async () => initialize, readinessTimeoutMs: 0
     });
-    void startOfficialProfileFirstInstall({ ...officialOptions, readInitialize: () => core.invoke("readInitialize") });
+    // The renderer may not have mounted yet when the desktop Host starts. A
+    // pre-renderer readInitialize call can wait forever on that UI-owned
+    // surface, so use the already authoritative Framework state read to gate
+    // the background first-install action.
+    void startOfficialProfileFirstInstall({ ...officialOptions, readInitialize: () => core.invoke("readState", { profile: "fast" }) });
   }
   if (managedUpdatesEnabled) {
     core.updateMaintenance = createManagedUpdateMaintenance({

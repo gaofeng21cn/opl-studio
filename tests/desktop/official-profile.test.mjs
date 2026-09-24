@@ -89,7 +89,7 @@ test("missing core readiness defers without claiming an attempt and can resume a
   const f = fixture();
   try {
     const admission = captureOfficialProfileAdmission({ homeDir: f.homeDir, env: {} });
-    const output = await startOfficialProfileFirstInstall({ admission, resourcesPath: f.resourcesPath, env: {}, readInitialize: async () => ({ readback: { exitCode: 0 }, system_initialize: { setup_flow: { ready_to_launch: false } } }), readinessTimeoutMs: 5, execute: async () => { throw new Error("must not execute"); } });
+  const output = await startOfficialProfileFirstInstall({ admission, resourcesPath: f.resourcesPath, env: {}, readInitialize: async () => ({ readback: { exitCode: 1 }, system_initialize: { setup_flow: { ready_to_launch: false } } }), readinessTimeoutMs: 5, execute: async () => { throw new Error("must not execute"); } });
     assert.equal(output.status, "deferred");
     assert.equal(output.reason, "framework_core_not_ready");
     assert.equal(fs.existsSync(admission.completePath), false);

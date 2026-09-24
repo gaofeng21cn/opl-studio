@@ -50,6 +50,24 @@ export async function runRuntimeRefresh({ evaluate, timeoutMs }) {
 export async function runFrameworkReadiness({ evaluate, projection = null, expectedRootPackageIds = [], timeoutMs = 120_000 }) {
   if (projection) {
     const missing = expectedRootPackageIds.filter((id) => !projection.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
+    if (missing.length > 0) {
+      // Official Profile installation is deliberately background work. The
+      // first Standard state projection can therefore precede the package
+      // actions; take one bounded live readback before failing the release
+      // gate, while retaining the fast path for a complete projection.
+      const refreshed = await evaluate(`(async()=>{await new Promise((resolve)=>setTimeout(resolve,1000));return window.oplStudio.readState('fast');})()`);
+      const refreshedProjection = projectFrameworkReadiness(refreshed, expectedRootPackageIds);
+      return {
+        ...refreshedProjection,
+        expectedRootPackageIds,
+        missingRootPackageIds: refreshedProjection.missingRootPackageIds,
+        status: refreshedProjection.initializeExitCode === 0
+          && refreshedProjection.stateExitCode === 0
+          && refreshedProjection.launchReady === true
+          && refreshedProjection.packageDirectoryPresent === true
+          && refreshedProjection.missingRootPackageIds.length === 0 ? "passed" : "failed"
+      };
+    }
     return {
       ...projection,
       expectedRootPackageIds,
