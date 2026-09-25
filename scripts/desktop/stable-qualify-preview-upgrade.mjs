@@ -152,6 +152,7 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
     copy(bindingFile, "/tmp/opl-preview-bindings.json");
     guest('mkdir -p "$HOME/Library/Application Support/opl-studio" && cp /tmp/opl-preview-bindings.json "$HOME/Library/Application Support/opl-studio/channel-transport-bindings.json"');
     const credentials = { email: fs.readFileSync(options.emailFile, "utf8").trim(), password: fs.readFileSync(options.passwordFile, "utf8") };
+    invariant(credentials.email && credentials.password, "Dedicated Gateway credential files are empty");
     const port = 19349;
     let expectedRootPackageIds;
     const receipt = await qualifyUpgradeVm({ vm, route: "preview", user: options.user, sshKey: options.sshKey, cdpPort: port, timeoutMs: 900_000, networkMode: "controlled_exact_candidate", targetVersion: target.version, previewTargetVersion: candidate.checkpoint.source.version, launchEnvironment, out: path.join(artifactRoot, "upgrade.json"), verifyTarget: async () => {
