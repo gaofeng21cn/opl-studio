@@ -3,11 +3,12 @@ set -eu
 # Older OPL images wrote the App data volume as root. Repair only root-owned
 # entries in that App-owned volume; never recurse into user project files.
 if [ "$(id -u)" = 0 ]; then
-  mkdir -p /data /projects
+  mkdir -p /data/codex /data/inputs /projects
   find /data -xdev -uid 0 -exec chown -h node:node {} +
   if [ "$(stat -c %u /projects)" = 0 ]; then chown node:node /projects; fi
   exec gosu node "$0" "$@"
 fi
+mkdir -p /data/codex /data/inputs
 # Legacy cloud deployments already supply a password but no separate signing
 # secret. Persist a private random key so their compose file remains usable.
 if [ "${OPL_WEBUI_AUTH_MODE:-}" = password ] || [ "${OPL_WEBUI_DEPLOYMENT_MODE:-}" = cloud ]; then
