@@ -1,5 +1,14 @@
 {
   "schema": "opl_studio_preview_handoff_plan.v1",
-  "enabled": false,
-  "targetUserDataRoot": "~/Library/Application Support/One Person Lab"
+  "enabled": true,
+  "targetUserDataRoot": "~/Library/Application Support/One Person Lab",
+  "target": {
+    "productName": "One Person Lab",
+    "bundleId": "cn.onepersonlab.opl",
+    "version": "26.9.2591",
+    "url": "https://github.com/gaofeng21cn/one-person-lab-app/releases/download/v26.9.25/One-Person-Lab-26.9.25-mac-arm64.dmg",
+    "size": 209104041,
+    "sha256": "7c70a7573ca96802991e500b631889c6f00d33f6d6c1fce2e407ff5b0a4eeb2e",
+    "teamId": "SVVC4TA784"
+  }
 }
