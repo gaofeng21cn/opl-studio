@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const evidence = JSON.parse(fs.readFileSync(path.join(root, "src/candidateContractEvidence.json"), "utf8"));
 const stateModel = evidence.active_project_line_state_model;
 const liveDerivationPolicy = evidence.workbench_model_live_derivation;

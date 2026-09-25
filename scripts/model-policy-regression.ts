@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createCodexModelPolicy } from "./build-renderer.mjs";
@@ -46,7 +47,7 @@ const syntheticProfile = {
 const missingInjection = spawnSync(
   "bun",
   ["--eval", 'await import("./src/workbench/modelPolicy.ts")'],
-  { cwd: new URL("..", import.meta.url).pathname, encoding: "utf8" }
+  { cwd: fileURLToPath(new URL("..", import.meta.url)), encoding: "utf8" }
 );
 assert.notEqual(missingInjection.status, 0);
 assert.match(missingInjection.stderr, /invalid App-owned Codex model policy injection: policy is missing/);
