@@ -112,7 +112,7 @@ ENV NODE_ENV=production \
   OPL_HEADLESS_HOST=0.0.0.0 \
   OPL_HEADLESS_PORT=3000 \
   OPL_HEADLESS_SHUTDOWN_TIMEOUT_MS=8000 \
-  OPL_NATIVE_WORKBENCH_READ_ONLY=1 \
+  OPL_NATIVE_WORKBENCH_READ_ONLY=0 \
   PATH=/opt/opl-framework/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 VOLUME ["/data", "/projects"]
