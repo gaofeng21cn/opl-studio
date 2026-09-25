@@ -216,6 +216,7 @@ export async function qualifyCleanVm(options) {
   const runRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-clean-vm-"));
   const productName = options.productName || PREVIEW_PRODUCT.productName;
   const bundleId = options.bundleId || PREVIEW_PRODUCT.bundleId;
+  const fullRuntime = options.runtimeProfiles?.includes("full") === true;
   const guestDmg = `/tmp/opl-studio-clean-${process.pid}.dmg`;
   const guestCodexTarball = `/tmp/opl-studio-clean-${process.pid}-codex.tgz`;
   const guestCodexRoot = `/tmp/opl-studio-clean-${process.pid}-codex`;
@@ -314,7 +315,21 @@ export async function qualifyCleanVm(options) {
         });
       }
 
-      if (options.frameworkSourceArchive) {
+      if (fullRuntime) {
+        const resource = `${guestApp}/Contents/Resources/opl-studio-full-runtime`;
+        const manifest = `${resource}/manifest/full-package-manifest.json`;
+        const frameworkRef = guestRun(options, ip, [
+          "set -eu",
+          `test -x ${shellQuote(`${resource}/runtime/current/bin/opl`)}`,
+          `test "$(plutil -extract carrier.carrier_id raw -o - ${shellQuote(manifest)})" = opl-studio`,
+          `test "$(plutil -extract carrier.runtime_resource_dir raw -o - ${shellQuote(manifest)})" = opl-studio-full-runtime`,
+          `plutil -extract resolved_refs.opl_framework.resolved_commit raw -o - ${shellQuote(manifest)}`
+        ].join(" && ")).stdout.trim();
+        invariant(!options.frameworkRef || frameworkRef === options.frameworkRef, "Packaged Full Framework differs from the frozen source");
+        checks.framework = { ...checks.framework, status: "prepared", expectedRef: frameworkRef,
+          source: "packaged_full_runtime", guestInjection: null, bundleIncluded: true,
+          packagedFullManifestValidated: true, archiveCopiedToGuest: false };
+      } else if (options.frameworkSourceArchive) {
         scpToGuest(options, ip, options.frameworkSourceArchive, guestFrameworkArchive);
         const packagedManifest = `${guestApp}/Contents/Resources/opl-framework-bootstrap/manifest.json`;
         const packagedInstaller = `${guestApp}/Contents/Resources/opl-framework-bootstrap/opl-install.sh`;
@@ -372,8 +387,8 @@ export async function qualifyCleanVm(options) {
         appExecutable: `${guestApp}/Contents/MacOS/${productName}`,
         logPath: guestLog,
         codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
-        frameworkSourceArchive: options.frameworkSourceArchive ? guestFrameworkArchive : null,
-        frameworkRef: options.frameworkRef,
+        frameworkSourceArchive: !fullRuntime && options.frameworkSourceArchive ? guestFrameworkArchive : null,
+        frameworkRef: fullRuntime ? null : options.frameworkRef,
         caBundle: trust ? guestCaBundle : null,
         allowActions: options.allowActions
       });
