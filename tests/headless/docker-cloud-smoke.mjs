@@ -13,6 +13,7 @@ const container = `opl-studio-cloud-smoke-${suffix}`;
 const dataVolume = `${container}-data`;
 const projectsVolume = `${container}-projects`;
 const secretRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-cloud-secrets-"));
+const legacy = process.env.OPL_CLOUD_SMOKE_LEGACY === "1";
 const password = "preview-test-password";
 const passwordFile = path.join(secretRoot, "password");
 const sessionFile = path.join(secretRoot, "session-secret");
@@ -68,9 +69,8 @@ try {
   docker(
     "run", "--detach", "--name", container,
     "--publish", `127.0.0.1:${port}:3000`,
-    "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=256m",
-    "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "512",
-    "--user", "1000:1000",
+    ...(legacy ? [] : ["--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=256m",
+      "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "512", "--user", "1000:1000"]),
     "--mount", `type=volume,src=${dataVolume},dst=/data`,
     "--mount", `type=volume,src=${projectsVolume},dst=/projects`,
     "--mount", `type=bind,src=${passwordFile},dst=/run/secrets/opl-password,readonly`,
@@ -79,7 +79,7 @@ try {
     "--env", "OPL_WEBUI_AUTH_MODE=password",
     "--env", "OPL_WEBUI_USERNAME=opl",
     "--env", "OPL_WEBUI_PASSWORD_FILE=/run/secrets/opl-password",
-    "--env", "OPL_WEBUI_SESSION_SECRET_FILE=/run/secrets/opl-session",
+    ...(legacy ? [] : ["--env", "OPL_WEBUI_SESSION_SECRET_FILE=/run/secrets/opl-session"]),
     image
   );
 
