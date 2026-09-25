@@ -465,7 +465,7 @@ export async function qualifyCleanVm(options) {
       await writeFile(localDriver, `import { __test } from ${JSON.stringify(guestProbe)};
 import { spawnSync } from "node:child_process";
 const runtime = ${JSON.stringify(runtime)};
-const quote = (value) => "'" + String(value).replaceAll("'", "'\\''") + "'";
+const quote = ${shellQuote.toString()};
 // Adapt only the command transport to Studio's packaged runtime. All lifecycle
 // actions, launchd observations and SQLite checks execute against the real VM.
 const runOplJson = (args, options) => {
@@ -474,7 +474,7 @@ const runOplJson = (args, options) => {
   if (result.status !== 0 || result.error) throw new Error(result.stderr || result.error?.message || "Framework command failed");
   return JSON.parse(result.stdout);
 };
-const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",timeoutMs:90000,__testHooks:{runOplJson}}, "");
+const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",artifacts:${JSON.stringify(guestDriver + ".artifacts")},timeoutMs:90000,__testHooks:{runOplJson}}, "");
 process.stdout.write(JSON.stringify(proof));
 `);
       scpToGuest(options, ip, legacyProbe, guestProbe);
