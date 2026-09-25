@@ -210,3 +210,30 @@ test('browser exports only contribute known UI keys and do not invent persisted 
   assert.equal(snapshot.drafts.status, 'unavailable');
   assert.equal(JSON.stringify(snapshot).includes('never-export'), false);
 });
+
+test('automatic OPL discovery excludes unrelated AionUI databases and reads only native metadata', t => {
+  const root = temporary(t);
+  for (const name of ['One Person Lab', 'AionUi']) {
+    const file = path.join(root, 'Library/Application Support', name, 'opl-data/aionui-backend.db');
+    const db = database(file);
+    conversation(db, { extra: { canonical_thread_id: 'native-id' } });
+    db.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)').run('m1', 'c1', 'text', 'private history', 'right', 100);
+    db.close();
+  }
+  const sources = discoverAionMigrationSources({ homeDir: root, env: {}, platform: 'darwin' });
+  assert.equal(sources.length, 1);
+  assert.ok(sources[0].path.includes('/One Person Lab/'));
+  const snapshot = readAionMigrationSnapshot({ sources, includeMessages: false });
+  assert.equal(snapshot.conversations[0].nativeCodexThreadId, 'native-id');
+  assert.deepEqual(snapshot.conversations[0].messages, []);
+});
+
+test('legacy Codex ACP UUID is a native reference candidate only for the Codex backend', t => {
+  const root = temporary(t); const db = database(path.join(root, 'aionui-backend.db'));
+  const id = '019c1234-1111-4111-8111-123456789012';
+  conversation(db, { id: 'codex', extra: { backend: 'codex', acp_session_id: id } });
+  conversation(db, { id: 'other', extra: { backend: 'gemini', acp_session_id: id } }); db.close();
+  const rows = readAionMigrationSnapshot({ roots: [root], includeMessages: false }).conversations;
+  assert.equal(rows.find(r => r.id === 'codex').nativeCodexThreadId, id);
+  assert.equal(rows.find(r => r.id === 'other').nativeCodexThreadId, null);
+});

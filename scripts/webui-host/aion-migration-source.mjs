@@ -44,11 +44,10 @@ export function discoverAionMigrationSources({ env = process.env, homeDir = os.h
   const explicitRoot = string(env.OPL_AIONUI_DATA_DIR)?.trim();
   const explicitRoots = string(env.OPL_SHELL_MIGRATION_SOURCE_DIRS)?.split(path.delimiter).map((value) => value.trim()).filter(Boolean) ?? [];
   const candidates = roots ?? (explicitRoot ? [explicitRoot] : [
-    ...(platform === 'darwin' ? ['One Person Lab', 'OnePersonLab', 'AionUi', 'AionUI'].map((name) => path.join(homeDir, 'Library/Application Support', name)) : []),
+    ...(platform === 'darwin' ? ['One Person Lab', 'OnePersonLab'].map((name) => path.join(homeDir, 'Library/Application Support', name)) : []),
     ...(platform === 'darwin' ? ['opl-studio', 'One Person Lab Preview'].map((name) => path.join(homeDir, 'Library/Application Support', name)) : []),
     path.join(homeDir, '.opl-app-data'), path.join(homeDir, '.opl-app-config'),
-    path.join(homeDir, '.aionui'), path.join(homeDir, '.aionui-config'),
-    path.join(homeDir, '.aionui-web'), path.join(homeDir, '.opl-server'),
+    path.join(homeDir, '.opl-server'),
     path.join(homeDir, '.local/share/one-person-lab/webui/data'),
     ...(platform === 'linux' ? ['/data', env.AIONUI_DATA_DIR, env.OPL_DATA_DIR].filter(Boolean) : []),
   ]).concat(explicitRoots);
@@ -103,7 +102,12 @@ function normalizeMessage(row, sourceId, conversationId, index) {
 
 function normalizeConversation(row, source, index) {
   const extra = object(parseJson(row.extra, {}));
-  const nativeCodexThreadId = string(extra.canonical_thread_id);
+  const canonicalId = string(extra.canonical_thread_id);
+  const acpId = string(extra.acp_session_id) ?? string(extra.acpSessionId);
+  // Older Codex ACP records stored the same native UUID under acp_session_id.
+  // It is only a candidate here; App Server must confirm it before linking.
+  const legacyCodexId = extra.backend === 'codex' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(acpId ?? '') ? acpId : null;
+  const nativeCodexThreadId = canonicalId ?? legacyCodexId;
   return {
     id: row.id,
     sourceId: source.id,
@@ -112,7 +116,7 @@ function normalizeConversation(row, source, index) {
     type: string(row.type) ?? 'unknown',
     backend: string(extra.backend),
     nativeCodexThreadId,
-    nativeCodexThreadIdSource: nativeCodexThreadId ? 'extra.canonical_thread_id' : null,
+    nativeCodexThreadIdSource: canonicalId ? 'extra.canonical_thread_id' : legacyCodexId ? 'extra.acp_session_id' : null,
     workspace: string(extra.workspace) ?? string(extra.canonical_recorded_workspace),
     projectId: string(extra.canonical_project_id) ?? string(row.project_id),
     pinned: own(row, 'pinned') ? row.pinned === true || row.pinned === 1 : extra.pinned === true,
@@ -170,10 +174,10 @@ function readSqlite(source, options, diagnostics) {
     if (rows.length > limits.maxConversations) throw new Error('source-conversation-limit');
     const messageColumns = columns(db, 'messages');
     const messageSelect = selectColumns(messageColumns, ['id', 'conversation_id', 'msg_id', 'type', 'content', 'position', 'status', 'hidden', 'created_at']);
-    const messageQuery = messageColumns.has('conversation_id') && messageColumns.has('content')
+    const messageQuery = options.includeMessages !== false && messageColumns.has('conversation_id') && messageColumns.has('content')
       ? db.prepare(`SELECT ${messageSelect} FROM messages WHERE conversation_id = ? ORDER BY ${messageColumns.has('created_at') ? 'created_at, ' : ''}rowid LIMIT ?`)
       : null;
-    if (!messageQuery) diagnostic(diagnostics, source.id, 'source-messages-unavailable');
+    if (options.includeMessages !== false && !messageQuery) diagnostic(diagnostics, source.id, 'source-messages-unavailable');
     let messageCount = 0;
     for (const [index, row] of rows.entries()) {
       if (!string(row.id)) throw new Error('source-conversation-invalid');
@@ -204,18 +208,19 @@ function readSqlite(source, options, diagnostics) {
   }
 }
 
-function readLegacyHistory(source, limits, diagnostics) {
+function readLegacyHistory(source, limits, diagnostics, includeMessages = true) {
   const data = object(readJson(source.path, limits));
   if (!Array.isArray(data['chat.history'])) throw new Error('source-schema-unsupported');
   const rows = data['chat.history'];
   if (rows.length > limits.maxConversations) throw new Error('source-conversation-limit');
   const directory = path.dirname(source.path);
   const aggregatePath = path.join(directory, 'aionui-chat-message.txt');
-  const aggregate = existsSync(aggregatePath) ? object(readJson(aggregatePath, limits)) : {};
+  const aggregate = includeMessages && existsSync(aggregatePath) ? object(readJson(aggregatePath, limits)) : {};
   let messageCount = 0;
   const conversations = rows.map((row, index) => {
     if (!string(row?.id)) throw new Error('source-conversation-invalid');
     const conversation = normalizeConversation(row, source, index);
+    if (!includeMessages) return conversation;
     // Legacy ids become file names; never let imported data select arbitrary files.
     const validFilename = row.id !== '.' && row.id !== '..' && !/[\\/\0]/.test(row.id);
     const messagePath = validFilename ? path.join(directory, 'aionui-chat-history', `${row.id}.txt`) : null;
@@ -250,13 +255,14 @@ export function readAionMigrationSnapshot(options = {}) {
     try {
       let result;
       if (source.kind === 'sqlite') result = readSqlite(source, { ...options, limits }, diagnostics);
-      else if (source.kind === 'json-history') result = readLegacyHistory(source, limits, diagnostics);
+      else if (source.kind === 'json-history') result = readLegacyHistory(source, limits, diagnostics, options.includeMessages !== false);
       else if (source.kind === 'json-settings') {
         const config = object(readJson(source.path, limits));
         result = { conversations: [], ui: [] };
         for (const key of UI_KEYS) if (own(config, key)) addUi(result.ui, key, config[key], source.id);
       } else throw new Error('source-kind-unsupported');
       for (const conversation of result.conversations) {
+        if (options.includeMessages === false) conversation.messages = [];
         if (!conversations.has(conversation.id)) conversations.set(conversation.id, conversation);
       }
       ui.push(...result.ui);

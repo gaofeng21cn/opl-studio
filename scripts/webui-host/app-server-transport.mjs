@@ -893,17 +893,13 @@ export class CodexAppServerTransport extends EventEmitter {
     if (!activeThreadId) {
       throw new AppServerTransportError("invalid_app_server_response", "thread/start returned no thread id");
     }
-    const migrationContext = this.migrationContextForThread?.(activeThreadId);
     const startedTurn = await this.startTurn(activeThreadId, prompt, inputs, {
       cwd: workingDirectory,
       ...turnPermission,
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { effort: reasoningEffort } : {}),
-      ...((selection || turnSelection || migrationContext) ? {
-        additionalContext: {
-          ...agentSelectionContext(selection || turnSelection),
-          ...(migrationContext ? { "opl.aionui_history": { kind: "application", value: migrationContext } } : {})
-        }
+      ...((selection || turnSelection) ? {
+        additionalContext: agentSelectionContext(selection || turnSelection)
       } : {})
     });
     const turnId = startedTurn.turn?.id;

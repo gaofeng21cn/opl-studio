@@ -1,146 +1,92 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { AionMigration, MigratedThreadAdapter } from "./aion-migration.mjs";
 
+const thread = { id: "019c1234-1111-4111-8111-123456789012", cwd: os.tmpdir(), turns: [], status: { type: "idle" }, createdAt: 100, updatedAt: 100 };
+const conversation = { id: "old-1", sourceId: "opl-source", sourceUserId: "default", title: "Old label", nativeCodexThreadId: thread.id,
+  workspace: os.tmpdir(), pinned: true, pinnedAt: 20, sortOrder: 2, archived: false };
+const keyFor = c => createHash('sha256').update(JSON.stringify([c.sourceUserId, c.id])).digest('hex');
+const snapshot = (conversations = [conversation]) => ({ conversations, sources: [{ id: "opl-source", status: "read" }], ui: [], diagnostics: [], complete: true });
 class Transport extends EventEmitter {
-  constructor() { super(); this.cwd = os.tmpdir(); this.threads = new Map(); this.created = 0; }
-  async startThread({ cwd = this.cwd }) {
-    const thread = { id: `native-${++this.created}`, cwd, turns: [], status: { type: "idle" }, createdAt: 100, updatedAt: 100 };
-    this.threads.set(thread.id, thread); return { thread };
-  }
-  async readThread(id) {
-    if (!this.threads.has(id)) throw new Error("thread not found");
-    return { thread: { ...this.threads.get(id) } };
-  }
-  async listThreads() { return { data: [], nextCursor: null }; }
-  async renameThread(id, name) { this.threads.get(id).name = name; }
-  async archiveThread(id) { this.threads.get(id).archived = true; return { threadId: id, archived: true }; }
-  async unarchiveThread(id) { this.threads.get(id).archived = false; return { threadId: id, archived: false }; }
-  async deleteThread(id) { this.threads.delete(id); }
-  async resumeThread(id) { return this.readThread(id); }
+  constructor() { super(); this.cwd = os.tmpdir(); this.reads = []; this.mutations = []; }
+  async readThread(id) { this.reads.push(id); assert.equal(id, thread.id); return { thread: { ...thread } }; }
+  async listThreads() { return { data: [{ ...thread }], nextCursor: null }; }
+  async startThread() { this.mutations.push('start'); throw Error('startup must not create threads'); }
+  async renameThread() { this.mutations.push('rename'); throw Error('startup must not rename threads'); }
+  async archiveThread() { this.mutations.push('archive'); throw Error('startup must not archive threads'); }
 }
 
-const conversation = {
-  id: "old-1", sourceId: "source-1", sourceUserId: "default", title: "Prior research",
-  workspace: os.tmpdir(), pinned: true, pinnedAt: 20, sortOrder: 2, archived: false,
-  createdAt: 10000, updatedAt: 20000,
-  messages: [{ id: "m1", type: "text", position: "right", content: { content: "Prior question" } },
-    { id: "m2", type: "text", position: "left", content: { content: "Prior answer" } }],
-};
-const snapshot = (rows = [conversation]) => ({ conversations: rows, sources: [{ id: "source-1" }], ui: [], diagnostics: [], complete: true });
-
-test("startup preserves history, pin/order, canonical binding, and deletion across restarts", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-migration-test-"));
+test("OPL only links canonical metadata and returns the unchanged Codex directory", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'opl-canonical-metadata-'));
   const transport = new Transport();
-  const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
   try {
-    const first = make(); await first.start();
-    const threads = new MigratedThreadAdapter(transport, first);
-    const list = await threads.listThreads({ archived: false });
-    assert.equal(list.data.length, 1);
-    assert.equal(list.migration.entries[0].pinned, true);
-    assert.equal(list.migration.entries[0].sortOrder, 2);
-    const read = await threads.readThread({ threadId: "native-1", includeTurns: true });
-    assert.deepEqual(read.turns, []);
-    assert.deepEqual(read.importedHistory.messages.map((message) => message.text), ["Prior question", "Prior answer"]);
-    assert.match(first.context("native-1"), /Prior answer/);
-    const second = make(); await second.start();
-    assert.equal(transport.created, 1);
-    assert.equal(second.summary().entries[0].threadId, "native-1");
-    await threads.deleteThread({ threadId: "native-1", confirmed: true });
-    const third = make(); await third.start();
-    assert.equal(transport.created, 1);
-    assert.equal(third.summary().entries.length, 0);
-    assert.equal(JSON.parse(await readFile(path.join(directory, `${third.document.entries[0].key}.json`), "utf8")).messages.length, 2);
-  } finally { await rm(directory, { recursive: true, force: true }); }
-});
-
-test("existing native history is linked without duplication or replay", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-migration-native-"));
-  const transport = new Transport(); await transport.startThread({});
-  const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot([{ ...conversation, nativeCodexThreadId: "native-1" }]) });
-  try {
-    await migration.start();
-    assert.equal(transport.created, 1);
-    assert.equal(migration.summary().entries[0].native, true);
-    assert.equal(migration.context("native-1"), undefined);
-    assert.equal(migration.project((await transport.readThread("native-1")).thread, true).importedHistory, undefined);
-  } finally { await rm(directory, { recursive: true, force: true }); }
-});
-
-test("a failed rename resumes its saved binding without another thread", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-migration-retry-"));
-  const transport = new Transport(); const rename = transport.renameThread.bind(transport);
-  transport.renameThread = async () => { throw new Error("disconnected"); };
-  const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
-  try {
-    const first = make(); await first.start(); assert.equal(first.summary().complete, false);
-    transport.renameThread = rename;
-    const second = make(); await second.start(); assert.equal(second.summary().complete, true);
-    assert.equal(transport.created, 1);
-  } finally { await rm(directory, { recursive: true, force: true }); }
-});
-
-test("legacy archive visibility survives before Codex materializes the first native turn", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-import-empty-native-"));
-  const transport = new Transport();
-  const noRollout = async id => { throw Object.assign(new Error("archive unavailable"), { code: "app_server_rpc_error", details: { error: { code: -32600, message: `no rollout found for thread id ${id}` } } }); };
-  transport.archiveThread = noRollout;
-  transport.unarchiveThread = noRollout;
-  const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot([{ ...conversation, archived: true }]) });
-  try {
-    await migration.start();
-    assert.equal(migration.summary().complete, true);
+    const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: options => { assert.equal(options.includeMessages, false); return snapshot(); } });
     const adapter = new MigratedThreadAdapter(transport, migration);
-    assert.equal((await adapter.listThreads({ archived: false })).data.length, 0);
-    const archived = (await adapter.listThreads({ archived: true })).data;
-    assert.equal(archived.length, 1);
-    assert.equal(archived[0].archived, true);
-    assert.equal((await adapter.readThread({ threadId: "native-1", includeTurns: true })).importedHistory.messages.length, 2);
-    await adapter.setArchived({ threadId: "native-1", archived: false });
-    assert.equal((await adapter.listThreads({ archived: false })).data.length, 1);
-    assert.equal((await adapter.listThreads({ archived: true })).data.length, 0);
+    const result = await adapter.listThreads({ archived: false });
+    assert.equal(result.data.length, 1);
+    assert.equal(result.data[0].id, thread.id);
+    assert.equal(result.data[0].importedHistory, undefined);
+    assert.equal(result.migration.entries[0].threadId, thread.id);
+    assert.equal(result.migration.entries[0].pinned, true);
+    assert.deepEqual(transport.mutations, []);
+    assert.equal(migration.document.complete, true);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test("repair only owner-confirmed unmaterialized paginated imports and preserve their old binding", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-pagination-repair-"));
+test("old pending imports are retained for recovery, canonical refs relink and unrelated history stays out", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'opl-canonical-repair-'));
   const transport = new Transport();
+  const unrelated = { ...conversation, id: 'gemini-elsewhere', nativeCodexThreadId: null };
+  const old = { schema: 'opl_studio_shell_migration.v2', entries: [conversation, unrelated].map(c => ({ key: keyFor(c), sourceConversationId: c.id,
+    threadId: 'thread-fixture', native: false, state: 'pending' })), ui: [], diagnostics: [], complete: false };
+  try {
+    await writeFile(path.join(directory, 'index.json'), JSON.stringify(old));
+    await writeFile(path.join(directory, keyFor(unrelated) + '.json'), 'untouched old source');
+    const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
+    await migration.start();
+    assert.equal(migration.document.complete, true);
+    assert.deepEqual(JSON.parse(await readFile(path.join(directory, 'index.before-canonical-metadata.json'), 'utf8')), old);
+    assert.equal(migration.document.entries[0].threadId, thread.id);
+    assert.equal(migration.document.entries[0].previousBindings[0].threadId, 'thread-fixture');
+    assert.equal(migration.document.entries[1].state, 'ignored');
+    assert.equal(migration.summary().entries.length, 1);
+    assert.equal(await readFile(path.join(directory, keyFor(unrelated) + '.json'), 'utf8'), 'untouched old source');
+    assert.deepEqual(transport.mutations, []);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("missing native identity and non-Codex history never manufacture replacement threads", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'opl-canonical-missing-'));
+  const transport = new Transport();
+  transport.readThread = async () => { throw Object.assign(Error('RPC rejected'), { code: 'app_server_rpc_error', details: { error: { code: -32600, message: 'no rollout found for thread id missing' } } }); };
+  try {
+    const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot([conversation, { ...conversation, id: 'gemini', nativeCodexThreadId: null }]) });
+    await migration.start();
+    assert.equal(migration.document.complete, true);
+    assert.equal(migration.summary().entries.length, 0);
+    assert.deepEqual(migration.document.entries.map(e => e.state), ['ignored', 'ignored']);
+    assert.deepEqual(transport.mutations, []);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("transient owner failure remains retryable without changing or deleting native data", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'opl-canonical-retry-'));
+  const transport = new Transport();
+  const reader = transport.readThread.bind(transport);
+  transport.readThread = async () => { throw Error('runtime unavailable'); };
   const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
   try {
-    await make().start();
-    transport.threads.get("native-1").historyMode = "paginated";
-    transport.resumeThread = async () => { throw Object.assign(new Error("no rollout"), {
-      code: "app_server_rpc_error", details: { error: { code: -32600, message: "no rollout found for thread id native-1" } }
-    }); };
-    const repaired = make(); await repaired.start();
-    assert.equal(repaired.summary().complete, true);
-    assert.equal(repaired.document.entries[0].threadId, "native-2");
-    assert.equal(repaired.document.entries[0].previousBindings[0].threadId, "native-1");
-    assert.equal(transport.threads.has("native-1"), true);
-    const history = await new MigratedThreadAdapter(transport, repaired).readThread({ threadId: "native-2", includeTurns: true });
-    assert.deepEqual(history.importedHistory.messages.map(message => message.text), ["Prior question", "Prior answer"]);
-    await make().start(); assert.equal(transport.created, 2);
+    const failed = make(); await failed.start(); assert.equal(failed.summary().complete, false);
+    transport.readThread = reader;
+    const retried = make(); await retried.start(); assert.equal(retried.summary().complete, true);
+    await retried.deleted(thread.id);
+    const restarted = make(); await restarted.start(); assert.equal(restarted.summary().entries.length, 0);
+    assert.equal(restarted.document.entries[0].state, 'deleted');
+    assert.deepEqual(transport.mutations, []);
   } finally { await rm(directory, { recursive: true, force: true }); }
-});
-
-test("materialized imports and unrelated native failures never replace canonical bindings", async () => {
-  for (const failure of [null, "database unavailable"]) {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "aion-pagination-preserve-"));
-    const transport = new Transport();
-    const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
-    try {
-      await make().start();
-      transport.threads.get("native-1").historyMode = "paginated";
-      transport.resumeThread = async () => { if (failure) throw new Error(failure); return transport.readThread("native-1"); };
-      const again = make(); await again.start();
-      assert.equal(transport.created, 1);
-      assert.equal(again.document.entries[0].threadId, "native-1");
-      assert.equal(again.summary().complete, !failure);
-    } finally { await rm(directory, { recursive: true, force: true }); }
-  }
 });

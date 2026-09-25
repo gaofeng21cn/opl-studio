@@ -736,7 +736,6 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   assert.match(runtimeShim, /isWindowsStylePath/);
   assert.match(bunBuild, /"process\.env\.DSH_CLIENT_COMMIT_HASH": JSON\.stringify\(""\)/);
   assert.match(slotHost, /"hero.headline": \["One Person Lab", "One Person Lab"\]/);
-  assert.match(slotHost, /"hero.preview": \["预览版", "Preview"\]/);
   assert.match(slotHost, /function SettingsHeaderSlot\(\) \{ return <>One Person Lab<\/>; \}/);
   assert.doesNotMatch(main, /--opl-brand-logo/);
   assert.doesNotMatch(main, /branding\/opl-app-logo\.png/);

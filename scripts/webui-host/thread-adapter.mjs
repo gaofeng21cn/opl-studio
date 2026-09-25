@@ -127,6 +127,8 @@ export class CodexThreadAdapter extends EventEmitter {
     const params = {
       sortKey: "updated_at",
       sortDirection: "desc",
+      // Account/provider changes must not hide existing native conversations.
+      modelProviders: [],
       ...(Number.isFinite(request.limit) ? { limit: request.limit } : {}),
       ...(typeof request.archived === "boolean" ? { archived: request.archived } : {}),
       ...(requestedWorkspace ? { cwd: requestedWorkspace } : {}),

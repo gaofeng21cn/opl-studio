@@ -26,6 +26,7 @@ class FakeTransport extends EventEmitter {
   calls = [];
 
   async listThreads(params) {
+    assert.deepEqual(params.modelProviders, []);
     this.calls.push(["thread/list", params]);
     if (params.cursor === "page-2") {
       return {
