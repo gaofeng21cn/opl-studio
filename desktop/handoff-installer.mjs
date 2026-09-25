@@ -28,7 +28,7 @@ export function verifyApp(bundle, { minimumVersion, exactVersion, requireNotariz
   };
   command('/usr/bin/codesign', ['--verify','--deep','--strict',bundle]);
   // A designated requirement binds both bundle and publisher, not just an optional team string.
-  command('/usr/bin/codesign', ['--verify','-R',`identifier "${STABLE_BUNDLE_ID}" and anchor apple generic and certificate leaf[subject.OU] = "${PUBLISHER_TEAM_ID}"`,bundle]);
+  command('/usr/bin/codesign', ['--verify','-R',`=identifier "${STABLE_BUNDLE_ID}" and anchor apple generic and certificate leaf[subject.OU] = "${PUBLISHER_TEAM_ID}"`,bundle]);
   // Gatekeeper is present on customer Macs; stapler requires developer tools.
   // Capture its verbose assessment (written to stderr) and require Apple's
   // notarization verdict for new target bytes. CI separately verifies stapling.

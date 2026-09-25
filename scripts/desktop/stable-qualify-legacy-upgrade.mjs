@@ -92,7 +92,7 @@ async function qualifyBaseline(options, candidate, tag, transient) {
     const copy = (source, target) => run("scp", [...sshArgs, source, `${options.user}@${ip}:${target}`]);
     copy(baselineDmg, "/tmp/opl-baseline.dmg");
     guest("test ! -e '/Applications/One Person Lab.app' && mkdir -p /tmp/opl-baseline-mount && hdiutil attach /tmp/opl-baseline.dmg -nobrowse -readonly -mountpoint /tmp/opl-baseline-mount && sudo -n ditto '/tmp/opl-baseline-mount/One Person Lab.app' '/Applications/One Person Lab.app' && hdiutil detach /tmp/opl-baseline-mount");
-    guest("codesign --verify --deep --strict '/Applications/One Person Lab.app' && codesign --verify -R 'identifier \"cn.onepersonlab.opl\" and anchor apple generic and certificate leaf[subject.OU] = \"SVVC4TA784\"' '/Applications/One Person Lab.app' && spctl --assess --type execute '/Applications/One Person Lab.app'");
+    guest("codesign --verify --deep --strict '/Applications/One Person Lab.app' && codesign --verify -R '=identifier \"cn.onepersonlab.opl\" and anchor apple generic and certificate leaf[subject.OU] = \"SVVC4TA784\"' '/Applications/One Person Lab.app' && spctl --assess --type execute '/Applications/One Person Lab.app'");
     const executable = "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab";
     const guestNode = `env ELECTRON_RUN_AS_NODE=1 ${quote(executable)}`;
     guest("mkdir -p /tmp/opl-upgrade-assets /tmp/opl-upgrade-codex");

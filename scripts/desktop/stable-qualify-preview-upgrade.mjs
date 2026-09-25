@@ -89,7 +89,7 @@ function inspectSignedBridge(candidate, transient) {
   run("ditto", ["-x", "-k", zip.file, root]);
   const app = path.join(root, "One Person Lab Preview.app");
   run("codesign", ["--verify", "--deep", "--strict", app]);
-  run("codesign", ["--verify", "-R", `identifier "cn.onepersonlab.opl.studio.preview" and anchor apple generic and certificate leaf[subject.OU] = "${publisher}"`, app]);
+  run("codesign", ["--verify", "-R", `=identifier "cn.onepersonlab.opl.studio.preview" and anchor apple generic and certificate leaf[subject.OU] = "${publisher}"`, app]);
   run("spctl", ["--assess", "--type", "execute", app]);
   run("xcrun", ["stapler", "validate", app]); run("xcrun", ["stapler", "validate", dmg.file]);
   invariant(run("plutil", ["-extract", "CFBundleShortVersionString", "raw", "-o", "-", path.join(app, "Contents/Info.plist")]).stdout.trim() === candidate.checkpoint.source.version, "Signed bridge version differs from checkpoint");
@@ -125,7 +125,7 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
     copy(baselineDmg, "/tmp/opl-preview-baseline.dmg");
     guest("hdiutil attach /tmp/opl-preview-baseline.dmg -nobrowse -readonly -mountpoint /tmp/opl-preview-mount && ditto '/tmp/opl-preview-mount/One Person Lab Preview.app' '/Applications/One Person Lab Preview.app' && hdiutil detach /tmp/opl-preview-mount");
     const previewApp = "/Applications/One Person Lab Preview.app";
-    guest(`codesign --verify --deep --strict ${quote(previewApp)} && codesign --verify -R 'identifier "cn.onepersonlab.opl.studio.preview" and anchor apple generic and certificate leaf[subject.OU] = "${publisher}"' ${quote(previewApp)} && spctl --assess --type execute ${quote(previewApp)}`);
+    guest(`codesign --verify --deep --strict ${quote(previewApp)} && codesign --verify -R '=identifier "cn.onepersonlab.opl.studio.preview" and anchor apple generic and certificate leaf[subject.OU] = "${publisher}"' ${quote(previewApp)} && spctl --assess --type execute ${quote(previewApp)}`);
     invariant(guest(`plutil -extract CFBundleShortVersionString raw -o - ${quote(`${previewApp}/Contents/Info.plist`)}`).stdout.trim() === baseline.tag_name.slice(1), "Installed baseline version differs from public tag");
     const previewAssets = candidate.assets.map((asset) => ({ name: path.basename(asset.path), path: `/tmp/opl-preview-assets/${path.basename(asset.path)}`, sha256: asset.sha256, size: asset.size_bytes }));
     for (const asset of candidate.assets) copy(asset.file, `/tmp/opl-preview-assets/${path.basename(asset.path)}`);

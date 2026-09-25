@@ -17,7 +17,8 @@ function systemCommands({ notarized = true, gatekeeperStatus = 0 } = {}) {
 test('handoff checks notarization with built-in macOS tools and stderr verdict', () => {
   const system = systemCommands();
   assert.equal(verifyApp('/Applications/One Person Lab.app', { exactVersion:'26.9.2491', execute:system.execute }).version, '26.9.2491');
-  assert.ok(system.calls.some(call => call.command === '/usr/bin/codesign' && call.args.includes('-R')));
+  const requirement = system.calls.find(call => call.command === '/usr/bin/codesign' && call.args.includes('-R'));
+  assert.match(requirement.args[requirement.args.indexOf('-R') + 1], /^=identifier "cn\.onepersonlab\.opl" and anchor apple generic/);
   assert.ok(system.calls.every(call => call.command !== '/usr/bin/xcrun'));
 });
 
