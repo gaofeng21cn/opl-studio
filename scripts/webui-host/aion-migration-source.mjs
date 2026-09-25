@@ -117,7 +117,8 @@ function normalizeConversation(row, source, index) {
     projectId: string(extra.canonical_project_id) ?? string(row.project_id),
     pinned: own(row, 'pinned') ? row.pinned === true || row.pinned === 1 : extra.pinned === true,
     pinnedAt: number(row.pinned_at) ?? number(extra.pinned_at),
-    archived: row.archived === true || row.archived === 1 || extra.archived === true,
+    archived: row.archived === true || row.archived === 1 || extra.archived === true
+      || number(row.archived_at) !== null || number(extra.archived_at) !== null,
     archivedAt: number(row.archived_at) ?? number(extra.archived_at),
     sortOrder: number(extra.sortOrder),
     sourceIndex: index,

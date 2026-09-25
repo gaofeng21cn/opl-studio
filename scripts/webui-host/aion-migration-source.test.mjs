@@ -82,6 +82,21 @@ test('reads native continuity, ordering, archive and UI settings with provenance
   assert.deepEqual(snapshot.drafts, { status: 'unavailable', reasonCode: 'upstream-drafts-memory-only', records: [] });
 });
 
+test('modern archive timestamps preserve archived conversations without a legacy boolean', (t) => {
+  const root = temporary(t);
+  const file = path.join(root, 'aionui-backend.db');
+  const db = database(file);
+  db.exec('ALTER TABLE conversations ADD COLUMN archived_at INTEGER');
+  conversation(db);
+  db.exec("UPDATE conversations SET archived_at = 1790290100000 WHERE id = 'c1'");
+  db.close();
+  const before = fingerprint(file);
+  const [record] = readAionMigrationSnapshot({ roots: [root] }).conversations;
+  assert.equal(record.archived, true);
+  assert.equal(record.archivedAt, 1790290100000);
+  assert.equal(fingerprint(file), before);
+});
+
 test('reads active WAL committed history without changing database or WAL bytes', (t) => {
   const root = temporary(t);
   const file = path.join(root, 'aionui-backend.db');
