@@ -80,6 +80,24 @@ export async function qualifyUpgradeVm(options) {
       await pause(1500);
     }
     invariant(downloaded, "Updater download did not finish");
+    if (options.route === "aion") {
+      // The legacy renderer reports the ZIP download before Squirrel finishes
+      // verifying and staging it. Exercise background download followed by a
+      // restart once the native installer has persisted the exact target.
+      const nativeDeadline = Math.min(deadline, Date.now() + 120_000);
+      let ready = false;
+      do {
+        const stagedUrl = guest('plutil -extract updateBundleURL raw -o - "$HOME/Library/Caches/cn.onepersonlab.opl.ShipIt/ShipItState.plist"', true).stdout.trim();
+        if (stagedUrl.startsWith("file://")) {
+          const stagedBundle = fileURLToPath(stagedUrl);
+          ready = plistVersion(stagedBundle) === options.targetVersion;
+        }
+        if (ready) break;
+        await pause(500);
+      } while (Date.now() < nativeDeadline);
+      invariant(ready, "Legacy native updater did not finish staging the exact target");
+      receipt.checks.nativeUpdateReady = { version: options.targetVersion, activation: "background_download_then_restart" };
+    }
     // Invoke the production restart action, then observe its on-disk replacement.
     if (options.route === "preview") await evaluate("window.oplStudio.restartNativeApp()").catch(() => {});
     else await evaluate(aionInvokeExpression("auto-update.quit-and-install", {})).catch(() => {});
