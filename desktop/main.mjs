@@ -471,6 +471,7 @@ app.whenReady().then(async () => {
       await runPreviewHandoff({ app,plan:previewPlan });
       app.exit(0);
     } catch (error) {
+      console.warn("[OPL:preview-handoff]", error.message, error.cause?.code ?? "");
       await dialog.showMessageBox(progress,{ type:"error",title:"One Person Lab",message:"自动升级未完成，原应用和数据已保留。重新打开 Preview 可自动重试。",detail:String(error.message),buttons:["关闭 / Close"] });
       app.exit(1);
     }

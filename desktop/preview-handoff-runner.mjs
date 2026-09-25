@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, net } from 'electron';
 import { createPreviewHandoff, writePreviewHandoff, readPreviewHandoff, privateJson, atomicJson, digest,
   normalizeStorageSnapshot, mergeShellStorage, mergeChannelBindings, HANDOFF_STORAGE_KEYS, validateTarget } from './preview-handoff.mjs';
 import { prepareTarget, launchInstallHelper } from './handoff-installer.mjs';
@@ -26,7 +26,7 @@ export function packagedPreviewPlan(resourcesPath, isPackaged) {
 export async function runPreviewHandoff({ app, plan, onStatus = () => {} }) {
   const transactionRoot = path.join(app.getPath('userData'),'handoff',plan.target.sha256);
   onStatus('downloading');
-  const staged = await prepareTarget({ target:plan.target, transactionRoot });
+  const staged = await prepareTarget({ target:plan.target, transactionRoot, fetchImpl: (...args) => net.fetch(...args) });
   const window = await storageWindow();
   try {
     const storage = await window.webContents.executeJavaScript(`Object.fromEntries(${JSON.stringify(HANDOFF_STORAGE_KEYS)}.map(k => [k, localStorage.getItem(k)]))`);
