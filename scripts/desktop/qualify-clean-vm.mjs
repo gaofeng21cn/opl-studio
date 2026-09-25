@@ -436,7 +436,7 @@ export async function qualifyCleanVm(options) {
     progress({ phase: "smoke", status: smoke.status, phaseTimeoutMs, blockers: smoke.blockers });
     checks.startup = smoke.checks.startup;
     checks.runtime = smoke.checks.runtime;
-    if (options.frameworkSourceArchive && ip) {
+    if (!fullRuntime && options.frameworkSourceArchive && ip) {
       const identityResult = guestRun(options, ip, "cat \"$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json\"");
       const installedIdentity = JSON.parse(identityResult.stdout);
       const identityPassed = installedIdentity?.schema === "opl_framework_installed_source_identity.v1"
@@ -448,6 +448,9 @@ export async function qualifyCleanVm(options) {
         installedIdentity
       };
       invariant(identityPassed, "Studio Standard Framework bootstrap did not install the exact injected Framework archive");
+    }
+    if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
+      checks.framework.status = 'passed';
     }
     checks.gateway = smoke.checks.gateway;
     checks.update = {
