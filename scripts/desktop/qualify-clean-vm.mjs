@@ -193,15 +193,23 @@ function scpToGuest(options, ip, source, target) {
   return run("scp", ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, source, `${options.guestUser}@${ip}:${target}`]);
 }
 
-async function waitForIp(vmName, timeoutMs = 120_000) {
+export async function waitForVmIp(vmName, { vmProcess, timeoutMs = 120_000, pollMs = 2_000,
+  readIp = () => run("tart", ["ip", vmName], { allowFailure: true }) } = {}) {
+  let diagnostics = "";
+  let spawnError;
+  vmProcess?.stderr?.on("data", (chunk) => { diagnostics = (diagnostics + String(chunk)).slice(-4096); });
+  vmProcess?.once("error", (error) => { spawnError = error; });
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const result = run("tart", ["ip", vmName], { allowFailure: true });
+    if (spawnError || (vmProcess && (vmProcess.exitCode !== null || vmProcess.signalCode !== null))) {
+      throw new Error(`Tart failed to start ${vmName}: ${spawnError?.message || diagnostics.trim() || `exit=${vmProcess.exitCode}, signal=${vmProcess.signalCode}`}`);
+    }
+    const result = readIp();
     const ip = result.stdout.trim();
     if (result.status === 0 && ip) return ip;
-    await delay(2_000);
+    await delay(pollMs);
   }
-  throw new Error(`timed out waiting for Tart IP for ${vmName}`);
+  throw new Error(`timed out waiting for Tart IP for ${vmName}${diagnostics.trim() ? `: ${diagnostics.trim()}` : ""}`);
 }
 
 export async function qualifyCleanVm(options) {
@@ -283,9 +291,12 @@ export async function qualifyCleanVm(options) {
   };
   try {
     if (!options.attach) {
+      progress({ phase: "clone_vm", status: "started", vm_name: options.vmName });
       if (!options.skipClone) run("tart", ["clone", options.sourceVm, options.vmName]);
-      tartProcess = spawn("tart", ["run", "--no-graphics", options.vmName], { stdio: "ignore" });
-      ip = await waitForIp(options.vmName);
+      progress({ phase: "start_vm", status: "started", vm_name: options.vmName });
+      tartProcess = spawn("tart", ["run", "--no-graphics", options.vmName], { stdio: ["ignore", "ignore", "pipe"] });
+      ip = await waitForVmIp(options.vmName, { vmProcess: tartProcess });
+      progress({ phase: "wait_for_ip", status: "passed", vm_name: options.vmName, guest_ip: ip });
       checks.vm = { source: options.sourceVm, clone: options.vmName, ip, started: true };
 
       scpToGuest(options, ip, options.dmg, guestDmg);

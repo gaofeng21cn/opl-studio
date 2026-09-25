@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
 import {
+  waitForVmIp,
   buildGuestLaunchCommand,
   prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
@@ -165,4 +166,11 @@ test("clean VM rejects partial or attach-mode Framework source preparation", () 
     ]),
     /cannot be used with --attach/
   );
+});
+
+
+test("a failed Tart process reports its startup cause without waiting for DHCP", async () => {
+  const child = spawn(process.execPath, ["-e", "process.stderr.write('maximum supported VM count exceeded');process.exit(2)"], { stdio: ["ignore", "ignore", "pipe"] });
+  await assert.rejects(waitForVmIp("fixture-vm", { vmProcess: child, timeoutMs: 1000, pollMs: 10,
+    readIp: () => ({ status: 1, stdout: "" }) }), /Tart failed to start fixture-vm: maximum supported VM count exceeded/);
 });
