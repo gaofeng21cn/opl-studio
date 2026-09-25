@@ -150,6 +150,7 @@ manual updates remain available through the existing update actions.
 Before starting its persistent App Server, Preview supplies a fresh `OPL_APP_PROCESS_INSTANCE_ID` and
 calls `opl update activate --json`. Framework owns verification, pending generation activation and rollback.
 Explicit Codex executables remain selected; otherwise the activation receipt selects the managed binary.
+Framework Package actions inherit that executable through `OPL_CODEX_PLUGIN_BIN` when no explicit Package carrier override is set, including standalone executables outside `PATH`.
 The Standard bootstrap recognizes both the installer identity and Framework's
 `opl_framework_runtime_source` receipt after an owner update. Missing activation support does not
 authorize overwriting an owner-updated directory. Explicit external Framework roots are

@@ -102,5 +102,10 @@ export function resolveDesktopRuntimeEnvironment({
     const opl = findExecutable("opl", oplSearchDirectories, executable);
     if (opl) resolved.OPL_APP_OPL_BIN = opl;
   }
+  // Framework Package actions must use the same selected Codex executable
+  // even when it is outside PATH (for example a migrated standalone carrier).
+  if (!resolved.OPL_CODEX_PLUGIN_BIN && resolved.OPL_CODEX_BIN) {
+    resolved.OPL_CODEX_PLUGIN_BIN = resolved.OPL_CODEX_BIN;
+  }
   return resolved;
 }

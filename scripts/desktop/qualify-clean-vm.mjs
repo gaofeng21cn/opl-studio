@@ -446,6 +446,16 @@ export async function qualifyCleanVm(options) {
     checks.failure = { detail: redactSecrets(error instanceof Error ? error.message : String(error), secretValues) };
     if (ip) checks.guestLog = redactSecrets(guestRun(options, ip, `tail -120 ${guestLog}`, { allowFailure: true }).stdout, secretValues);
   } finally {
+    if (ip && (checks.failure || checks.smoke?.status !== "passed")) {
+      const secretValues = [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password, smokeInputs?.turnRequest?.prompt].filter(Boolean);
+      try {
+        checks.guestLog = redactSecrets(guestRun(options, ip, `tail -120 ${shellQuote(guestLog)}`, { allowFailure: true }).stdout, secretValues);
+        const attempt = guestRun(options, ip, 'cat "$HOME/Library/Application Support/OPL/state/.official-profile-first-install-attempt.json"', { allowFailure: true });
+        if (attempt.stdout.trim()) checks.officialProfileAttempt = JSON.parse(redactSecrets(attempt.stdout, secretValues));
+      } catch {
+        checks.officialProfileDiagnosticsUnavailable = true;
+      }
+    }
     if (tunnel && tunnel.exitCode === null) tunnel.kill("SIGTERM");
     if (!options.keepVm && tartProcess && tartProcess.exitCode === null) tartProcess.kill("SIGTERM");
     if (!options.attach && !options.keepVm) run("tart", ["stop", options.vmName], { allowFailure: true });

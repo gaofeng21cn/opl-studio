@@ -34,6 +34,7 @@ test("desktop runtime resolution preserves explicit executable overrides", () =>
   });
 
   assert.equal(resolved.OPL_CODEX_BIN, "/managed/codex");
+  assert.equal(resolved.OPL_CODEX_PLUGIN_BIN, "/managed/codex");
   assert.equal(resolved.OPL_APP_OPL_BIN, "/managed/opl");
 });
 test("Aion standalone Codex remains discoverable with the same custom CODEX_HOME", () => {
@@ -41,6 +42,7 @@ test("Aion standalone Codex remains discoverable with the same custom CODEX_HOME
   const binary = path.join(codexHome, "packages", "standalone", "current", "codex");
   const env = resolveDesktopRuntimeEnvironment({ env: { PATH: "/usr/bin", CODEX_HOME: codexHome }, homeDir: "/Users/opl", readDirectory: () => [], executable: candidate => candidate === binary });
   assert.equal(env.OPL_CODEX_BIN, binary);
+  assert.equal(env.OPL_CODEX_PLUGIN_BIN, binary);
   assert.equal(env.CODEX_HOME, codexHome);
 });
 
