@@ -39,13 +39,37 @@ export async function startHeadlessHost({
   env = process.env
 } = {}) {
   await access(path.join(config.webRoot, "index.html"));
+  let official;
+  const resourcesPath = env.OPL_OFFICIAL_PROFILE_RESOURCES;
+  if (resourcesPath) {
+    const profile = await import('../../desktop/official-profile.mjs');
+    const { discoverAionMigrationSources } = await import('../webui-host/aion-migration-source.mjs');
+    // The image includes runtime binaries; only persisted owner state or history
+    // identifies an existing installation. Never reapply its Package selection.
+    if (discoverAionMigrationSources({ env }).length === 0) {
+      const admission = profile.captureOfficialProfileAdmission({ env: {
+        ...env, OPL_APP_OPL_BIN: undefined, OPL_COMMAND: undefined, OPL_FRAMEWORK_PACKAGE_ROOT: undefined
+      } });
+      official = { ...profile, admission };
+    }
+  }
   const host = await createHost({
+    env,
     webRoot: config.webRoot,
     webHost: config.address,
     webPort: config.port,
     channelBindingFile: env.OPL_STUDIO_CHANNEL_BINDINGS_FILE
       ?? path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "channel-transport-bindings.json")
   });
+  if (official) {
+    const options = { admission: official.admission, resourcesPath, env,
+      logEvent: (event) => process.stderr.write(`[OPL:official-profile] ${JSON.stringify(event)}\n`) };
+    host.core.applyOfficialProfileWhenReady = (initialize) => official.startOfficialProfileFirstInstall({
+      ...options, readInitialize: async () => initialize, readinessTimeoutMs: 0
+    });
+    void official.startOfficialProfileFirstInstall({ ...options,
+      readInitialize: () => host.core.invoke('readState', { profile: 'fast' }) });
+  }
   return {
     host,
     config,

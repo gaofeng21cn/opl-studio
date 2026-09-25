@@ -9,7 +9,7 @@ RUN apt-get update \
 
 FROM source-builder-base AS framework-builder
 ARG OPL_FRAMEWORK_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab.git
-ARG OPL_FRAMEWORK_REF=0cd2325eae4df36c1db882c7a51a19a95661c281
+ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
 WORKDIR /src/opl-framework
 
 RUN git init \
@@ -25,13 +25,13 @@ RUN npm ci --ignore-scripts \
   && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS codex-builder
-ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.156.1
+ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.144.5
 RUN npm install --global --prefix /opt/codex "${OPL_CODEX_NPM_SPEC}" \
   && npm cache clean --force
 
 FROM source-builder-base AS app-product-profile
 ARG OPL_APP_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab-app.git
-ARG OPL_APP_REF=0ff60b27beba357c235cc4d50eb20bf193b9b113
+ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
 WORKDIR /src/one-person-lab-app
 RUN git init \
   && git remote add origin "${OPL_APP_REPOSITORY}" \
@@ -39,6 +39,7 @@ RUN git init \
   && git checkout --detach FETCH_HEAD \
   && test "$(git rev-parse HEAD)" = "${OPL_APP_REF}" \
   && test -f contracts/app-product-profile.json
+RUN node --experimental-strip-types --input-type=module -e "import { materializeStudioOfficialProfileResources } from './scripts/studio-official-profile-resources.ts'; materializeStudioOfficialProfileResources('/opt/opl', process.cwd());"
 
 FROM ${NODE_IMAGE} AS renderer-builder
 ARG OPL_BUN_VERSION=1.3.14
@@ -79,6 +80,14 @@ RUN apt-get update \
 
 COPY --from=framework-builder /opt/opl-framework /opt/opl-framework
 COPY --from=codex-builder /opt/codex /opt/codex
+COPY --from=app-product-profile /opt/opl/resources /opt/opl/resources
+COPY desktop/official-profile.mjs ./desktop/official-profile.mjs
+COPY scripts/headless/image-manifest.mjs /tmp/image-manifest.mjs
+ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
+ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
+ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.144.5
+RUN OPL_FRAMEWORK_REF="${OPL_FRAMEWORK_REF}" OPL_APP_REF="${OPL_APP_REF}" OPL_CODEX_NPM_SPEC="${OPL_CODEX_NPM_SPEC}" OPL_SOURCE_REVISION="${OPL_SOURCE_REVISION}" node /tmp/image-manifest.mjs \
+  && rm /tmp/image-manifest.mjs
 COPY --from=production-dependencies --chown=node:node /app/package.json ./package.json
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=production-dependencies --chown=node:node /app/packages ./packages
@@ -91,6 +100,9 @@ ENV NODE_ENV=production \
   HOME=/data \
   CODEX_HOME=/data/codex \
   OPL_DATA_DIR=/data \
+  OPL_IMAGE_MANIFEST_PATH=/opt/opl/image-manifest.json \
+  OPL_IMAGE_SEED_DIR=/opt/opl/seed \
+  OPL_OFFICIAL_PROFILE_RESOURCES=/opt/opl/resources \
   OPL_PROJECTS_DIR=/projects \
   OPL_WORKSPACE_ROOT=/projects \
   OPL_STUDIO_CODEX_CWD=/projects \

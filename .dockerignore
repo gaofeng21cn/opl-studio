@@ -9,8 +9,12 @@ coverage
 *.log
 docs
 tests
-desktop
+desktop/*
+!desktop/official-profile.mjs
 assets
 electron-builder.yml
 scripts/webui-host/*.test.mjs
 scripts/webui-host/fixtures
+
+**/*.tgz
+!.opl-frozen-inputs/codex-cli.tgz
