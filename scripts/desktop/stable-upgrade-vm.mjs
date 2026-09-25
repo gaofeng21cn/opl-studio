@@ -105,9 +105,20 @@ export async function qualifyUpgradeVm(options) {
     invariant(plistVersion(stableBundle) === options.targetVersion, "Squirrel replacement or Preview handoff did not install exact Studio Stable");
     guest(`/usr/bin/codesign --verify --deep --strict ${quote(stableBundle)} && /usr/bin/codesign --verify -R '=identifier "cn.onepersonlab.opl" and anchor apple generic and certificate leaf[subject.OU] = "SVVC4TA784"' ${quote(stableBundle)} && /usr/sbin/spctl --assess --type execute ${quote(stableBundle)}`);
     receipt.checks.installedIdentity = { version: options.targetVersion, bundleId: "cn.onepersonlab.opl", teamId: "SVVC4TA784", signatureVerified: true, gatekeeperAccepted: true };
-    await pause(3000);
+    const stableProcess = "pgrep -f '^/Applications/One Person Lab.app/Contents/MacOS/One Person Lab( |$)' >/dev/null";
+    const installerProcess = "pgrep -x ShipIt >/dev/null || ps -axo comm | awk 'index($0, \"/handoff/\") && index($0, \"/Contents/MacOS/One Person Lab\") {found=1} END {exit !found}'";
+    const launchDeadline = Math.min(deadline, Date.now() + 120_000);
+    let launchSettled = false;
+    do {
+      launchSettled = guest(installerProcess, true).status !== 0 && guest(stableProcess, true).status === 0;
+      if (launchSettled) break;
+      await pause(500);
+    } while (Date.now() < launchDeadline);
+    invariant(launchSettled, "Native installer did not finish launching the installed App");
     guest("pkill -TERM -f '^/Applications/One Person Lab.app/Contents/MacOS/One Person Lab( |$)'", true);
-    await pause(2000);
+    const closeDeadline = Date.now() + 30_000;
+    while (guest(stableProcess, true).status === 0 && Date.now() < closeDeadline) await pause(250);
+    invariant(guest(stableProcess, true).status !== 0, "Installed App did not exit before diagnostic relaunch");
     guest(`nohup ${trustEnvironment}${quote(`${stableBundle}/Contents/MacOS/One Person Lab`)} --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 >/tmp/opl-upgrade-stable.log 2>&1 & echo $!`);
     await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
     const readback = await evaluate(`(async()=>{const status=await window.oplStudio.readNativeAppUpdateStatus();return {status,bridge:typeof window.oplStudio.readState==='function',draft:localStorage.getItem('opl.studio.drafts.v2'),settings:localStorage.getItem('opl.studio.settings.v1')};})()`);
