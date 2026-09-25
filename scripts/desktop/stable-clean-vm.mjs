@@ -65,6 +65,7 @@ export function buildStableSummary(options, receipt, error = null) {
     settings_smoke: { status: smoke?.status === "passed" ? "passed" : "failed", evidence: "artifacts/smoke-summary.json", runtime_refresh: smoke?.checks?.runtimeRefresh ?? null },
     distribution: distribution ?? null,
     generation_requested: false,
+    temporal_service_supervisor_proof: receipt?.checks?.temporal_service_supervisor_proof ?? null,
     failure: passed ? null : { stage: "studio_clean_vm", message: error?.message ?? receipt?.checks?.failure?.detail ?? "Studio clean VM checks did not pass" },
     studio_qualification: "studio-clean-vm-qualification.json"
   };
