@@ -25,7 +25,7 @@ RUN npm ci --ignore-scripts \
   && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS codex-builder
-ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.144.5
+ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.157.0
 RUN npm install --global --prefix /opt/codex "${OPL_CODEX_NPM_SPEC}" \
   && npm cache clean --force
 
@@ -86,7 +86,7 @@ COPY desktop/official-profile.mjs ./desktop/official-profile.mjs
 COPY scripts/headless/image-manifest.mjs /tmp/image-manifest.mjs
 ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
 ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
-ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.144.5
+ARG OPL_CODEX_NPM_SPEC=@openai/codex@0.157.0
 RUN OPL_FRAMEWORK_REF="${OPL_FRAMEWORK_REF}" OPL_APP_REF="${OPL_APP_REF}" OPL_CODEX_NPM_SPEC="${OPL_CODEX_NPM_SPEC}" OPL_SOURCE_REVISION="${OPL_SOURCE_REVISION}" node /tmp/image-manifest.mjs \
   && rm /tmp/image-manifest.mjs
 COPY --from=production-dependencies --chown=node:node /app/package.json ./package.json

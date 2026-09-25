@@ -221,7 +221,12 @@ The macOS Standard and Full App bundles do not embed a second Codex CLI.
 `opl-codex-native` starts the exact external or Framework-managed executable
 selected through `OPL_CODEX_BIN` and the existing desktop resolver. Respect
 explicit user-managed paths; Framework owns managed installation and updates.
-The clean-VM qualification tarball is a test input, not the shipped CLI version.
+The clean-VM qualification tarball is a test input, not an embedded CLI. App pins
+the current stable Codex version and verified npm digests in its qualification
+manifest; Windows/WSL bootstrap and Docker release builds consume that same
+version. The Studio Dockerfile/Compose defaults must match it. Freeze these inputs
+for an operation; do not resolve a moving npm tag during a resumed qualification.
+Read the actual managed version during migration and task acceptance as well.
 
 The Docker/WebUI carrier does include Codex CLI and pins its default npm spec
 in `Dockerfile` and `compose.yaml`; those files own the pinned version. Runtime
