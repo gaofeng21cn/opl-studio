@@ -463,7 +463,18 @@ export async function qualifyCleanVm(options) {
       const localDriver = path.join(runRoot, "temporal-driver.mjs");
       const runtime = `${guestApp}/Contents/Resources/opl-studio-full-runtime/runtime/current`;
       await writeFile(localDriver, `import { __test } from ${JSON.stringify(guestProbe)};
-const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",appPath:${JSON.stringify(guestApp)},__testOplCommandPath:${JSON.stringify(runtime + "/bin/opl")},timeoutMs:90000}, "");
+import { spawnSync } from "node:child_process";
+const runtime = ${JSON.stringify(runtime)};
+const quote = (value) => "'" + String(value).replaceAll("'", "'\\''") + "'";
+// Adapt only the command transport to Studio's packaged runtime. All lifecycle
+// actions, launchd observations and SQLite checks execute against the real VM.
+const runOplJson = (args, options) => {
+  const command = __test.buildFullRuntimeCommandPrefix(runtime) + " && " + [runtime + "/bin/opl", ...args].map(quote).join(" ");
+  const result = spawnSync("/bin/zsh", ["-lc", command], {encoding:"utf8",timeout:options.timeoutMs,maxBuffer:16*1024*1024,env:{...process.env,OPL_OUTPUT:"json"}});
+  if (result.status !== 0 || result.error) throw new Error(result.stderr || result.error?.message || "Framework command failed");
+  return JSON.parse(result.stdout);
+};
+const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",timeoutMs:90000,__testHooks:{runOplJson}}, "");
 process.stdout.write(JSON.stringify(proof));
 `);
       scpToGuest(options, ip, legacyProbe, guestProbe);
