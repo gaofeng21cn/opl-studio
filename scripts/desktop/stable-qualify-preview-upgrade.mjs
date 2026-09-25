@@ -8,7 +8,7 @@ import semver from "semver";
 import { validateTarget, readPreviewHandoff } from "../../desktop/preview-handoff.mjs";
 import { verifyApp } from "../../desktop/handoff-installer.mjs";
 import { qualifyUpgradeVm } from "./stable-upgrade-vm.mjs";
-import { runStableSmoke, validateStableRuntimeEvidence } from "./stable-smoke.mjs";
+import { runFrameworkReadiness, runStableSmoke, validateStableRuntimeEvidence } from "./stable-smoke.mjs";
 import { evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 import { prepareRunnerTrustBundle } from "./qualify-clean-vm.mjs";
 
@@ -153,12 +153,13 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
     guest('mkdir -p "$HOME/Library/Application Support/opl-studio" && cp /tmp/opl-preview-bindings.json "$HOME/Library/Application Support/opl-studio/channel-transport-bindings.json"');
     const credentials = { email: fs.readFileSync(options.emailFile, "utf8").trim(), password: fs.readFileSync(options.passwordFile, "utf8") };
     const port = 19349;
+    let expectedRootPackageIds;
     const receipt = await qualifyUpgradeVm({ vm, route: "preview", user: options.user, sshKey: options.sshKey, cdpPort: port, timeoutMs: 900_000, networkMode: "controlled_exact_candidate", targetVersion: target.version, previewTargetVersion: candidate.checkpoint.source.version, launchEnvironment, out: path.join(artifactRoot, "upgrade.json"), verifyTarget: async () => {
-      const productProfile = json(options.productProfile);
-      const expectedRootPackageIds = productProfile.official_profile?.desired_root_package_ids;
-      invariant(Array.isArray(expectedRootPackageIds) && expectedRootPackageIds.length > 0, "App-owned Official Profile roots are missing");
+      invariant(Array.isArray(expectedRootPackageIds), "Baseline Package selection was not captured");
       const smoke = await runStableSmoke({ evaluate: (expression) => evaluatePageStable({ port, expression, timeoutMs: 240_000 }), waitForReady: () => waitForPageReady({ port, timeoutMs: 120_000 }), credentials, turnRequest: null, identity: { status: "passed" }, options: { carrier: "macos-dmg", runtimeProfiles: ["standard"], timeoutMs: 180_000, expectedRootPackageIds } });
       writeJson(path.join(artifactRoot, "target-smoke.json"), smoke); validateStableRuntimeEvidence(smoke);
+      const installedIds = smoke.checks.frameworkReadiness.packages.filter((entry) => entry.installed && entry.present).map((entry) => entry.id).sort();
+      invariant(JSON.stringify(installedIds) === JSON.stringify(expectedRootPackageIds), "Upgrade changed the existing Package selection");
       const readGuestJson = (relative) => JSON.parse(guest(`cat "$HOME/Library/Application Support/${relative}"`).stdout);
       const incoming = readGuestJson("One Person Lab/handoff/incoming.json");
       const localIncoming = path.join(artifactRoot, "incoming.json"); writeJson(localIncoming, incoming);
@@ -178,6 +179,15 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
       const importedBindings = readGuestJson("One Person Lab/channel-transport-bindings.json");
       invariant(importedBindings.entries?.some((entry) => Object.keys(binding).every((key) => entry[key] === binding[key])), "Preview channel reference was not preserved");
       return { status: "passed", ownerReadback: true, channelBindingsPreserved: true, sourceRetained: true };
+    }, verifyBaseline: async () => {
+      await waitForPageReady({ port, timeoutMs: 120_000 });
+      const projection = await runFrameworkReadiness({ evaluate: (expression) => evaluatePageStable({ port, expression, timeoutMs: 150_000 }) });
+      invariant(projection.status === "passed", "Baseline Framework Package projection is unavailable");
+      // Official Profile applies only to first installation. Upgrade must retain
+      // the actual existing selection, including an intentionally empty one.
+      expectedRootPackageIds = projection.packages.filter((entry) => entry.installed && entry.present).map((entry) => entry.id).sort();
+      writeJson(path.join(artifactRoot, "baseline-packages.json"), projection);
+      return { status: "passed", installedPackageIds: expectedRootPackageIds };
     } });
     invariant(receipt.status === "passed", receipt.failure?.message ?? "Preview native update and handoff failed");
     return { tag: baseline.tag_name, status: "passed", baselineSha256: baselineAsset.digest, nativeUpdater: true, terminalHandoff: true, ownerReadback: true, storagePreserved: receipt.checks.previewShellStoragePreserved === true, channelBindingsPreserved: receipt.checks.targetReadiness?.channelBindingsPreserved === true, evidence: `${baseline.tag_name}/upgrade.json` };

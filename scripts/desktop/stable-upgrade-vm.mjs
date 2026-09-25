@@ -55,6 +55,7 @@ export async function qualifyUpgradeVm(options) {
     tunnel = spawn("ssh", [...sshBase, "-N", "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.user}@${ip}`], { stdio: "ignore" });
     await waitForPageTarget({ port: options.cdpPort, timeoutMs: 120_000 });
     const evaluate = (expression) => evaluatePage({ port: options.cdpPort, expression, timeoutMs: 90_000 });
+    if (options.verifyBaseline) receipt.checks.baselineReadiness = await options.verifyBaseline();
     if (options.route === "preview") {
       const sentinel = { "opl.studio.settings.v1": JSON.stringify({ locale: "en", theme: "dark", fontSize: 15 }), "opl.studio.drafts.v2": JSON.stringify({ prompts: { "opl-upgrade-sentinel": "Preserve this offline draft during the Studio transition." } }) };
       await evaluate(`(()=>{const storage=${JSON.stringify(sentinel)};for(const [key,value] of Object.entries(storage))localStorage.setItem(key,value);return true;})()`);
