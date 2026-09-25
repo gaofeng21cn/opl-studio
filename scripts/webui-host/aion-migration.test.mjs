@@ -84,3 +84,25 @@ test("a failed rename resumes its saved binding without another thread", async (
     assert.equal(transport.created, 1);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test("legacy archive visibility survives before Codex materializes the first native turn", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-import-empty-native-"));
+  const transport = new Transport();
+  const noRollout = async id => { throw Object.assign(new Error("archive unavailable"), { code: "app_server_rpc_error", details: { error: { code: -32600, message: `no rollout found for thread id ${id}` } } }); };
+  transport.archiveThread = noRollout;
+  transport.unarchiveThread = noRollout;
+  const migration = new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot([{ ...conversation, archived: true }]) });
+  try {
+    await migration.start();
+    assert.equal(migration.summary().complete, true);
+    const adapter = new MigratedThreadAdapter(transport, migration);
+    assert.equal((await adapter.listThreads({ archived: false })).data.length, 0);
+    const archived = (await adapter.listThreads({ archived: true })).data;
+    assert.equal(archived.length, 1);
+    assert.equal(archived[0].archived, true);
+    assert.equal((await adapter.readThread({ threadId: "native-1", includeTurns: true })).importedHistory.messages.length, 2);
+    await adapter.setArchived({ threadId: "native-1", archived: false });
+    assert.equal((await adapter.listThreads({ archived: false })).data.length, 1);
+    assert.equal((await adapter.listThreads({ archived: true })).data.length, 0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

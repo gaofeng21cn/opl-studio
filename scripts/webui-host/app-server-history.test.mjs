@@ -117,3 +117,19 @@ test("history reads inspect metadata first and only request inline history for l
   assert.deepEqual((await transport.readThread("legacy", true)).thread.turns, turns);
   assert.deepEqual(legacyCalls.map(call => call.params.includeTurns), [false, true]);
 });
+
+test("unmaterialized threads expose empty native history without hiding other RPC failures", async () => {
+  for (const historyMode of ["legacy", "paginated"]) {
+    const transport = new CodexAppServerTransport();
+    const failure = Object.assign(new Error("native history unavailable"), { code: "app_server_rpc_error", details: { error: { code: -32600, message: "no rollout found for thread id fresh" } } });
+    transport.request = async (method, params) => {
+      if (method === "thread/read" && !params.includeTurns) return { thread: { id: "fresh", historyMode } };
+      throw failure;
+    };
+    assert.deepEqual((await transport.readThread("fresh", true)).thread.turns, []);
+    failure.details.error.message = "database read failed";
+    await assert.rejects(transport.readThread("fresh", true), error => error === failure);
+    failure.details.error.message = "no rollout found for thread id another";
+    await assert.rejects(transport.readThread("fresh", true), error => error === failure);
+  }
+});

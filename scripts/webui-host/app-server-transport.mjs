@@ -60,6 +60,13 @@ export class AppServerTransportError extends Error {
   }
 }
 
+export function isUnmaterializedThreadError(error, threadId) {
+  const rpc = error?.details?.error;
+  return error?.code === "app_server_rpc_error" && rpc?.code === -32600
+    && (rpc.message === `no rollout found for thread id ${threadId}`
+      || rpc.message?.startsWith(`thread ${threadId} is not materialized yet;`) === true);
+}
+
 function buildUserInputs(prompt, inputs = []) {
   const normalized = [];
   const text = typeof prompt === "string" ? prompt.trim() : "";
@@ -519,8 +526,13 @@ export class CodexAppServerTransport extends EventEmitter {
     const response = await this.request("thread/read", { threadId, includeTurns: false });
     if (!includeTurns) return response;
     // Paginated threads must not load the full transcript before paging it again.
-    if (response.thread?.historyMode === "paginated") return this.hydrateThreadHistory(response);
-    return this.request("thread/read", { threadId, includeTurns: true });
+    try {
+      if (response.thread?.historyMode === "paginated") return await this.hydrateThreadHistory(response);
+      return await this.request("thread/read", { threadId, includeTurns: true });
+    } catch (error) {
+      if (!isUnmaterializedThreadError(error, threadId)) throw error;
+      return { ...response, thread: { ...response.thread, turns: [] } };
+    }
   }
 
   async resumeThread(threadId, overrides = {}) {

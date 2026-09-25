@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { readAionMigrationSnapshot } from "./aion-migration-source.mjs";
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
+import { isUnmaterializedThreadError } from "./app-server-transport.mjs";
 
 const SCHEMA = "opl_studio_shell_migration.v2";
 const keyFor = (conversation) => createHash("sha256").update(JSON.stringify([conversation.sourceUserId, conversation.id])).digest("hex");
@@ -152,7 +153,17 @@ export class AionMigration {
         }
         if (!entry.native) {
           await this.transport.renameThread(entry.threadId, conversation.title || "AionUI");
-          if (conversation.archived) await this.transport.archiveThread(entry.threadId);
+          if (conversation.archived) {
+            try {
+              await this.transport.archiveThread(entry.threadId);
+              entry.nativeArchiveDeferred = false;
+            } catch (error) {
+              if (!isUnmaterializedThreadError(error, entry.threadId)) throw error;
+              // Imported history exists before the first native turn. Preserve
+              // its legacy visibility without inventing a Codex rollout.
+              entry.nativeArchiveDeferred = true;
+            }
+          }
         }
         entry.state = "complete";
         await atomicJson(this.file, this.document);
@@ -182,6 +193,7 @@ export class AionMigration {
     const hasTurns = thread.turns?.length > 0;
     return {
       ...thread,
+      ...(entry.nativeArchiveDeferred ? { archived: Boolean(entry.archived) } : {}),
       createdAt: source.createdAt ? Math.floor(source.createdAt / 1000) : thread.createdAt,
       ...(!hasTurns && !thread.preview && source.updatedAt ? { updatedAt: Math.floor(source.updatedAt / 1000) } : {}),
       ...(includeHistory ? { importedHistory: { source: "aionui", sourceConversationId: source.id, messages: importedMessages(source) } } : {}),
@@ -231,7 +243,8 @@ export class MigratedThreadAdapter extends CodexThreadAdapter {
         result.data.push({ ...thread, archived: Boolean(entry.archived) });
       } catch { /* Deleted canonical threads must not be recreated from history. */ }
     }
-    return { ...result, data: result.data.map((thread) => this.migration.project(thread)), migration: this.migration.summary() };
+    return { ...result, data: result.data.map((thread) => this.migration.project(thread))
+      .filter((thread) => request.archived === undefined || thread.archived === request.archived), migration: this.migration.summary() };
   }
   async readThread(request) {
     await this.migration.start();
@@ -253,8 +266,17 @@ export class MigratedThreadAdapter extends CodexThreadAdapter {
     return result;
   }
   async setArchived(request) {
-    const result = await super.setArchived(request);
     const entry = this.migration.entry(request.threadId);
+    let result;
+    try {
+      result = await super.setArchived(request);
+      if (entry) entry.nativeArchiveDeferred = false;
+    } catch (error) {
+      if (!entry || entry.native || !isUnmaterializedThreadError(error, request.threadId)) throw error;
+      await this.transport.readThread(request.threadId, false);
+      entry.nativeArchiveDeferred = true;
+      result = { threadId: request.threadId, archived: request.archived };
+    }
     if (entry) { entry.archived = request.archived; await atomicJson(this.migration.file, this.migration.document); }
     return result;
   }
