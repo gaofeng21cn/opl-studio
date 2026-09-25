@@ -474,7 +474,7 @@ const runOplJson = (args, options) => {
   if (result.status !== 0 || result.error) throw new Error(result.stderr || result.error?.message || "Framework command failed");
   return JSON.parse(result.stdout);
 };
-const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",artifacts:${JSON.stringify(guestDriver + ".artifacts")},timeoutMs:90000,__testHooks:{runOplJson}}, "");
+const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",artifacts:"/tmp",timeoutMs:90000,__testHooks:{runOplJson}}, "");
 process.stdout.write(JSON.stringify(proof));
 `);
       scpToGuest(options, ip, legacyProbe, guestProbe);
