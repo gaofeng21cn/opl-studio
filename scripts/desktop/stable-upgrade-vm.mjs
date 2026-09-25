@@ -23,7 +23,7 @@ export function parseUpgradeVmArgs(argv) {
   const keys = { "--vm": "vm", "--route": "route", "--ssh-key": "sshKey", "--user": "user", "--target-version": "targetVersion", "--preview-target-version": "previewTargetVersion", "--out": "out", "--cdp-port": "cdpPort", "--timeout-ms": "timeoutMs", "--network-mode": "networkMode" };
   for (let i = 0; i < argv.length; i++) { invariant(keys[argv[i]] && argv[i + 1], `Invalid argument ${argv[i]}`); const field = keys[argv[i]]; values[field] = ["timeoutMs", "cdpPort"].includes(field) ? Number(argv[++i]) : argv[++i]; }
   invariant(/^opl-studio-cutover-[a-z0-9-]+$/.test(values.vm ?? ""), "Only task-owned isolated upgrade VMs are permitted");
-  invariant(["aion", "preview"].includes(values.route), "Upgrade route must be aion or preview");
+  invariant(["aion", "preview", "studio"].includes(values.route), "Upgrade route must be aion, preview, or studio");
   invariant(values.sshKey && values.out && /^\d+\.\d+\.\d+$/.test(values.targetVersion ?? ""), "SSH key, receipt and exact target version are required");
   invariant(values.route !== "preview" || /^\d+\.\d+\.\d+$/.test(values.previewTargetVersion ?? ""), "Preview route requires exact terminal bridge version");
   invariant(["controlled_exact_candidate", "public"].includes(values.networkMode), "Invalid qualification network mode");
@@ -35,7 +35,7 @@ export async function qualifyUpgradeVm(options) {
   invariant(/^192\.168\.64\.\d+$/.test(ip), "Upgrade VM is not on the isolated Tart network");
   const sshBase = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey];
   const guest = (command, allowFailure = false) => run("ssh", [...sshBase, `${options.user}@${ip}`, command], allowFailure);
-  const product = options.route === "aion" ? "One Person Lab" : "One Person Lab Preview";
+  const product = options.route === "preview" ? "One Person Lab Preview" : "One Person Lab";
   const sourceBundle = `/Applications/${product}.app`;
   const stableBundle = "/Applications/One Person Lab.app";
   const plistVersion = (bundle) => guest(`/usr/bin/plutil -extract CFBundleShortVersionString raw -o - ${quote(`${bundle}/Contents/Info.plist`)}`, true).stdout.trim();
@@ -60,8 +60,10 @@ export async function qualifyUpgradeVm(options) {
       const sentinel = { "opl.studio.settings.v1": JSON.stringify({ locale: "en", theme: "dark", fontSize: 15 }), "opl.studio.drafts.v2": JSON.stringify({ prompts: { "opl-upgrade-sentinel": "Preserve this offline draft during the Studio transition." } }) };
       await evaluate(`(()=>{const storage=${JSON.stringify(sentinel)};for(const [key,value] of Object.entries(storage))localStorage.setItem(key,value);return true;})()`);
       receipt.checks.previewStorageSeeded = true;
+    }
+    if (options.route !== "aion") {
       const result = await evaluate("window.oplStudio.checkNativeAppUpdate()");
-      invariant(result.targetVersion === options.previewTargetVersion, "Preview updater did not select the exact terminal bridge");
+      invariant(result.targetVersion === (options.route === "preview" ? options.previewTargetVersion : options.targetVersion), "Studio updater did not select the exact target");
       receipt.checks.updateSelected = { version: result.targetVersion };
       if (result.state === "available") await evaluate("window.oplStudio.applyNativeAppUpdate()");
     } else {
@@ -74,7 +76,7 @@ export async function qualifyUpgradeVm(options) {
     const deadline = Date.now() + options.timeoutMs;
     let downloaded = false;
     while (Date.now() < deadline) {
-      const status = await evaluate(options.route === "preview" ? "window.oplStudio.readNativeAppUpdateStatus()" : aionInvokeExpression("auto-update.get-status-snapshot"));
+      const status = await evaluate(options.route !== "aion" ? "window.oplStudio.readNativeAppUpdateStatus()" : aionInvokeExpression("auto-update.get-status-snapshot"));
       if (status?.state === "downloaded" || status?.status === "downloaded") { downloaded = true; receipt.checks.downloaded = status; break; }
       invariant(status?.state !== "error" && status?.status !== "error", "Updater reported a download error");
       await pause(1500);
@@ -99,7 +101,7 @@ export async function qualifyUpgradeVm(options) {
       receipt.checks.nativeUpdateReady = { version: options.targetVersion, activation: "background_download_then_restart" };
     }
     // Invoke the production restart action, then observe its on-disk replacement.
-    if (options.route === "preview") await evaluate("window.oplStudio.restartNativeApp()").catch(() => {});
+    if (options.route !== "aion") await evaluate("window.oplStudio.restartNativeApp()").catch(() => {});
     else await evaluate(aionInvokeExpression("auto-update.quit-and-install", {})).catch(() => {});
     while (Date.now() < deadline && plistVersion(stableBundle) !== options.targetVersion) await pause(1500);
     invariant(plistVersion(stableBundle) === options.targetVersion, "Squirrel replacement or Preview handoff did not install exact Studio Stable");

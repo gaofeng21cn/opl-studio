@@ -121,10 +121,30 @@ export class AionMigration {
       await atomicJson(this.file, this.document);
     }
     for (const entry of this.document.entries) {
-      if (entry.state === "deleted" || entry.state === "complete") continue;
+      if (entry.state === "deleted") continue;
       const conversation = this.histories.get(entry.key);
       if (!conversation) continue;
       try {
+        if (entry.state === "complete" && !entry.native && entry.threadId) {
+          const metadata = await this.transport.readThread(entry.threadId, false);
+          if (metadata.thread?.historyMode === "paginated") {
+            try {
+              await this.transport.resumeThread(entry.threadId, { excludeTurns: true });
+            } catch (error) {
+              if (!isUnmaterializedThreadError(error, entry.threadId)) throw error;
+              // Only the canonical owner can confirm that this imported binding
+              // never materialized. Retain its identity; never rewrite or delete
+              // a Codex rollout to repair the 0.157 empty-pagination defect.
+              entry.previousBindings = [...(entry.previousBindings ?? []), {
+                threadId: entry.threadId, reason: "codex-unmaterialized-paginated-thread"
+              }];
+              entry.threadId = null;
+              entry.state = "pending";
+              await atomicJson(this.file, this.document);
+            }
+          }
+        }
+        if (entry.state === "complete") continue;
         if (!entry.threadId && conversation.nativeCodexThreadId) {
           try {
             const existing = await this.transport.readThread(conversation.nativeCodexThreadId, false);

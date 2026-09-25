@@ -133,3 +133,10 @@ test("unmaterialized threads expose empty native history without hiding other RP
     await assert.rejects(transport.readThread("fresh", true), error => error === failure);
   }
 });
+
+test("new Studio threads explicitly select resumable legacy history without changing existing threads", async () => {
+  const transport = new CodexAppServerTransport();
+  transport.request = async (method, params) => ({ method, params });
+  assert.equal((await transport.startThread()).params.historyMode, "legacy");
+  assert.equal((await transport.startThread({ historyMode: "paginated" })).params.historyMode, "paginated");
+});

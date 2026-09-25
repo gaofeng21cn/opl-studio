@@ -106,3 +106,41 @@ test("legacy archive visibility survives before Codex materializes the first nat
     assert.equal((await adapter.listThreads({ archived: true })).data.length, 0);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test("repair only owner-confirmed unmaterialized paginated imports and preserve their old binding", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "aion-pagination-repair-"));
+  const transport = new Transport();
+  const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
+  try {
+    await make().start();
+    transport.threads.get("native-1").historyMode = "paginated";
+    transport.resumeThread = async () => { throw Object.assign(new Error("no rollout"), {
+      code: "app_server_rpc_error", details: { error: { code: -32600, message: "no rollout found for thread id native-1" } }
+    }); };
+    const repaired = make(); await repaired.start();
+    assert.equal(repaired.summary().complete, true);
+    assert.equal(repaired.document.entries[0].threadId, "native-2");
+    assert.equal(repaired.document.entries[0].previousBindings[0].threadId, "native-1");
+    assert.equal(transport.threads.has("native-1"), true);
+    const history = await new MigratedThreadAdapter(transport, repaired).readThread({ threadId: "native-2", includeTurns: true });
+    assert.deepEqual(history.importedHistory.messages.map(message => message.text), ["Prior question", "Prior answer"]);
+    await make().start(); assert.equal(transport.created, 2);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("materialized imports and unrelated native failures never replace canonical bindings", async () => {
+  for (const failure of [null, "database unavailable"]) {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "aion-pagination-preserve-"));
+    const transport = new Transport();
+    const make = () => new AionMigration({ directory, transport, env: {}, snapshotReader: () => snapshot() });
+    try {
+      await make().start();
+      transport.threads.get("native-1").historyMode = "paginated";
+      transport.resumeThread = async () => { if (failure) throw new Error(failure); return transport.readThread("native-1"); };
+      const again = make(); await again.start();
+      assert.equal(transport.created, 1);
+      assert.equal(again.document.entries[0].threadId, "native-1");
+      assert.equal(again.summary().complete, !failure);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  }
+});

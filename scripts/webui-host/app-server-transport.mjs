@@ -857,6 +857,10 @@ export class CodexAppServerTransport extends EventEmitter {
       cwd,
       ...threadPermissionOverrides(permissions, cwd),
       ephemeral: false,
+      // Studio consumes complete turn history. Codex 0.157 defaults to a
+      // paginated mode whose newly imported empty threads cannot be resumed.
+      // Select the public persisted inline-history contract for our threads.
+      historyMode: "legacy",
       ...requestParams
     });
   }
