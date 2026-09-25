@@ -449,7 +449,7 @@ export async function qualifyCleanVm(options) {
       };
       invariant(identityPassed, "Studio Standard Framework bootstrap did not install the exact injected Framework archive");
     }
-    if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.status === 'passed') {
+    if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
       checks.framework.status = 'passed';
     }
     checks.gateway = smoke.checks.gateway;
