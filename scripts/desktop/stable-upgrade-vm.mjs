@@ -39,7 +39,7 @@ export async function qualifyUpgradeVm(options) {
   const sourceBundle = `/Applications/${product}.app`;
   const stableBundle = "/Applications/One Person Lab.app";
   const plistVersion = (bundle) => guest(`/usr/bin/plutil -extract CFBundleShortVersionString raw -o - ${quote(`${bundle}/Contents/Info.plist`)}`, true).stdout.trim();
-  const baseVersion = plistVersion(sourceBundle);
+  const baseVersion = guest(`/usr/bin/plutil -extract CFBundleShortVersionString raw -o - ${quote(`${sourceBundle}/Contents/Info.plist`)}`).stdout.trim();
   invariant(baseVersion, "Signed baseline is not installed in the test VM");
   const baseSignature = guest(`/usr/bin/codesign --verify --deep --strict ${quote(sourceBundle)} && /usr/bin/codesign -dvv ${quote(sourceBundle)} 2>&1`).stdout;
   invariant(baseSignature.includes("TeamIdentifier=SVVC4TA784"), "Baseline publisher does not match OPL");
