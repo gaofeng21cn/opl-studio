@@ -452,6 +452,28 @@ export async function qualifyCleanVm(options) {
     if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
       checks.framework.status = 'passed';
     }
+    if (fullRuntime && ip && smoke.status === "passed") {
+      // Reuse the frozen CLI-only Framework lifecycle probe as a test fixture.
+      // No legacy application code is packaged or used by the Studio runtime.
+      const legacyProbe = path.join(runRoot, "framework-temporal-probe.mjs");
+      const fetchProbe = spawnSync("curl", ["-fsSL", "https://raw.githubusercontent.com/gaofeng21cn/opl-aion-shell/7f574278c1076545f7a7e6a3f06babc40f3a3a15/scripts/opl-first-run-vm-smoke.mjs", "-o", legacyProbe], { encoding: "utf8", timeout: 60_000 });
+      invariant(fetchProbe.status === 0 && sha256File(legacyProbe) === "aa5850661e54ac4d8f5e761b4a16d9932137bf51bc7fff4cd23001a74a2d8002", "Frozen Framework lifecycle probe identity mismatch");
+      const guestProbe = `/tmp/opl-framework-temporal-probe-${process.pid}.mjs`;
+      const guestDriver = `/tmp/opl-framework-temporal-driver-${process.pid}.mjs`;
+      const localDriver = path.join(runRoot, "temporal-driver.mjs");
+      const runtime = `${guestApp}/Contents/Resources/opl-studio-full-runtime/runtime/current`;
+      await writeFile(localDriver, `import { __test } from ${JSON.stringify(guestProbe)};
+const proof = await __test.collectTemporalServiceSupervisorProof({runtimeProfile:"full",appPath:${JSON.stringify(guestApp)},__testOplCommandPath:${JSON.stringify(runtime + "/bin/opl")},timeoutMs:90000}, "");
+process.stdout.write(JSON.stringify(proof));
+`);
+      scpToGuest(options, ip, legacyProbe, guestProbe);
+      scpToGuest(options, ip, localDriver, guestDriver);
+      progress({ phase: "full-temporal-lifecycle", status: "started" });
+      const result = guestRun(options, ip, `NODE_ENV=test ${shellQuote(runtime + "/node/bin/node")} ${shellQuote(guestDriver)}`);
+      checks.temporal_service_supervisor_proof = JSON.parse(result.stdout);
+      invariant(checks.temporal_service_supervisor_proof.status === "passed", "Full Temporal lifecycle did not pass");
+      progress({ phase: "full-temporal-lifecycle", status: "passed" });
+    }
     checks.gateway = smoke.checks.gateway;
     checks.update = {
       status: await evaluatePage({ port: options.cdpPort, expression: "window.oplStudio.readNativeAppUpdateStatus()", timeoutMs: options.timeoutMs }),
