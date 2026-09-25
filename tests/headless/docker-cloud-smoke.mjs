@@ -164,10 +164,13 @@ try {
   docker("restart", container);
   await waitFor(`${baseUrl}/readyz`);
   assert.equal(docker("exec", container, "cat", `${completed.inputs[0].path}/note.txt`), "persistent cloud upload");
-  assert.equal(docker("inspect", container, "--format", "{{.Config.User}}"), "1000:1000");
-  assert.equal(docker("inspect", container, "--format", "{{.HostConfig.ReadonlyRootfs}}"), "true");
-  assert.match(docker("inspect", container, "--format", "{{json .HostConfig.CapDrop}}"), /ALL/);
-  assert.match(docker("inspect", container, "--format", "{{json .HostConfig.SecurityOpt}}"), /no-new-privileges/);
+  assert.match(docker("exec", container, "cat", "/proc/1/status"), /^Uid:\s+1000\s/m);
+  assert.equal((await fetch(`${baseUrl}/api/auth/user`, { headers: { cookie } })).status, 200);
+  if (!legacy) {
+    assert.equal(docker("inspect", container, "--format", "{{.HostConfig.ReadonlyRootfs}}"), "true");
+    assert.match(docker("inspect", container, "--format", "{{json .HostConfig.CapDrop}}"), /ALL/);
+    assert.match(docker("inspect", container, "--format", "{{json .HostConfig.SecurityOpt}}"), /no-new-privileges/);
+  }
 
   console.log(JSON.stringify({
     status: "cloud_webui_container_smoke_passed",

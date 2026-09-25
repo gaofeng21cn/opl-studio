@@ -126,7 +126,7 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-wsl-host-build-'));
   try {
     const bootstrap = prepareBootstrapRuntime(staging, appRoot, frameworkRef);
-    for (const relative of ['package.json', 'package-lock.json', 'packages', 'scripts/webui-host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs', 'resources/opl-official-profile']) {
+    for (const relative of ['package.json', 'package-lock.json', 'packages', 'scripts/webui-host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
       const destination = path.join(staging, relative);
       fs.mkdirSync(path.dirname(destination), { recursive: true });
       fs.cpSync(path.join(root, relative), destination, { recursive: true, dereference: true,
