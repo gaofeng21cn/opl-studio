@@ -31,7 +31,7 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/packages \.\/packages/);
   assert.match(runtime, /NARB_DISABLE_NATIVE_CACHE=1/);
   assert.doesNotMatch(runtime, /org\.opencontainers\.image\.licenses/);
-  assert.match(runtime, /USER node/);
+  assert.match(runtime, /ENTRYPOINT \["\/usr\/local\/bin\/opl-webui-entrypoint"\]/);
   assert.match(runtime, /VOLUME \["\/data", "\/projects"\]/);
   assert.match(runtime, /HEALTHCHECK[\s\S]*\/healthz/);
   assert.match(runtime, /CMD \["node", "scripts\/headless\/run\.mjs"\]/);

@@ -50,10 +50,11 @@ RUN npm install --global "bun@${OPL_BUN_VERSION}" \
   && npm ci
 COPY contracts ./contracts
 COPY scripts ./scripts
+COPY desktop/deep-links.mjs ./desktop/deep-links.mjs
 COPY packages ./packages
 COPY src ./src
 COPY tsconfig.json tsconfig.typecheck.json ./
-COPY --from=app-product-profile /src/one-person-lab-app/contracts/app-product-profile.json ./one-person-lab-app/contracts/app-product-profile.json
+COPY --from=app-product-profile /src/one-person-lab-app/contracts ./one-person-lab-app/contracts
 RUN npm run build:webui
 
 FROM ${NODE_IMAGE} AS production-dependencies
@@ -73,7 +74,7 @@ LABEL org.opencontainers.image.title="One Person Lab" \
   org.opencontainers.image.revision="${OPL_SOURCE_REVISION}"
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates git \
+  && apt-get install -y --no-install-recommends ca-certificates git gosu \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /data/codex /data/inputs /projects \
   && chown -R node:node /data /projects
@@ -116,7 +117,10 @@ ENV NODE_ENV=production \
 
 VOLUME ["/data", "/projects"]
 EXPOSE 3000
-USER node
+USER root
+COPY scripts/headless/docker-entrypoint.sh /usr/local/bin/opl-webui-entrypoint
+RUN chmod 755 /usr/local/bin/opl-webui-entrypoint
+ENTRYPOINT ["/usr/local/bin/opl-webui-entrypoint"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.OPL_HEADLESS_PORT+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 CMD ["node", "scripts/headless/run.mjs"]
