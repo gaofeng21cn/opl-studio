@@ -115,7 +115,9 @@ export async function qualifyUpgradeVm(options) {
       await pause(500);
     } while (Date.now() < launchDeadline);
     invariant(launchSettled, "Native installer did not finish launching the installed App");
-    guest("pkill -TERM -f '^/Applications/One Person Lab.app/Contents/MacOS/One Person Lab( |$)'", true);
+    // Use the same macOS quit event as the user-facing menu. SIGTERM can leave
+    // an Electron application alive and is not a reliable normal quit request.
+    guest(`/usr/bin/osascript -e 'tell application id "cn.onepersonlab.opl" to quit'`);
     const closeDeadline = Date.now() + 30_000;
     while (guest(stableProcess, true).status === 0 && Date.now() < closeDeadline) await pause(250);
     invariant(guest(stableProcess, true).status !== 0, "Installed App did not exit before diagnostic relaunch");
