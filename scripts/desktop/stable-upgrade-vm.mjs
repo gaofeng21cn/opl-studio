@@ -2,7 +2,7 @@ import { spawnSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluatePage, waitForPageTarget } from "./cdp.mjs";
+import { evaluatePage, waitForPageReady, waitForPageTarget } from "./cdp.mjs";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const quote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
@@ -109,7 +109,7 @@ export async function qualifyUpgradeVm(options) {
     guest("pkill -TERM -f '^/Applications/One Person Lab.app/Contents/MacOS/One Person Lab( |$)'", true);
     await pause(2000);
     guest(`nohup ${trustEnvironment}${quote(`${stableBundle}/Contents/MacOS/One Person Lab`)} --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 >/tmp/opl-upgrade-stable.log 2>&1 & echo $!`);
-    await waitForPageTarget({ port: options.cdpPort, timeoutMs: 120_000 });
+    await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
     const readback = await evaluate(`(async()=>{const status=await window.oplStudio.readNativeAppUpdateStatus();return {status,bridge:typeof window.oplStudio.readState==='function',draft:localStorage.getItem('opl.studio.drafts.v2'),settings:localStorage.getItem('opl.studio.settings.v1')};})()`);
     invariant(readback.bridge && readback.status?.currentVersion === options.targetVersion, "Relaunched Studio did not report the installed version");
     if (options.route === "preview") {
