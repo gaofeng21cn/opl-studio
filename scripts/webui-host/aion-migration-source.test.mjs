@@ -213,17 +213,21 @@ test('browser exports only contribute known UI keys and do not invent persisted 
 
 test('automatic OPL discovery excludes unrelated AionUI databases and reads only native metadata', t => {
   const root = temporary(t);
-  for (const name of ['One Person Lab', 'AionUi']) {
-    const file = path.join(root, 'Library/Application Support', name, 'opl-data/aionui-backend.db');
-    const db = database(file);
-    conversation(db, { extra: { canonical_thread_id: 'native-id' } });
-    db.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)').run('m1', 'c1', 'text', 'private history', 'right', 100);
-    db.close();
-  }
+  const file = path.join(root, 'Library/Application Support', 'One Person Lab', 'opl-data/aionui-backend.db');
+  const db = database(file);
+  conversation(db, { extra: { canonical_thread_id: 'native-id' } });
+  conversation(db, { id: 'gemini-1', extra: { backend: 'gemini' } });
+  db.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)').run('m1', 'c1', 'text', 'private history', 'right', 100);
+  db.close();
+  const unrelated = path.join(root, 'Library/Application Support', 'AionUi', 'opl-data/aionui-backend.db');
+  const unrelatedDb = database(unrelated);
+  conversation(unrelatedDb, { extra: { canonical_thread_id: 'unrelated-native-id' } });
+  unrelatedDb.close();
   const sources = discoverAionMigrationSources({ homeDir: root, env: {}, platform: 'darwin' });
   assert.equal(sources.length, 1);
   assert.ok(sources[0].path.includes('/One Person Lab/'));
   const snapshot = readAionMigrationSnapshot({ sources, includeMessages: false });
+  assert.deepEqual(snapshot.conversations.map((entry) => entry.id), ['c1']);
   assert.equal(snapshot.conversations[0].nativeCodexThreadId, 'native-id');
   assert.deepEqual(snapshot.conversations[0].messages, []);
 });
@@ -235,5 +239,5 @@ test('legacy Codex ACP UUID is a native reference candidate only for the Codex b
   conversation(db, { id: 'other', extra: { backend: 'gemini', acp_session_id: id } }); db.close();
   const rows = readAionMigrationSnapshot({ roots: [root], includeMessages: false }).conversations;
   assert.equal(rows.find(r => r.id === 'codex').nativeCodexThreadId, id);
-  assert.equal(rows.find(r => r.id === 'other').nativeCodexThreadId, null);
+  assert.equal(rows.find(r => r.id === 'other'), undefined);
 });

@@ -261,12 +261,20 @@ export function readAionMigrationSnapshot(options = {}) {
         result = { conversations: [], ui: [] };
         for (const key of UI_KEYS) if (own(config, key)) addUi(result.ui, key, config[key], source.id);
       } else throw new Error('source-kind-unsupported');
-      for (const conversation of result.conversations) {
+      // The Codex App Server owns conversation identity and history.  A legacy
+      // source row is eligible for the shell metadata bridge only when it has
+      // an owner-confirmed native Codex thread reference.  Rows from Gemini or
+      // another historical backend stay outside the Studio directory entirely;
+      // they must never become "pending migration" records or affect counts.
+      const canonicalConversations = options.includeMessages === false
+        ? result.conversations.filter((conversation) => Boolean(conversation.nativeCodexThreadId))
+        : result.conversations;
+      for (const conversation of canonicalConversations) {
         if (options.includeMessages === false) conversation.messages = [];
         if (!conversations.has(conversation.id)) conversations.set(conversation.id, conversation);
       }
       ui.push(...result.ui);
-      sourceResults.push({ ...source, status: diagnostics.some((entry) => entry.sourceId === source.id) ? 'partial' : 'read', conversationCount: result.conversations.length });
+      sourceResults.push({ ...source, status: diagnostics.some((entry) => entry.sourceId === source.id) ? 'partial' : 'read', conversationCount: canonicalConversations.length });
     } catch (error) {
       const code = /^source-[a-z-]+$/.test(error?.message) ? error.message : 'source-read-failed';
       diagnostic(diagnostics, source.id, code);
