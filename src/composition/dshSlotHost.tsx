@@ -173,7 +173,7 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
   const copy: Record<string, [string, string]> = {
     "session.new.label": ["新建任务", "New task"], "session.new": ["新建任务", "New task"],
     "toggle.open": ["展开侧栏", "Expand sidebar"], "toggle.collapse": ["收起侧栏", "Collapse sidebar"],
-    "hero.headline": ["One Person Lab", "One Person Lab"], "hero.preview": ["预览版", "Preview"],
+    "hero.headline": ["One Person Lab", "One Person Lab"], "hero.preview": ["", ""],
     "hero.chooseWorkspace": ["选择工作区", "Choose workspace"], "placeholder.workspace": ["先选择工作区", "Choose a workspace first"],
     "placeholder.hero": ["向 OPL 描述你的目标", "Describe your goal to OPL"], "placeholder.default": ["向 OPL 描述你的目标", "Describe your goal to OPL"],
     "placeholder.unavailable": ["当前不可输入", "Input unavailable"], "placeholder.parentOffline": ["父任务当前离线", "Parent task is offline"],

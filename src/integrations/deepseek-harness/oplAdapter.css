@@ -1062,3 +1062,8 @@ select {
   .opl-dsh-session-header-copy { display: block; }
   .opl-dsh-session-header-copy span { display: block; }
 }
+
+/* App release channel is shown in About, never as an upstream hero badge. */
+.opl-studio-dsh-root [class*="previewBadge"]:empty {
+  display: none;
+}
