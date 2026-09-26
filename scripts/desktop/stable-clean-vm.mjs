@@ -11,9 +11,9 @@ function invariant(condition, message) { if (!condition) throw new Error(message
 const quote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
 export function parseStableArgs(argv) {
-  const own = { artifacts: null, expectedSha256: null, expectedVersion: null, expectedTeamId: null, accountEmailFile: null, accountPasswordFile: null, productProfile: null, runtimeProfile: "standard", requireGatekeeper: false };
+  const own = { artifacts: null, expectedSha256: null, expectedVersion: null, expectedTeamId: null, accountEmailFile: null, accountPasswordFile: null, productProfile: null, runtimeProfile: "standard", channel: "stable", requireGatekeeper: false };
   const forwarded = [];
-  const keys = { "--artifacts": "artifacts", "--expected-sha256": "expectedSha256", "--expected-version": "expectedVersion", "--expected-team-id": "expectedTeamId", "--gateway-account-email-file": "accountEmailFile", "--gateway-account-password-file": "accountPasswordFile", "--runtime-profile": "runtimeProfile", "--product-profile": "productProfile" };
+  const keys = { "--artifacts": "artifacts", "--expected-sha256": "expectedSha256", "--expected-version": "expectedVersion", "--expected-team-id": "expectedTeamId", "--gateway-account-email-file": "accountEmailFile", "--gateway-account-password-file": "accountPasswordFile", "--runtime-profile": "runtimeProfile", "--product-profile": "productProfile", "--channel": "channel" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--require-gatekeeper") { own.requireGatekeeper = true; continue; }
@@ -26,7 +26,13 @@ export function parseStableArgs(argv) {
   invariant(/^(sha256:)?[a-f0-9]{64}$/.test(own.expectedSha256 ?? ""), "Exact candidate SHA-256 is required");
   invariant(/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(own.expectedVersion ?? ""), "Exact installed machine version is required");
   invariant(/^[A-Z0-9]{10}$/.test(own.expectedTeamId ?? ""), "Expected Developer ID team is required");
-  invariant(own.requireGatekeeper, "Stable qualification requires Gatekeeper with quarantine preserved");
+  invariant(["stable", "nightly"].includes(own.channel), "Unsupported qualification channel");
+  if (own.channel === "nightly") {
+    invariant(/^\d+\.\d+\.\d+-nightly\.[1-9]\d*$/.test(own.expectedVersion), "Nightly qualification requires an exact Nightly machine version");
+    invariant(own.runtimeProfile === "standard" && !own.requireGatekeeper, "Nightly qualification is Standard preview only");
+  } else {
+    invariant(own.requireGatekeeper, "Stable qualification requires Gatekeeper with quarantine preserved");
+  }
   invariant(["standard", "full"].includes(own.runtimeProfile), "Unsupported runtime profile");
   const artifacts = path.resolve(own.artifacts);
   const clean = parseCleanArgs([...forwarded, "--product-name", STABLE_PRODUCT.productName, "--bundle-id", STABLE_PRODUCT.bundleId, "--runtime-profiles", own.runtimeProfile, "--out", path.join(artifacts, "studio-clean-vm-qualification.json")]);
@@ -54,11 +60,14 @@ export function buildDistributionCommand({ guestApp, expectedTeamId, requireGate
 export function buildStableSummary(options, receipt, error = null) {
   const smoke = receipt?.checks?.smoke;
   const distribution = receipt?.checks?.distribution;
+  const nightly = options.channel === "nightly";
+  const distributionPassed = nightly
+    ? distribution?.qualificationChannel === "nightly" && distribution?.candidateDigestVerified === true
+    : distribution?.signatureVerified === true && distribution?.stapledDmgNotarizationVerifiedOnHost === true && distribution?.gatekeeperAccepted === true;
   const passed = !error && receipt?.status === "passed" && smoke?.status === "passed" && distribution?.status === "passed"
-    && distribution.signatureVerified === true && distribution.stapledDmgNotarizationVerifiedOnHost === true
-    && distribution.gatekeeperAccepted === true && distribution.installedVersion === options.expectedVersion;
+    && distributionPassed && distribution.installedVersion === options.expectedVersion;
   return {
-    schema: "opl_studio_stable_clean_vm.v1", surface_id: "opl_tart_gui_first_run_smoke", status: passed ? "passed" : "failed",
+    schema: nightly ? "opl_studio_nightly_clean_vm.v1" : "opl_studio_stable_clean_vm.v1", surface_id: "opl_tart_gui_first_run_smoke", status: passed ? "passed" : "failed",
     shell: "opl-studio", source_vm: options.sourceVm, smoke_profile: "no-clt-clean-vm", runtime_profile: options.runtimeProfile,
     framework_source_archive: options.frameworkSourceArchive ?? null,
     artifact: { path: options.dmg, sha256: options.expectedSha256, expected_version: options.expectedVersion },
@@ -83,8 +92,10 @@ export async function runStableCleanVm(options) {
     const profile = JSON.parse(productProfileBytes);
     const roots = profile.official_profile?.desired_root_package_ids;
     invariant(Array.isArray(roots) && roots.length > 0 && roots.every((id) => typeof id === "string" && id.length > 0) && new Set(roots).size === roots.length, "App Official Profile roots are invalid");
-    const staple = spawnSync("/usr/bin/xcrun", ["stapler", "validate", options.dmg], { encoding: "utf8" });
-    invariant(staple.status === 0, "Exact candidate DMG stapled notarization is not valid");
+    if (options.channel !== "nightly") {
+      const staple = spawnSync("/usr/bin/xcrun", ["stapler", "validate", options.dmg], { encoding: "utf8" });
+      invariant(staple.status === 0, "Exact candidate DMG stapled notarization is not valid");
+    }
     const credentials = { email: (await readFile(options.accountEmailFile, "utf8")).trim(), password: await readFile(options.accountPasswordFile, "utf8") };
     invariant(credentials.email && credentials.password, "Dedicated Gateway credentials are empty");
     const credentialsFile = path.join(transient, "account.json");
@@ -96,6 +107,9 @@ export async function runStableCleanVm(options) {
       runSmoke: runStableSmoke,
       verifyInstalledApp: async ({ guestRun, guestApp, identity }) => {
         invariant(identity?.version === options.expectedVersion, "Installed machine version differs from the exact candidate");
+        if (options.channel === "nightly") {
+          return { status: "passed", qualificationChannel: "nightly", candidateDigestVerified: true, bundleId: identity.bundleId, productName: identity.productName, installedVersion: identity.version, developerIdTeam: null, signatureVerified: null, stapledDmgNotarizationVerifiedOnHost: null, gatekeeperAccepted: null };
+        }
         const result = guestRun(buildDistributionCommand({ guestApp, expectedTeamId: options.expectedTeamId, requireGatekeeper: options.requireGatekeeper }));
         invariant(result.stdout.includes("OPL_DISTRIBUTION_VERIFIED"), "Installed signature/notarization validation did not finish");
         return { status: "passed", bundleId: identity.bundleId, productName: identity.productName, installedVersion: identity.version, developerIdTeam: options.expectedTeamId, signatureVerified: true, stapledDmgNotarizationVerifiedOnHost: true, gatekeeperAccepted: options.requireGatekeeper };

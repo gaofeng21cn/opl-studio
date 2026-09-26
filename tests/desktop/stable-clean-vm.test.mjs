@@ -28,6 +28,27 @@ test("Installed distribution validation preserves quarantine and verifies the ex
   assert.doesNotMatch(command, /xattr -[rd]|codesign --force|--sign -|NODE_TLS_REJECT_UNAUTHORIZED/);
 });
 
+test("Nightly admission cannot waive Stable or Full trust gates", () => {
+  const unsigned = required.filter((arg) => arg !== "--require-gatekeeper");
+  assert.throws(() => parseStableArgs(unsigned), /requires Gatekeeper/);
+  assert.throws(() => parseStableArgs([...unsigned, "--channel", "nightly"]), /exact Nightly machine version/);
+  const nightly = [...unsigned, "--channel", "nightly", "--expected-version", "26.9.2691-nightly.1"];
+  assert.equal(parseStableArgs(nightly).channel, "nightly");
+  assert.throws(() => parseStableArgs([...nightly, "--runtime-profile", "full"]), /Standard preview only/);
+  assert.throws(() => parseStableArgs([...nightly, "--require-gatekeeper"]), /Standard preview only/);
+});
+
+test("Nightly installation proof never becomes signed Stable evidence", () => {
+  const options = parseStableArgs([...required.filter((arg) => arg !== "--require-gatekeeper"), "--channel", "nightly", "--expected-version", "26.9.2691-nightly.1"]);
+  const distribution = { status: "passed", qualificationChannel: "nightly", candidateDigestVerified: true, installedVersion: options.expectedVersion, signatureVerified: null, stapledDmgNotarizationVerifiedOnHost: null, gatekeeperAccepted: null };
+  const receipt = { status: "passed", checks: { smoke: { status: "passed" }, distribution } };
+  assert.equal(buildStableSummary(options, receipt).status, "passed");
+  assert.equal(buildStableSummary(options, receipt).schema, "opl_studio_nightly_clean_vm.v1");
+  assert.equal(buildStableSummary({ ...options, channel: "stable" }, receipt).status, "failed");
+  assert.equal(buildStableSummary(options, { ...receipt, checks: { ...receipt.checks, distribution: { ...distribution, installedVersion: "26.9.2691" } } }).status, "failed");
+  assert.equal(buildStableSummary(options, { ...receipt, checks: { ...receipt.checks, distribution: { ...distribution, candidateDigestVerified: false } } }).status, "failed");
+});
+
 test("Summary never promotes missing distribution or smoke evidence to passed", () => {
   const options = parseStableArgs(required);
   const receipt = { status: "passed", checks: { smoke: { status: "passed" }, distribution: { status: "passed", signatureVerified: true, stapledDmgNotarizationVerifiedOnHost: true, gatekeeperAccepted: true, installedVersion: options.expectedVersion } } };
