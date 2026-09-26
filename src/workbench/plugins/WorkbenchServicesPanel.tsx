@@ -10,6 +10,48 @@ export type WorkbenchServicesClient = {
 type Props = { onOpened?(): void; client: WorkbenchServicesClient; locale: 'zh' | 'en'; onAction(request: SettingsActionRequest): void; busy: boolean; revision?: string; cwd?: string };
 const record = (v: unknown): Record<string, any> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, any> : {};
 const rows = (v: unknown): Record<string, any>[] => Array.isArray(v) ? v.map(record) : [];
+
+export type WorkbenchErrorPresentation = {
+  title: string;
+  detail: string;
+  nextStep: string;
+};
+
+/**
+ * Electron adds a remote-method prefix to bridge failures. Keep that transport
+ * detail out of the product UI and explain which part of the App is affected.
+ */
+export function presentWorkbenchError(error: unknown, locale: 'zh' | 'en'): WorkbenchErrorPresentation {
+  const raw = String(error ?? '').replace(/^Error invoking remote method '[^']+':\s*Error:\s*/i, '').trim();
+  const zh = locale === 'zh';
+  if (/export is unavailable|update Framework/i.test(raw)) {
+    return {
+      title: zh ? '基础服务版本需要更新' : 'Base services need an update',
+      detail: zh ? '计划任务、记忆管理和日志清理由 OPL Framework 提供，当前载体没有可用的工作台服务接口。普通 Codex 对话仍可继续。' : 'Scheduled tasks, memory management, and log cleanup are provided by OPL Framework. The active carrier does not expose the workbench service interface. Ordinary Codex conversations remain available.',
+      nextStep: zh ? '在“更新与修复”中更新基础服务，重启 App 后再刷新。' : 'Update Base services in Runtime & Maintenance, restart the App, then refresh.'
+    };
+  }
+  if (/workbench services are unavailable|workbench services have not initialized/i.test(raw)) {
+    return {
+      title: zh ? '基础服务暂不可用' : 'Base services are temporarily unavailable',
+      detail: zh ? '计划任务、记忆管理和日志清理尚未连接到 OPL Framework。普通 Codex 对话不受影响。' : 'Scheduled tasks, memory management, and log cleanup are not connected to OPL Framework. Ordinary Codex conversations are unaffected.',
+      nextStep: zh ? '先检查“更新与修复”，完成更新并重启后重新读取。' : 'Check Runtime & Maintenance, finish the update, restart, and read again.'
+    };
+  }
+  if (/unsupported workbench schema|schema/i.test(raw)) {
+    return {
+      title: zh ? '基础服务接口版本不匹配' : 'Base service interface is incompatible',
+      detail: zh ? 'App 与 OPL Framework 的工作台接口版本不同，因此暂时无法读取此页面。普通 Codex 对话仍可继续。' : 'The App and OPL Framework expose different workbench interface versions, so this page cannot be read yet. Ordinary Codex conversations remain available.',
+      nextStep: zh ? '更新基础服务并重启 App。' : 'Update Base services and restart the App.'
+    };
+  }
+  return {
+    title: zh ? '读取所属服务失败' : 'Could not read the owner service',
+    detail: zh ? '此页面暂时没有拿到所属服务的最新状态，已有的普通 Codex 对话不受影响。' : 'This page did not receive the latest owner-service state. Existing ordinary Codex conversations are unaffected.',
+    nextStep: zh ? '刷新一次；如果仍然失败，请在“更新与修复”中检查基础服务。' : 'Refresh once. If it still fails, check Base services in Runtime & Maintenance.'
+  };
+}
+
 function useRead(client: WorkbenchServicesClient, operation: string, revision?: string) {
   const [data, setData] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState('');
@@ -30,8 +72,15 @@ function action(props: Props, operation: string, input: Record<string, unknown>,
     confirmationRequired: true, dryRunSupported: true });
 }
 function ReadStatus({ value, zh }: { value: ReturnType<typeof useRead>; zh: boolean }) {
-  return <><Button variant="outline" size="sm" type="button" disabled={value.busy} onClick={() => void value.refresh()}>{value.busy ? (zh ? '读取中…' : 'Loading…') : (zh ? '刷新' : 'Refresh')}</Button>
-    {value.error && <p role="alert">{value.error}<br />{zh ? '请检查 Framework 服务后刷新。普通对话仍可继续。' : 'Check Framework services and refresh. Chat remains available.'}</p>}</>;
+  const presentation = value.error ? presentWorkbenchError(value.error, zh ? 'zh' : 'en') : null;
+  return <>
+    <Button variant="outline" size="sm" type="button" disabled={value.busy} onClick={() => void value.refresh()}>{value.busy ? (zh ? '读取中…' : 'Loading…') : (zh ? '刷新' : 'Refresh')}</Button>
+    {presentation && <div className="workbench-service-error" role="alert">
+      <strong>{presentation.title}</strong>
+      <p>{presentation.detail}</p>
+      <small>{presentation.nextStep}</small>
+    </div>}
+  </>;
 }
 
 export function ScheduledTasksPanel(props: Props) {
@@ -78,7 +127,7 @@ export function ScheduledTasksPanel(props: Props) {
     <h4>{zh ? '最近执行（含已删除任务）' : 'Recent runs (including deleted tasks)'}</h4><ReadStatus value={history} zh={zh} />
     {history.data && !rows(history.data.items).length && <p>{zh ? '暂无执行记录。' : 'No runs yet.'}</p>}
     {rows(history.data?.items).map(run => <article key={`${run.workflowId}:${run.runId}`}><strong>{run.title ?? run.taskId}</strong><p>{new Date(run.startTime).toLocaleString(locale)} · {run.result?.status}</p><p>{run.result?.summary ?? run.result?.reason}</p>{run.result?.threadId && <Button variant="outline" size="sm" type="button" onClick={async () => { try { const error = await client.openThread(run.result.threadId); setOpenError(error ?? ''); if (!error) props.onOpened?.(); } catch (e) { setOpenError(String(e)); } }}>{zh ? '打开结果任务' : 'Open result task'}</Button>}</article>)}
-    {openError && <p role="alert">{openError}</p>}
+    {openError && <div className="workbench-service-error" role="alert"><strong>{presentWorkbenchError(openError, zh ? 'zh' : 'en').title}</strong><p>{presentWorkbenchError(openError, zh ? 'zh' : 'en').detail}</p><small>{presentWorkbenchError(openError, zh ? 'zh' : 'en').nextStep}</small></div>}
   </section>;
 }
 
@@ -95,7 +144,7 @@ export function MemoryManagerPanel(props: Props) {
     <ReadStatus value={list} zh={zh} />
     {list.data && !rows(list.data.items).length && <p>{zh ? '此 Codex home 尚无记忆文件。' : 'No memory files in this Codex home yet.'}</p>}
     <ul>{rows(list.data?.items).map(item => <li key={item.id}><Button variant="outline" size="sm" type="button" onClick={() => void open(item.id)}>{item.editable ? `${zh ? '纠错建议' : 'Correction'} · ${new Date(item.modifiedAt).toLocaleString(locale)}` : item.name}</Button>{item.editable && <span> · {zh ? '用户纠错建议' : 'User correction'}</span>}</li>)}</ul>
-    {error && <p role="alert">{error}</p>}
+    {error && <div className="workbench-service-error" role="alert"><strong>{presentWorkbenchError(error, zh ? 'zh' : 'en').title}</strong><p>{presentWorkbenchError(error, zh ? 'zh' : 'en').detail}</p><small>{presentWorkbenchError(error, zh ? 'zh' : 'en').nextStep}</small></div>}
     {selected && <><label>{zh ? '记忆正文' : 'Memory content'}<textarea readOnly={!selected.editable} value={content} onChange={e => setContent(e.target.value)} rows={12} /></label>
       {selected.editable && <div><Button variant="outline" size="sm" type="button" disabled={props.busy} onClick={() => action(props, 'memory_update_note', { id: selected.id, revision: selected.revision, content }, zh ? '修改纠错建议' : 'Edit correction')}>{zh ? '预览修改' : 'Preview edit'}</Button><Button variant="outline" size="sm" type="button" disabled={props.busy} onClick={() => action(props, 'memory_delete_note', { id: selected.id, revision: selected.revision }, zh ? '删除纠错建议' : 'Delete correction')}>{zh ? '删除建议' : 'Delete note'}</Button></div>}</>}
     <label>{zh ? '纠错建议' : 'Correction'}<textarea value={correction} maxLength={64000} onChange={e => setCorrection(e.target.value)} /></label>

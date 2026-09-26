@@ -17,6 +17,7 @@ Object.assign(globalThis, {
 });
 
 const presentation = await import("../../src/workbench/SettingsPanel.tsx");
+const workbenchServices = await import("../../src/workbench/plugins/WorkbenchServicesPanel.tsx");
 const settingsSource = readFileSync(new URL("../../src/workbench/SettingsPanel.tsx", import.meta.url), "utf8");
 
 test("settings navigation exposes primary categories with related destinations grouped inside", () => {
@@ -74,9 +75,22 @@ test("internal status and package role identifiers are projected as user-facing 
   assert.equal(presentation.statusTone("4/5"), "attention");
   assert.equal(presentation.formatStatus("25/25", "zh"), "25 / 25 可用");
   assert.equal(presentation.formatStatus("4/5", "en"), "4 / 5 available");
+  assert.equal(presentation.formatStatus(undefined, "zh"), "尚未读取");
+  assert.equal(presentation.formatStatus("unknown", "zh"), "待确认");
   assert.notEqual(presentation.formatStatus("preview_legacy_modules_fallback", "zh"), "preview_legacy_modules_fallback");
   assert.notEqual(presentation.packageRoleLabel("standard_agent", "zh"), "standard_agent");
   assert.notEqual(presentation.formatUpdateChannel("private_canary", "zh"), "private_canary");
+});
+
+test("workbench service errors explain the affected surface without exposing Electron transport text", () => {
+  const error = workbenchServices.presentWorkbenchError(
+    "Error invoking remote method 'opl:invoke': Error: Framework workbench services are unavailable. Update Framework and restart the App.",
+    "zh"
+  );
+  assert.equal(error.title, "基础服务版本需要更新");
+  assert.match(error.detail, /普通 Codex 对话/);
+  assert.match(error.nextStep, /更新基础服务/);
+  assert.doesNotMatch(error.detail, /remote method|opl:invoke/);
 });
 
 test("standard Agent summary is derived from the same installed, enabled, callable, and launchable axes shown in the row", () => {

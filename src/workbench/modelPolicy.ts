@@ -218,9 +218,10 @@ export function resolveCodexSelection(
   selection: CodexModelSelection,
   requestedReasoning: CodexReasoningEffort
 ) {
-  const unknownCatalogDefault = options.find((option) => option.isCatalogDefault && !option.known && option.available);
-  const defaultModel = unknownCatalogDefault
-    ?? options.find((option) => option.id === codexModelPolicy.defaultModel)
+  // OPL Auto is product-owned. Codex's provider-local `isDefault` may point at
+  // a local/custom model (for example deepseek-flash), but that must not
+  // replace the OPL App default Astra policy for ordinary OPL sessions.
+  const defaultModel = options.find((option) => option.id === codexModelPolicy.defaultModel)
     ?? options.find((option) => option.available)
     ?? options[0]!;
   const requestedModel = options.find((option) => option.id === selection);

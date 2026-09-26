@@ -381,7 +381,7 @@ export function carrierLogDetail(
 }
 
 export function formatStatus(status: string | undefined, locale: WorkbenchSettings["locale"]): string {
-  if (!status) return locale === "zh" ? "待确认" : "Not available";
+  if (!status) return locale === "zh" ? "尚未读取" : "Not read yet";
   const healthRatio = status.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
   if (healthRatio) {
     const available = Number(healthRatio[1]);
@@ -433,7 +433,7 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     usage_unavailable: ["用量不可用", "Usage unavailable"],
     not_configured: ["尚未配置", "Not configured"],
     unknown: ["待确认", "Not available"],
-    app_state_projection: ["待确认", "Not available"],
+    app_state_projection: ["尚未读取", "Not read yet"],
     preview_legacy_modules_fallback: ["信息有限", "Limited information"],
     stable: ["稳定版", "Stable"],
     preview: ["预览版", "Preview"]
@@ -1667,6 +1667,15 @@ export function SettingsPanel({
   const gatewayAccountReady = gatewayConnectionState === "account"
     && gateway !== undefined
     && !["setup_required", "reauth_required"].includes(gateway.status);
+  // Auto is resolved by the App-owned policy. A provider projection may still
+  // expose its own local default (for example deepseek-flash), which must not
+  // be presented as the user's effective OPL model.
+  const displayedModelId = settings.modelAccess === "__auto"
+    ? resolvedModel?.id ?? projection?.codex.model
+    : projection?.codex.model ?? resolvedModel?.id;
+  const displayedReasoning = settings.modelAccess === "__auto"
+    ? resolvedReasoning
+    : projection?.codex.reasoningEffort ?? resolvedReasoning;
 
   useEffect(() => {
     if (selectedDestination === "capabilities" && capabilityStatus === "idle") onRefreshCapabilities();
@@ -1771,7 +1780,7 @@ export function SettingsPanel({
             <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"} detail={projection?.codex.version ? `${settings.locale === "zh" ? "版本" : "Version"} ${projection.codex.version}` : undefined}>
               <StatusValue status={projection?.codex.versionStatus ?? (projection?.codex.installed ? "ready" : undefined)} locale={settings.locale} />
             </SettingRow>
-            <SettingRow label={settings.locale === "zh" ? "模型" : "Model"}><span>{modelLabel(projection?.codex.model ?? resolvedModel?.id ?? "--", settings.locale)}</span></SettingRow>
+            <SettingRow label={settings.locale === "zh" ? "模型" : "Model"}><span>{modelLabel(displayedModelId ?? "--", settings.locale)}</span></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "工作目录" : "Working directory"}><code>{projection?.workspace.selectedPath ?? statePlaceholder}</code></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "设置状态" : "Settings status"}>
               <StatusValue status={readbackStatus} locale={settings.locale} />
@@ -2012,8 +2021,8 @@ export function SettingsPanel({
             <SettingRow label={settings.locale === "zh" ? "强度" : "Effort"}>{renderSettingControl("reasoningLevel")}</SettingRow>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "当前配置" : "Current setup"}>
-            <SettingRow label={settings.locale === "zh" ? "当前模型" : "Current model"}><span>{modelLabel(projection?.codex.model ?? "--", settings.locale)}</span></SettingRow>
-            <SettingRow label={settings.locale === "zh" ? "当前强度" : "Current effort"}><span>{projection?.codex.reasoningEffort ? reasoningLabel(projection.codex.reasoningEffort, settings.locale, true) : "--"}</span></SettingRow>
+            <SettingRow label={settings.locale === "zh" ? "当前模型" : "Current model"}><span>{modelLabel(displayedModelId ?? "--", settings.locale)}</span></SettingRow>
+            <SettingRow label={settings.locale === "zh" ? "当前强度" : "Current effort"}><span>{displayedReasoning ? reasoningLabel(displayedReasoning, settings.locale, true) : "--"}</span></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "模型访问方式" : "Model access"}><span>{projection?.codex.providerName ?? "--"}</span></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "访问状态" : "Access status"}><StatusValue status={projection?.codex.accessStatus} locale={settings.locale} /></SettingRow>
           </SettingsGroup>

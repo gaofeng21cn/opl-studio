@@ -5325,4 +5325,25 @@ export const codexWorkbenchStyles = `
   .feature-status-panel input { max-width: 100%; }
   .feature-status-content > input { width: 100%; padding: 8px 12px; border: 0; border-radius: 10px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: inherit; }
   .feature-status-panel button { border: 0; border-radius: 18px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: inherit; }
+
+  /* Keep host-owned settings on the same quiet, row-based rhythm as DSH.
+     These pages are projections inside the DSH modal, so they should not add
+     a second card system or oversized section spacing. */
+  .opl-settings-slot-root .settings-detail-header { padding: 20px 24px 14px; }
+  .opl-settings-slot-root .settings-content { padding: 0 24px 32px; }
+  .opl-settings-slot-root .settings-group + .settings-group,
+  .opl-settings-slot-root .gateway-identity + .settings-group,
+  .opl-settings-slot-root .about-mark + .settings-group { margin-top: 20px; }
+  .opl-settings-slot-root .settings-group h2 { margin-bottom: 4px; font-size: 14px; line-height: 22px; }
+  .opl-settings-slot-root .settings-row { min-height: 48px; padding: 12px 0; gap: 20px; }
+  .opl-settings-slot-root .settings-page-summary { min-height: 32px; margin-bottom: 12px; padding-bottom: 8px; }
+  .opl-settings-slot-root .settings-subnav button { border-color: transparent; background: transparent; }
+  .opl-settings-slot-root .settings-subnav button[aria-current="page"] { border-color: transparent; background: var(--dsw-alias-interactive-bg-active); }
+  .opl-settings-slot-root .feature-status-panel { margin-top: 16px; }
+  .opl-settings-slot-root .workbench-services { margin-top: 16px; }
+  .opl-settings-slot-root .workbench-services > p { margin: 0 0 8px; color: var(--opl-muted); font-size: var(--opl-text-sm); }
+  @media (max-width: 640px) {
+    .opl-settings-slot-root .settings-detail-header,
+    .opl-settings-slot-root .settings-content { padding-left: 16px; padding-right: 16px; }
+  }
 `;

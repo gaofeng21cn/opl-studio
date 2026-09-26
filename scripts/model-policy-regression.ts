@@ -19,7 +19,7 @@ const syntheticProfile = {
       known_model_reasoning_effort_overrides: {
         "codex-future-primary": "max"
       },
-      unknown_default_model_policy: "accept_catalog_default_even_when_not_in_frontier_model_preference_order",
+      unknown_default_model_policy: "ignore_catalog_default_for_app_auto",
       unknown_model_reasoning_effort_policy: "highest_supported_reasoning_effort_from_catalog",
       catalog_unavailable_fallback: {
         model: "codex-future-primary",
@@ -156,10 +156,21 @@ const futureCatalog = normalizeCodexModelCatalog({
 const futureOptions = resolveCodexModelOptions(futureCatalog.models);
 const futureAuto = resolveCodexSelection(futureOptions, "__auto", "low");
 assert.equal(futureCatalog.source, "codex_app_server_model_list");
-assert.equal(futureAuto.model?.id, "codex-6");
-assert.equal(futureAuto.reasoningEffort, "ultra");
+assert.equal(futureAuto.model?.id, "codex-future-primary");
+assert.equal(futureAuto.reasoningEffort, "max");
 assert.deepEqual(futureAuto.reasoningOptions, ["low", "high", "xhigh", "max", "ultra"]);
 assert.equal(futureAuto.effectiveSelection, "__auto");
+assert.equal(futureOptions.some((option) => option.id === "codex-6"), false);
+
+const localProviderDefaultOptions = resolveCodexModelOptions([{
+  id: "deepseek-flash",
+  displayName: "DeepSeek Flash",
+  isDefault: true,
+  defaultReasoningEffort: "high",
+  supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }]
+}]);
+assert.equal(localProviderDefaultOptions.some((option) => option.id === "deepseek-flash"), false);
+assert.equal(resolveCodexSelection(localProviderDefaultOptions, "__auto", "low").model?.id, "codex-future-primary");
 const emptyOptions = resolveCodexModelOptions([]);
 assert.equal(emptyOptions.find((option) => option.id === "codex-future-primary")?.available, true);
 assert.equal(emptyOptions.find((option) => option.id === "codex-future-secondary")?.available, false);

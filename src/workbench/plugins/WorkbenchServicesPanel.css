@@ -1,5 +1,5 @@
 
-.workbench-services form, .workbench-services article { display: grid; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border, #8884); }
+.workbench-services form, .workbench-services article { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--opl-border, var(--border, #8884)); }
 .workbench-services label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
 .workbench-services label:has(textarea), .workbench-services form > label { flex-direction: column; align-items: stretch; }
 .workbench-services input, .workbench-services select, .workbench-services textarea { max-width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border, #8886); border-radius: 6px; background: transparent; color: inherit; }
@@ -10,4 +10,7 @@
 .workbench-services fieldset { display: flex; flex-wrap: wrap; gap: 8px; }
 .workbench-services button { height: auto; min-height: 28px; background: var(--dsw-alias-button-tertiary-fill, transparent); color: var(--dsw-alias-label-primary, inherit); }
 .workbench-services li { margin: 6px 0; }
-.workbench-services h3 { margin-block: 12px; }
+.workbench-services h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; line-height: 22px; }
+.workbench-service-error { display: grid; gap: 4px; margin: 10px 0 12px; padding: 10px 12px; border-left: 2px solid var(--opl-warning, #f59e0b); background: color-mix(in srgb, var(--opl-warning, #f59e0b) 8%, transparent); color: var(--opl-text, inherit); }
+.workbench-service-error p, .workbench-service-error small { margin: 0; color: var(--opl-muted, inherit); }
+.workbench-service-error strong { font-weight: 500; }

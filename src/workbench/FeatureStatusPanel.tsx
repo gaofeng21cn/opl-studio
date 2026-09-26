@@ -4,9 +4,9 @@ import { actionPayloadComplete, type SettingsActionRequest } from './settingsAct
 import type { FeatureDestination } from './featureModel';
 
 const stateLabels = {
-  available: ['可用', 'Available'], degraded: ['部分可用 / 读取中', 'Degraded / loading'],
+  available: ['可用', 'Available'], degraded: ['状态不完整', 'Incomplete status'],
   not_configured: ['尚未配置', 'Not configured'], unavailable: ['不可用', 'Unavailable'],
-  owner_action_required: ['需要所属服务提供能力', 'Owner action required'],
+  owner_action_required: ['需要服务支持', 'Service support required'],
 } as const;
 
 function FeatureAction({ action, feature, busy, locale, onAction }: {
