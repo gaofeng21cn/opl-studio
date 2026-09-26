@@ -395,6 +395,74 @@ export function settingsSubDestinations(
     ?.destinations ?? [{ id: "about", label: navigationCopy[locale].destinations.about }];
 }
 
+export type SettingsPagePresentation = {
+  eyebrow: string;
+  description: string;
+};
+
+const settingsPagePresentation: Record<SettingsDestinationId, { zh: SettingsPagePresentation; en: SettingsPagePresentation }> = {
+  overview: {
+    zh: { eyebrow: "设置总览", description: "查看连接、模型、工作区和本机状态。需要修改时进入对应的负责人页面。" },
+    en: { eyebrow: "Settings overview", description: "Review access, models, workspace, and local status. Open the owner page when you need to change something." }
+  },
+  account: {
+    zh: { eyebrow: "账户与访问", description: "管理 OPL Gateway 账户或 API Key。凭据由专用 owner 保存，App 只显示状态和回读。" },
+    en: { eyebrow: "Account & access", description: "Manage your OPL Gateway account or API key. Credentials stay with their owner; the App shows status and readback." }
+  },
+  models: {
+    zh: { eyebrow: "账户与模型", description: "选择模型来源和推理强度。自动模式遵循 OPL 的模型策略，并显示实际生效结果。" },
+    en: { eyebrow: "Account & models", description: "Choose the model source and reasoning effort. Auto follows the OPL model policy and shows the effective result." }
+  },
+  resources: {
+    zh: { eyebrow: "连接与部署", description: "查看外部资源、通道和部署连接。连接动作由对应 owner 执行，页面只呈现可验证状态。" },
+    en: { eyebrow: "Connections & deployment", description: "Review external resources, channels, and deployment connections. Each owner executes its own connection actions." }
+  },
+  workspace: {
+    zh: { eyebrow: "工作区", description: "设置当前工作目录和项目文件位置。路径变更会经过 owner 校验并返回新的生效路径。" },
+    en: { eyebrow: "Workspace", description: "Set the current working directory and project location. Changes are validated and returned by the owner." }
+  },
+  storage: {
+    zh: { eyebrow: "工作区 · 数据与存储", description: "查看已盘点的数据和可恢复的清理动作。未知容量保持未知，不会显示为零。" },
+    en: { eyebrow: "Workspace · data & storage", description: "Review inventoried data and recoverable cleanup actions. Unknown capacity stays unknown instead of becoming zero." }
+  },
+  agents: {
+    zh: { eyebrow: "智能体与能力", description: "管理可运行的智能体、工作流和入口偏好。目录与生命周期来自 Framework 投影。" },
+    en: { eyebrow: "Agents & capabilities", description: "Manage runnable agents, workflows, and entry preferences from the Framework projection." }
+  },
+  capabilities: {
+    zh: { eyebrow: "智能体与能力", description: "查看 DSH 官方能力、Skills、插件、连接应用和 OPL 能力包，并了解它们由谁管理。" },
+    en: { eyebrow: "Agents & capabilities", description: "Review DSH capabilities, skills, plugins, connected apps, and OPL packages with clear ownership." }
+  },
+  instructions: {
+    zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "管理本机指令、新会话补充说明和记忆纠错建议。保存后会回读当前上下文来源。" },
+    en: { eyebrow: "Agents & capabilities · instructions & context", description: "Manage local instructions, new conversation context, and memory corrections with owner readback." }
+  },
+  services: {
+    zh: { eyebrow: "运行与维护", description: "查看服务、工作进程、定时任务和 Framework 扩展的运行状态，并执行明确的维护动作。" },
+    en: { eyebrow: "Runtime & maintenance", description: "Review services, workers, schedules, and Framework extensions, then run explicit maintenance actions." }
+  },
+  updates: {
+    zh: { eyebrow: "运行与维护", description: "检查 App、基础服务和能力包更新。每个组件由自己的 owner 更新并返回生效版本。" },
+    en: { eyebrow: "Runtime & maintenance", description: "Check App, Base, and capability updates. Each component is updated by its owner and returns the effective version." }
+  },
+  diagnostics: {
+    zh: { eyebrow: "运行与维护", description: "查看日志路径、运行引用和诊断信息。技术详情只读展示，不会在这里产生隐式修复。" },
+    en: { eyebrow: "Runtime & maintenance", description: "Inspect log paths, runtime refs, and diagnostics. Technical details are read-only." }
+  },
+  preferences: {
+    zh: { eyebrow: "偏好", description: "调整语言、外观、字号、通知和执行确认等 App 本地行为。" },
+    en: { eyebrow: "Preferences", description: "Adjust language, appearance, font size, notifications, and execution confirmation for this App." }
+  },
+  about: {
+    zh: { eyebrow: "关于", description: "查看版本、更新状态、安装指南和安全的反馈入口。" },
+    en: { eyebrow: "About", description: "View the version, update status, installation guide, and a safe feedback entry point." }
+  }
+};
+
+export function settingsPagePresentationFor(destination: SettingsDestinationId, locale: WorkbenchSettings["locale"]): SettingsPagePresentation {
+  return settingsPagePresentation[destination][locale];
+}
+
 export function statusTone(status: string | undefined): "ready" | "attention" | "neutral" {
   if (!status) return "neutral";
   const normalized = status.toLowerCase();
@@ -1056,6 +1124,33 @@ function SettingsContributionSection({
       <div className="opl-contribution-slot">{contributions}</div>
     </section>
   );
+}
+
+type OfficialDshCapability = {
+  id: string;
+  pluginIds: string[];
+  label: { zh: string; en: string };
+  description: { zh: string; en: string };
+  owner: { zh: string; en: string };
+  integrated: boolean;
+};
+
+export const officialDshCapabilities: OfficialDshCapability[] = [
+  { id: "dsh-plugin-manager", pluginIds: ["@deepseek-ai/dsh-plugin-manager", "plugin-manager"], label: { zh: "插件管理", en: "Plugin management" }, description: { zh: "吸收 DSH 的插件发现、详情和设置入口，安装与启用动作交给 OPL Package owner。", en: "Reuse DSH discovery, details, and settings entry points while OPL Package owners execute install and enable actions." }, owner: { zh: "Framework / Package owner", en: "Framework / Package owner" }, integrated: false },
+  { id: "dsh-auto-review", pluginIds: ["@deepseek-ai/dsh-experimental-auto-review", "auto-review"], label: { zh: "Auto Review", en: "Auto Review" }, description: { zh: "吸收审阅开关和拒绝后的继续/停止交互，审批事实仍由 Codex owner 回读。", en: "Reuse review controls and continue/stop decisions after denial; Codex remains the approval owner." }, owner: { zh: "Codex / App Server", en: "Codex / App Server" }, integrated: false },
+  { id: "dsh-shortcuts", pluginIds: ["@deepseek-ai/dsh-client-ui-shortcuts", "shortcuts"], label: { zh: "快捷键", en: "Keyboard shortcuts" }, description: { zh: "吸收 DSH 的搜索、编辑、冲突提示和恢复默认；绑定属于 App 本地偏好。", en: "Reuse DSH search, editing, conflict warnings, and reset flow; bindings are App-local preferences." }, owner: { zh: "App / Shell local", en: "App / Shell local" }, integrated: false },
+  { id: "dsh-time-context", pluginIds: ["@deepseek-ai/dsh-time-context", "time-context"], label: { zh: "时间上下文", en: "Time context" }, description: { zh: "提供可选的时间更新和间隔设置，作用域与隐私说明由 OPL context owner 回读。", en: "Provide optional time updates and interval settings with scope and privacy readback from the OPL context owner." }, owner: { zh: "Codex / Context owner", en: "Codex / Context owner" }, integrated: false },
+  { id: "dsh-schedule", pluginIds: ["@deepseek-ai/dsh-schedule", "@deepseek-ai/dsh-client-ui-schedule", "schedule"], label: { zh: "计划任务", en: "Scheduled tasks" }, description: { zh: "DSH 的任务表单、重复规则和运行历史已由 OPL Workbench Services 接入。", en: "DSH task forms, recurrence rules, and run history are integrated through OPL Workbench Services." }, owner: { zh: "Framework / Temporal", en: "Framework / Temporal" }, integrated: true },
+  { id: "dsh-inspector", pluginIds: ["@deepseek-ai/dsh-experimental-inspector", "inspector"], label: { zh: "任务 Inspector", en: "Task inspector" }, description: { zh: "DSH Inspector 的详情分栏由 OPL typed projection 驱动，默认保持按需打开。", en: "The DSH Inspector pattern is driven by OPL typed projections and remains on-demand by default." }, owner: { zh: "OPL App projection", en: "OPL App projection" }, integrated: true },
+  { id: "dsh-voice-input", pluginIds: ["@deepseek-ai/dsh-experimental-client-ui-voice-input", "voice-input"], label: { zh: "语音输入", en: "Voice input" }, description: { zh: "吸收 DSH 的入口、未就绪引导和权限状态；provider 通过能力包接入。", en: "Reuse DSH entry points, readiness guidance, and permission state; providers arrive through capability packages." }, owner: { zh: "Capability / connection owner", en: "Capability / connection owner" }, integrated: false }
+];
+
+export function officialDshCapabilityStatus(capability: OfficialDshCapability, plugins: CodexInstalledCapability[], locale: WorkbenchSettings["locale"]): { status: string; detail: string } {
+  if (capability.integrated) return { status: "available", detail: locale === "zh" ? `已接入 · ${capability.owner.zh}` : `Integrated · ${capability.owner.en}` };
+  const plugin = plugins.find((item) => capability.pluginIds.includes(item.id) || capability.pluginIds.includes(item.name));
+  if (plugin?.enabled && plugin.callable) return { status: "available", detail: locale === "zh" ? `已启用 · ${capability.owner.zh}` : `Enabled · ${capability.owner.en}` };
+  if (plugin?.enabled) return { status: "attention_needed", detail: locale === "zh" ? `已安装，等待 owner 接入 · ${capability.owner.zh}` : `Installed; owner adapter pending · ${capability.owner.en}` };
+  return { status: "planned", detail: locale === "zh" ? `待接入 · ${capability.owner.zh}` : `Ready for adoption · ${capability.owner.en}` };
 }
 
 function CapabilityDirectory({
