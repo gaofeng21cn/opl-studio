@@ -219,6 +219,8 @@ const studioDeveloperTools = true;
 const useStudioDeveloperTools = (selector: (enabled: boolean) => unknown) => selector(studioDeveloperTools);
 const studioStopShortcut: readonly string[] = [];
 const useStudioStopShortcut = (selector: (keys: typeof studioStopShortcut) => unknown) => selector(studioStopShortcut);
+const studioWorkspaceShortcutState = { searchRequest: 0, addRequested: false, directoryBusy: false, renameTarget: null, forkError: null };
+const useStudioWorkspaceShortcuts = (selector: (state: typeof studioWorkspaceShortcutState) => unknown) => selector(studioWorkspaceShortcutState);
 // Studio queue rows carry text only, so the queue thumbnail loader is inert.
 const loadStudioQueueImage = async (): Promise<string> => "";
 
@@ -442,6 +444,13 @@ function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandS
     searchResultLimit={100}
     useDirectoryFlow={() => false}
     useHostInfo={(selector: any) => selector({ home: undefined })}
+    useShortcuts={useStudioShortcuts}
+    useWorkspaceShortcuts={useStudioWorkspaceShortcuts}
+    requestSearch={() => undefined}
+    requestAddWorkspace={() => undefined}
+    closeAddWorkspace={() => undefined}
+    setDirectoryBusy={() => undefined}
+    dismissForkError={() => undefined}
     renderSlot={(key: string, owner: { sessionId: string }, options?: { hookContext?: [boolean, (open: boolean) => void] }) => renderSessionMenu(key, owner, options, dshLocale, studio.forkThread, studio.archiveThread)}
     t={dshLocale}
   />
