@@ -1850,6 +1850,24 @@ export const codexWorkbenchStyles = `
     padding-bottom: 18px;
   }
 
+  .settings-detail-heading {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+  }
+
+  .settings-detail-eyebrow {
+    overflow: hidden;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    font-weight: var(--opl-weight-medium);
+    letter-spacing: 0;
+    line-height: var(--opl-leading-normal);
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
   .settings-detail-header h1 {
     margin: 0;
     font-size: 16px;
@@ -1863,6 +1881,14 @@ export const codexWorkbenchStyles = `
     align-items: center;
     justify-content: space-between;
     gap: 18px;
+  }
+
+  .settings-detail-description {
+    max-width: 680px;
+    margin: 0;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-relaxed);
   }
 
   .settings-subnav {

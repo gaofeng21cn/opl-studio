@@ -27,6 +27,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type {
   CarrierDiagnosticsReadback,
+  CodexInstalledCapability,
   CodexCapabilityCatalog,
   NativeAppUpdateResult,
   OplInitializeReadback
@@ -515,6 +516,7 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     current: ["已是最新", "Up to date"],
     installed: ["已安装", "Installed"],
     enabled: ["已开启", "Enabled"],
+    planned: ["待接入", "Planned"],
     disabled: ["已关闭", "Disabled"],
     not_installed: ["未安装", "Not installed"],
     checking: ["正在检查", "Checking"],
@@ -1191,10 +1193,26 @@ function CapabilityDirectory({
     detail: locale === "zh" ? "动态依赖" : "Dynamic dependency",
     technical: `${owner.sourceRef}#dependency_readiness.checks`
   })));
+  const officialItems = officialDshCapabilities.map((capability) => {
+    const presentation = officialDshCapabilityStatus(capability, catalog.plugins, locale);
+    return {
+      id: capability.id,
+      name: capability.label[locale],
+      description: capability.description[locale],
+      status: presentation.status,
+      detail: presentation.detail,
+      technical: capability.pluginIds.join(" · ")
+    };
+  });
   const capabilityPackageItems = [...capabilityPackages, ...dependencyPackages].filter((item, index, items) => (
     items.findIndex((candidate) => candidate.id === item.id) === index
   ));
   const groups = [
+    {
+      id: "dsh-official",
+      label: locale === "zh" ? "DSH 官方能力" : "Official DSH capabilities",
+      items: officialItems
+    },
     {
       id: "capability-packages",
       label: locale === "zh" ? "能力模块" : "Capability packages",
@@ -1768,6 +1786,7 @@ export function SettingsPanel({
   const selectedDestination = !onNavigate && subDestination
     ? subDestination
     : activeDestination;
+  const pagePresentation = settingsPagePresentationFor(selectedDestination, settings.locale);
   const projection = model.settingsProjection;
   const runtime = model.runtimeOverview;
   const gateway = model.gatewayAccount;
@@ -2563,22 +2582,26 @@ export function SettingsPanel({
     <section data-testid="opl-settings-panel" className="settings-page" aria-label={settings.locale === "zh" ? "设置" : "Settings"}>
       <div className="settings-detail">
         <header className="settings-detail-header">
-          <div className="settings-detail-title-row">
-            <h1>{copy[selectedDestination]}</h1>
-            {activeGroup && activeGroup.destinations.length > 1 ? (
-              <nav className="settings-subnav" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} sections`}>
-                {activeGroup.destinations.map((destination) => (
-                  <button
-                    key={destination.id}
-                    type="button"
-                    aria-current={destination.id === selectedDestination ? "page" : undefined}
-                    onClick={() => onNavigate ? onNavigate(destination.id) : setSubDestination(destination.id)}
-                  >
-                    {destination.label}
-                  </button>
-                ))}
-              </nav>
-            ) : null}
+          <div className="settings-detail-heading">
+            <span className="settings-detail-eyebrow">{pagePresentation.eyebrow}</span>
+            <div className="settings-detail-title-row">
+              <h1>{copy[selectedDestination]}</h1>
+              {activeGroup && activeGroup.destinations.length > 1 ? (
+                <nav className="settings-subnav" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} sections`}>
+                  {activeGroup.destinations.map((destination) => (
+                    <button
+                      key={destination.id}
+                      type="button"
+                      aria-current={destination.id === selectedDestination ? "page" : undefined}
+                      onClick={() => onNavigate ? onNavigate(destination.id) : setSubDestination(destination.id)}
+                    >
+                      {destination.label}
+                    </button>
+                  ))}
+                </nav>
+              ) : null}
+            </div>
+            <p className="settings-detail-description">{pagePresentation.description}</p>
           </div>
         </header>
         <div className="settings-content" data-section={selectedDestination}>
