@@ -5328,6 +5328,49 @@ export const codexWorkbenchStyles = `
     .settings-detail-header { padding-top: 12px; padding-bottom: 16px; }
     .settings-detail-header, .settings-content { padding-left: 16px; padding-right: 16px; }
     .settings-detail-title-row { gap: 12px; }
+
+    /* DSH mounts its settings dialog through a portal, outside the local
+       settings slot root. Keep the same mobile layout for that shell. */
+    [role="dialog"][aria-label="设置"],
+    [role="dialog"][aria-label="Settings"] {
+      width: 100vw;
+      max-width: 100vw;
+      height: 100dvh;
+      border-radius: 0;
+      flex-direction: column;
+    }
+    [role="dialog"][aria-label="设置"] > nav,
+    [role="dialog"][aria-label="Settings"] > nav {
+      width: 100%;
+      height: auto;
+      flex: none;
+      padding: 12px 44px 8px 12px;
+      gap: 0;
+      overflow: visible;
+    }
+    [role="dialog"][aria-label="设置"] > nav > div:last-child,
+    [role="dialog"][aria-label="Settings"] > nav > div:last-child {
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      gap: 4px;
+      padding-bottom: 0;
+    }
+    [role="dialog"][aria-label="设置"] > nav button,
+    [role="dialog"][aria-label="Settings"] > nav button {
+      width: auto;
+      min-width: 0;
+      flex: none;
+      padding: 8px 10px;
+      height: 38px;
+    }
+    [role="dialog"][aria-label="设置"] > div:last-child,
+    [role="dialog"][aria-label="Settings"] > div:last-child {
+      width: 100%;
+      min-width: 0;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
   }
 
   .feature-status-panel { margin-top: 24px; border-top: 0.5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 22px; }
