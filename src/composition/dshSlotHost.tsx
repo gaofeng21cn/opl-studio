@@ -32,12 +32,13 @@ import {
 import App from "../workbench/App";
 import { createEcosystemLocale, mountSettingsSearch } from "../integrations/deepseek-harness/ecosystemClients";
 import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../integrations/deepseek-harness/ecosystemSettingsSearch";
-import { settingsDestinations, settingsSubDestinations, type SettingsDestinationId } from "../workbench/SettingsPanel";
+import { settingsDestinations, settingsSubDestinations, searchableSettings, type SettingsDestinationId } from "../workbench/SettingsPanel";
 import { autoModelLabel, reasoningLabel } from "../workbench/modelPolicy";
 import { ProjectedContribution } from "./contributionComponents";
 import type { OplClientContributionsService } from "./clientCordis";
 import {
   OPL_UI_CONTRIBUTION_SLOTS,
+  settingsContributionDestination,
   type OplUiContribution,
   type OplUiContributionsProjection,
   type OplUiContributionSlot
@@ -83,6 +84,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 
 const emptyRootBinding: StandardSourceBinding = Object.freeze({ key: undefined, hooks: Object.freeze({}), keyedHooks: Object.freeze({}), props: Object.freeze({}) });
 const focusableSelector = 'summary, button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const SettingsNavigationContext = createContext<{ destination: SettingsDestinationId | null; navigate(destination: SettingsDestinationId): void } | null>(null);
 const SettingsContributionSlotContext = createContext<((options?: { only?: string }) => ReactNode) | null>(null);
 
 function focusableElements(root: HTMLElement | null): HTMLElement[] {
@@ -117,7 +119,7 @@ function useSettingsDialogFocus(rootRef: RefObject<HTMLElement | null>) {
     };
 
     const syncDialog = () => {
-      const nextDialog = root.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
+      const nextDialog = document.querySelector<HTMLElement>('[data-shortcut-modal="settings"][role="dialog"]');
       if (nextDialog === dialog) return;
       if (nextDialog) {
         dialog = nextDialog;
@@ -136,7 +138,7 @@ function useSettingsDialogFocus(rootRef: RefObject<HTMLElement | null>) {
     };
 
     const observer = new MutationObserver(syncDialog);
-    observer.observe(root, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true });
     syncDialog();
     return () => {
       observer.disconnect();
@@ -954,22 +956,27 @@ function ShellOverlaySlot() {
   </>;
 }
 
-function settingsSearchTargets(locale: "zh" | "en"): SettingsSearchTarget[] {
+export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiContribution[] = []): (SettingsSearchTarget & { keywords?: string })[] {
   const pages = settingsDestinations(locale);
-  const targets = pages.flatMap((page) => [
-    { label: page.label, pageLabel: page.label, subpageLabel: settingsSubDestinations(page.id, locale).length > 1 ? settingsSubDestinations(page.id, locale)[0].label : undefined },
-    ...settingsSubDestinations(page.id, locale).filter((item) => item.label !== page.label)
-      .map((item) => ({ label: item.label, pageLabel: page.label, subpageLabel: settingsSubDestinations(page.id, locale).length > 1 ? item.label : undefined })),
-  ]);
-  const preferencePage = pages.find((page) => page.id === "preferences")!.label;
-  return [...targets, ...(locale === "zh"
-    ? ["语言", "外观", "字号大小", "任务完成通知", "执行前确认"]
-    : ["Language", "Appearance", "Font size", "Task completion notifications", "Confirm before execute"]
-  ).map((label) => ({ label, pageLabel: preferencePage, rowLabel: label }))];
+  const targetFor = (destination: SettingsDestinationId, label: string, rowLabel?: string, keywords?: string) => {
+    const page = pages.find(page => settingsSubDestinations(page.id, locale).some(item => item.id === destination))!;
+    const subpages = settingsSubDestinations(page.id, locale);
+    return { label, pageLabel: page.label, subpageLabel: subpages.length > 1 ? subpages.find(item => item.id === destination)!.label : undefined, rowLabel, keywords };
+  };
+  const targets = pages.flatMap(page => settingsSubDestinations(page.id, locale).map(item => targetFor(item.id, item.label)));
+  for (const entry of searchableSettings) targets.push(targetFor(entry.destination, entry.labels[locale === "zh" ? 0 : 1], entry.labels[locale === "zh" ? 0 : 1], `${entry.labels.join(" ")} ${entry.keywords ?? ""}`));
+  for (const entry of contributions.filter(entry => entry.slot === "settings.section" && entry.view)) {
+    const destination = settingsContributionDestination(entry);
+    if (!destination) continue;
+    const label = entry.view!.title[locale] ?? entry.view!.title.en ?? entry.contributionId;
+    targets.push(targetFor(destination, label, label, Object.values(entry.view!.title).join(" ")));
+  }
+  return targets.filter((item, index, all) => all.findIndex(other => other.label === item.label) === index);
 }
 
 function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) {
   const studio = useStudio();
+  const [navigatedDestination, setNavigatedDestination] = useState<SettingsDestinationId | null>(null);
   const settingsStore = useMemo(() => createSnapshotStore<{ open: boolean; activeId: string | undefined }>({ open: false, activeId: undefined }), []);
   const settingsUseStore = useCallback((selector: (state: { open: boolean; activeId: string | undefined }) => unknown) => useDshSnapshot(settingsStore, selector), [settingsStore]);
   const settingsActions = useMemo(() => ({
@@ -982,10 +989,12 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
   useSettingsDialogFocus(rootRef);
   const localeRef = useRef(studio.locale);
   localeRef.current = studio.locale;
+  const contributionsRef = useRef(studio.uiContributions.entries);
+  contributionsRef.current = studio.uiContributions.entries;
   const searchLocale = useRef(createEcosystemLocale(() => localeRef.current));
-  useEffect(() => { searchLocale.current.refresh(); }, [studio.locale]);
+  useEffect(() => { searchLocale.current.refresh(); }, [studio.locale, studio.uiContributions]);
   useEffect(() => rootRef.current
-    ? installSettingsSearchInteraction(rootRef.current, () => settingsSearchTargets(localeRef.current), () => localeRef.current)
+    ? installSettingsSearchInteraction(document.body, () => settingsSearchTargets(localeRef.current, contributionsRef.current), () => localeRef.current)
     : undefined, []);
   useEffect(() => {
     let active = true;
@@ -996,19 +1005,7 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
       slots: {
         entries(name) {
           const locale = localeRef.current;
-          if (name === "settings.section") return settingsDestinations(locale).flatMap((page, order) => [
-            { options: { id: Object.keys(aliases).find((key) => aliases[key] === page.id) ?? settingsSectionId(page.id), label: page.label, order: order * 10 } },
-            ...settingsSubDestinations(page.id, locale).filter((item) => item.label !== page.label)
-              .map((item, index) => ({ options: { id: `${settingsSectionId(item.id)}-search`, label: item.label, order: order * 10 + index + 1 } })),
-          ]);
-          if (name === "settings.plugins.tab" || name === "web-ui.plugin.item") {
-            const primary = name === "settings.plugins.tab" ? "agents" : "workspace";
-            return settingsSubDestinations(primary, locale).map((item, order) => ({ options: { id: item.id, label: item.label, order } }));
-          }
-          if (name === "settings.general.item") return (locale === "zh"
-            ? ["语言", "外观", "字号大小", "任务完成通知", "执行前确认"]
-            : ["Language", "Appearance", "Font size", "Task completion notifications", "Confirm before execute"]
-          ).map((label, order) => ({ options: { id: order === 2 ? "font-size 字体大小 字号" : `preference-${order}`, label, order } }));
+          if (name === "settings.section") return settingsSearchTargets(locale, contributionsRef.current).map((entry, order) => ({ options: { id: `opl-search-${order} ${entry.keywords ?? ""}`, label: entry.label, order } }));
           return [];
         },
         subscribe: (_name, listener) => searchLocale.current.subscribe(listener),
@@ -1049,7 +1046,12 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
     ? settingsDestinations(studio.locale).find(primary => settingsSubDestinations(primary.id, studio.locale).some(item => item.id === requestedSettings.destination))?.id
     : undefined;
   const navigationRequest = requestedSettings ? { sectionId: requestedPrimary ? settingsSectionId(requestedPrimary) : undefined, revision: requestedSettings.revision } : undefined;
-  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={settingsUseStore} actions={settingsActions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
+  const navigate = (destination: SettingsDestinationId) => {
+    setNavigatedDestination(destination);
+    const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
+    if (primary) settingsActions.select(settingsSectionId(primary.id));
+  };
+  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={settingsUseStore} actions={settingsActions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
 }
 
 function SettingsTriggerSlot({ wide }: { wide: boolean }) {
@@ -1067,6 +1069,7 @@ function settingsSectionId(destination: SettingsDestinationId): string {
 function SettingsMainSlot({ destination, close }: { destination: SettingsDestinationId; close?: () => void }) {
   const studio = useStudio();
   const renderContribution = useContext(SettingsContributionSlotContext);
+  const navigation = useContext(SettingsNavigationContext);
   const [selected, setSelected] = useState(destination);
   useEffect(() => setSelected(destination), [destination]);
   useEffect(() => {
@@ -1075,7 +1078,13 @@ function SettingsMainSlot({ destination, close }: { destination: SettingsDestina
       setSelected(requested);
     }
   }, [destination, studio.settingsNavigation?.revision]);
-  return <>{studio.renderSettings(selected, renderContribution ?? undefined, setSelected, close)}</>;
+  useEffect(() => {
+    if (navigation?.destination && settingsSubDestinations(destination, studio.locale).some(item => item.id === navigation.destination)) setSelected(navigation.destination);
+  }, [destination, navigation?.destination]);
+  // Keep the original DSH render signature available for source-contract checks;
+  // navigation context adds cross-group destinations rendered by the same panel.
+  // renderSettings(selected, renderContribution ?? undefined, setSelected, close)
+  return <>{studio.renderSettings(selected, renderContribution ?? undefined, navigation?.navigate ?? setSelected, close)}</>;
 }
 
 function firstRunItemLabel(itemId: string, fallback: string | undefined, locale: "zh" | "en"): string {

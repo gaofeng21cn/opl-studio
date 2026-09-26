@@ -235,6 +235,8 @@ export class OplHostCore extends EventEmitter {
         await this.platform.accessWorkspacePath({ path: resolved.target, action: payload.action });
         return { accepted: true };
       }
+      case "openLogDirectory": return this.carrierDiagnostics.openLogDirectory?.()
+        ?? Promise.reject(new ThreadAdapterError("desktop_capability_unavailable", "Log folder access is unavailable", {}, 501));
       case "setLogDirectory": return this.carrierDiagnostics.setLogDirectory?.(payload)
         ?? unsupportedLogDirectoryUpdate();
       case "sendMessage": return this.transport.sendMessage(payload);

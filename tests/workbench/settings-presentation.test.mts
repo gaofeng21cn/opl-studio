@@ -31,11 +31,11 @@ test("settings navigation exposes primary categories with related destinations g
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("agents", "zh").map((destination) => destination.id),
-    ["agents", "capabilities", "instructions"]
+    ["agents", "capabilities", "instructions", "memory"]
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("services", "zh").map((destination) => destination.id),
-    ["services", "updates", "diagnostics"]
+    ["services", "schedules", "updates", "diagnostics"]
   );
 });
 
@@ -46,8 +46,8 @@ test("settings pages expose a purpose statement for every destination", () => {
     assert.ok(page.description.length > 0);
   }
   const capabilities = presentation.settingsPagePresentationFor("capabilities", "zh");
-  assert.match(capabilities.description, /DSH/);
-  assert.match(presentation.settingsPagePresentationFor("capabilities", "en").description, /DSH/);
+  assert.match(capabilities.description, /技能/);
+  assert.match(presentation.settingsPagePresentationFor("capabilities", "en").description, /skills/);
 });
 
 test("official DSH capabilities expose adoption status and owner semantics", () => {
@@ -66,7 +66,7 @@ test("official DSH capabilities expose adoption status and owner semantics", () 
   const pluginManager = presentation.officialDshCapabilities.find((capability) => capability.id === "dsh-plugin-manager");
   assert.ok(pluginManager);
   assert.equal(presentation.officialDshCapabilityStatus(pluginManager, [], "zh").status, "planned");
-  assert.match(presentation.officialDshCapabilityStatus(pluginManager, [{ id: "plugin-manager", name: "plugin-manager", description: "", enabled: true, callable: false }], "zh").detail, /等待 owner/);
+  assert.match(presentation.officialDshCapabilityStatus(pluginManager, [{ id: "plugin-manager", name: "plugin-manager", description: "", enabled: true, callable: false }], "zh").detail, /等待功能/);
   assert.equal(presentation.formatStatus("planned", "zh"), "待接入");
 });
 
@@ -182,7 +182,7 @@ test("standard Agent summary is derived from the same installed, enabled, callab
   assert.equal(presentation.agentPackagePresentationStatus(agent({ activated: false })), "disabled");
   assert.equal(presentation.agentPackagePresentationStatus(agent({ readiness: { callable: false, launchAllowed: true } })), "unavailable");
   assert.equal(presentation.agentPackagePresentationStatus(agent({ readiness: { callable: true, launchAllowed: null } })), "checking");
-  assert.equal(presentation.agentPackagePresentationStatus(agent({ homeShortcuts: [] })), "unavailable");
+  assert.equal(presentation.agentPackagePresentationStatus(agent({ homeShortcuts: [] })), "launch_route_missing");
   assert.equal(presentation.agentPackagePresentationStatus(agent({ packageRole: "workflow_profile", homeShortcuts: [] })), "ready");
 });
 
@@ -308,4 +308,24 @@ test("Gateway account identity and usage render only from a real account project
   assert.doesNotMatch(settingsSource, /gatewayLoginVisible = Boolean\(onGatewayLogin\) && \(!gateway/);
   assert.doesNotMatch(settingsSource, /gatewayDeviceLabel|设备名称|Device name/);
   assert.match(settingsSource, /editingAccess && gatewayConnectionState !== "none"/);
+});
+
+
+test("component readiness cannot borrow healthy state from its aggregate", () => {
+  assert.equal(presentation.componentReadinessStatus(false, "ready"), "not_ready");
+  assert.equal(presentation.componentReadinessStatus(null, "available"), "unknown");
+  assert.equal(presentation.componentReadinessStatus(true, "available"), "ready");
+});
+
+test("unknown total storage never yields a fabricated zero remainder", () => {
+  assert.equal(workbenchServices.remainingStorageBytes(undefined, 100), undefined);
+  assert.equal(workbenchServices.remainingStorageBytes(null, 100), undefined);
+  assert.equal(workbenchServices.remainingStorageBytes(NaN, 100), undefined);
+  assert.equal(workbenchServices.remainingStorageBytes(300, 100), 200);
+});
+
+test("search covers actual controls and unsupported input features without fake switches", () => {
+  const labels = presentation.searchableSettings.flatMap(item => item.labels);
+  for (const label of ["快捷键", "语音输入", "任务权限", "今日用量", "应用日志"]) assert.ok(labels.includes(label));
+  assert.doesNotMatch(settingsSource, /renderSettingControl\("confirmBeforeExecute"\)/);
 });

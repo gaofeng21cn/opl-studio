@@ -62,19 +62,23 @@ export function createDesktopUpdater({
   isPackaged,
   updateConfigAvailable = true,
   currentVersion,
+  buildKind,
+  localBuildId,
   automatic = true,
   onStateChange = () => undefined,
   beforeRestart = async () => undefined
 }) {
-  const supported = isPackaged && updateConfigAvailable;
+  const supported = isPackaged && updateConfigAvailable && buildKind !== "local-development";
   let state = supported
     ? baseState(currentVersion)
     : {
         ...baseState(currentVersion),
         supported: false,
         state: "unsupported",
-        reasonCode: isPackaged ? "desktop_update_config_unavailable" : "desktop_updater_requires_packaged_app"
+        reasonCode: buildKind === "local-development" ? "local_development_updates_disabled" : isPackaged ? "desktop_update_config_unavailable" : "desktop_updater_requires_packaged_app"
       };
+
+  state = { ...state, ...(buildKind ? { buildKind } : {}), ...(localBuildId ? { localBuildId } : {}), automatic };
 
   const update = (next) => {
     state = { ...state, ...next };

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import updaterPackage from "electron-updater";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -196,6 +197,11 @@ function desktopCodexWorkspaceRoot() {
 }
 
 async function createDesktopHost(appLogDirectory) {
+  // Local full builds stamp the signed bundle, not the source package.json.
+  let buildIdentity = {};
+  if (app.isPackaged && process.platform === "darwin") {
+    try { buildIdentity = JSON.parse(execFileSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", path.join(process.resourcesPath, "..", "Info.plist")], { encoding: "utf8" })); } catch { /* Other carriers keep their native identity. */ }
+  }
   const updateConfigAvailable = fs.existsSync(path.join(process.resourcesPath, "app-update.yml"));
   updaterQualificationEnabled = configureDesktopUpdaterQualification({
     autoUpdater,
@@ -208,6 +214,8 @@ async function createDesktopHost(appLogDirectory) {
     isPackaged: app.isPackaged,
     updateConfigAvailable,
     currentVersion: app.getVersion(),
+    buildKind: buildIdentity.OPLBuildKind,
+    localBuildId: buildIdentity.OPLLocalBuildID,
     automatic: !updaterQualificationEnabled || updaterQualificationAutomatic,
     onStateChange: (state) => {
       sendDesktopRendererEvent("desktop/native-app-update", state);
@@ -365,6 +373,7 @@ async function createDesktopHost(appLogDirectory) {
         application: { systemInfo: { logDir: app.getPath("logs"), platform: process.platform, arch: process.arch } },
         setLogDirectorySupported: true
       }),
+      openLogDirectory: async () => { const error = await shell.openPath(app.getPath("logs")); if (error) throw new Error(error); return { accepted: true }; },
       setLogDirectory: (request) => appLogDirectory.setLogDirectory(request)
     },
     nativeUpdater: updater

@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   readThreadWorkspaceFile: (request) => invoke("readThreadWorkspaceFile", request),
   accessThreadWorkspace: (request) => invoke("accessThreadWorkspace", request),
   searchThreadWorkspace: (request) => invoke("searchThreadWorkspace", request),
+  openLogDirectory: () => invoke("openLogDirectory"),
   setLogDirectory: (request) => invoke("setLogDirectory", request),
   sendMessage: (request) => invoke("sendMessage", request),
   steerTurn: (request) => invoke("steerTurn", request),

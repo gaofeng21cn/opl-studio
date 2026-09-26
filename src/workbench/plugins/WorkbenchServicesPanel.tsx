@@ -46,8 +46,8 @@ export function presentWorkbenchError(error: unknown, locale: 'zh' | 'en'): Work
     };
   }
   return {
-    title: zh ? '读取所属服务失败' : 'Could not read the owner service',
-    detail: zh ? '此页面暂时没有拿到所属服务的最新状态，已有的普通 Codex 对话不受影响。' : 'This page did not receive the latest owner-service state. Existing ordinary Codex conversations are unaffected.',
+    title: zh ? '读取失败' : 'Could not refresh this page',
+    detail: zh ? '此页面暂时无法取得最新状态，已有的普通 Codex 对话不受影响。' : 'This page did not receive the latest service state. Existing ordinary Codex conversations are unaffected.',
     nextStep: zh ? '刷新一次；如果仍然失败，请在“更新与修复”中检查基础服务。' : 'Refresh once. If it still fails, check Base services in Runtime & Maintenance.'
   };
 }
@@ -57,14 +57,15 @@ function useRead(client: WorkbenchServicesClient, operation: string, revision?: 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const serial = useRef(0);
+  const [observedAt, setObservedAt] = useState<Date | null>(null);
   const refresh = useCallback(async () => {
     const id = ++serial.current; setBusy(true); setError('');
-    try { const value = await client.read(operation); if (id === serial.current) setData(record(value)); }
-    catch (error) { if (id === serial.current) { setError(String(error)); setData(null); } }
+    try { const value = await client.read(operation); if (id === serial.current) { setData(record(value)); setObservedAt(new Date()); } }
+    catch (error) { if (id === serial.current) { setError(String(error)); } }
     finally { if (id === serial.current) setBusy(false); }
   }, [client, operation]);
   useEffect(() => { void refresh(); return () => { serial.current++; }; }, [refresh, revision]);
-  return { data, error, busy, refresh };
+  return { data, error, busy, refresh, observedAt };
 }
 function action(props: Props, operation: string, input: Record<string, unknown>, label: string) {
   props.onAction({ key: `workbench:${operation}`, actionId: 'package_contribution_execute', label,
@@ -74,7 +75,8 @@ function action(props: Props, operation: string, input: Record<string, unknown>,
 function ReadStatus({ value, zh }: { value: ReturnType<typeof useRead>; zh: boolean }) {
   const presentation = value.error ? presentWorkbenchError(value.error, zh ? 'zh' : 'en') : null;
   return <>
-    <Button variant="outline" size="sm" type="button" disabled={value.busy} onClick={() => void value.refresh()}>{value.busy ? (zh ? '读取中…' : 'Loading…') : (zh ? '刷新' : 'Refresh')}</Button>
+    {value.busy ? <p className="settings-inline-note" role="status">{zh ? '正在读取最新内容…' : 'Loading latest content…'}</p> : null}
+    {value.error && value.data ? <p className="settings-inline-note">{zh ? '保留上次成功结果；涉及更改的操作暂时停用。' : 'Showing the last successful result; changes are temporarily disabled.'}</p> : null}
     {presentation && <div className="workbench-service-error" role="alert">
       <strong>{presentation.title}</strong>
       <p>{presentation.detail}</p>
@@ -111,6 +113,18 @@ function protectedCategoryLabel(category: Record<string, any>, zh: boolean): str
   return id || (zh ? '受保护数据' : 'Protected data');
 }
 
+export function scheduleLabel(value: Record<string, any> | undefined, zh: boolean): string {
+  if (!value) return zh ? '时间未设置' : 'No schedule';
+  if (value.kind === 'interval') return zh ? `每 ${value.minutes} 分钟` : `Every ${value.minutes} minutes`;
+  if (value.kind === 'once') return value.at ? new Date(value.at).toLocaleString(zh ? 'zh-CN' : 'en-US') : (zh ? '单次' : 'Once');
+  if (value.kind === 'weekly') return `${zh ? '每周' : 'Weekly'} ${(value.weekdays ?? []).map((day: number) => (zh ? ['日','一','二','三','四','五','六'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'])[day]).join(', ')} ${value.time ?? ''}`;
+  return `${zh ? '每天' : 'Daily'} ${value.time ?? ''}`;
+}
+
+export function remainingStorageBytes(total: unknown, selected: number): number | undefined {
+  return typeof total === 'number' && Number.isFinite(total) && total >= 0 ? Math.max(0, total - selected) : undefined;
+}
+
 export function ScheduledTasksPanel(props: Props) {
   const { client, locale, revision } = props;
   const zh = locale === 'zh';
@@ -121,21 +135,20 @@ export function ScheduledTasksPanel(props: Props) {
     schedule: { kind: 'daily', time: '09:00', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, weekdays: [1], minutes: 60, at: '' } });
   const [draft, setDraft] = useState<Record<string, any> | null>(null);
   const [openError, setOpenError] = useState('');
-  useEffect(() => { if (revision) setDraft(null); }, [revision]);
+  useEffect(() => { if (revision?.split(':')[0]) setDraft(null); }, [revision?.split(':')[0]]);
   const set = (key: string, value: unknown) => setDraft(current => ({ ...current, [key]: value }));
   const schedule = (key: string, value: unknown) => setDraft(current => ({ ...current, schedule: { ...current?.schedule, [key]: value } }));
   return <section className="feature-status-panel workbench-services" data-testid="opl-scheduled-tasks">
-    <h3>{zh ? '计划任务' : 'Scheduled tasks'}</h3>
     <p>{zh ? '按指定时间启动独立 Codex 任务。App 需保持运行，可最小化；退出期间不保证执行。重叠运行跳过，超过五分钟未启动的执行跳过。' : 'Start independent Codex tasks on a schedule. Keep the App running; minimizing is supported. Overlaps and starts delayed beyond five minutes are skipped.'}</p>
     <ReadStatus value={tasks} zh={zh} />
-    <Button variant="outline" size="sm" type="button" disabled={props.busy || !tasks.data || tasks.busy} onClick={() => setDraft(blank())}>{zh ? '创建计划任务' : 'Create scheduled task'}</Button>
+    <Button variant="outline" size="sm" type="button" disabled={props.busy || !tasks.data || tasks.busy || Boolean(tasks.error)} onClick={() => setDraft(blank())}>{zh ? '创建计划任务' : 'Create scheduled task'}</Button>
     {tasks.data && !rows(tasks.data.items).length && <p>{zh ? '还没有计划任务。' : 'No scheduled tasks yet.'}</p>}
     {rows(tasks.data?.items).map(task => <article key={task.id}>
-      <h4>{task.title}</h4><p>{task.paused ? (zh ? '已暂停' : 'Paused') : (task.running?.length ? (zh ? '运行中' : 'Running') : task.schedule?.kind === 'once' && !task.nextRuns?.length ? (zh ? '已触发' : 'Triggered') : (zh ? '已启用' : 'Enabled'))} · {task.schedule?.timeZone} · {task.schedule?.kind} {task.schedule?.time ?? task.schedule?.at ?? `${task.schedule?.minutes} min`}</p>
+      <h4>{task.title}</h4><p>{task.paused ? (zh ? '已暂停' : 'Paused') : (task.running?.length ? (zh ? '运行中' : 'Running') : task.schedule?.kind === 'once' && !task.nextRuns?.length ? (zh ? '已触发' : 'Triggered') : (zh ? '已启用' : 'Enabled'))} · {task.schedule?.timeZone} · {scheduleLabel(task.schedule, zh)}</p>
       <p>{zh ? '下次运行：' : 'Next run: '}{(task.nextRuns?.[0] ? new Date(task.nextRuns[0]).toLocaleString(locale) : (zh ? '没有后续触发时间' : 'No future trigger'))}</p>
       <p>{task.prompt}</p><code>{task.cwd}</code>
       <div><Button variant="outline" size="sm" type="button" disabled={props.busy} onClick={() => setDraft(structuredClone(task))}>{zh ? '编辑' : 'Edit'}</Button>
-        {[['task_run', zh ? '立即运行' : 'Run now'], [task.paused ? 'task_resume' : 'task_pause', task.paused ? (zh ? '恢复' : 'Resume') : (zh ? '暂停' : 'Pause')], ['task_delete', zh ? '删除' : 'Delete']].map(([op, label]) => <Button variant="outline" size="sm" key={op} type="button" disabled={props.busy} onClick={() => action(props, op, { id: task.id, revision: task.revision }, label)}>{label}</Button>)}</div>
+        {[['task_run', zh ? '立即运行' : 'Run now'], [task.paused ? 'task_resume' : 'task_pause', task.paused ? (zh ? '恢复' : 'Resume') : (zh ? '暂停' : 'Pause')], ['task_delete', zh ? '删除' : 'Delete']].map(([op, label]) => <Button variant="outline" size="sm" key={op} type="button" disabled={props.busy || tasks.busy || Boolean(tasks.error)} onClick={() => action(props, op, { id: task.id, revision: task.revision }, label)}>{label}</Button>)}</div>
     </article>)}
     {draft && <form aria-label={zh ? '计划任务编辑器' : 'Schedule editor'} onSubmit={event => { event.preventDefault(); action(props, draft.revision ? 'task_update' : 'task_create', draft, zh ? '保存计划任务' : 'Save scheduled task'); }}>
       <label>{zh ? '名称' : 'Title'}<input required maxLength={160} value={draft.title} onChange={e => set('title', e.target.value)} /></label>
@@ -150,7 +163,7 @@ export function ScheduledTasksPanel(props: Props) {
       <label>{zh ? '权限' : 'Permissions'}<select value={draft.permissions} onChange={e => set('permissions', e.target.value)}><option value=":read-only">{zh ? '只读' : 'Read only'}</option><option value=":workspace">{zh ? '可写工作区' : 'Workspace write'}</option></select></label>
       <label>{zh ? '超时分钟' : 'Timeout minutes'}<input type="number" min={1} max={120} required value={draft.timeoutMinutes} onChange={e => set('timeoutMinutes', Number(e.target.value))} /></label>
       <p>{zh ? '模型采用 Codex 当前默认值。日历按当地时钟匹配，夏令时跳时可能跳过，回拨可能触发两次。' : 'Uses the current Codex default model. DST gaps may skip a run and clock rollback may trigger twice.'}</p>
-      <Button variant="outline" size="sm" type="submit" disabled={props.busy}>{zh ? '预览并保存' : 'Preview and save'}</Button><Button variant="outline" size="sm" type="button" onClick={() => setDraft(null)}>{zh ? '关闭编辑器' : 'Close editor'}</Button>
+      <Button variant="outline" size="sm" type="submit" disabled={props.busy || tasks.busy || Boolean(tasks.error)}>{zh ? '预览并保存' : 'Preview and save'}</Button><Button variant="outline" size="sm" type="button" onClick={() => setDraft(null)}>{zh ? '关闭编辑器' : 'Close editor'}</Button>
     </form>}
     <h4>{zh ? '最近执行（含已删除任务）' : 'Recent runs (including deleted tasks)'}</h4><ReadStatus value={history} zh={zh} />
     {history.data && !rows(history.data.items).length && <p>{zh ? '暂无执行记录。' : 'No runs yet.'}</p>}
@@ -162,21 +175,26 @@ export function ScheduledTasksPanel(props: Props) {
 export function MemoryManagerPanel(props: Props) {
   const { client, locale, revision } = props; const zh = locale === 'zh';
   const list = useRead(client, 'memory', revision);
+  const [query, setQuery] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const [selected, setSelected] = useState<Record<string, any> | null>(null);
   const [content, setContent] = useState(''); const [correction, setCorrection] = useState(''); const [error, setError] = useState('');
   const serial = useRef(0);
-  useEffect(() => { serial.current++; setSelected(null); if (revision) setCorrection(''); }, [revision]);
+  useEffect(() => { serial.current++; setSelected(null); if (revision?.split(':')[0]) setCorrection(''); }, [revision?.split(':')[0]]);
   async function open(id: string) { const seq = ++serial.current; setError(''); setSelected(null); try { const value = record(await client.read('memory_read', { id })); if (seq === serial.current) { setSelected(value); setContent(value.content); } } catch (error) { if (seq === serial.current) setError(String(error)); } }
-  return <section className="feature-status-panel workbench-services" data-testid="opl-memory-manager"><h3>{zh ? '记忆与纠错' : 'Memory and corrections'}</h3>
+  return <section className="feature-status-panel workbench-services" data-testid="opl-memory-manager">
     <p>{zh ? '查看现有 Codex 记忆。纠错会提交到记忆系统的用户建议目录，由记忆系统后续处理；提交不表示主记忆已被改写。' : 'Read existing Codex memory. Corrections become user notes for the memory owner to process; submission does not rewrite canonical memory.'}</p>
     <ReadStatus value={list} zh={zh} />
     {list.data && !rows(list.data.items).length && <p>{zh ? '此 Codex home 尚无记忆文件。' : 'No memory files in this Codex home yet.'}</p>}
-    <ul>{rows(list.data?.items).map(item => <li key={item.id}><Button variant="outline" size="sm" type="button" onClick={() => void open(item.id)}>{item.editable ? `${zh ? '纠错建议' : 'Correction'} · ${new Date(item.modifiedAt).toLocaleString(locale)}` : item.name}</Button>{item.editable && <span> · {zh ? '用户纠错建议' : 'User correction'}</span>}</li>)}</ul>
+    <label className="settings-search-field"><input aria-label={zh ? '搜索记忆文件' : 'Search memory files'} placeholder={zh ? '搜索记忆文件' : 'Search memory files'} value={query} onChange={event => setQuery(event.target.value)} /></label>
+    <div className="memory-file-list">{rows(list.data?.items).filter(item => !item.editable && (showHistory || query || !item.name?.includes("/")) && item.name?.toLowerCase().includes(query.toLowerCase())).map(item => <button className="memory-file-row" type="button" key={item.id} aria-pressed={selected?.id === item.id} onClick={() => void open(item.id)}><span>{item.name}</span><small>{zh ? '查看' : 'View'}</small></button>)}</div>
+    <Button variant="ghost" size="sm" type="button" onClick={() => setShowHistory(value => !value)}>{showHistory ? (zh ? '只看主要记忆' : 'Show main memory') : (zh ? '查看历史记录与其他文件' : 'Show history and other files')}</Button>
+    <details className="settings-secondary-details"><summary>{zh ? '已提交的纠错建议' : 'Submitted corrections'} · {rows(list.data?.items).filter(item => item.editable).length}</summary><div className="memory-file-list">{rows(list.data?.items).filter(item => item.editable && (item.name ?? '').toLowerCase().includes(query.toLowerCase())).map(item => <button className="memory-file-row" type="button" key={item.id} onClick={() => void open(item.id)}>{new Date(item.modifiedAt).toLocaleString(locale)}</button>)}</div></details>
     {error && <div className="workbench-service-error" role="alert"><strong>{presentWorkbenchError(error, zh ? 'zh' : 'en').title}</strong><p>{presentWorkbenchError(error, zh ? 'zh' : 'en').detail}</p><small>{presentWorkbenchError(error, zh ? 'zh' : 'en').nextStep}</small></div>}
     {selected && <><label>{zh ? '记忆正文' : 'Memory content'}<textarea readOnly={!selected.editable} value={content} onChange={e => setContent(e.target.value)} rows={12} /></label>
-      {selected.editable && <div><Button variant="outline" size="sm" type="button" disabled={props.busy} onClick={() => action(props, 'memory_update_note', { id: selected.id, revision: selected.revision, content }, zh ? '修改纠错建议' : 'Edit correction')}>{zh ? '预览修改' : 'Preview edit'}</Button><Button variant="outline" size="sm" type="button" disabled={props.busy} onClick={() => action(props, 'memory_delete_note', { id: selected.id, revision: selected.revision }, zh ? '删除纠错建议' : 'Delete correction')}>{zh ? '删除建议' : 'Delete note'}</Button></div>}</>}
+      {selected.editable && <div><Button variant="outline" size="sm" type="button" disabled={props.busy || list.busy || Boolean(list.error)} onClick={() => action(props, 'memory_update_note', { id: selected.id, revision: selected.revision, content }, zh ? '修改纠错建议' : 'Edit correction')}>{zh ? '预览修改' : 'Preview edit'}</Button><Button variant="outline" size="sm" type="button" disabled={props.busy || list.busy || Boolean(list.error)} onClick={() => action(props, 'memory_delete_note', { id: selected.id, revision: selected.revision }, zh ? '删除纠错建议' : 'Delete correction')}>{zh ? '删除建议' : 'Delete note'}</Button></div>}</>}
     <label>{zh ? '纠错建议' : 'Correction'}<textarea value={correction} maxLength={64000} onChange={e => setCorrection(e.target.value)} /></label>
-    <Button variant="outline" size="sm" type="button" disabled={props.busy || !list.data || !correction.trim()} onClick={() => action(props, 'memory_correct', { content: correction, ...(selected ? { source_id: selected.id } : {}) }, zh ? '提交记忆纠错建议' : 'Submit memory correction')}>{zh ? '预览并提交建议' : 'Preview and submit correction'}</Button>
+    <Button variant="outline" size="sm" type="button" disabled={props.busy || list.busy || Boolean(list.error) || !list.data || !correction.trim()} onClick={() => action(props, 'memory_correct', { content: correction, ...(selected ? { source_id: selected.id } : {}) }, zh ? '提交记忆纠错建议' : 'Submit memory correction')}>{zh ? '预览并提交建议' : 'Preview and submit correction'}</Button>
   </section>;
 }
 
@@ -188,12 +206,12 @@ export function StorageCleanupPanel(props: Props) {
   const protectedCategories = rows(inventory.data?.protectedCategories);
   const eligibleFiles = categories.flatMap(category => rows(category.files));
   const selectedBytes = eligibleFiles.filter(file => selection.includes(file.id)).reduce((total, file) => total + (typeof file.bytes === 'number' ? file.bytes : 0), 0);
-  const reclaimableBytes = typeof inventory.data?.reclaimable_bytes === 'number'
+  const reclaimableBytes = !inventory.data ? undefined : typeof inventory.data?.reclaimable_bytes === 'number'
     ? inventory.data.reclaimable_bytes
     : categories.reduce((total, category) => total + (typeof category.reclaimableBytes === 'number' ? category.reclaimableBytes : 0), 0);
   const totalBytes = typeof inventory.data?.total_bytes === 'number' ? inventory.data.total_bytes : inventory.data?.totalBytes;
   const selectedAll = eligibleFiles.length > 0 && selection.length === eligibleFiles.length;
-  const observedAt = typeof inventory.data?.observed_at === 'string' ? new Date(inventory.data.observed_at) : null;
+  const observedAt = typeof inventory.data?.observed_at === 'string' ? new Date(inventory.data.observed_at) : inventory.observedAt;
   const observedLabel = observedAt && !Number.isNaN(observedAt.getTime())
     ? observedAt.toLocaleString(props.locale)
     : inventory.data
@@ -202,21 +220,21 @@ export function StorageCleanupPanel(props: Props) {
   const selectAll = () => setSelection(selectedAll ? [] : eligibleFiles.map(file => file.id));
   const clearLabel = selectedBytes > 0
     ? (zh ? `预览并释放 ${formatBytes(selectedBytes, props.locale, '0 B')}` : `Preview and release ${formatBytes(selectedBytes, props.locale, '0 B')}`)
-    : (zh ? `选择可释放内容（最多 ${formatBytes(reclaimableBytes, props.locale, '0 B')}）` : `Choose reclaimable data (up to ${formatBytes(reclaimableBytes, props.locale, '0 B')})`);
+    : (zh ? '预览清理' : 'Preview cleanup');
   return <section className="feature-status-panel workbench-services storage-center" data-testid="opl-storage-cleanup">
     <div className="storage-center-heading">
       <div>
         <h3>{zh ? '释放空间' : 'Release space'}</h3>
-        <p>{zh ? '先看结果，再决定是否执行。当前路径只处理所属服务声明的旧日志和缓存，不触碰对话、项目、凭据、任务会话或记忆。' : 'See the outcome before deciding. This path only handles old owner-declared logs and caches; conversations, projects, credentials, task sessions and memory are untouched.'}</p>
+        <p>{zh ? '清理过期日志和缓存。先预览、再确认；对话、项目和记忆会保留。' : 'Preview and confirm cleanup of old logs and caches. Conversations, projects and memory are retained.'}</p>
       </div>
-      <span className="storage-freshness">{zh ? `最近盘点：${observedLabel}` : `Last inventory: ${observedLabel}`}</span>
+      <span className="storage-freshness">{zh ? `读取时间：${observedLabel}` : `Read at: ${observedLabel}`}</span>
     </div>
     <ReadStatus value={inventory} zh={zh} />
 
     <div className="storage-intent-summary" aria-label={zh ? '存储状态摘要' : 'Storage status summary'}>
       <div className="storage-intent-stat"><span>{zh ? '已确认占用' : 'Confirmed usage'}</span><strong>{formatBytes(totalBytes, props.locale, zh ? '未统计' : 'Not measured')}</strong><small>{zh ? '只包含本次盘点覆盖的数据' : 'Only data covered by this inventory'}</small></div>
-      <div className="storage-intent-stat"><span>{zh ? '现在可释放' : 'Available to release'}</span><strong>{formatBytes(reclaimableBytes, props.locale, '0 B')}</strong><small>{zh ? '超过保留期的日志和缓存' : 'Logs and caches past the retention window'}</small></div>
-      <div className="storage-intent-stat"><span>{zh ? '本次选择' : 'This selection'}</span><strong>{formatBytes(selectedBytes, props.locale, '0 B')}</strong><small>{selectedBytes > 0 ? (zh ? `预计释放后保留 ${formatBytes(Math.max(0, (totalBytes ?? 0) - selectedBytes), props.locale, '未统计')}` : `Expected remaining ${formatBytes(Math.max(0, (totalBytes ?? 0) - selectedBytes), props.locale, 'not measured')}`) : (zh ? '尚未选择' : 'Nothing selected')}</small></div>
+      <div className="storage-intent-stat"><span>{zh ? '现在可释放' : 'Available to release'}</span><strong>{formatBytes(reclaimableBytes, props.locale, zh ? '未统计' : 'Not measured')}</strong><small>{zh ? '超过保留期的日志和缓存' : 'Logs and caches past the retention window'}</small></div>
+      <div className="storage-intent-stat"><span>{zh ? '本次选择' : 'This selection'}</span><strong>{formatBytes(selectedBytes, props.locale, '0 B')}</strong><small>{selectedBytes > 0 ? (zh ? `预计释放后保留 ${formatBytes(remainingStorageBytes(totalBytes, selectedBytes), props.locale, '未统计')}` : `Expected remaining ${formatBytes(remainingStorageBytes(totalBytes, selectedBytes), props.locale, 'not measured')}`) : (zh ? '尚未选择' : 'Nothing selected')}</small></div>
     </div>
 
     <div className="storage-next-step" role="status">
@@ -224,11 +242,11 @@ export function StorageCleanupPanel(props: Props) {
         <strong>{selectedBytes > 0 ? (zh ? '下一步：确认释放' : 'Next: confirm release') : (zh ? '建议操作：先选择要释放的内容' : 'Suggested action: choose what to release')}</strong>
         <p>{selectedBytes > 0
           ? (zh ? '下一步会先显示详细预览；确认后才会删除。此类清理不可恢复。' : 'The next step shows a detailed preview first; deletion happens only after confirmation. This cleanup cannot be restored.')
-          : (zh ? '默认可以一次选择全部安全候选，也可以展开类别只选其中一部分。' : 'You can select all safe candidates or expand a category and choose only part of it.')}</p>
+          : (zh ? '选择下方类别或具体文件，再预览清理结果。' : 'Select categories or files below, then preview the cleanup.')}</p>
       </div>
       <div className="storage-next-step-actions">
-        <Button variant="outline" size="sm" type="button" disabled={props.busy || !eligibleFiles.length} onClick={selectAll}>{selectedAll ? (zh ? '取消全选' : 'Clear all') : (zh ? '选择全部可释放内容' : 'Select all reclaimable')}</Button>
-        <Button variant="outline" size="sm" type="button" disabled={props.busy || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '预览并释放空间' : 'Preview and release space')}>{clearLabel}</Button>
+        <Button variant="outline" size="sm" type="button" disabled={props.busy || inventory.busy || Boolean(inventory.error) || !eligibleFiles.length} onClick={selectAll}>{selectedAll ? (zh ? '取消全选' : 'Clear all') : (zh ? '全选' : 'Select all')}</Button>
+        <Button variant="outline" size="sm" type="button" disabled={props.busy || inventory.busy || Boolean(inventory.error) || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '预览并释放空间' : 'Preview and release space')}>{clearLabel}</Button>
       </div>
     </div>
 
@@ -240,30 +258,24 @@ export function StorageCleanupPanel(props: Props) {
         const allCategorySelected = files.length > 0 && categorySelected === files.length;
         return <article key={category.id} className="storage-category-row">
           <div className="storage-category-header">
-            <label><input type="checkbox" checked={allCategorySelected} disabled={!files.length || props.busy} onChange={event => setSelection(current => event.target.checked
+            <label><input type="checkbox" checked={allCategorySelected} disabled={!files.length || props.busy || inventory.busy || Boolean(inventory.error)} onChange={event => setSelection(current => event.target.checked
               ? [...new Set([...current, ...files.map(file => file.id)])]
               : current.filter(id => !files.some(file => file.id === id)))} /><strong>{categoryLabel(category, zh)}</strong></label>
             <span>{formatBytes(category.reclaimableBytes, props.locale, '0 B')} {zh ? '可释放' : 'reclaimable'}</span>
           </div>
-          <p>{zh ? `${category.owner ?? '所属服务'} · 只包含超过保留期且未被当前使用的文件。` : `${category.owner ?? 'Owner service'} · Only files past the retention window and not currently in use.`}</p>
+          <p>{zh ? '只包含超过保留期且未被当前使用的文件。' : 'Only files past the retention window and not currently in use.'}</p>
           <details>
             <summary>{zh ? `查看明细（已选 ${categorySelected}/${files.length}）` : `View details (${categorySelected}/${files.length} selected)`}</summary>
             <div className="storage-detail-list">
-              {files.length ? files.map(file => <label key={file.id}><input type="checkbox" checked={selection.includes(file.id)} disabled={props.busy} onChange={event => setSelection(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span>{file.name}</span><small>{formatBytes(file.bytes, props.locale, '0 B')}</small></label>) : <p>{zh ? '当前没有符合条件的文件。' : 'No files currently match the criteria.'}</p>}
+              {files.length ? files.map(file => <label key={file.id}><input type="checkbox" checked={selection.includes(file.id)} disabled={props.busy || inventory.busy || Boolean(inventory.error)} onChange={event => setSelection(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span>{file.name}</span><small>{formatBytes(file.bytes, props.locale, '0 B')}</small></label>) : <p>{zh ? '当前没有符合条件的文件。' : 'No files currently match the criteria.'}</p>}
             </div>
           </details>
         </article>;
-      }) : <p className="storage-muted">{zh ? '当前没有可安全释放的内容。' : 'There is currently nothing safe to release.'}</p>}
-    </section>
-
-    <section className="storage-intent-section" aria-labelledby="storage-organize-title">
-      <h4 id="storage-organize-title">{zh ? '整理我的内容' : 'Organize my content'}</h4>
-      <article className="storage-capability-row"><div><strong>{zh ? '对话、项目与附件' : 'Conversations, projects and attachments'}</strong><p>{zh ? '当前没有可用的归档、导出、恢复或删除 owner 动作。这里的空间不会被“释放空间”操作触碰。' : 'No archive, export, restore or delete owner action is available yet. This data is not touched by the release-space action.'}</p></div><span className="storage-state-neutral">{zh ? '暂不支持整理' : 'Not available yet'}</span></article>
-      <article className="storage-capability-row"><div><strong>{zh ? '网页端数据' : 'Web app data'}</strong><p>{zh ? '当前由部署方决定是否可盘点和处理；App 只显示已确认的状态，不会伪造清理入口。' : 'The deployment owner decides whether this data can be inventoried or managed. The App shows confirmed state only and does not invent a cleanup action.'}</p></div><span className="storage-state-neutral">{zh ? '由部署方管理' : 'Deployment managed'}</span></article>
+      }) : <p className="storage-muted">{zh ? '当前没有已确认可释放的内容。' : 'No reclaimable content is currently confirmed.'}</p>}
     </section>
 
     <details className="storage-protected"><summary>{zh ? '哪些数据会被保留' : 'What stays protected'}</summary>
-      <p>{zh ? '以下数据不属于本次释放空间范围，仍由各自 owner 管理。' : 'The following data is outside this release-space action and remains managed by its owner.'}</p>
+      <p>{zh ? '以下内容不参与本次清理。' : 'The following content is excluded from this cleanup.'}</p>
       {protectedCategories.length ? protectedCategories.map(category => <div key={category.id}><strong>{protectedCategoryLabel(category, zh)}</strong><span>{category.bytes === null || category.bytes === undefined ? (zh ? '未取得用量' : 'Usage unavailable') : formatBytes(category.bytes, props.locale, '0 B')} · {category.truncated ? (zh ? '部分统计' : 'Partial inventory') : (zh ? '保留' : 'Retained')}</span></div>) : <p className="storage-muted">{zh ? '当前没有额外的受保护数据统计。' : 'No additional protected data was reported.'}</p>}
     </details>
   </section>;

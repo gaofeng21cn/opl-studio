@@ -90,7 +90,6 @@ function ContributionActions({ entry, owner }: {
             <Button
               variant={command.confirmationRequired ? "outline" : "ghost"}
               size="sm"
-              icon={<Play aria-hidden="true" size={13} />}
               disabled={!owner.actionAvailable}
               onClick={() => owner.onAction(entry, command)}
             >

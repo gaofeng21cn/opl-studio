@@ -484,6 +484,9 @@ export type NativeAppUpdateResult = {
     | "error"
     | "unsupported";
   currentVersion?: string;
+  buildKind?: string;
+  localBuildId?: string;
+  automatic?: boolean;
   targetVersion?: string;
   progressPercent?: number;
   accepted?: boolean;
@@ -538,7 +541,7 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -618,6 +621,7 @@ export type OplBridge = CodexThreadAdapterBridge & {
   readThreadWorkspaceFile(request: { threadId: string; relativePath: string }): Promise<ThreadWorkspaceFile>;
   accessThreadWorkspace(request: ThreadWorkspaceAccessRequest): Promise<{ accepted: boolean }>;
   searchThreadWorkspace(request: { threadId: string; query: string }): Promise<ThreadWorkspaceSearch>;
+  openLogDirectory(): Promise<{ accepted: boolean }>;
   setLogDirectory(request: { path: string }): Promise<AppLogDirectoryUpdateResult>;
   sendMessage(request: CodexMessageRequest): Promise<CodexMessageResponse>;
   steerTurn(request: ThreadSteerRequest): Promise<ThreadSteerResult>;
@@ -1453,12 +1457,18 @@ export function normalizeStateReadback(value: unknown, profile = readRuntimeProf
     ?? asRecord(record?.raw_state)
     ?? asRecord(record?.app_state)
     ?? record;
+  const readback = record?.readback
+    ? normalizeCommandReadback(record.readback, commandReadback.command, commandReadback.commandArgs)
+    : commandReadback;
+  // A failed owner read is not an empty account or package directory. Reject
+  // it before normalization can replace the last successful model with defaults.
+  if (readback.timedOut || readback.exitCode !== 0) {
+    throw new Error(readback.timedOut ? "opl_state_read_timeout" : "opl_state_read_failed");
+  }
   return {
     profile: normalizedProfile,
     app_state: normalizeStateObject(stateSource, fallback),
-    readback: record?.readback
-      ? normalizeCommandReadback(record.readback, commandReadback.command, commandReadback.commandArgs)
-      : commandReadback,
+    readback,
     carrierDiagnostics: normalizeCarrierDiagnostics(record?.carrierDiagnostics ?? record?.carrier_diagnostics),
     ...(asRecord(record?.managedUpdateMaintenance)?.schema === "opl_studio_update_maintenance.v1"
       ? { managedUpdateMaintenance: record?.managedUpdateMaintenance as OplStateReadback["managedUpdateMaintenance"] } : {})
@@ -1839,6 +1849,9 @@ export function createBrowserBridge(): OplBridge {
         return Promise.reject(new Error("Thread workspace search is unavailable in this host"));
       }
       return candidate.searchThreadWorkspace(request);
+    },
+    openLogDirectory() {
+      return candidate?.openLogDirectory?.() ?? Promise.reject(new Error("Log folder access is unavailable in this host"));
     },
     setLogDirectory(request) {
       return candidate?.setLogDirectory?.(request) ?? Promise.resolve(unsupportedLogDirectoryUpdate());

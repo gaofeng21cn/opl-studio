@@ -1850,24 +1850,6 @@ export const codexWorkbenchStyles = `
     padding-bottom: 18px;
   }
 
-  .settings-detail-heading {
-    min-width: 0;
-    display: grid;
-    gap: 5px;
-  }
-
-  .settings-detail-eyebrow {
-    overflow: hidden;
-    color: var(--opl-muted);
-    font-size: var(--opl-text-xs);
-    font-weight: var(--opl-weight-medium);
-    letter-spacing: 0;
-    line-height: var(--opl-leading-normal);
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
   .settings-detail-header h1 {
     margin: 0;
     font-size: 16px;
@@ -2259,8 +2241,23 @@ export const codexWorkbenchStyles = `
     opacity: 0.52;
   }
 
-  .settings-page-refresh {
-    margin-top: 18px;
+  .settings-detail-title-row > .settings-page-refresh {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 6px;
+    border: 0;
+    border-radius: var(--dsw-radius-md, 12px);
+    background: transparent;
+    color: var(--dsw-alias-label-secondary, var(--opl-muted));
+  }
+  .settings-detail-title-row > .settings-page-refresh:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover, var(--opl-hover));
+  }
+  .settings-page-refresh:focus-visible {
+    outline: 2px solid var(--dsw-alias-label-secondary, var(--opl-text));
+    outline-offset: 2px;
   }
 
   .about-mark {
@@ -5289,21 +5286,25 @@ export const codexWorkbenchStyles = `
     }
   }
 
-  .opl-settings-slot-root .sss-pop { background: var(--opl-canvas); z-index: 100; min-width: 220px; }
+  [data-shortcut-modal="settings"] .sss-pop { background: var(--opl-canvas); z-index: 100; min-width: 220px; }
   /* OPL navigation content inside the unchanged DSH settings shell. */
-  .opl-settings-slot-root [role="dialog"] > nav + div > div:last-child { padding: 0 0 24px; }
-  .opl-settings-slot-root [role="dialog"] > nav button > svg { display: none; }
-  .opl-settings-slot-root [role="dialog"] > nav button { min-height: 40px; height: auto; }
+  [data-shortcut-modal="settings"][role="dialog"] > nav + div > div:last-child { padding: 0 0 24px; }
+  [data-shortcut-modal="settings"][role="dialog"] > nav button > svg { display: none; }
+  [data-shortcut-modal="settings"][role="dialog"] > nav button { min-height: 40px; height: auto; }
+  .settings-state-notice { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 14px 16px; background: var(--opl-hover); border: 1px solid var(--opl-border); border-radius: 10px; color: var(--opl-muted); }
+  .settings-state-notice > svg { flex: none; }
+  .settings-state-notice > span { flex: 1; }
+  .settings-state-notice > button { flex: none; border: 1px solid var(--opl-border); border-radius: 6px; padding: 6px 12px; color: var(--opl-text); background: var(--opl-canvas); }
   .opl-settings-nav-label { display: flex; align-items: center; gap: 10px; white-space: normal; line-height: 20px; }
   .opl-settings-nav-label > svg { flex: none; }
   .settings-appearance button { flex: 1 1 0; min-width: 0; padding: 14px 8px; border-radius: 8px; }
   .settings-font-size [class*="arrows_"] { opacity: 1; }
   .settings-font-size [class*="stepper_"] { min-width: 88px; padding-right: 20px; }
   .settings-detail-header, .settings-content { padding-left: 24px; padding-right: 24px; }
-  .settings-detail-title-row { flex-wrap: wrap; align-items: flex-start; }
+  .settings-detail-title-row { flex-wrap: nowrap; align-items: center; }
   .settings-subnav { flex-wrap: wrap; }
   .settings-subnav button { white-space: nowrap; }
-  .settings-subnav button[aria-current="page"] { color: var(--opl-text); background: var(--opl-hover); border-color: var(--opl-text); }
+  .settings-subnav button[aria-current="page"] { color: var(--opl-text); background: var(--opl-hover); border-color: transparent; }
   .agent-catalog-toolbar { flex-wrap: wrap; }
   .agent-catalog-toolbar .settings-search-field { flex: 1 1 190px; width: auto; }
   .segmented-control { flex-shrink: 0; max-width: 100%; }
@@ -5314,17 +5315,17 @@ export const codexWorkbenchStyles = `
   .workspace-file-row.is-selected { background: var(--opl-hover); outline: 1px solid var(--opl-border); }
   .workspace-file-actions button { border: 1px solid var(--opl-border); background: var(--opl-canvas); color: var(--opl-text); border-radius: 7px; padding: 6px 9px; }
   @media (max-width: 640px) {
-    .opl-settings-slot-root [role="dialog"] { width: 100vw; max-width: 100vw; height: 100dvh; border-radius: 0; flex-direction: column; }
-    .opl-settings-slot-root [role="dialog"] > nav { width: 100%; padding: 12px 44px 8px 12px; gap: 0; }
-    .opl-settings-slot-root [role="dialog"] > nav > div:first-child { position: relative; width: auto; height: auto; overflow: visible; padding: 0 0 8px; }
-    .opl-settings-slot-root .sss-wrap { margin-right: 34px; }
-    .opl-settings-slot-root .sss-title { display: none; }
-    .opl-settings-slot-root [role="dialog"] > nav > div:last-child { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
-    .opl-settings-slot-root [role="dialog"] > nav button { flex: none; padding: 8px 10px; height: 38px; }
+    [data-shortcut-modal="settings"][role="dialog"] { width: 100vw; max-width: 100vw; height: 100dvh; border-radius: 0; flex-direction: column; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav { width: 100%; padding: 12px 44px 8px 12px; gap: 0; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav > div:first-child { position: relative; width: auto; height: auto; overflow: visible; padding: 0 0 8px; }
+    [data-shortcut-modal="settings"] .sss-wrap { margin-right: 34px; }
+    [data-shortcut-modal="settings"] .sss-title { display: none; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav button { flex: none; padding: 8px 10px; height: 38px; }
     .opl-settings-nav-label > svg { display: none; }
     .opl-settings-nav-label { white-space: nowrap; }
-    .opl-settings-slot-root [role="dialog"] > nav + div { min-height: 0; width: 100%; }
-    .opl-settings-slot-root [role="dialog"] > nav + div > div:first-child { position: absolute; right: 8px; top: 14px; height: auto; padding: 0; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav + div { min-height: 0; width: 100%; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav + div > div:first-child { position: absolute; right: 8px; top: 14px; height: auto; padding: 0; }
     .settings-detail-header { padding-top: 12px; padding-bottom: 16px; }
     .settings-detail-header, .settings-content { padding-left: 16px; padding-right: 16px; }
     .settings-detail-title-row { gap: 12px; }
@@ -5407,21 +5408,70 @@ export const codexWorkbenchStyles = `
   /* Keep host-owned settings on the same quiet, row-based rhythm as DSH.
      These pages are projections inside the DSH modal, so they should not add
      a second card system or oversized section spacing. */
-  .opl-settings-slot-root .settings-detail-header { padding: 20px 24px 14px; }
-  .opl-settings-slot-root .settings-content { padding: 0 24px 32px; }
-  .opl-settings-slot-root .settings-group + .settings-group,
-  .opl-settings-slot-root .gateway-identity + .settings-group,
-  .opl-settings-slot-root .about-mark + .settings-group { margin-top: 20px; }
-  .opl-settings-slot-root .settings-group h2 { margin-bottom: 4px; font-size: 14px; line-height: 22px; }
-  .opl-settings-slot-root .settings-row { min-height: 48px; padding: 12px 0; gap: 20px; }
-  .opl-settings-slot-root .settings-page-summary { min-height: 32px; margin-bottom: 12px; padding-bottom: 8px; }
-  .opl-settings-slot-root .settings-subnav button { border-color: transparent; background: transparent; }
-  .opl-settings-slot-root .settings-subnav button[aria-current="page"] { border-color: transparent; background: var(--dsw-alias-interactive-bg-active); }
-  .opl-settings-slot-root .feature-status-panel { margin-top: 16px; }
-  .opl-settings-slot-root .workbench-services { margin-top: 16px; }
-  .opl-settings-slot-root .workbench-services > p { margin: 0 0 8px; color: var(--opl-muted); font-size: var(--opl-text-sm); }
+  .settings-page .settings-detail-header { display: grid; gap: 8px; padding: 20px 24px 14px; }
+  .settings-page .settings-detail-title-row { flex-direction: row; align-items: center; gap: 12px; }
+  .settings-page .settings-detail-header h1 { color: var(--dsw-alias-label-primary); font-size: 16px; line-height: 24px; font-weight: 500; }
+  .settings-page .settings-detail-description { color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 22px; }
+  .settings-page .settings-subnav { gap: 4px; padding-top: 4px; }
+  .settings-page .settings-subnav button { min-height: 32px; padding: 5px 12px; font-size: 14px; line-height: 22px; border-radius: var(--dsw-radius-md, 12px); }
+  .settings-page .settings-capability-filters { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0; }
+  .settings-page .settings-capability-filters button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; min-height: 32px; border: 0; border-radius: var(--dsw-radius-md, 12px); background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; }
+  .settings-page .settings-capability-filters button:hover { background: var(--dsw-alias-interactive-bg-hover); }
+  .settings-page .settings-capability-filters button[aria-pressed="true"] { background: var(--dsw-alias-interactive-bg-active); color: var(--dsw-alias-label-primary); }
+  .settings-page .settings-capability-filters button > span { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+  .settings-page .settings-upstream-details { margin-top: 24px; border-top: 0.5px solid var(--dsw-alias-border-l2); padding-top: 12px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
+  .settings-page .settings-upstream-details > summary, .settings-page .settings-secondary-details > summary { cursor: pointer; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 22px; padding: 8px 0; }
+  .settings-page .settings-upstream-details .settings-capability-row > summary { display: flex; justify-content: space-between; gap: 12px; }
+
+  .settings-page .settings-content { padding: 0 24px 32px; }
+  .settings-page .settings-group + .settings-group,
+  .settings-page .gateway-identity + .settings-group,
+  .settings-page .about-mark + .settings-group { margin-top: 20px; }
+  .settings-page .settings-group h2 { margin-bottom: 4px; font-size: 14px; line-height: 22px; }
+  .settings-page .settings-row { min-height: 48px; padding: 12px 0; gap: 20px; }
+  .settings-page .settings-page-summary { min-height: 32px; margin-bottom: 12px; padding-bottom: 8px; }
+  .settings-page .settings-subnav button { border-color: transparent; background: transparent; }
+  .settings-page .settings-subnav button[aria-current="page"] { border-color: transparent; background: var(--dsw-alias-interactive-bg-active); }
+  .settings-page .feature-status-panel { margin-top: 16px; }
+  .settings-page .workbench-services { margin-top: 16px; }
+  .settings-page .workbench-services > p { margin: 0 0 8px; color: var(--opl-muted); font-size: var(--opl-text-sm); }
   @media (max-width: 640px) {
-    .opl-settings-slot-root .settings-detail-header,
-    .opl-settings-slot-root .settings-content { padding-left: 16px; padding-right: 16px; }
+    .settings-page .settings-detail-header,
+    .settings-page .settings-content { padding-left: 16px; padding-right: 16px; }
   }
+
+  /* DSH settings primitives apply inside the Portal and plugin contributions. */
+  .settings-page .settings-issue { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: .5px solid var(--dsw-alias-border-l2); }
+  .settings-page .settings-issue > svg { flex-shrink: 0; margin-top: 3px; color: var(--opl-warning); }
+  .settings-page .settings-issue > div { flex: 1; min-width: 0; }
+  .settings-page .settings-issue strong { font-size: 14px; font-weight: 500; }
+  .settings-page .settings-issue p, .settings-page .settings-inline-note { color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 21px; margin: 4px 0 8px; }
+  .settings-page .settings-quick-links { display: flex; gap: 8px; flex-wrap: wrap; padding-block: 10px; }
+  .settings-page .settings-path { overflow-wrap: anywhere; text-align: right; }
+  .settings-page .settings-support-link { display: flex; align-items: center; min-height: 44px; padding: 10px 0; color: var(--dsw-alias-label-primary); text-decoration: none; border-bottom: .5px solid var(--dsw-alias-border-l2); }
+  .settings-page .settings-support-link:hover { text-decoration: underline; }
+  .settings-page .settings-contribution-section { margin-top: 24px; }
+  .settings-page .settings-contribution-package { border: 0; border-bottom: .5px solid var(--dsw-alias-border-l2); border-radius: 0; padding: 14px 0; box-shadow: none; background: transparent; }
+  .settings-page .opl-contribution { background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+  .settings-page .opl-contribution-header { margin-bottom: 10px; }
+  .settings-page .opl-contribution-title { font-size: 14px; font-weight: 500; }
+  .settings-page .opl-contribution-title > svg { display: none; }
+  .settings-page .opl-contribution-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .settings-page .opl-contribution-result h3 { font-size: 13px; font-weight: 500; margin: 16px 0 8px; }
+  .settings-page .opl-contribution-result p { font-size: 13px; line-height: 21px; color: var(--dsw-alias-label-secondary); }
+  .settings-page :is(button, input, select, textarea, summary, a):focus-visible { outline: 2px solid var(--dsw-alias-label-secondary); outline-offset: 3px; }
+  .settings-page .settings-secondary-details { margin-block: 12px; }
+  .settings-page .settings-action-button, .settings-page .settings-inline-command { white-space: normal; }
+  @media (max-width: 640px) {
+    .settings-page .settings-issue { flex-wrap: wrap; }
+    .settings-page .settings-issue > div { flex-basis: calc(100% - 40px); }
+    .settings-page .settings-issue > button { margin-left: 28px; }
+    .settings-page .settings-path { text-align: left; }
+    .settings-page .settings-subnav { flex-wrap: wrap; }
+  }
+
+  .settings-page .settings-inline-note { border: 0; border-radius: 0; padding: 0; background: transparent; }
+  [data-shortcut-modal="settings"] .sss-item { gap: 10px; }
+  [data-shortcut-modal="settings"] .sss-item-kind { font-size: 11px; color: var(--dsw-alias-label-secondary); white-space: normal; text-align: right; }
+  .settings-page .settings-row .settings-inline-command { background: transparent; border: 0; padding: 3px 0; }
 `;

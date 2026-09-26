@@ -2700,12 +2700,12 @@ export function App({
     setCapabilityError("");
     try {
       const catalog = await bridge.readCodexCapabilities(codexThreadId);
-      setCapabilityCatalog(catalog);
       if (catalog.errors.length && !catalog.skills.length && !catalog.plugins.length && !catalog.apps.length) {
         setCapabilityStatus("error");
         setCapabilityError(catalog.errors.join("\n"));
         return false;
       } else {
+        setCapabilityCatalog(catalog);
         setCapabilityStatus("ready");
         return true;
       }
@@ -3166,6 +3166,9 @@ export function App({
       onInstallCodex={installCodex}
       onConfigureCodexApiKey={configureCodexApiKey}
       onChangeLogDirectory={() => void changeLogDirectory()}
+      onOpenLogDirectory={bridge.platformCapabilities.nativeWorkspaceFileAccess ? () => bridge.openLogDirectory() : undefined}
+      currentWorkspace={selectedProject?.workspace ?? currentProject}
+      onOpenWorkspace={bridge.platformCapabilities.nativeWorkspaceFileAccess && codexThreadId ? () => bridge.accessThreadWorkspace({ threadId: codexThreadId, relativePath: "", action: "open" }) : undefined}
       onSettingChange={updateSetting}
       onReasoningChange={updateReasoning}
       additionalConversationInstructions={additionalConversationInstructions}
@@ -3191,7 +3194,7 @@ export function App({
         )));
         return groups.length ? groups.map((group, index) => (
           <section className="settings-contribution-package" data-package-id={group.packageId} key={group.packageId}>
-            <h3>{packageLabels.get(group.packageId) ?? (settings.locale === "zh" ? `已安装模块 ${index + 1}` : `Installed module ${index + 1}`)}</h3>
+            {settings.developerDetails ? <small>{packageLabels.get(group.packageId) ?? group.packageId}</small> : null}
             <div className="opl-contribution-slot">
               {group.entries.map((entry) => (
                 <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>

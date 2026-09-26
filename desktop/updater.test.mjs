@@ -163,3 +163,14 @@ test("directory package stays truthful until release update metadata is present"
   assert.equal(result.supported, false);
   assert.equal(result.reasonCode, "desktop_update_config_unavailable");
 });
+
+
+test("signed local builds retain identity and never start a public update", async () => {
+  const autoUpdater = new FakeAutoUpdater();
+  const updater = createDesktopUpdater({ autoUpdater, isPackaged: true, updateConfigAvailable: true, currentVersion: "26.9.2691", buildKind: "local-development", localBuildId: "local.src123" });
+  const result = await updater.perform("check");
+  assert.equal(result.supported, false);
+  assert.equal(result.reasonCode, "local_development_updates_disabled");
+  assert.equal(result.localBuildId, "local.src123");
+  assert.equal(result.state, "unsupported");
+});

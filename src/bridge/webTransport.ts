@@ -213,6 +213,7 @@ export function installWebTransport(): void {
       return { accepted: true };
     },
     searchThreadWorkspace: (request) => postJson("/api/threads/workspace/search", request),
+    openLogDirectory: () => Promise.reject(new Error("Log folder access requires the desktop app")),
     setLogDirectory: () => Promise.resolve({
       schema: "opl_app_log_directory_update.v1",
       owner: "one-person-lab-app_native_host",

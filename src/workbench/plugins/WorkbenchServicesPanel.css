@@ -53,3 +53,23 @@
   .storage-category-header, .storage-capability-row, .storage-protected > div { display: grid; gap: 5px; }
   .storage-category-header > span, .storage-protected > div span { text-align: left; }
 }
+
+/* Shared DSH settings rhythm for service-contributed controls. */
+.settings-page .workbench-services { border: 0; padding: 0; box-shadow: none; color: var(--dsw-alias-label-primary); }
+.settings-page .workbench-services button { width: auto; flex: 0 0 auto; min-height: 30px; border-radius: 7px; padding: 5px 10px; font: inherit; font-size: 13px; line-height: 20px; margin: 0; }
+.settings-page .workbench-services button:disabled { opacity: .45; cursor: not-allowed; }
+.settings-page .workbench-services button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
+.settings-page .workbench-services input, .settings-page .workbench-services select, .settings-page .workbench-services textarea { font: inherit; font-size: 13px; line-height: 20px; border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-background-primary, transparent); }
+.settings-page .workbench-services input[type="checkbox"] { accent-color: var(--dsw-alias-label-primary); width: 15px; height: 15px; }
+.settings-page .workbench-services form { margin-block: 16px; padding: 16px 0; border-block: .5px solid var(--dsw-alias-border-l2); }
+.settings-page .workbench-services article > div:has(> button), .settings-page .storage-next-step-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.settings-page .workbench-services h4 { font-size: 14px; font-weight: 500; line-height: 22px; margin: 16px 0 6px; }
+.settings-page .memory-file-list { display: grid; gap: 0; max-height: 240px; overflow: auto; }
+.settings-page .workbench-services .memory-file-row { width: 100%; border: 0; border-bottom: .5px solid var(--dsw-alias-border-l2); border-radius: 0; background: transparent; padding: 10px 0; display: flex; justify-content: space-between; text-align: left; gap: 12px; }
+.settings-page .memory-file-row[aria-pressed="true"] { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-active); }
+.settings-page .memory-file-row small { color: var(--dsw-alias-label-secondary); }
+.settings-page .storage-next-step { flex-wrap: wrap; align-items: center; }
+.settings-page .storage-next-step > div:first-child { flex: 1 1 260px; }
+.settings-page .storage-next-step-actions { flex-shrink: 1; }
+.settings-page .storage-center-heading h3 { display: none; }
+.settings-page .storage-intent-stat { border-top: 0; padding-block: 6px; }

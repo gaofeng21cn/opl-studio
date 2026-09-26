@@ -26,6 +26,10 @@ export function installSettingsSearchInteraction(root: HTMLElement, readTargets:
     if (popup) { popup.id = "opl-settings-search-results"; popup.setAttribute("role", "listbox"); }
     field.setAttribute("aria-controls", "opl-settings-search-results");
     rows.forEach((row, index) => {
+      const target = readTargets().find(target => target.label === row.querySelector(".sss-item-label")?.textContent?.trim());
+      const kind = row.querySelector(".sss-item-kind");
+      const path = target ? [target.pageLabel, target.subpageLabel].filter(Boolean).join(" › ") : "";
+      if (kind && path && kind.textContent !== path) kind.textContent = path;
       row.id = `opl-settings-search-result-${index}`;
       row.setAttribute("role", "option");
       row.setAttribute("aria-selected", String(index === activeOption));
@@ -40,7 +44,7 @@ export function installSettingsSearchInteraction(root: HTMLElement, readTargets:
   const clearNavigation = () => { navigationObserver?.disconnect(); navigationObserver = undefined; clearTimeout(navigationTimeout); };
   const navigate = (target: SettingsSearchTarget) => {
     clearNavigation();
-    const dialog = root.querySelector<HTMLElement>('[role="dialog"]');
+    const dialog = root.querySelector<HTMLElement>('[data-shortcut-modal="settings"][role="dialog"]');
     if (!dialog) return;
     const buttons = () => [...dialog.querySelectorAll<HTMLButtonElement>("button")];
     const page = buttons().find((button) => button.textContent?.trim() === target.pageLabel && !button.closest(".settings-subnav"));
@@ -54,11 +58,13 @@ export function installSettingsSearchInteraction(root: HTMLElement, readTargets:
         if (subpage.getAttribute("aria-current") !== "page") { subpage.click(); return; }
       }
       if (target.rowLabel) {
-        const title = [...dialog.querySelectorAll<HTMLElement>(".settings-page span, .settings-page label, .settings-page div")]
+        const title = [...dialog.querySelectorAll<HTMLElement>(".settings-page span, .settings-page label, .settings-page div, .settings-page summary, .settings-page strong, .settings-page h2, .settings-page h3")]
           .find((node) => node.childElementCount === 0 && node.textContent?.trim() === target.rowLabel);
         if (!title) return;
-        const row = title.closest<HTMLElement>(".settings-row") ?? title.parentElement?.parentElement;
+        const row = title.closest<HTMLElement>(".settings-row, .settings-secondary-details, .opl-contribution") ?? title.parentElement?.parentElement;
         if (!row) return;
+        let ancestor: HTMLElement | null = row;
+        while (ancestor && ancestor !== dialog) { if (ancestor instanceof HTMLDetailsElement) ancestor.open = true; ancestor = ancestor.parentElement; }
         row.scrollIntoView({ block: "nearest" });
         row.animate([{ outline: "2px solid currentColor" }, { outline: "2px solid transparent" }], { duration: 1600 });
         (row.querySelector<HTMLElement>("button:not([disabled]), input, select") ?? page).focus();
