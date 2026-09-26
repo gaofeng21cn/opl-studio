@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, realpath, mkdir, writeFile, readFile, access, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, mkdir, writeFile, readFile, access, rm, utimes } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +15,9 @@ const address = process.env.OPL_TEST_TEMPORAL_ADDRESS;
 if (!framework || !address || !/^(127\.0\.0\.1|localhost):\d+$/.test(address)) throw Error('Set OPL_FRAMEWORK_REPO_ROOT and an isolated loopback OPL_TEST_TEMPORAL_ADDRESS.');
 const { startCordisWorkbenchServicesHost } = await import(pathToFileURL(path.join(framework, 'dist/host/composition-profiles.js')));
 const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'opl-workbench-acceptance-')));
-const env = { ...process.env, CODEX_HOME: root, OPL_STATE_DIR: path.join(root, 'state'), OPL_FRAMEWORK_PACKAGE_ROOT: framework, OPL_TEMPORAL_ADDRESS: address, OPL_TEMPORAL_NAMESPACE: 'default', OPL_STUDIO_READ_ONLY: '0', OPL_DATA_DIR: root, FAKE_APP_SERVER_LOG: path.join(root, 'codex.jsonl') };
+const logRoot = path.join(root, 'app-logs');
+const cacheRoot = path.join(root, 'app-cache');
+const env = { ...process.env, CODEX_HOME: root, OPL_STATE_DIR: path.join(root, 'state'), OPL_FRAMEWORK_PACKAGE_ROOT: framework, OPL_TEMPORAL_ADDRESS: address, OPL_TEMPORAL_NAMESPACE: 'default', OPL_STUDIO_READ_ONLY: '0', OPL_DATA_DIR: root, OPL_STUDIO_LOG_ROOT: logRoot, OPL_STUDIO_CACHE_ROOT: cacheRoot, FAKE_APP_SERVER_LOG: path.join(root, 'codex.jsonl') };
 const fixture = path.resolve('scripts/webui-host/fixtures/fake-app-server.mjs');
 const transport = new CodexAppServerTransport({ command: process.execPath, args: [fixture], cwd: root, env, requestTimeoutMs: 3000 });
 let service; let webHost;
@@ -33,6 +35,10 @@ const waitUntil = async (fn, timeout = 20_000) => {
 };
 try {
   await mkdir(path.join(root, 'memories')); await writeFile(path.join(root, 'memories', 'MEMORY.md'), 'Existing fixture memory');
+  await mkdir(logRoot); await mkdir(cacheRoot);
+  const staleLog = path.join(logRoot, 'stale.log'); const staleCache = path.join(cacheRoot, 'stale.bin');
+  await writeFile(staleLog, 'old log'); await writeFile(staleCache, 'old cache');
+  await utimes(staleLog, new Date(0), new Date(0)); await utimes(staleCache, new Date(0), new Date(0));
   await transport.start();
   const bootstrap = new OplFrameworkBridge({ env, workspaceRoot: root, codex: { transport, capabilities: () => ({}) } });
   await bootstrap.start();
@@ -42,6 +48,19 @@ try {
     evidence.push('production-framework-bootstrap/public-export/isolated-plugin-lifecycle');
   } finally { await bootstrap.close(); }
   service = await startCordisWorkbenchServicesHost({ env, executor: createWorkbenchTaskExecutor(transport) });
+  const inventory = await read('inventory');
+  assert.equal(inventory.schema, 'opl_local_data_lifecycle_inventory.v1');
+  const cleanupIds = inventory.categories.flatMap(category => category.files).filter(file => file.name === 'stale.log' || file.name === 'stale.bin').map(file => file.id);
+  assert.equal(cleanupIds.length, 2);
+  const cleanup = await execute('cleanup', { ids: cleanupIds });
+  assert.equal(cleanup.result.status, 'executed');
+  assert.equal(cleanup.result.removed.length, 2);
+  assert.equal(typeof cleanup.result.receipt_ref, 'string');
+  await assert.rejects(access(staleLog)); await assert.rejects(access(staleCache));
+  const receiptPath = path.join(env.OPL_STATE_DIR, 'receipts', 'workbench-cleanup', `${cleanup.result.receipt_ref.split(':').at(-1)}.json`);
+  const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+  assert.equal(receipt.removed_count, 2);
+  evidence.push('owner-log-cache-inventory/preview-confirm/fingerprint-guard/receipt');
   await read('tasks');
   const task = { id: 'integration', title: 'Isolated scheduled test', prompt: 'fixture only', cwd: root, permissions: ':read-only', timeoutMinutes: 1, schedule: { kind: 'daily', time: '09:00', timeZone: 'Asia/Shanghai' } };
   await assert.rejects(execute('task_create', task, { confirm: false }), /confirmation/);
