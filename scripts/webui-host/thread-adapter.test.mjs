@@ -77,6 +77,11 @@ class FakeTransport extends EventEmitter {
     this.calls.push(["thread/unarchive", { threadId }]);
     return { threadId, archived: false };
   }
+
+  async deleteThread(threadId) {
+    this.calls.push(["thread/delete", { threadId }]);
+    return { threadId, deleted: true };
+  }
 }
 
 test("projects canonical thread and Codex subagent metadata without private authority", () => {
@@ -114,6 +119,7 @@ test("adapter paginates standard thread/list and exposes only Codex-owned lifecy
   assert.equal(capabilities.threadStoreOwner, "codex_core_app_server");
   assert.equal(capabilities.privateCoordinationLayer, false);
   assert.deepEqual(capabilities.subagentProjection.itemTypes, ["collabAgentToolCall", "subAgentActivity"]);
+  assert.equal(capabilities.supportedProtocols.includes("thread/delete"), true);
   assert.equal(capabilities.supportedProtocols.includes("thread/archive"), true);
   assert.equal(capabilities.supportedProtocols.some((item) => item.includes("coordination")), false);
 });
@@ -154,6 +160,14 @@ test("adapter preserves native subagent items and routes standard lifecycle", as
   assert.deepEqual(
     await adapter.setArchived({ threadId: "subagent", archived: false }),
     { threadId: "subagent", archived: false }
+  );
+  await assert.rejects(
+    adapter.deleteThread({ threadId: "subagent" }),
+    (error) => error instanceof ThreadAdapterError && error.code === "confirmation_required"
+  );
+  assert.deepEqual(
+    await adapter.deleteThread({ threadId: "subagent", confirmed: true }),
+    { threadId: "subagent", deleted: true }
   );
 });
 

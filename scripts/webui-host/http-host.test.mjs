@@ -183,6 +183,13 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   assert.equal(archived.body.archived, true);
   const unarchived = await post(baseUrl, "/api/threads/unarchive", { threadId: "thread-idle" });
   assert.equal(unarchived.body.archived, false);
+  const deleteDenied = await post(baseUrl, "/api/threads/delete", { threadId: "thread-idle" });
+  assert.equal(deleteDenied.status, 409);
+  assert.equal(deleteDenied.body.error.details.confirmationRequired, true);
+  const deleted = await post(baseUrl, "/api/threads/delete", { threadId: "thread-idle", confirmed: true, confirmationId: "delete-confirmation" });
+  assert.deepEqual(deleted.body, { threadId: "thread-idle", deleted: true });
+  const afterDelete = await post(baseUrl, "/api/threads/list", { projectKey: "project-a" });
+  assert.equal(afterDelete.body.data.some((thread) => thread.id === "thread-idle"), false);
 
   const steered = await post(baseUrl, "/api/turns/steer", {
     threadId: "thread-running",

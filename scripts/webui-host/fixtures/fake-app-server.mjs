@@ -148,7 +148,7 @@ async function handle(frame) {
     const page = params.cursor === "page-2"
       ? [threads.get("thread-running"), threads.get("thread-subagent")]
       : [threads.get("thread-source"), threads.get("thread-idle"), threads.get("thread-unloaded"), ...(includeProjectlessThread ? [threads.get("thread-recent")] : [])];
-    return send({ id, result: { data: page, nextCursor: params.cursor ? null : "page-2", backwardsCursor: null } });
+    return send({ id, result: { data: page.filter(Boolean), nextCursor: params.cursor ? null : "page-2", backwardsCursor: null } });
   }
   if (method === "thread/read") {
     const target = threads.get(params.threadId);
@@ -181,6 +181,11 @@ async function handle(frame) {
   }
   if (method === "thread/archive") {
     threads.get(params.threadId).archived = true;
+    return send({ id, result: {} });
+  }
+  if (method === "thread/delete") {
+    if (!threads.has(params.threadId)) return send({ id, error: { code: -32004, message: "thread not found" } });
+    threads.delete(params.threadId);
     return send({ id, result: {} });
   }
   if (method === "thread/unarchive") {

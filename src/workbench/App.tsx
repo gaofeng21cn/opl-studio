@@ -2302,25 +2302,40 @@ export function App({
 
   async function confirmThreadLifecycle() {
     if (!lifecycleConfirmation) return;
+    const pending = lifecycleConfirmation;
     setThreadActionBusy(true);
     setThreadActionError("");
     try {
-      if (lifecycleConfirmation.action === "fork") {
+      if (pending.action === "fork") {
         await bridge.forkThread({
-          threadId: lifecycleConfirmation.thread.id,
-          throughTurnId: lifecycleConfirmation.thread.activeTurnId
+          threadId: pending.thread.id,
+          throughTurnId: pending.thread.activeTurnId
         });
+      } else if (pending.action === "delete") {
+        const result = await bridge.deleteThread({
+          threadId: pending.thread.id,
+          confirmed: true,
+          confirmationId: `opl-studio:${Date.now()}`
+        });
+        if (!result.deleted) throw new Error(settings.locale === "zh" ? "对话删除未被确认。" : "The thread deletion was not confirmed.");
+        const [active, archived] = await Promise.all([
+          bridge.listThreads({ archived: false, limit: 100 }),
+          bridge.listThreads({ archived: true, limit: 100 })
+        ]);
+        if ([...active.data, ...archived.data].some((thread) => thread.id === pending.thread.id)) {
+          throw new Error(settings.locale === "zh" ? "删除后仍能读到该对话，已停止刷新。" : "The deleted thread is still returned by the canonical directory.");
+        }
       } else {
         await bridge.setArchived({
-          threadId: lifecycleConfirmation.thread.id,
-          archived: lifecycleConfirmation.action === "archive",
+          threadId: pending.thread.id,
+          archived: pending.action === "archive",
           confirmed: true,
           confirmationId: `opl-studio:${Date.now()}`
         });
       }
       setLifecycleConfirmation(null);
       setThreadDetail(null);
-      if (lifecycleConfirmation.thread.id === codexThreadId && lifecycleConfirmation.action === "archive") startNewChat();
+      if (pending.thread.id === codexThreadId && (pending.action === "archive" || pending.action === "delete")) startNewChat();
       await loadThreadDirectory(false);
     } catch (error) {
       setThreadActionError(String(error));
@@ -3282,7 +3297,7 @@ export function App({
     setupCapabilities,
     chooseWorkspaceRoot,
     installCodex,
-    overlay: <><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={() => setContributionActionConfirmation(null)} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={() => setContributionActionConfirmation(null)}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => { const pending = contributionActionConfirmation; if (pending) void executeContributionAction(pending.entry, pending.command, true, pending.input); }}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>} /></>,
+    overlay: <><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={() => setContributionActionConfirmation(null)} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={() => setContributionActionConfirmation(null)}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => { const pending = contributionActionConfirmation; if (pending) void executeContributionAction(pending.entry, pending.command, true, pending.input); }}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>} /></>,
     detailsRequestRevision,
     startSession: startNewChat,
     startSessionInProject: startNewChatInProject,

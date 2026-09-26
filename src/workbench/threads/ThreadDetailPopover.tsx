@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Archive, ArchiveRestore, GitFork, Play, X } from "lucide-react";
+import { Archive, ArchiveRestore, GitFork, Play, Trash2, X } from "lucide-react";
 import type { WorkbenchThreadItem } from "../workbenchModel";
 
 type ThreadDetailPopoverProps = {
@@ -10,12 +10,13 @@ type ThreadDetailPopoverProps = {
   onResume: (thread: WorkbenchThreadItem) => void;
   onFork: (thread: WorkbenchThreadItem) => void;
   onRequestArchive: (thread: WorkbenchThreadItem, archived: boolean) => void;
+  onRequestDelete: (thread: WorkbenchThreadItem) => void;
 };
 
-export function ThreadDetailPopover({ thread, locale, busy, onClose, onResume, onFork, onRequestArchive }: ThreadDetailPopoverProps) {
+export function ThreadDetailPopover({ thread, locale, busy, onClose, onResume, onFork, onRequestArchive, onRequestDelete }: ThreadDetailPopoverProps) {
   const copy = locale === "zh"
-    ? { title: "对话详情", project: "项目", workspace: "工作区", lineage: "上游", agent: "智能体", source: "来源", activeTurn: "活动 Turn", status: "状态", id: "Thread ID", resume: "恢复对话", fork: "派生对话", archive: "归档", restore: "恢复", close: "关闭" }
-    : { title: "Thread details", project: "Project", workspace: "Workspace", lineage: "Lineage", agent: "Agent", source: "Source", activeTurn: "Active turn", status: "Status", id: "Thread ID", resume: "Resume thread", fork: "Fork thread", archive: "Archive", restore: "Restore", close: "Close" };
+    ? { title: "对话详情", project: "项目", workspace: "工作区", lineage: "上游", agent: "智能体", source: "来源", activeTurn: "活动 Turn", status: "状态", id: "Thread ID", resume: "恢复对话", fork: "派生对话", archive: "归档", restore: "恢复", delete: "删除", close: "关闭" }
+    : { title: "Thread details", project: "Project", workspace: "Workspace", lineage: "Lineage", agent: "Agent", source: "Source", activeTurn: "Active turn", status: "Status", id: "Thread ID", resume: "Resume thread", fork: "Fork thread", archive: "Archive", restore: "Restore", delete: "Delete", close: "Close" };
 
   return (
     <Dialog.Root open={Boolean(thread)} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -50,6 +51,7 @@ export function ThreadDetailPopover({ thread, locale, busy, onClose, onResume, o
                   {thread.archived ? <ArchiveRestore aria-hidden="true" size={14} /> : <Archive aria-hidden="true" size={14} />}
                   {thread.archived ? copy.restore : copy.archive}
                 </button>
+                <button type="button" disabled={busy} onClick={() => onRequestDelete(thread)}><Trash2 aria-hidden="true" size={14} />{copy.delete}</button>
               </div>
             </>
           ) : null}

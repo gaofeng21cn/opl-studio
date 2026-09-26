@@ -82,6 +82,21 @@ test("internal status and package role identifiers are projected as user-facing 
   assert.notEqual(presentation.formatUpdateChannel("private_canary", "zh"), "private_canary");
 });
 
+test("managed update policy keeps silent ownership separate from current eligibility", () => {
+  assert.equal(presentation.formatUpdatePolicy("controlled_apply", false, "zh"), "自动（静默）");
+  assert.equal(presentation.formatUpdatePolicy("projection_only", false, "zh"), "自动（静默）");
+  assert.equal(presentation.formatUpdatePolicy("native_host", false, "zh"), "由 App 更新器管理");
+  assert.equal(presentation.formatUpdatePolicy("prompt_only", false, "zh"), "手动");
+  assert.equal(presentation.formatUpdatePolicy(undefined, false, "zh"), "待处理");
+});
+
+test("settings keeps Codex version and update channel on the maintenance owner page", () => {
+  assert.match(settingsSource, /默认自动（静默）/);
+  assert.doesNotMatch(settingsSource, /`版本` \$\{projection\?\.codex\.version\}/);
+  assert.doesNotMatch(settingsSource, /<SettingRow label=\{locale === "zh" \? "更新通道"/);
+  assert.match(settingsSource, /component\?\.state !== "failed_with_repair"/);
+});
+
 test("workbench service errors explain the affected surface without exposing Electron transport text", () => {
   const error = workbenchServices.presentWorkbenchError(
     "Error invoking remote method 'opl:invoke': Error: Framework workbench services are unavailable. Update Framework and restart the App.",

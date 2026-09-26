@@ -180,11 +180,16 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.match(slotHost, /forkSession=\{/);
   assert.match(detail, /opl-thread-resume/);
   assert.match(detail, /onRequestArchive/);
+  assert.match(detail, /onRequestDelete/);
   assert.doesNotMatch(detail, /onCoordinate|coordinate/);
   assert.match(lifecycle, /opl-thread-lifecycle-confirmation/);
   assert.match(lifecycle, /ThreadLifecycleAction/);
+  assert.match(lifecycle, /delete/);
+  assert.match(styles, /\.dialog-warning/);
   assert.match(app, /action === "fork"/);
   assert.match(app, /confirmed: true/);
+  assert.match(app, /bridge\.deleteThread/);
+  assert.match(app, /canonical directory/);
   assert.match(app, /deriveThreadMessages/);
   assert.match(app, /<Streamdown/);
   assert.match(app, /linkSafety=\{assistantMarkdownLinkSafety\}/);

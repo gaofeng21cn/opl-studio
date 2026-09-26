@@ -1472,24 +1472,34 @@ export function formatUpdateChannel(value: string | undefined, locale: Workbench
   return locale === "zh" ? "自定义" : "Custom";
 }
 
-function formatUpdatePolicy(value: string | undefined, eligible: boolean | null | undefined, locale: WorkbenchSettings["locale"]): string {
+export function formatUpdatePolicy(value: string | undefined, eligible: boolean | null | undefined, locale: WorkbenchSettings["locale"]): string {
   const normalized = value?.toLowerCase();
-  if (normalized && ["silent_background", "automatic", "auto", "enabled"].includes(normalized)) {
-    return locale === "zh" ? "自动" : "Automatic";
+  if (normalized && ["silent_managed", "silent_background", "controlled_apply", "eligible_native_packages", "projection_only", "automatic", "auto", "enabled"].includes(normalized)) {
+    return locale === "zh" ? "自动（静默）" : "Automatic (silent)";
   }
-  if (normalized && ["manual", "explicit", "disabled"].includes(normalized)) {
+  if (normalized === "native_host") {
+    return locale === "zh" ? "由 App 更新器管理" : "Managed by the App updater";
+  }
+  if (normalized === "detect_only_guidance") {
+    return locale === "zh" ? "仅检测并提示" : "Detection and guidance only";
+  }
+  if (normalized && ["manual", "explicit", "disabled", "prompt_only"].includes(normalized)) {
     return locale === "zh" ? "手动" : "Manual";
   }
-  if (eligible === true) return locale === "zh" ? "自动" : "Automatic";
-  if (eligible === false) return locale === "zh" ? "手动" : "Manual";
+  if (eligible === true) return locale === "zh" ? "自动（静默）" : "Automatic (silent)";
+  if (eligible === false) return locale === "zh" ? "待处理" : "Needs attention";
   return locale === "zh" ? "待确认" : "Not available";
+}
+
+function isDefaultSilentManagedComponent(component: ManagedUpdateComponentRef | undefined): boolean {
+  if (!component || component.componentId === "opl_app") return false;
+  return ["silent_managed", "silent_background", "controlled_apply", "eligible_native_packages", "projection_only"].includes(component.autoApplyMode?.toLowerCase() ?? "");
 }
 
 function ManagedUpdateGroup({
   component,
   nativeUpdate,
   fallbackLabel,
-  managedChannel,
   actions,
   locale,
   busyKey,
@@ -1500,7 +1510,6 @@ function ManagedUpdateGroup({
   component?: ManagedUpdateComponentRef;
   nativeUpdate?: NativeAppUpdateResult | null;
   fallbackLabel: string;
-  managedChannel?: string;
   actions: SettingsExecutableIntent[];
   locale: WorkbenchSettings["locale"];
   busyKey: string | null;
@@ -1531,9 +1540,12 @@ function ManagedUpdateGroup({
         : nativeUpdate?.reasonCode
           ? (locale === "zh" ? "当前载体没有可用更新源" : "No update source is available for this carrier")
           : undefined;
-  const renderableActions = actions.filter((intent) => (
-    intent.availability === "ready" && (intent.transport === "app_action" || Boolean(onHostAction))
-  ));
+  const renderableActions = actions.filter((intent) => {
+    const isManagedApply = intent.transport !== "app_action" && intent.operation === "apply";
+    return intent.availability === "ready"
+      && (intent.transport === "app_action" || Boolean(onHostAction))
+      && !(isDefaultSilentManagedComponent(component) && isManagedApply && component?.state !== "failed_with_repair");
+  });
   return (
     <SettingsGroup title={fallbackLabel}>
       <SettingRow label={locale === "zh" ? "状态" : "Status"}>
@@ -1546,9 +1558,8 @@ function ManagedUpdateGroup({
       </SettingRow>
       <SettingRow label={locale === "zh" ? "版本" : "Version"}><span>{version}</span></SettingRow>
       {component?.currentness ? <SettingRow label={locale === "zh" ? "当前状态" : "Currentness"}><StatusValue status={component.currentness} locale={locale} /></SettingRow> : null}
-      <SettingRow label={locale === "zh" ? "更新通道" : "Update channel"}><span>{formatUpdateChannel(component?.channel ?? managedChannel, locale)}</span></SettingRow>
       {nativeUpdate ? <SettingRow label={locale === "zh" ? "更新源" : "Update source"}><span>{nativeUpdateSource ?? "--"}</span></SettingRow> : null}
-      <SettingRow label={nativeUpdate ? (locale === "zh" ? "更新方式" : "Update behavior") : (locale === "zh" ? "自动更新" : "Automatic updates")}><span>{autoPolicy}</span></SettingRow>
+      <SettingRow label={nativeUpdate ? (locale === "zh" ? "更新方式" : "Update behavior") : (locale === "zh" ? "默认更新策略" : "Default update policy")}><span>{autoPolicy}</span></SettingRow>
       {component?.flowDependencies?.length ? <details className="settings-advanced-actions" data-testid="opl-flow-dependency-currentness">
         <summary>{locale === "zh" ? `OPL Flow 依赖 ${component.flowDependencies.length} 项` : `${component.flowDependencies.length} OPL Flow dependencies`}<ChevronDown aria-hidden="true" size={14} /></summary>
         <div>{component.flowDependencies.map((dependency) => <SettingRow key={`${dependency.dependencyId}:${dependency.dependencyKind}`} label={dependency.dependencyId} detail={[dependency.dependencyKind, dependency.version].filter(Boolean).join(" · ")}><StatusValue status={dependency.currentness || dependency.status} locale={locale} /></SettingRow>)}</div>
@@ -1777,7 +1788,7 @@ export function SettingsPanel({
             <SettingRow label={settings.locale === "zh" ? "连接状态" : "Connection status"}><StatusValue status={gateway?.status ?? (stateLoading ? "loading" : stateFailed ? "attention_needed" : "not_configured")} locale={settings.locale} /></SettingRow>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "当前运行状态" : "Current status"}>
-            <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"} detail={projection?.codex.version ? `${settings.locale === "zh" ? "版本" : "Version"} ${projection.codex.version}` : undefined}>
+            <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"}>
               <StatusValue status={projection?.codex.versionStatus ?? (projection?.codex.installed ? "ready" : undefined)} locale={settings.locale} />
             </SettingRow>
             <SettingRow label={settings.locale === "zh" ? "模型" : "Model"}><span>{modelLabel(displayedModelId ?? "--", settings.locale)}</span></SettingRow>
@@ -2198,7 +2209,7 @@ export function SettingsPanel({
         <>
           {workbenchServices && <ScheduledTasksPanel onOpened={onClose} client={workbenchServices} locale={settings.locale} onAction={onAction} busy={actionBusyKey !== null} revision={actionReceipt?.receiptId} cwd={projection?.workspace.selectedPath} />}
           <SettingsGroup title={settings.locale === "zh" ? "本机能力" : "Local capabilities"}>
-            <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"} detail={projection?.codex.version ? `${settings.locale === "zh" ? "版本" : "Version"} ${projection.codex.version}` : undefined}><StatusValue status={projection?.codex.installed === true ? projection?.codex.versionStatus ?? "ready" : projection?.codex.installed === false ? "unavailable" : undefined} locale={settings.locale} /></SettingRow>
+            <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"}><StatusValue status={projection?.codex.installed === true ? projection?.codex.versionStatus ?? "ready" : projection?.codex.installed === false ? "unavailable" : undefined} locale={settings.locale} /></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "智能体与能力" : "Agents and capabilities"}><StatusValue status={projection?.statusSummary.agentPackageHealth} locale={settings.locale} /></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "运行环境" : "Runtime environment"}><StatusValue status={projection?.statusSummary.runtimeSourceHealth} locale={settings.locale} /></SettingRow>
           </SettingsGroup>
@@ -2227,17 +2238,18 @@ export function SettingsPanel({
       const component = (componentId: "opl_app" | "opl_base" | "opl_packages") => (
         actionViewModel.managedUpdates.find((item) => item.componentId === componentId)
       );
+      const updateChannel = managedUpdate?.channel ?? projection?.localEnvironment.releaseChannel ?? projection?.statusSummary.releaseChannel;
       return (
         <>
           <div className="settings-page-summary">
-            <span>{settings.locale === "zh" ? "分别检查应用、基础服务和智能体能力" : "Updates are checked separately for the app, base services, and agent capabilities"}</span>
+            <span>{settings.locale === "zh" ? "应用、基础服务和智能体能力由各自负责人后台维护" : "The App, Base services, and capabilities are maintained in the background by their owners"}</span>
+            <span>{settings.locale === "zh" ? `更新通道：${formatUpdateChannel(updateChannel, settings.locale)} · 默认自动（静默）` : `Channel: ${formatUpdateChannel(updateChannel, settings.locale)} · Automatic silent updates by default`}</span>
             <span>{settings.locale === "zh" ? `状态刷新于 ${formatDate(model.stateGeneratedAt, locale)}` : `Status refreshed ${formatDate(model.stateGeneratedAt, locale)}`}</span>
           </div>
           <ManagedUpdateGroup
             component={component("opl_app")?.component}
             nativeUpdate={nativeAppUpdate}
             fallbackLabel="One Person Lab"
-            managedChannel={managedUpdate?.channel ?? projection?.localEnvironment.releaseChannel ?? projection?.statusSummary.releaseChannel}
             actions={component("opl_app")?.actions ?? []}
             locale={settings.locale}
             busyKey={actionBusyKey}
@@ -2248,7 +2260,6 @@ export function SettingsPanel({
           <ManagedUpdateGroup
             component={component("opl_base")?.component}
             fallbackLabel={settings.locale === "zh" ? "基础服务" : "Base services"}
-            managedChannel={managedUpdate?.channel}
             actions={component("opl_base")?.actions ?? []}
             locale={settings.locale}
             busyKey={actionBusyKey}
@@ -2259,7 +2270,6 @@ export function SettingsPanel({
           <ManagedUpdateGroup
             component={component("opl_packages")?.component}
             fallbackLabel={settings.locale === "zh" ? "智能体与能力" : "Agents and capabilities"}
-            managedChannel={managedUpdate?.channel}
             actions={component("opl_packages")?.actions ?? []}
             locale={settings.locale}
             busyKey={actionBusyKey}
@@ -2392,7 +2402,6 @@ export function SettingsPanel({
               </span>
             </SettingRow>
           </div>
-          <SettingRow label={settings.locale === "zh" ? "本机助手" : "Local assistant"}><span>{projection?.codex.version ?? "--"}</span></SettingRow>
           {maintenanceStatus ? <SettingRow label={settings.locale === "zh" ? "组件维护" : "Component maintenance"}>
             <span role="status">{({
               idle: settings.locale === "zh" ? "等待检查" : "Pending check",

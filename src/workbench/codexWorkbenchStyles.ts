@@ -3715,6 +3715,12 @@ export const codexWorkbenchStyles = `
     color: var(--opl-danger);
   }
 
+  .dialog-warning {
+    margin: 12px 0 0;
+    color: var(--opl-warning, #9a6700);
+    font-size: var(--opl-text-sm);
+  }
+
   .thread-directory-row {
     min-width: 0;
     display: grid;
