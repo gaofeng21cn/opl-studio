@@ -39,6 +39,37 @@ test("settings navigation exposes primary categories with related destinations g
   );
 });
 
+test("settings pages expose a purpose statement for every destination", () => {
+  for (const destination of presentation.settingsDestinations("zh")) {
+    const page = presentation.settingsPagePresentationFor(destination.id, "zh");
+    assert.ok(page.eyebrow.length > 0);
+    assert.ok(page.description.length > 0);
+  }
+  const capabilities = presentation.settingsPagePresentationFor("capabilities", "zh");
+  assert.match(capabilities.description, /DSH/);
+  assert.match(presentation.settingsPagePresentationFor("capabilities", "en").description, /DSH/);
+});
+
+test("official DSH capabilities expose adoption status and owner semantics", () => {
+  assert.deepEqual(presentation.officialDshCapabilities.map((capability) => capability.id), [
+    "dsh-plugin-manager",
+    "dsh-auto-review",
+    "dsh-shortcuts",
+    "dsh-time-context",
+    "dsh-schedule",
+    "dsh-inspector",
+    "dsh-voice-input"
+  ]);
+  const schedule = presentation.officialDshCapabilities.find((capability) => capability.id === "dsh-schedule");
+  assert.ok(schedule);
+  assert.equal(presentation.officialDshCapabilityStatus(schedule, [], "zh").status, "available");
+  const pluginManager = presentation.officialDshCapabilities.find((capability) => capability.id === "dsh-plugin-manager");
+  assert.ok(pluginManager);
+  assert.equal(presentation.officialDshCapabilityStatus(pluginManager, [], "zh").status, "planned");
+  assert.match(presentation.officialDshCapabilityStatus(pluginManager, [{ id: "plugin-manager", name: "plugin-manager", description: "", enabled: true, callable: false }], "zh").detail, /等待 owner/);
+  assert.equal(presentation.formatStatus("planned", "zh"), "待接入");
+});
+
 test("package descriptions prefer the active locale and allow an English fallback", () => {
   const localized = {
     description: "Raw English description.",
