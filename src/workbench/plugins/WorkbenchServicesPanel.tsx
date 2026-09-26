@@ -156,14 +156,14 @@ export function StorageCleanupPanel(props: Props) {
   const zh = props.locale === 'zh'; const inventory = useRead(props.client, 'inventory', props.revision);
   const [selection, setSelection] = useState<string[]>([]);
   useEffect(() => { setSelection([]); }, [inventory.data]);
-  return <section className="feature-status-panel workbench-services" data-testid="opl-storage-cleanup"><h3>{zh ? '日志清理' : 'Log cleanup'}</h3>
-    <p>{zh ? '只清理由所属服务声明、超过 24 小时未修改的日志。工作区、领域产物、凭据、任务会话和记忆不在此清理范围。' : 'Only owner-declared logs unchanged for over 24 hours are eligible. Workspaces, artifacts, credentials, sessions and memory are excluded.'}</p>
+  return <section className="feature-status-panel workbench-services" data-testid="opl-storage-cleanup"><h3>{zh ? '数据与安全清理' : 'Data and safe cleanup'}</h3>
+    <p>{zh ? '只清理由所属服务声明、超过 24 小时未修改的日志和缓存。清理前先预览，确认后按当前文件指纹执行，并返回 receipt；工作区、领域产物、凭据、任务会话和记忆始终保留。' : 'Only owner-declared logs and caches unchanged for more than 24 hours are eligible. Preview first, then confirm against the current file fingerprints; the owner returns a receipt. Workspaces, artifacts, credentials, sessions and memory are always retained.'}</p>
     <ReadStatus value={inventory} zh={zh} />
-    {rows(inventory.data?.categories).map(category => <article key={category.id}><h4>{category.id} · {category.owner}</h4><p>{zh ? '占用 / 可清理' : 'Total / reclaimable'}: {category.bytes} / {category.reclaimableBytes} bytes</p>
+    {rows(inventory.data?.categories).map(category => <article key={category.id}><h4>{category.id} · {category.owner}</h4><p>{zh ? '占用 / 可清理 / 保留' : 'Total / reclaimable / retained'}: {category.bytes} / {category.reclaimableBytes} / {category.retainedBytes ?? Math.max(0, (category.bytes ?? 0) - (category.reclaimableBytes ?? 0))} bytes</p>
       {!rows(category.files).length && <p>{zh ? '没有可清理文件。' : 'No eligible files.'}</p>}
       {rows(category.files).map(file => <label key={file.id}><input type="checkbox" checked={selection.includes(file.id)} onChange={e => setSelection(current => e.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} />{file.name} · {file.bytes} bytes</label>)}
     </article>)}
     {rows(inventory.data?.protectedCategories).map(category => <p key={category.id}>{category.id} · {category.owner} · {category.bytes === null ? (zh ? '未取得用量' : 'Usage unavailable') : `${category.bytes} bytes`} · {category.truncated ? (zh ? '部分统计' : 'Partial inventory') : category.status} · {zh ? '只读，保留数据' : 'Read only, retained'}</p>)}
-    <Button variant="outline" size="sm" type="button" disabled={props.busy || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '清理选定日志' : 'Clean selected logs')}>{zh ? '预览清理范围' : 'Preview cleanup'}</Button>
+    <Button variant="outline" size="sm" type="button" disabled={props.busy || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '清理选定数据' : 'Clean selected data')}>{zh ? '预览清理范围' : 'Preview cleanup'}</Button>
   </section>;
 }
