@@ -210,6 +210,15 @@ const selectStudioPanel = () => undefined;
 // Plain Enter queues while the agent is busy; the accelerated chord steers.
 const studioBusyEnter = "queue" as const;
 const useStudioBusyEnter = (selector: (behavior: typeof studioBusyEnter) => unknown) => selector(studioBusyEnter);
+// RC2 UI packages receive these hook faces through DSH's runtime injector. The
+// Studio host renders the reference components directly, so bind the same
+// contracts to the App-owned local projections here.
+const studioShortcuts: readonly { id: string; keys: readonly string[]; aria: string }[] = [];
+const useStudioShortcuts = (selector: (entries: typeof studioShortcuts) => unknown) => selector(studioShortcuts);
+const studioDeveloperTools = true;
+const useStudioDeveloperTools = (selector: (enabled: boolean) => unknown) => selector(studioDeveloperTools);
+const studioStopShortcut: readonly string[] = [];
+const useStudioStopShortcut = (selector: (keys: typeof studioStopShortcut) => unknown) => selector(studioStopShortcut);
 // Studio queue rows carry text only, so the queue thumbnail loader is inert.
 const loadStudioQueueImage = async (): Promise<string> => "";
 
@@ -335,6 +344,7 @@ function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; wid
         toggleSidebar={studio.toggleSidebar}
         selectPanel={selectStudioPanel}
         usePanels={useStudioPanels}
+        useShortcuts={useStudioShortcuts}
         usePanelInfo={useConversationPanelInfo}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
         renderSlot={renderSlot}
@@ -684,6 +694,7 @@ function HeroActionsSlot() {
     select={(id: string) => studio.selectAgentPreset(id)}
     introduced={() => undefined}
     useAgentPresetSeat={(selector: any) => useDshSnapshot(store, selector)}
+    useDeveloperTools={useStudioDeveloperTools}
     t={(key: string) => translate(studio.locale, key)}
   />;
 }
@@ -796,7 +807,7 @@ function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const inputRenderSlot = (key: string, props: Record<string, unknown>) => key === "conversation.input.permission"
     ? <StudioPermissionSelect value={permissionValue} options={permissionOptions} locked={studio.sending} locale={studio.locale} command={command} />
     : renderSlot(key, props);
-  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addAttachments: () => true, removeAttachment: studio.removeComposerImage, pruneAttachments: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} addFiles={studio.addComposerImages} removeAttachment={studio.removeComposerImage} resolveDraftAttachments={(ids: readonly string[]) => ids.flatMap((id) => { const image = studio.composerImages.find((candidate) => candidate.id === id); return image ? [{ kind: "image", ...image }] : []; })} useBusyEnter={useStudioBusyEnter} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useFileUploads={(selector: any) => selector({})} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
+  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addAttachments: () => true, removeAttachment: studio.removeComposerImage, pruneAttachments: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} addFiles={studio.addComposerImages} removeAttachment={studio.removeComposerImage} resolveDraftAttachments={(ids: readonly string[]) => ids.flatMap((id) => { const image = studio.composerImages.find((candidate) => candidate.id === id); return image ? [{ kind: "image", ...image }] : []; })} useBusyEnter={useStudioBusyEnter} useStopShortcut={useStudioStopShortcut} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useFileUploads={(selector: any) => selector({})} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
 }
 
 function QueueDockSlot() {
@@ -950,6 +961,14 @@ function settingsSearchTargets(locale: "zh" | "en"): SettingsSearchTarget[] {
 
 function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) {
   const studio = useStudio();
+  const settingsStore = useMemo(() => createSnapshotStore<{ open: boolean; activeId: string | undefined }>({ open: false, activeId: undefined }), []);
+  const settingsUseStore = useCallback((selector: (state: { open: boolean; activeId: string | undefined }) => unknown) => useDshSnapshot(settingsStore, selector), [settingsStore]);
+  const settingsActions = useMemo(() => ({
+    open: () => settingsStore.update((state) => { state.open = true }),
+    close: () => settingsStore.update((state) => { state.open = false; state.activeId = undefined }),
+    select: (id: string) => settingsStore.update((state) => { state.activeId = id }),
+    openSection: (id: string) => settingsStore.update((state) => { state.activeId = id; state.open = true })
+  }), [settingsStore]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useSettingsDialogFocus(rootRef);
   const localeRef = useRef(studio.locale);
@@ -1021,7 +1040,7 @@ function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) 
     ? settingsDestinations(studio.locale).find(primary => settingsSubDestinations(primary.id, studio.locale).some(item => item.id === requestedSettings.destination))?.id
     : undefined;
   const navigationRequest = requestedSettings ? { sectionId: requestedPrimary ? settingsSectionId(requestedPrimary) : undefined, revision: requestedSettings.revision } : undefined;
-  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
+  return <SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={settingsUseStore} actions={settingsActions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider>;
 }
 
 function SettingsTriggerSlot({ wide }: { wide: boolean }) {
