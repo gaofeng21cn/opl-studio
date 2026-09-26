@@ -5331,16 +5331,18 @@ export const codexWorkbenchStyles = `
 
     /* DSH mounts its settings dialog through a portal, outside the local
        settings slot root. Keep the same mobile layout for that shell. */
-    [role="dialog"][aria-label="设置"],
-    [role="dialog"][aria-label="Settings"] {
-      width: 100vw;
-      max-width: 100vw;
-      height: 100dvh;
-      border-radius: 0;
-      flex-direction: column;
+    /* DSH renders this panel in a body portal. Its accessible name is supplied
+       by aria-labelledby, so data-shortcut-modal is the stable hook. */
+    [data-shortcut-modal="settings"][role="dialog"] {
+      width: 100vw !important;
+      max-width: none !important;
+      height: 100dvh !important;
+      max-height: none !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      flex-direction: column !important;
     }
-    [role="dialog"][aria-label="设置"] > nav,
-    [role="dialog"][aria-label="Settings"] > nav {
+    [data-shortcut-modal="settings"][role="dialog"] > nav {
       width: 100%;
       height: auto;
       flex: none;
@@ -5348,28 +5350,29 @@ export const codexWorkbenchStyles = `
       gap: 0;
       overflow: visible;
     }
-    [role="dialog"][aria-label="设置"] > nav > div:last-child,
-    [role="dialog"][aria-label="Settings"] > nav > div:last-child {
+    [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child {
       display: flex;
       flex-direction: row;
       overflow-x: auto;
       gap: 4px;
       padding-bottom: 0;
     }
-    [role="dialog"][aria-label="设置"] > nav button,
-    [role="dialog"][aria-label="Settings"] > nav button {
+    [data-shortcut-modal="settings"][role="dialog"] > nav button {
       width: auto;
       min-width: 0;
       flex: none;
       padding: 8px 10px;
       height: 38px;
     }
-    [role="dialog"][aria-label="设置"] > div:last-child,
-    [role="dialog"][aria-label="Settings"] > div:last-child {
+    [data-shortcut-modal="settings"][role="dialog"] > div:last-child {
       width: 100%;
       min-width: 0;
       min-height: 0;
       flex: 1 1 auto;
+      overflow: hidden;
+    }
+    [data-shortcut-modal="settings"][role="dialog"] > div:last-child > * {
+      min-width: 0;
     }
   }
 
