@@ -1541,7 +1541,7 @@ function ManagedUpdateGroup({
           ? (locale === "zh" ? "当前载体没有可用更新源" : "No update source is available for this carrier")
           : undefined;
   const renderableActions = actions.filter((intent) => {
-    const isManagedApply = intent.transport !== "app_action" && intent.operation === "apply";
+    const isManagedApply = intent.transport !== "app_action" && "operation" in intent && intent.operation === "apply";
     return intent.availability === "ready"
       && (intent.transport === "app_action" || Boolean(onHostAction))
       && !(isDefaultSilentManagedComponent(component) && isManagedApply && component?.state !== "failed_with_repair");
@@ -2244,7 +2244,7 @@ export function SettingsPanel({
           <div className="settings-page-summary">
             <span>{settings.locale === "zh" ? "应用、基础服务和智能体能力由各自负责人后台维护" : "The App, Base services, and capabilities are maintained in the background by their owners"}</span>
             <span>{settings.locale === "zh" ? `更新通道：${formatUpdateChannel(updateChannel, settings.locale)} · 默认自动（静默）` : `Channel: ${formatUpdateChannel(updateChannel, settings.locale)} · Automatic silent updates by default`}</span>
-            <span>{settings.locale === "zh" ? `状态刷新于 ${formatDate(model.stateGeneratedAt, locale)}` : `Status refreshed ${formatDate(model.stateGeneratedAt, locale)}`}</span>
+            <span>{settings.locale === "zh" ? `状态刷新于 ${formatDate(model.stateGeneratedAt, settings.locale)}` : `Status refreshed ${formatDate(model.stateGeneratedAt, settings.locale)}`}</span>
           </div>
           <ManagedUpdateGroup
             component={component("opl_app")?.component}
