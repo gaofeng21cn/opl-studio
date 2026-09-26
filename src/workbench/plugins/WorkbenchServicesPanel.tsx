@@ -196,7 +196,9 @@ export function StorageCleanupPanel(props: Props) {
   const observedAt = typeof inventory.data?.observed_at === 'string' ? new Date(inventory.data.observed_at) : null;
   const observedLabel = observedAt && !Number.isNaN(observedAt.getTime())
     ? observedAt.toLocaleString(props.locale)
-    : (zh ? '尚未完成盘点' : 'Not inventoried yet');
+    : inventory.data
+      ? (zh ? '已完成（时间未提供）' : 'Complete (timestamp unavailable)')
+      : (zh ? '尚未完成盘点' : 'Not inventoried yet');
   const selectAll = () => setSelection(selectedAll ? [] : eligibleFiles.map(file => file.id));
   const clearLabel = selectedBytes > 0
     ? (zh ? `预览并释放 ${formatBytes(selectedBytes, props.locale, '0 B')}` : `Preview and release ${formatBytes(selectedBytes, props.locale, '0 B')}`)
