@@ -179,6 +179,18 @@ test("channel callbacks stay dormant unless an optional provider registrar is co
   assert.equal(invalidDisposeCount, 1);
 });
 
+test("remote companion reads expose development status when its optional host is unavailable", async () => {
+  const passthrough = createOplPassthrough({ command: "/missing/opl-remote-companion" });
+  const readback = await passthrough.readContribution({
+    packageId: "opl-link-desktop-connector",
+    ref: "remote_companion_access#state",
+    input: {}
+  });
+  assert.equal(readback.exitCode, 0);
+  assert.equal(readback.stdoutJson?.opl_app_contribution?.response?.result?.status, "unavailable");
+  assert.equal(readback.stdoutJson?.opl_app_contribution?.response?.result?.unavailable_reason, "implementation_in_progress");
+});
+
 test("candidate blocks confirmed mutations unless the launcher explicitly enables actions", async () => {
   const blocked = createOplPassthrough({
     cwd: process.cwd(),

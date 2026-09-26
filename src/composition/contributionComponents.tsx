@@ -650,6 +650,9 @@ function remoteCompanionStatusLabel(
     revoking: ["正在撤销", "Revoking"],
     attention: ["需要处理", "Needs attention"]
   };
+  if (result.status === "unavailable" && ["protected_blob_host_absent", "implementation_in_progress"].includes(result.unavailableReason ?? "")) {
+    return locale === "zh" ? "开发中" : "In development";
+  }
   return labels[result.status][locale === "zh" ? 0 : 1];
 }
 
@@ -881,7 +884,11 @@ function RemoteCompanionAccessView({ entry, owner }: {
         <Pill><StateDot state={remoteCompanionStatusState(result.status)} size={9} />{remoteCompanionStatusLabel(result, owner.locale)}</Pill>
       </div>
       {result.status === "unavailable" ? (
-        <p className="opl-contribution-fallback" role="status">{owner.locale === "zh" ? "远程配对服务当前不可用" : "Remote pairing service is unavailable"}</p>
+        <p className="opl-contribution-fallback" role="status">
+          {["protected_blob_host_absent", "implementation_in_progress"].includes(result.unavailableReason ?? "")
+            ? (owner.locale === "zh" ? "OPL Link 正在开发中，暂不可用。" : "OPL Link is in development and is not available yet.")
+            : (owner.locale === "zh" ? "远程配对服务当前不可用" : "Remote pairing service is unavailable")}
+        </p>
       ) : null}
       {pairStartAction ? (
         <section className="opl-remote-companion-start" data-testid="opl-remote-companion-access-start">

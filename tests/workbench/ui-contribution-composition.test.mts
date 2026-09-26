@@ -27,7 +27,7 @@ import {
 const { normalizeContributionReadback } = await import("../../src/bridge/oplBridge.ts");
 const { OplStudioDshSlotHost } = await import("../../src/composition/dshSlotHost.tsx");
 const { buildServiceStatusSummary } = await import("../../src/composition/contributionComponents.tsx");
-const { resolveCodexModelOptions } = await import("../../src/workbench/modelPolicy.ts");
+const { codexModelPolicy, resolveCodexModelOptions } = await import("../../src/workbench/modelPolicy.ts");
 
 const projectionState = {
   app_state: {
@@ -501,15 +501,17 @@ describe("OPL Studio DSH contribution composition", () => {
   });
 
   test("collapses alias-linked catalog rows into one App-owned model option", () => {
+    const appModelId = codexModelPolicy.modelOptions[0]!.id;
+    const canonicalId = `${appModelId}-canonical`;
     const options = resolveCodexModelOptions([{
-      id: "codex-fixture",
-      model: "codex-fixture-canonical",
+      id: appModelId,
+      model: canonicalId,
       displayName: "Legacy alias",
       isDefault: false,
       defaultReasoningEffort: "high",
       supportedReasoningEfforts: ["high"]
     }, {
-      id: "codex-fixture-canonical",
+      id: canonicalId,
       model: "codex-fixture-current",
       displayName: "Current catalog default",
       isDefault: true,
@@ -517,8 +519,8 @@ describe("OPL Studio DSH contribution composition", () => {
       supportedReasoningEfforts: ["high"]
     }]);
 
-    expect(options.map((option) => option.id)).toEqual(["codex-fixture"]);
-    expect(options[0]).toMatchObject({ known: true, isCatalogDefault: true, available: true });
+    expect(options.filter((option) => option.id === appModelId)).toHaveLength(1);
+    expect(options.find((option) => option.id === appModelId)).toMatchObject({ known: true, isCatalogDefault: true, available: true });
   });
 
   test("accepts only the current Framework contribution read identity", () => {

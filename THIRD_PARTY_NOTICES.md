@@ -15,7 +15,7 @@ OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
   `dsh-host-plugin-inventory`, `dsh-host-webserver`, `dsh-invariants`,
   `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, `dsh-sandbox`, `dsh-sandbox-policy`, and
   `dsh-typert-protocol`, `dsh-client-store`, and
-  `dsh-util-workspace-path`, `dsh-util-values`, all at `0.1.7-alpha.2`;
+  `dsh-util-workspace-path`, `dsh-util-values`, all at `0.1.7-rc.2`;
 - `use-sync-external-store` `1.2.0` for the vendored renderer closure;
 - `zustand` `4.4.7` and `immer` `10.2.0` for the DSH client store runtime
   closure (MIT, pmndrs and Michel Weststrate);
@@ -30,7 +30,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `00102833dfaee1da9f48a3a8eae9d34005a75218`
+Inspected source ref: `477b4f420553e8a52c2fbccc464d7561b239c443`
 
 The complete `src/` trees of eighteen client packages are vendored byte-for-byte
 from that ref under `src/vendor/deepseek-harness/packages/client/`:
@@ -58,7 +58,7 @@ The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
 The snapshot contains 526 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.1.7-alpha.2`), and
+roots, per-file SHA-256 inventory, source package version (`0.1.7-rc.2`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks local byte parity. OPL changes stay outside the vendor root.

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { Activity, Archive, Bot, Cable, CircleHelp, Gauge, GitFork, SlidersHorizontal, UserRound, AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, Files, Folder, LoaderCircle, PanelRight, Puzzle, RefreshCw, Settings as SettingsIcon, Shield, ShieldAlert, ShieldCheck, X } from "lucide-react";
-import { IconChevronDownOutlineMedium, Menu, MenuItemButton, OnboardingSurface, RiskConfirmation, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
+import { IconChevronDownOutlineMedium, Menu, MenuItemButton, RiskConfirmation, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   SlotCore,
   type HostObservable,
@@ -1096,7 +1096,7 @@ function FirstRunOnboardingSlot({
     setSetupBusy(false);
   };
   return (
-    <OnboardingSurface>
+    <div className="opl-first-run-surface">
       <section className="opl-first-run" role="dialog" aria-modal="true" aria-labelledby="opl-first-run-title">
         <header>
           <span className="opl-first-run-mark" aria-hidden="true">OPL</span>
@@ -1127,7 +1127,7 @@ function FirstRunOnboardingSlot({
           </button>
         </footer>
       </section>
-    </OnboardingSurface>
+    </div>
   );
 }
 

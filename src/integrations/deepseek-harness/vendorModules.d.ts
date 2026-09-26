@@ -49,6 +49,12 @@ declare module "@opl-vendor/dsh-model-select" {
 
 declare module "@deepseek-ai/dsh-client-ui-settings/client" {}
 
+declare module "@deepseek-ai/dsh-session-projection/types" {
+  interface SessionProjectionMap {
+    subagentCatalog: ReadonlyArray<{ id: import("@deepseek-ai/dsh-session/types").SessionId; running?: boolean }>;
+  }
+}
+
 declare module "@deepseek-ai/dsh-client-runtime/client" {
   import type {
     ActionsDecl,

@@ -173,6 +173,53 @@ export type SettingsDockerDiagnostic = {
   startupMaintenanceStatus?: string;
 };
 
+const quietDockerDiagnosticStatuses = new Set([
+  "not_checked",
+  "unknown",
+  "initializing",
+  "not_visible",
+  "verification_deferred",
+  "pending"
+]);
+
+export function dockerDiagnosticPresentation(
+  diagnostic: SettingsDockerDiagnostic | null,
+  locale: WorkbenchSettings["locale"]
+): { status: string; detail: string; issues: string[] } {
+  if (!diagnostic) {
+    return {
+      status: "not_checked",
+      detail: locale === "zh" ? "尚未运行检查" : "No check has been run",
+      issues: []
+    };
+  }
+  const issueStatuses = [
+    [locale === "zh" ? "Docker 服务" : "Docker service", diagnostic.dockerRuntimeStatus],
+    [locale === "zh" ? "网页访问" : "Web access", diagnostic.browserUrlStatus],
+    [locale === "zh" ? "启动准备" : "Startup", diagnostic.startupMaintenanceStatus ?? diagnostic.startupPhase]
+  ].flatMap(([label, value]) => {
+    const normalized = value?.toLowerCase();
+    return value && normalized && !quietDockerDiagnosticStatuses.has(normalized) && statusTone(value) === "attention"
+      ? [`${label}: ${formatStatus(value, locale)}`]
+      : [];
+  });
+  const attentionCount = diagnostic.attentionCount ?? 0;
+  if (attentionCount > 0 || issueStatuses.length > 0 || statusTone(diagnostic.status) === "attention") {
+    return {
+      status: "attention_needed",
+      detail: locale === "zh"
+        ? `检查发现 ${attentionCount || issueStatuses.length} 项需要处理`
+        : `The check found ${attentionCount || issueStatuses.length} item(s) requiring attention`,
+      issues: issueStatuses
+    };
+  }
+  return {
+    status: "ready",
+    detail: locale === "zh" ? "检查完成，当前没有需要处理的项目" : "Check complete; nothing needs attention",
+    issues: []
+  };
+}
+
 export type SettingsActionConfirmation = {
   request: SettingsActionRequest;
   previewStatus: string;
@@ -359,7 +406,7 @@ export function statusTone(status: string | undefined): "ready" | "attention" | 
     if (total > 0 && available >= 0 && available < total) return "attention";
     return "neutral";
   }
-  if (["error", "attention", "stale", "required", "unavailable", "not_available", "not-available", "not_installed", "restart_needed", "failed", "missing", "incompatible", "unsupported"].some((value) => normalized.includes(value))) {
+  if (["error", "attention", "stale", "required", "unavailable", "not_available", "not-available", "not_installed", "restart_needed", "failed", "missing", "incompatible", "unsupported", "unreachable"].some((value) => normalized.includes(value))) {
     return "attention";
   }
   if (["ready", "connected", "active", "compatible", "available", "installed", "enabled", "current", "stable", "healthy"].some((value) => normalized.includes(value))) {
@@ -2049,6 +2096,7 @@ export function SettingsPanel({
       const webAccessStatus = projection?.dockerWebui.status === "action_available"
         ? "setup_required"
         : projection?.dockerWebui.status;
+      const dockerPresentation = dockerDiagnosticPresentation(dockerDiagnostic, settings.locale);
       const ordinaryActions = dockerActions.filter((action) => (
         action.actionId !== "settings_diagnose_docker_webui"
         && action.state !== "unavailable"
@@ -2064,19 +2112,12 @@ export function SettingsPanel({
           <SettingsContributionSection contributions={contributions} locale={settings.locale} destination="resources" />
           <SettingsGroup title={settings.locale === "zh" ? "网页访问" : "Web access"}>
             <SettingRow label={settings.locale === "zh" ? "配置状态" : "Configuration"} detail={ordinaryActions.length ? (settings.locale === "zh" ? `${ordinaryActions.length} 个可用操作` : `${ordinaryActions.length} available actions`) : undefined}><StatusValue status={webAccessStatus} locale={settings.locale} /></SettingRow>
-            <SettingRow label={settings.locale === "zh" ? "运行检查" : "Runtime check"} detail={dockerDiagnostic
-              ? (settings.locale === "zh" ? `上次诊断${dockerDiagnostic.attentionCount ? `发现 ${dockerDiagnostic.attentionCount} 项需要处理` : "未发现需要处理的项目"}` : `Last check found ${dockerDiagnostic.attentionCount ?? 0} item(s) requiring attention`)
-              : (settings.locale === "zh" ? "只读检查，不会启动、停止或修改 Docker" : "Read-only; does not start, stop, or modify Docker")}>
-              <span className="runtime-setting-control"><StatusValue status={diagnosticStatus} locale={settings.locale} /><RuntimeActionButton action={diagnoseAction} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} /></span>
+            <SettingRow label={settings.locale === "zh" ? "运行检查" : "Runtime check"} detail={diagnosticStatus === "checking"
+              ? (settings.locale === "zh" ? "正在读取运行环境" : "Reading the runtime")
+              : dockerPresentation.detail}>
+              <span className="runtime-setting-control"><StatusValue status={diagnosticStatus === "checking" ? diagnosticStatus : dockerPresentation.status} locale={settings.locale} /><RuntimeActionButton action={diagnoseAction} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} /></span>
             </SettingRow>
-            {dockerDiagnostic ? (
-              <>
-                <SettingRow label={settings.locale === "zh" ? "Docker 服务" : "Docker service"}><StatusValue status={dockerDiagnostic.dockerRuntimeStatus} locale={settings.locale} /></SettingRow>
-                <SettingRow label={settings.locale === "zh" ? "网页地址" : "Web address"}><StatusValue status={dockerDiagnostic.browserUrlStatus} locale={settings.locale} /></SettingRow>
-                <SettingRow label={settings.locale === "zh" ? "启动准备" : "Startup preparation"}><StatusValue status={dockerDiagnostic.startupMaintenanceStatus ?? dockerDiagnostic.startupPhase} locale={settings.locale} /></SettingRow>
-              </>
-            ) : null}
-            <SettingRow label={settings.locale === "zh" ? "恢复能力" : "Recovery"}><StatusValue status={projection?.dockerWebui.recoveryStatus} locale={settings.locale} /></SettingRow>
+            {dockerPresentation.issues.length ? <SettingRow label={settings.locale === "zh" ? "需要处理" : "Needs attention"}><span>{dockerPresentation.issues.join(settings.locale === "zh" ? "，" : ", ")}</span></SettingRow> : null}
             {ordinaryActions.length ? (
               <SettingRow label={settings.locale === "zh" ? "可用操作" : "Available actions"}>
                 <span className="runtime-setting-control">{ordinaryActions.map((action) => <RuntimeActionButton key={action.actionId} action={action} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} />)}</span>

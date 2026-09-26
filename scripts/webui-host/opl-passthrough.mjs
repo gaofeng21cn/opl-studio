@@ -1024,6 +1024,38 @@ export function createOplPassthrough({
           stdoutJson
         };
       }
+      if (ref.startsWith("remote_companion_access#")) {
+        return {
+          command: "opl.connect.remote-companion-connector-host",
+          commandArgs: [],
+          exitCode: 0,
+          stderr: "",
+          timedOut: false,
+          stdout: "",
+          stdoutJson: {
+            opl_app_contribution: {
+              surface_kind: "opl_app_package_contribution.v1",
+              package_id: packageId,
+              ref,
+              operation: "read",
+              confirmation_required: false,
+              readiness: { installed: true, physical_status: "available", callability: "disabled" },
+              response: {
+                schema_version: "opl-package-app-contribution-response.v1",
+                ok: true,
+                ref,
+                operation: "read",
+                result: {
+                  schema_version: "opl-app-remote-companion-access.v1",
+                  status: "unavailable",
+                  unavailable_reason: "implementation_in_progress",
+                  actions: []
+                }
+              }
+            }
+          }
+        };
+      }
       const args = [command, "app", "contribution", "read", "--package-id", packageId, "--ref", ref, "--input", JSON.stringify(input), "--json"];
       const result = await run(command, args.slice(1), { cwd, env, timeoutMs: 45_000 });
       return { ...commandReadback(args, result), stdoutJson: jsonValue(result.stdout) };

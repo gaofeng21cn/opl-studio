@@ -82,6 +82,34 @@ test("internal status and package role identifiers are projected as user-facing 
   assert.notEqual(presentation.formatUpdateChannel("private_canary", "zh"), "private_canary");
 });
 
+test("Docker runtime checks collapse quiet probe states into one useful summary", () => {
+  assert.deepEqual(presentation.dockerDiagnosticPresentation(null, "zh"), {
+    status: "not_checked",
+    detail: "尚未运行检查",
+    issues: []
+  });
+  assert.deepEqual(presentation.dockerDiagnosticPresentation({
+    status: "unknown",
+    attentionCount: 0,
+    dockerRuntimeStatus: "not_visible",
+    browserUrlStatus: "initializing",
+    startupMaintenanceStatus: "verification_deferred"
+  }, "zh"), {
+    status: "ready",
+    detail: "检查完成，当前没有需要处理的项目",
+    issues: []
+  });
+  assert.deepEqual(presentation.dockerDiagnosticPresentation({
+    status: "attention",
+    attentionCount: 1,
+    dockerRuntimeStatus: "daemon_unreachable"
+  }, "zh"), {
+    status: "attention_needed",
+    detail: "检查发现 1 项需要处理",
+    issues: ["Docker 服务: 服务未运行"]
+  });
+});
+
 test("managed update policy keeps silent ownership separate from current eligibility", () => {
   assert.equal(presentation.formatUpdatePolicy("controlled_apply", false, "zh"), "自动（静默）");
   assert.equal(presentation.formatUpdatePolicy("projection_only", false, "zh"), "自动（静默）");
