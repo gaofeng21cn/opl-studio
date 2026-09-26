@@ -83,6 +83,34 @@ function ReadStatus({ value, zh }: { value: ReturnType<typeof useRead>; zh: bool
   </>;
 }
 
+function formatBytes(value: unknown, locale: string, fallback: string): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = Math.max(0, value);
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(size)} ${units[unit]}`;
+}
+
+function categoryLabel(category: Record<string, any>, zh: boolean): string {
+  const id = String(category.id ?? '');
+  if (id === 'codex_logs') return zh ? 'Codex 日志' : 'Codex logs';
+  if (id === 'app_logs') return zh ? 'App 日志' : 'App logs';
+  if (id === 'app_cache') return zh ? 'App 缓存' : 'App cache';
+  return id || (zh ? '其他数据' : 'Other data');
+}
+
+function protectedCategoryLabel(category: Record<string, any>, zh: boolean): string {
+  const id = String(category.id ?? '');
+  if (id === 'app_data') return zh ? 'App 数据' : 'App data';
+  if (id === 'runtime_substrate') return zh ? '运行环境' : 'Runtime';
+  if (id === 'codex_home') return zh ? 'Codex Home' : 'Codex Home';
+  return id || (zh ? '受保护数据' : 'Protected data');
+}
+
 export function ScheduledTasksPanel(props: Props) {
   const { client, locale, revision } = props;
   const zh = locale === 'zh';
@@ -156,14 +184,85 @@ export function StorageCleanupPanel(props: Props) {
   const zh = props.locale === 'zh'; const inventory = useRead(props.client, 'inventory', props.revision);
   const [selection, setSelection] = useState<string[]>([]);
   useEffect(() => { setSelection([]); }, [inventory.data]);
-  return <section className="feature-status-panel workbench-services" data-testid="opl-storage-cleanup"><h3>{zh ? '数据与安全清理' : 'Data and safe cleanup'}</h3>
-    <p>{zh ? '只清理由所属服务声明、超过 24 小时未修改的日志和缓存。清理前先预览，确认后按当前文件指纹执行，并返回 receipt；工作区、领域产物、凭据、任务会话和记忆始终保留。' : 'Only owner-declared logs and caches unchanged for more than 24 hours are eligible. Preview first, then confirm against the current file fingerprints; the owner returns a receipt. Workspaces, artifacts, credentials, sessions and memory are always retained.'}</p>
+  const categories = rows(inventory.data?.categories);
+  const protectedCategories = rows(inventory.data?.protectedCategories);
+  const eligibleFiles = categories.flatMap(category => rows(category.files));
+  const selectedBytes = eligibleFiles.filter(file => selection.includes(file.id)).reduce((total, file) => total + (typeof file.bytes === 'number' ? file.bytes : 0), 0);
+  const reclaimableBytes = typeof inventory.data?.reclaimable_bytes === 'number'
+    ? inventory.data.reclaimable_bytes
+    : categories.reduce((total, category) => total + (typeof category.reclaimableBytes === 'number' ? category.reclaimableBytes : 0), 0);
+  const totalBytes = typeof inventory.data?.total_bytes === 'number' ? inventory.data.total_bytes : inventory.data?.totalBytes;
+  const selectedAll = eligibleFiles.length > 0 && selection.length === eligibleFiles.length;
+  const observedAt = typeof inventory.data?.observed_at === 'string' ? new Date(inventory.data.observed_at) : null;
+  const observedLabel = observedAt && !Number.isNaN(observedAt.getTime())
+    ? observedAt.toLocaleString(props.locale)
+    : (zh ? '尚未完成盘点' : 'Not inventoried yet');
+  const selectAll = () => setSelection(selectedAll ? [] : eligibleFiles.map(file => file.id));
+  const clearLabel = selectedBytes > 0
+    ? (zh ? `预览并释放 ${formatBytes(selectedBytes, props.locale, '0 B')}` : `Preview and release ${formatBytes(selectedBytes, props.locale, '0 B')}`)
+    : (zh ? `选择可释放内容（最多 ${formatBytes(reclaimableBytes, props.locale, '0 B')}）` : `Choose reclaimable data (up to ${formatBytes(reclaimableBytes, props.locale, '0 B')})`);
+  return <section className="feature-status-panel workbench-services storage-center" data-testid="opl-storage-cleanup">
+    <div className="storage-center-heading">
+      <div>
+        <h3>{zh ? '释放空间' : 'Release space'}</h3>
+        <p>{zh ? '先看结果，再决定是否执行。当前路径只处理所属服务声明的旧日志和缓存，不触碰对话、项目、凭据、任务会话或记忆。' : 'See the outcome before deciding. This path only handles old owner-declared logs and caches; conversations, projects, credentials, task sessions and memory are untouched.'}</p>
+      </div>
+      <span className="storage-freshness">{zh ? `最近盘点：${observedLabel}` : `Last inventory: ${observedLabel}`}</span>
+    </div>
     <ReadStatus value={inventory} zh={zh} />
-    {rows(inventory.data?.categories).map(category => <article key={category.id}><h4>{category.id} · {category.owner}</h4><p>{zh ? '占用 / 可清理 / 保留' : 'Total / reclaimable / retained'}: {category.bytes} / {category.reclaimableBytes} / {category.retainedBytes ?? Math.max(0, (category.bytes ?? 0) - (category.reclaimableBytes ?? 0))} bytes</p>
-      {!rows(category.files).length && <p>{zh ? '没有可清理文件。' : 'No eligible files.'}</p>}
-      {rows(category.files).map(file => <label key={file.id}><input type="checkbox" checked={selection.includes(file.id)} onChange={e => setSelection(current => e.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} />{file.name} · {file.bytes} bytes</label>)}
-    </article>)}
-    {rows(inventory.data?.protectedCategories).map(category => <p key={category.id}>{category.id} · {category.owner} · {category.bytes === null ? (zh ? '未取得用量' : 'Usage unavailable') : `${category.bytes} bytes`} · {category.truncated ? (zh ? '部分统计' : 'Partial inventory') : category.status} · {zh ? '只读，保留数据' : 'Read only, retained'}</p>)}
-    <Button variant="outline" size="sm" type="button" disabled={props.busy || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '清理选定数据' : 'Clean selected data')}>{zh ? '预览清理范围' : 'Preview cleanup'}</Button>
+
+    <div className="storage-intent-summary" aria-label={zh ? '存储状态摘要' : 'Storage status summary'}>
+      <div className="storage-intent-stat"><span>{zh ? '已确认占用' : 'Confirmed usage'}</span><strong>{formatBytes(totalBytes, props.locale, zh ? '未统计' : 'Not measured')}</strong><small>{zh ? '只包含本次盘点覆盖的数据' : 'Only data covered by this inventory'}</small></div>
+      <div className="storage-intent-stat"><span>{zh ? '现在可释放' : 'Available to release'}</span><strong>{formatBytes(reclaimableBytes, props.locale, '0 B')}</strong><small>{zh ? '超过保留期的日志和缓存' : 'Logs and caches past the retention window'}</small></div>
+      <div className="storage-intent-stat"><span>{zh ? '本次选择' : 'This selection'}</span><strong>{formatBytes(selectedBytes, props.locale, '0 B')}</strong><small>{selectedBytes > 0 ? (zh ? `预计释放后保留 ${formatBytes(Math.max(0, (totalBytes ?? 0) - selectedBytes), props.locale, '未统计')}` : `Expected remaining ${formatBytes(Math.max(0, (totalBytes ?? 0) - selectedBytes), props.locale, 'not measured')}`) : (zh ? '尚未选择' : 'Nothing selected')}</small></div>
+    </div>
+
+    <div className="storage-next-step" role="status">
+      <div>
+        <strong>{selectedBytes > 0 ? (zh ? '下一步：确认释放' : 'Next: confirm release') : (zh ? '建议操作：先选择要释放的内容' : 'Suggested action: choose what to release')}</strong>
+        <p>{selectedBytes > 0
+          ? (zh ? '下一步会先显示详细预览；确认后才会删除。此类清理不可恢复。' : 'The next step shows a detailed preview first; deletion happens only after confirmation. This cleanup cannot be restored.')
+          : (zh ? '默认可以一次选择全部安全候选，也可以展开类别只选其中一部分。' : 'You can select all safe candidates or expand a category and choose only part of it.')}</p>
+      </div>
+      <div className="storage-next-step-actions">
+        <Button variant="outline" size="sm" type="button" disabled={props.busy || !eligibleFiles.length} onClick={selectAll}>{selectedAll ? (zh ? '取消全选' : 'Clear all') : (zh ? '选择全部可释放内容' : 'Select all reclaimable')}</Button>
+        <Button variant="outline" size="sm" type="button" disabled={props.busy || !selection.length || !inventory.data} onClick={() => action(props, 'cleanup', { ids: selection }, zh ? '预览并释放空间' : 'Preview and release space')}>{clearLabel}</Button>
+      </div>
+    </div>
+
+    <section className="storage-intent-section" aria-labelledby="storage-safe-release-title">
+      <h4 id="storage-safe-release-title">{zh ? '可安全释放的内容' : 'Safe to release'}</h4>
+      {categories.length ? categories.map(category => {
+        const files = rows(category.files);
+        const categorySelected = files.filter(file => selection.includes(file.id)).length;
+        const allCategorySelected = files.length > 0 && categorySelected === files.length;
+        return <article key={category.id} className="storage-category-row">
+          <div className="storage-category-header">
+            <label><input type="checkbox" checked={allCategorySelected} disabled={!files.length || props.busy} onChange={event => setSelection(current => event.target.checked
+              ? [...new Set([...current, ...files.map(file => file.id)])]
+              : current.filter(id => !files.some(file => file.id === id)))} /><strong>{categoryLabel(category, zh)}</strong></label>
+            <span>{formatBytes(category.reclaimableBytes, props.locale, '0 B')} {zh ? '可释放' : 'reclaimable'}</span>
+          </div>
+          <p>{zh ? `${category.owner ?? '所属服务'} · 只包含超过保留期且未被当前使用的文件。` : `${category.owner ?? 'Owner service'} · Only files past the retention window and not currently in use.`}</p>
+          <details>
+            <summary>{zh ? `查看明细（已选 ${categorySelected}/${files.length}）` : `View details (${categorySelected}/${files.length} selected)`}</summary>
+            <div className="storage-detail-list">
+              {files.length ? files.map(file => <label key={file.id}><input type="checkbox" checked={selection.includes(file.id)} disabled={props.busy} onChange={event => setSelection(current => event.target.checked ? [...current, file.id] : current.filter(id => id !== file.id))} /><span>{file.name}</span><small>{formatBytes(file.bytes, props.locale, '0 B')}</small></label>) : <p>{zh ? '当前没有符合条件的文件。' : 'No files currently match the criteria.'}</p>}
+            </div>
+          </details>
+        </article>;
+      }) : <p className="storage-muted">{zh ? '当前没有可安全释放的内容。' : 'There is currently nothing safe to release.'}</p>}
+    </section>
+
+    <section className="storage-intent-section" aria-labelledby="storage-organize-title">
+      <h4 id="storage-organize-title">{zh ? '整理我的内容' : 'Organize my content'}</h4>
+      <article className="storage-capability-row"><div><strong>{zh ? '对话、项目与附件' : 'Conversations, projects and attachments'}</strong><p>{zh ? '当前没有可用的归档、导出、恢复或删除 owner 动作。这里的空间不会被“释放空间”操作触碰。' : 'No archive, export, restore or delete owner action is available yet. This data is not touched by the release-space action.'}</p></div><span className="storage-state-neutral">{zh ? '暂不支持整理' : 'Not available yet'}</span></article>
+      <article className="storage-capability-row"><div><strong>{zh ? '网页端数据' : 'Web app data'}</strong><p>{zh ? '当前由部署方决定是否可盘点和处理；App 只显示已确认的状态，不会伪造清理入口。' : 'The deployment owner decides whether this data can be inventoried or managed. The App shows confirmed state only and does not invent a cleanup action.'}</p></div><span className="storage-state-neutral">{zh ? '由部署方管理' : 'Deployment managed'}</span></article>
+    </section>
+
+    <details className="storage-protected"><summary>{zh ? '哪些数据会被保留' : 'What stays protected'}</summary>
+      <p>{zh ? '以下数据不属于本次释放空间范围，仍由各自 owner 管理。' : 'The following data is outside this release-space action and remains managed by its owner.'}</p>
+      {protectedCategories.length ? protectedCategories.map(category => <div key={category.id}><strong>{protectedCategoryLabel(category, zh)}</strong><span>{category.bytes === null || category.bytes === undefined ? (zh ? '未取得用量' : 'Usage unavailable') : formatBytes(category.bytes, props.locale, '0 B')} · {category.truncated ? (zh ? '部分统计' : 'Partial inventory') : (zh ? '保留' : 'Retained')}</span></div>) : <p className="storage-muted">{zh ? '当前没有额外的受保护数据统计。' : 'No additional protected data was reported.'}</p>}
+    </details>
   </section>;
 }
