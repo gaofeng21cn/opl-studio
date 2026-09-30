@@ -207,7 +207,7 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
 
 // DSH uses null for the current conversation and falls back to the "conversation"
 // main-slot key. A non-null id denotes a global panel and clears row selection.
-function useStudioPanelInfo<T>(selector: (info: { activePanelId: string | null }) => T): T {
+function useConversationPanelInfo<T>(selector: (info: { activePanelId: string | null }) => T): T {
   const studio = useStudio();
   return selector({ activePanelId: studio.primaryView === "workspace" ? "workspace" : null });
 }
@@ -305,7 +305,7 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
         <AppFrame
           useStore={(selector: (state: { layoutInfo: typeof panels }) => unknown) => selector({ layoutInfo: panels })}
           useSessions={(selector: (state: typeof sessions) => unknown) => selector(sessions)}
-          usePanelInfo={useStudioPanelInfo}
+          usePanelInfo={useConversationPanelInfo}
           actions={actions}
           renderSlot={renderSlot}
           t={(key: string, params?: Record<string, unknown>) => translate(surface.locale, key, params)}
@@ -358,7 +358,7 @@ function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; wid
         selectPanel={(id: string) => { if (id === "workspace") studio.openPrimaryView("workspace"); }}
         usePanels={useStudioPanels}
         useShortcuts={useStudioShortcuts}
-        usePanelInfo={useStudioPanelInfo}
+        usePanelInfo={useConversationPanelInfo}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
         renderSlot={renderSlot}
       />
@@ -436,7 +436,7 @@ function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandS
   <div className="opl-workspace-browser-seat">
   <WorkspaceBrowser
     wide={wide}
-    usePanelInfo={useStudioPanelInfo}
+    usePanelInfo={useConversationPanelInfo}
     expandSidebar={expandSidebar}
     useSessions={(selector: any) => selector(list)}
     useSessionStatus={(selector: any) => selector(new Map(Object.values(list.byId).filter((session) => session.pendingInteraction).map((session) => [session.id, { pendingInteraction: session.pendingInteraction }])))}
@@ -1207,7 +1207,7 @@ export class OplStudioDshSlotHost {
 
   private registerStaticSlots() {
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
-    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" } } }, OplStudioRoot);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
@@ -1233,7 +1233,7 @@ export class OplStudioDshSlotHost {
     register({ name: "conversation.input.model", registrant: "opl-studio" }, ComposerModelSlot);
     register({ name: "conversation.input.dock", id: "queue", order: 20, registrant: "dsh-ui-conversation" }, QueueDockSlot);
     register({ name: "conversation.hero.agentPreset", registrant: "opl-studio" }, HeroActionsSlot);
-    register({ name: "rightbar", registrant: "opl-studio", children: { "runtime.detail": { kind: "list", scope: "root" } } }, DetailsSlot);
+    register({ name: "rightbar", registrant: "opl-studio" }, DetailsSlot);
     register({ name: "shell.overlay", id: "opl-studio-overlay", order: 0, registrant: "opl-studio" }, ShellOverlaySlot);
   }
 

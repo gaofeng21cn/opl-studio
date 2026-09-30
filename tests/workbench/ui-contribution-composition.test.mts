@@ -332,6 +332,8 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("registers each static list-slot occupant with a stable id", () => {
     const host = new OplStudioDshSlotHost();
+    expect(host.core.entries("root")[0]?.children?.["runtime.detail"]).toEqual({ kind: "list", scope: "root" });
+    expect(host.core.entries("rightbar")[0]?.children?.["runtime.detail"]).toBeUndefined();
     expect(host.core.entries("shell.overlay")).toHaveLength(1);
     expect(host.core.snapshot("shell.overlay")[0]?.occupants[0]?.id).toBe("opl-studio-overlay");
     expect(host.core.entries("conversation.input.dock")).toHaveLength(1);
