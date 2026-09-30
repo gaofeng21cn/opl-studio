@@ -1199,7 +1199,7 @@ export class OplStudioDshSlotHost {
 
   private registerStaticSlots() {
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
-    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" } } }, OplStudioRoot);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist": { kind: "single", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
@@ -1225,7 +1225,7 @@ export class OplStudioDshSlotHost {
     register({ name: "conversation.input.model", registrant: "opl-studio" }, ComposerModelSlot);
     register({ name: "conversation.input.dock", id: "queue", order: 20, registrant: "dsh-ui-conversation" }, QueueDockSlot);
     register({ name: "conversation.hero.agentPreset", registrant: "opl-studio" }, HeroActionsSlot);
-    register({ name: "rightbar", registrant: "opl-studio", children: { "runtime.detail": { kind: "list", scope: "root" } } }, DetailsSlot);
+    register({ name: "rightbar", registrant: "opl-studio" }, DetailsSlot);
     register({ name: "shell.overlay", id: "opl-studio-overlay", order: 0, registrant: "opl-studio" }, ShellOverlaySlot);
   }
 
