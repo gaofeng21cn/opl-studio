@@ -24,8 +24,68 @@ import {
   useHighestSupportedReasoningForUnknown: true
 };
 
-const { normalizeContributionReadback } = await import("../../src/bridge/oplBridge.ts");
+const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../src/bridge/oplBridge.ts");
+
+test("startup recovers a failed owner read into the real contribution projection", async () => {
+  let attempts = 0;
+  const value = await readStartupState(async () => {
+    if (++attempts === 1) return normalizeStateReadback({ readback: { exitCode: 1 } });
+    return normalizeStateReadback({ app_state: { app_state: {
+      ui_contributions: { surface_kind: "opl_app_ui_contributions_projection.v1", entries: [{
+        contribution_key: "sample:inbox", contribution_id: "inbox", package_id: "sample",
+        slot: "runtime.detail", view: { view_id: "inbox", view_type: "list_detail" }
+      }] }
+    } }, readback: { exitCode: 0 } });
+  }, () => true);
+  expect(attempts).toBe(2);
+  expect(readUiContributionsProjection(value).entries).toHaveLength(1);
+});
+
+test("startup owner failures remain visible after three attempts", async () => {
+  let attempts = 0;
+  await expect(readStartupState(async () => {
+    attempts += 1;
+    throw new Error("opl_state_read_timeout");
+  }, () => true)).rejects.toThrow("opl_state_read_timeout");
+  expect(attempts).toBe(3);
+});
+
+test("a newer state refresh cancels the pending startup retry", async () => {
+  let current = true;
+  let attempts = 0;
+  const pending = readStartupState(async () => {
+    attempts += 1;
+    throw new Error("opl_state_read_failed");
+  }, () => current);
+  await Promise.resolve();
+  current = false;
+  expect(await pending).toBeNull();
+  expect(attempts).toBe(1);
+});
+
+test("startup does not retry unrelated validation failures", async () => {
+  let attempts = 0;
+  await expect(readStartupState(async () => {
+    attempts += 1;
+    throw new Error("invalid_projection");
+  }, () => true)).rejects.toThrow("invalid_projection");
+  expect(attempts).toBe(1);
+});
 const { OplStudioDshSlotHost } = await import("../../src/composition/dshSlotHost.tsx");
+const { installWorkspaceClientPlugin } = await import("../../src/composition/workspaceClientPlugin.tsx");
+test("capability workspace installs into DSH main and sidebar panel slots and disposes both", () => {
+  const host = new OplStudioDshSlotHost();
+  const beforeMain = host.core.entries("main").length;
+  const beforeOverlay = host.core.entries("shell.overlay").length;
+  const dispose = installWorkspaceClientPlugin(host.core, () => ({} as never));
+  expect(host.core.snapshot("sidebar.panellist")[0]?.occupants[0]?.id).toBe("workspace");
+  expect(host.core.entries("main").length).toBe(beforeMain + 1);
+  expect(host.core.entries("shell.overlay").length).toBe(beforeOverlay);
+  expect(host.core.entries("sidebar.footer.action")).toHaveLength(0);
+  dispose();
+  expect(host.core.entries("sidebar.panellist")).toHaveLength(0);
+  expect(host.core.entries("main").length).toBe(beforeMain);
+});
 const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../src/composition/contributionComponents.tsx");
 
 test("channel failures explain the reason and recovery action without exposing raw transport errors", () => {
@@ -272,6 +332,8 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("registers each static list-slot occupant with a stable id", () => {
     const host = new OplStudioDshSlotHost();
+    expect(host.core.entries("root")[0]?.children?.["runtime.detail"]).toEqual({ kind: "list", scope: "root" });
+    expect(host.core.entries("rightbar")[0]?.children?.["runtime.detail"]).toBeUndefined();
     expect(host.core.entries("shell.overlay")).toHaveLength(1);
     expect(host.core.snapshot("shell.overlay")[0]?.occupants[0]?.id).toBe("opl-studio-overlay");
     expect(host.core.entries("conversation.input.dock")).toHaveLength(1);

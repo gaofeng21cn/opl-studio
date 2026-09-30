@@ -48,6 +48,12 @@ win:
   extraResources:
     - from: resources/opl-wsl-host
       to: opl-wsl-host
+    # electron-builder excludes the root-level node_modules of an extraResources
+    # directory (app-builder-lib filter.js). Declaring it as its own entry keeps
+    # the guest Host dependency closure inside the packaged payload, matching the
+    # manifest.json inventory that prepare-wsl-host-payload.mjs writes.
+    - from: resources/opl-wsl-host/node_modules
+      to: opl-wsl-host/node_modules
   icon: assets/branding/opl-studio.png
   target:
     - nsis

@@ -48,6 +48,7 @@ is the command owner.
 | `OPL_APP_REPO_ROOT=/absolute/app/root npm run package` | App-contract-driven three-carrier local qualification and exact-commit evidence: Electron `.app`, standalone WebUI archive, Docker smoke receipt, and candidate manifest; requires macOS, Docker, and tracked-clean committed Studio source |
 | `npm run validate:package` | Electron package and three-platform builder configuration structure |
 | `npm run dist:windows` | Unsigned Windows x64 unpacked app, NSIS, and ZIP construction with publishing disabled |
+| `node scripts/validate-desktop-package.mjs --distribution --write-receipt --identity stable --version <version>` | Post-pack byte qualification of the packaged Windows guest Host payload against its packaged manifest, plus the `opl_studio_windows_guest_host_payload_qualification.v1` receipt |
 | `npm run dist:linux` | Unsigned Linux x64 unpacked app and DEB construction with publishing disabled |
 | `npm run qualify:desktop:distribution` | Current-platform native package-set presence and executable-shape checks |
 | `npm run smoke:preview -- --require-codex-turn` | Packaged-identity, Framework readback, Settings/Runtime/inspector UI, Gateway action, and a non-simulated Codex turn proving provider connectivity; a structured `INSUFFICIENT_BALANCE` response passes as `connectivity_confirmed` instead of gating carrier delivery |

@@ -117,6 +117,60 @@ export function validateWslHostPayload(directory, expectedShellRef) {
   return manifest;
 }
 
+// electron-builder drops the *root-level* node_modules of an extraResources
+// directory (app-builder-lib filter.js: `if (relative === "node_modules") return false;`).
+// The packaged tree is therefore a different artifact than the staged source, so
+// the byte inventory must be re-verified against the manifest after packing.
+export function assertPackagedWslHostPayloadBytes(directory) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
+  if (manifest.schema !== 'opl_studio_windows_guest_host.v1' || manifest.platform !== 'linux'
+    || manifest.arch !== 'x64' || manifest.entry !== 'desktop/windows-guest-host.mjs'
+    || !/^[0-9a-f]{40}$/.test(manifest.shell_ref) || !/^[0-9a-f]{64}$/.test(manifest.package_lock_sha256)) {
+    throw new Error('Packaged Windows guest Host manifest is invalid');
+  }
+  const lockDigest = sha256(fs.readFileSync(path.join(directory, 'package-lock.json')));
+  if (lockDigest !== manifest.package_lock_sha256) {
+    throw new Error('Packaged Windows guest Host dependency lock digest mismatch');
+  }
+  if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
+    throw new Error('Packaged Windows guest Host payload inventory is missing');
+  }
+  const actual = payloadFiles(directory);
+  const declaredByPath = new Map(manifest.files.map(entry => [entry.path, entry.sha256]));
+  const actualByPath = new Map(actual.map(entry => [entry.path, entry.sha256]));
+  const missing = manifest.files.filter(entry => !actualByPath.has(entry.path));
+  const extra = actual.filter(entry => !declaredByPath.has(entry.path));
+  const changed = actual.filter(entry => declaredByPath.has(entry.path) && declaredByPath.get(entry.path) !== entry.sha256);
+  if (missing.length > 0 || extra.length > 0 || changed.length > 0
+    || JSON.stringify(manifest.files) !== JSON.stringify(actual)) {
+    const detail = [
+      missing.length > 0 ? `missing ${missing.length} (e.g. ${missing.slice(0, 3).map(entry => entry.path).join(', ')})` : null,
+      extra.length > 0 ? `extra ${extra.length} (e.g. ${extra.slice(0, 3).map(entry => entry.path).join(', ')})` : null,
+      changed.length > 0 ? `changed ${changed.length} (e.g. ${changed.slice(0, 3).map(entry => entry.path).join(', ')})` : null
+    ].filter(Boolean).join('; ');
+    throw new Error(`Packaged Windows guest Host payload bytes differ from the packaged manifest${detail ? `: ${detail}` : ''}`);
+  }
+  return {
+    schema: 'opl_studio_windows_guest_host_payload_qualification.v1',
+    status: 'passed',
+    stage: 'post_pack',
+    subject: 'packaged_windows_guest_host_payload',
+    payload_root_relative: 'resources/opl-wsl-host',
+    manifest_schema: manifest.schema,
+    shell_ref: manifest.shell_ref,
+    node_version: manifest.node_version,
+    framework_ref: manifest.bootstrap.framework_ref,
+    manifest_sha256: sha256(fs.readFileSync(path.join(directory, 'manifest.json'))),
+    package_lock_sha256: lockDigest,
+    declared_file_count: manifest.files.length,
+    actual_file_count: actual.length,
+    missing_file_count: 0,
+    extra_file_count: 0,
+    changed_file_count: 0,
+    symlink_count: 0
+  };
+}
+
 export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot = process.env.OPL_APP_REPO_ROOT,
   frameworkRef = process.env.OPL_STANDARD_PAYLOAD_FRAMEWORK_REF, output = path.join(root, 'resources/opl-wsl-host') } = {}) {
   if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Windows guest Host dependencies must be built and executed on Linux x64');
@@ -160,7 +214,7 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv[2] === '--validate') {
+  if (process.argv[2] === '--validate-packaged' || process.argv[2] === '--validate') {
     process.stdout.write(JSON.stringify(validateWslHostPayload(path.resolve(process.argv[3]), process.env.OPL_SHELL_SOURCE_REF)) + '\n');
   } else {
     process.stdout.write(JSON.stringify(prepareWslHostPayload({ shellRef: process.env.OPL_SHELL_SOURCE_REF })) + '\n');

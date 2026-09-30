@@ -221,6 +221,75 @@ sealed Standard assets and update metadata. For a combined OCI release, follow
 the [publication order](../oci-distribution.md#publication-order) before creating
 the desktop release tag.
 
+## Windows guest Host payload
+
+The Windows Stable carrier ships an App-owned Linux x64 guest Host payload at
+`resources/opl-wsl-host`. It contains the Studio guest Host entry, the DSH plugin
+closure, the production `node_modules` closure, the pinned Node and Codex
+runtime, the Framework installer, and the Official Profile resources. The
+Windows installer projects that directory into the App-owned WSL2 distribution
+and starts the guest Host there; the payload is therefore a release input, not a
+build cache.
+
+`scripts/desktop/prepare-wsl-host-payload.mjs` is the only producer. It stages
+the tracked sources, installs the frozen lock with `npm ci --omit=dev
+--ignore-scripts`, runs `src/host/packed-host-smoke.mjs` on Linux x64, copies the
+tree with materialized symlinks (NTFS extraction must not depend on symlink
+privileges), and writes `manifest.json` — schema
+`opl_studio_windows_guest_host.v1` — while the payload bytes are still on disk.
+
+`electron-builder` omits the *root-level* `node_modules` of an `extraResources`
+directory (`app-builder-lib/out/util/filter.js` rejects `relative ===
+"node_modules"`). `electron-builder.stable.yml` therefore declares the payload
+twice: once for `resources/opl-wsl-host` and once for
+`resources/opl-wsl-host/node_modules`. Both entries are required; a single entry
+produces a package whose bytes no longer match the manifest written before
+packing, and the App fails at startup with `Windows guest Host payload bytes
+differ from the packaged manifest` before it contacts the guest.
+
+Because the packaged tree is a different artifact than the staged tree,
+qualification runs twice: `prepare-wsl-host-payload.mjs --validate` before
+packing, and `scripts/validate-desktop-package.mjs` after packing. The post-pack
+gate re-reads the bytes that actually ship and fails closed on any missing,
+extra, changed, or symlinked entry.
+
+### Post-pack receipt
+
+`node scripts/validate-desktop-package.mjs --distribution --write-receipt
+--identity stable --version <version>` writes
+`out/opl-windows-guest-host-payload-qualification.json` and reports the same
+object as `packagedWslHostPayload` in its stdout summary:
+
+```json
+{
+  "schema": "opl_studio_windows_guest_host_payload_qualification.v1",
+  "status": "passed",
+  "stage": "post_pack",
+  "subject": "packaged_windows_guest_host_payload",
+  "payload_root_relative": "resources/opl-wsl-host",
+  "manifest_schema": "opl_studio_windows_guest_host.v1",
+  "shell_ref": "<40-hex Studio commit>",
+  "node_version": "v<version>",
+  "framework_ref": "<40-hex Framework commit>",
+  "manifest_sha256": "<64-hex>",
+  "package_lock_sha256": "<64-hex>",
+  "declared_file_count": 0,
+  "actual_file_count": 0,
+  "missing_file_count": 0,
+  "extra_file_count": 0,
+  "changed_file_count": 0,
+  "symlink_count": 0,
+  "receipt": "opl-windows-guest-host-payload-qualification.json"
+}
+```
+
+The receipt binds the packaged payload to the exact `shell_ref` and
+`framework_ref` already recorded in `manifest.json`, and to the digests of
+`manifest.json` and `package-lock.json`. It proves the packaged Windows guest
+Host payload matches its packaged manifest byte for byte. It does not prove WSL2
+provisioning, guest bootstrap, Codex execution, App release admission, or
+production readiness; those remain with their owners.
+
 ## Codex CLI version ownership
 
 The macOS Standard and Full App bundles do not embed a second Codex CLI.

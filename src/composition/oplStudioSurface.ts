@@ -13,7 +13,7 @@ export type OplSetupOperationResult = {
 
 export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
 
-export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules";
+export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace";
 export type RenderSettingsContribution = (options?: { only?: string }) => ReactNode;
 
 export type OplStudioSurface = {

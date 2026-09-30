@@ -1,23 +1,26 @@
-.opl-workspace-launcher { display: flex; align-items: center; gap: 8px; background: transparent; color: inherit; border: 0; padding: 8px; min-height: 32px; text-align: left; cursor: pointer; }
-.opl-workspace-backdrop { position: fixed; inset: 0; z-index: 45; padding: 36px; background: rgb(0 0 0 / 18%); display: grid; place-items: center; }
-.opl-workspace-panel { width: min(1180px, 100%); height: min(820px, 100%); display: flex; flex-direction: column; background: var(--opl-bg, #fff); color: var(--opl-text, #202020); border: 1px solid var(--opl-border, #ddd); border-radius: 8px; box-shadow: 0 16px 48px rgb(0 0 0 / 15%); font-size: 13px; line-height: 1.5; overflow: hidden; }
-.opl-workspace-panel > header { display: flex; gap: 12px; align-items: center; min-height: 54px; padding: 10px 16px; border-bottom: 1px solid var(--opl-border, #ddd); }
-.opl-workspace-panel > header > div { display: flex; gap: 8px; align-items: center; }
-.opl-workspace-panel h2 { font-size: 16px; margin: 0; white-space: nowrap; }
-.opl-workspace-panel > header > span { flex: 1; color: var(--opl-muted, #666); font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
-.opl-workspace-panel button, .opl-workspace-form button { border: 1px solid var(--opl-border, #ddd); border-radius: 4px; background: transparent; color: inherit; cursor: pointer; padding: 5px 8px; font: inherit; }
-.opl-workspace-panel > header > button { flex: none; width: 30px; height: 30px; padding: 5px; display: grid; place-items: center; }
-.opl-workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 192px minmax(0, 1fr); }
+.opl-workspace-page { width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--opl-bg, #fff); color: var(--opl-text, #202020); font-size: 13px; line-height: 1.5; overflow: hidden; }
+.opl-workspace-page > header { display: flex; gap: 12px; align-items: center; min-height: 54px; padding: 10px 16px; border-bottom: 1px solid var(--opl-border, #ddd); }
+html[data-opl-host="desktop"] .opl-workspace-page > header { padding-top: 32px; }
+.opl-workspace-page > header > div { display: flex; gap: 8px; align-items: center; }
+.opl-workspace-page h2 { font-size: 16px; margin: 0; white-space: nowrap; }
+.opl-workspace-page > header > span { flex: 1; color: var(--opl-muted, #666); font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.opl-workspace-page button, .opl-workspace-form button { border: 1px solid var(--opl-border, #ddd); border-radius: 4px; background: transparent; color: inherit; cursor: pointer; padding: 5px 8px; font: inherit; }
+.opl-workspace-page > header > button { flex: none; width: 30px; height: 30px; padding: 5px; display: grid; place-items: center; }
+.opl-workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 156px minmax(0, 1fr); }
 .opl-workspace-body > nav { padding: 10px; overflow: auto; border-right: 1px solid var(--opl-border, #ddd); }
-.opl-workspace-body > nav > button { width: 100%; border: 0; text-align: left; margin-bottom: 4px; padding: 8px; overflow-wrap: anywhere; }
-.opl-workspace-body > nav > button[aria-current="page"], .opl-workspace-items button[aria-current="true"] { background: var(--opl-soft, #f0f2f2); }
+.opl-workspace-body > nav h3 { font-size: 11px; font-weight: 500; color: var(--opl-muted, #666); margin: 16px 8px 4px; }
+.opl-workspace-body > nav section:first-child h3 { margin-top: 4px; }
+.opl-workspace-body > nav button { width: 100%; border: 0; text-align: left; margin-bottom: 4px; padding: 8px; overflow-wrap: anywhere; }
+.opl-workspace-body > nav button[aria-current="page"], .opl-workspace-items button[aria-current="true"] { background: var(--opl-soft, #f0f2f2); }
 .opl-workspace-body > nav small { display: block; color: var(--opl-muted, #666); font-size: 11px; }
 .opl-workspace-content { min-width: 0; overflow: auto; padding: 16px 20px; }
 .opl-workspace-content .opl-contribution { padding: 0; border: 0; box-shadow: none; }
 .opl-workspace-content .opl-contribution-title { font-size: 14px; }
 .opl-workspace-content .opl-contribution-result { padding: 0; }
 .opl-workspace-toolbar { display: flex; gap: 12px; align-items: center; padding: 14px 0 10px; }
-.opl-workspace-toolbar label { display: flex; gap: 8px; align-items: center; flex: 1; }
+.opl-workspace-toolbar label { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
+.opl-workspace-toolbar button { display: grid; place-items: center; width: 32px; height: 32px; flex: none; }
+.opl-workspace-toolbar select { max-width: 130px; }
 .opl-workspace-toolbar input { width: 100%; min-width: 0; }
 .opl-workspace-toolbar > span { color: var(--opl-muted, #666); }
 .opl-workspace-collection input:not([type="checkbox"]), .opl-workspace-collection select, .opl-workspace-collection textarea { border: 1px solid var(--opl-border, #ddd); border-radius: 4px; background: var(--opl-bg, #fff); color: inherit; font: inherit; padding: 7px 8px; box-sizing: border-box; }
@@ -46,16 +49,31 @@
 .opl-workspace-form input[type="checkbox"] { width: 16px; height: 16px; }
 .opl-workspace-form footer { justify-content: flex-end; margin-top: 12px; }
 .opl-workspace-empty { color: var(--opl-muted, #666); padding: 24px 0; }
+.opl-workspace-feedback { border-left: 3px solid #28856a; padding: 6px 10px; margin: 10px 0; }
+.opl-workspace-review { margin-bottom: 16px; }
+.opl-workspace-review > p { display: grid; gap: 4px; }
+.opl-workspace-review strong { font-size: 12px; font-weight: 500; color: var(--opl-muted, #666); }
+.opl-workspace-document, .opl-workspace-diff pre { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 4px 8px; }
+.opl-workspace-document { border-left: 2px solid var(--opl-border, #ddd); padding: 10px 12px; line-height: 1.65; }
+.opl-workspace-diff { border: 1px solid var(--opl-border, #ddd); border-radius: 4px; overflow: hidden; }
+.opl-workspace-diff [data-change="added"] { background: #e6f4e9; color: #174e2c; }
+.opl-workspace-diff [data-change="removed"] { background: #fce8e6; color: #762720; }
+.opl-workspace-pagination { display: flex; gap: 12px; align-items: center; justify-content: flex-end; padding: 12px 0; }
+.opl-workspace-pagination button { display: grid; place-items: center; width: 30px; height: 30px; }
+.opl-workspace-items time { display: block; font-size: 11px; color: var(--opl-muted, #666); }
+.opl-workspace-split[data-view-type="timeline"] .opl-workspace-items, .opl-workspace-split[data-view-type="activity_log"] .opl-workspace-items { border-left: 2px solid var(--opl-border, #ddd); }
+.opl-workspace-form [role="alert"] { color: #a33c30; overflow-wrap: anywhere; }
 .opl-voice-input { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
 .opl-voice-input > [role="status"], .opl-voice-input > [role="alert"] { max-width: 240px; font-size: 12px; overflow-wrap: anywhere; }
 @media (max-width: 700px) {
-  .opl-workspace-backdrop { padding: 8px; }
-  .opl-workspace-panel > header { flex-wrap: wrap; gap: 8px; padding: 10px; }
-  .opl-workspace-panel > header > span { order: 5; flex-basis: 100%; }
-  .opl-workspace-panel > header > div { flex: 1; }
+  .opl-workspace-page > header { flex-wrap: wrap; gap: 8px; padding: 10px; }
+  .opl-workspace-page > header > span { order: 5; flex-basis: 100%; }
+  .opl-workspace-page > header > div { flex: 1; }
   .opl-workspace-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .opl-workspace-body > nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--opl-border, #ddd); padding: 6px; gap: 6px; }
-  .opl-workspace-body > nav > button { width: auto; min-width: 112px; flex: none; margin: 0; }
+  .opl-workspace-body > nav section { display: flex; flex: none; gap: 4px; align-items: center; }
+  .opl-workspace-body > nav h3 { margin: 0 4px; white-space: nowrap; }
+  .opl-workspace-body > nav button { width: auto; min-width: 90px; flex: none; margin: 0; }
   .opl-workspace-content { padding: 12px; }
   .opl-workspace-split { grid-template-columns: minmax(0, 1fr); }
   .opl-workspace-items { border-right: 0; padding: 4px 0; border-bottom: 1px solid var(--opl-border, #ddd); max-height: 200px; overflow: auto; }

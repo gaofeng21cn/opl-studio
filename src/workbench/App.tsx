@@ -5,6 +5,7 @@ import { ScheduledTasksPanel } from "./plugins/WorkbenchServicesPanel";
 import { SettingsActionDialog } from "./settings/SettingsActionDialog";
 import { agentAvailabilityDetail } from "./settings/packages";
 import { actionReceiptView, type ActionReceiptView } from "./actionReceiptView";
+import { WorkspaceReviewPreview } from "../composition/workspaceClientPlugin";
 import { resolveDeepLinkDestination } from "./deepLinkNavigation";
 import { SubagentsPanel } from "./SubagentsPanel";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
@@ -40,6 +41,7 @@ import {
 } from "react";
 import {
   createBrowserBridge,
+  readStartupState,
   type CodexAgentSelectionSnapshot,
   type CodexCapabilityCatalog,
   type CodexComposerInput,
@@ -151,7 +153,7 @@ import type {
   RenderOplContributionSlot
 } from "../composition/contributionProjection";
 import { groupSettingsContributions, settingsContributionDestination } from "../composition/contributionProjection";
-import { createOplContributionActionRequest } from "../composition/contributionProjection";
+import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
 import { CodexServerRequestPanel } from "./CodexServerRequestPanel";
@@ -884,7 +886,10 @@ export function App({
     entry: OplUiContribution;
     command: OplUiContributionCommand;
     input: Record<string, unknown>;
+    preview?: Record<string, unknown>;
   } | null>(null);
+  const contributionActionResolver = useRef<((value: import("../composition/contributionProjection").OplContributionActionOutcome) => void) | null>(null);
+  useEffect(() => () => { contributionActionResolver.current?.({status: "cancelled"}); }, []);
   const [settingsActionReceipt, setSettingsActionReceipt] = useState<ActionReceiptView | null>(null);
   const [settingsActionBusyKey, setSettingsActionBusyKey] = useState<string | null>(null);
   const [settingsActionFeedback, setSettingsActionFeedback] = useState<SettingsActionFeedback | null>(null);
@@ -1326,14 +1331,14 @@ export function App({
   }, [bridge]);
 
   const stateReadSequence = useRef(0);
-  function loadState(profile = settings.runtimeProfile) {
+  function loadState(profile = settings.runtimeProfile, recoverStartup = false) {
     const sequence = ++stateReadSequence.current;
     setStateStatus("loading");
     setStateError("");
-    return bridge
-      .readState(profile)
+    const read = () => bridge.readState(profile);
+    return (recoverStartup ? readStartupState(read, () => sequence === stateReadSequence.current) : read())
       .then((state) => {
-        if (sequence !== stateReadSequence.current) return null;
+        if (!state || sequence !== stateReadSequence.current) return null;
         const nextModel = deriveWorkbenchModelFromState(state);
         onHostStateChange?.(state);
         setModel(nextModel);
@@ -2018,7 +2023,7 @@ export function App({
     if (startupLoadKeyRef.current === loadKey) return;
     startupLoadKeyRef.current = loadKey;
     void Promise.all([
-      loadState(settings.runtimeProfile),
+      loadState(settings.runtimeProfile, true),
       loadThreadDirectory(true),
       loadModels(),
       loadCapabilities(true)
@@ -2234,34 +2239,51 @@ export function App({
   ) {
     setContributionActionBusy(true);
     setContributionActionConfirmation(null);
-    setActiveFilesView("results");
-    requestDetails("opl-files-results-panel");
     try {
       const actionRequest = createOplContributionActionRequest(entry, command, confirmed);
       actionRequest.payload.input = input;
       const receipt = await bridge.executeAction(actionRequest);
       setLastDryRun(formatReceipt(contributionReceiptForDisplay(entry, receipt)));
-      if (receipt.status === "executed") {
+      if (receipt.status === "executed" || receipt.status === "no_op") {
+        const outcome = contributionActionOutcome(receipt.stdoutJson, entry, command);
+        if (outcome.status !== "succeeded") return {...outcome, message: settings.locale === "zh" ? "尚未确认操作完成，请刷新核实；输入已保留" : "Completion not confirmed; refresh to inspect. Input retained"};
         await loadState(settings.runtimeProfile);
         setContributionRefreshRevision((revision) => revision + 1);
+        return {status: "succeeded" as const, message: actionReceiptView(receipt).summary};
       }
+      return {status: "failed" as const, retryable: !receipt.timedOut, message: receipt.timedOut ? (settings.locale === "zh" ? "执行结果尚不确定，请刷新核实；不会重复提交" : "Execution outcome is unknown; refresh to inspect, not resend") : receipt.blockedReason || receipt.stderr || (settings.locale === "zh" ? "操作未完成，请核实状态后重试" : "Action not completed; inspect before retrying")};
     } catch (error) {
       setLastDryRun(formatReceipt({
         actionId: "package_contribution_execute",
         dryRun: false,
         error: String(error)
       }));
+      return {status: "failed" as const, retryable: false, message: settings.locale === "zh" ? "未收到执行结果，请刷新核实；输入已保留" : "No execution result; refresh to inspect. Input retained"};
     } finally {
       setContributionActionBusy(false);
     }
   }
-  const handleContributionAction: OplContributionAction = (entry, command, input = {}) => {
-    if (!contributionActionAvailable) return;
+  function cancelContributionAction() {
+    contributionActionResolver.current?.({status: "cancelled", message: settings.locale === "zh" ? "已取消，输入已保留" : "Cancelled; input retained"});
+    contributionActionResolver.current = null;
+    setContributionActionConfirmation(null);
+  }
+  async function confirmContributionAction() {
+    const pending = contributionActionConfirmation;
+    if (!pending || contributionActionBusy) return;
+    const resolve = contributionActionResolver.current;
+    contributionActionResolver.current = null;
+    resolve?.(await executeContributionAction(pending.entry, pending.command, true, pending.input));
+  }
+  const handleContributionAction: OplContributionAction = (entry, command, input = {}, preview) => {
+    if (!contributionActionAvailable || contributionActionResolver.current) return Promise.resolve({status: "failed", message: settings.locale === "zh" ? "其他操作仍在处理，请稍后重试" : "Another action is in progress"});
     if (command.confirmationRequired) {
-      setContributionActionConfirmation({ entry, command, input });
-      return;
+      return new Promise(resolve => {
+        contributionActionResolver.current = resolve;
+        setContributionActionConfirmation({ entry, command, input, preview });
+      });
     }
-    void executeContributionAction(entry, command, false, input);
+    return executeContributionAction(entry, command, false, input);
   };
   const readContributionData = useCallback((entry: OplUiContributionsProjection["entries"][number], input: Record<string, unknown> = {}) => {
     if (!entry.view) return Promise.reject(new Error("Contribution view is unavailable"));
@@ -3344,7 +3366,7 @@ export function App({
     setupCapabilities,
     chooseWorkspaceRoot,
     installCodex,
-    overlay: <><SettingsActionDialog settings={settings} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={() => setSettingsActionConfirmation(null)} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={() => setContributionActionConfirmation(null)} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={() => setContributionActionConfirmation(null)}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => { const pending = contributionActionConfirmation; if (pending) void executeContributionAction(pending.entry, pending.command, true, pending.input); }}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>} /></>,
+    overlay: <><SettingsActionDialog settings={settings} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={() => setSettingsActionConfirmation(null)} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={cancelContributionAction} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={cancelContributionAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => void confirmContributionAction()}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>}>{contributionActionConfirmation ? <><h3>{contributionLabel(contributionActionConfirmation.command.label, settings.locale, contributionActionConfirmation.command.commandId)}</h3><WorkspaceReviewPreview value={{...contributionActionConfirmation.preview, ...contributionActionConfirmation.input}} zh={settings.locale === "zh"}/></> : null}</Modal></>,
     detailsRequestRevision,
     startSession: startNewChat,
     startSessionInProject: startNewChatInProject,

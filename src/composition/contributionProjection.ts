@@ -144,11 +144,13 @@ export const emptyUiContributionsProjection: OplUiContributionsProjection = {
   entries: []
 };
 
+export type OplContributionActionOutcome = { status: "succeeded" | "cancelled" | "failed" | "pending"; message?: string; retryable?: boolean };
 export type OplContributionAction = (
   entry: OplUiContribution,
   command: OplUiContributionCommand,
-  input?: OplContributionInput
-) => void;
+  input?: OplContributionInput,
+  preview?: Record<string, unknown>
+) => void | Promise<OplContributionActionOutcome>;
 export type OplContributionActionRequest = {
   actionId: "package_contribution_execute";
   payload: {
@@ -216,6 +218,27 @@ export function createOplContributionActionRequest(
     },
     dryRun: false
   };
+}
+
+export function contributionActionOutcome(
+  value: unknown, entry: OplUiContribution, command: OplUiContributionCommand
+): OplContributionActionOutcome {
+  const root = asRecord(value);
+  const execution = asRecord(root?.app_action_execution);
+  const result = execution ? asRecord(execution.result) : root;
+  const envelope = asRecord(result?.opl_app_contribution);
+  const response = asRecord(envelope?.response);
+  if ((execution && (execution.action_id !== "package_contribution_execute" || execution.dry_run !== false))
+    || envelope?.surface_kind !== "opl_app_package_contribution.v1" || envelope.package_id !== entry.packageId
+    || envelope.ref !== command.actionRef || envelope.operation !== "execute"
+    || response?.schema_version !== "opl-package-app-contribution-response.v1" || response.ref !== command.actionRef
+    || response.operation !== "execute" || response.ok !== true || !asRecord(response.result)) {
+    return {status: "failed", retryable: false};
+  }
+  const ownerResult = asRecord(response.result)!;
+  if (["queued", "running", "pending", "unknown"].includes(String(ownerResult.execution_status))) return {status: "pending", retryable: false};
+  if (ownerResult.ok === false || ["error", "failed", "unsupported", "blocked"].includes(String(ownerResult.status))) return {status: "failed"};
+  return {status: "succeeded"};
 }
 
 export const OPL_REMOTE_COMPANION_ACCESS_SCHEMA_VERSION = "opl-app-remote-companion-access.v1" as const;

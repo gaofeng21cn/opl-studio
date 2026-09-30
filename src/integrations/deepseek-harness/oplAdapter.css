@@ -32,6 +32,8 @@ body {
   padding-top: 18px;
 }
 
+.opl-dsh-sidebar-shell[data-narrow-expanded] > div { position: relative; z-index: 3; }
+
 html[data-opl-host="desktop"] .opl-studio-dsh-root::before {
   content: "";
   position: fixed;

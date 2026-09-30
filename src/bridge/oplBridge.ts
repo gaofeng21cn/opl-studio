@@ -1481,6 +1481,23 @@ export function normalizeStateReadback(value: unknown, profile = readRuntimeProf
   };
 }
 
+// Cold desktop startup can race the Framework bootstrap. Recover only owner
+// reads, with a fixed limit; a newer read cancels the old startup retry.
+export async function readStartupState<T>(read: () => Promise<T>, isCurrent: () => boolean): Promise<T | null> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!isCurrent()) return null;
+    try {
+      return await read();
+    } catch (error) {
+      if (!isCurrent()) return null;
+      if (attempt === 2 || !(error instanceof Error)
+        || !["opl_state_read_failed", "opl_state_read_timeout"].includes(error.message)) throw error;
+      await new Promise<void>(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+    }
+  }
+  return null;
+}
+
 export function normalizeFullDrilldownReadback(value: unknown): OplFullDrilldownReadback {
   const fallback = defaultFullDrilldown();
   const commandReadback = normalizeCommandReadback(

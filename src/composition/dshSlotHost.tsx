@@ -47,6 +47,7 @@ import {
 import type { OplAgentPermission, OplStudioSurface } from "./oplStudioSurface";
 import { useComposerEditor } from "../integrations/deepseek-harness/useComposerEditor";
 import { installWorkspaceClientPlugin } from "./workspaceClientPlugin";
+import { workspaceEntries } from "./workspaceViewModel";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -59,6 +60,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "sidebar.workspaces": { kind: "single"; scope: "root"; owner: { wide: boolean; expandSidebar(): void } };
     "sidebar.settings": { kind: "single"; scope: "root"; owner: { wide: boolean } };
     "sidebar.footer.action": { kind: "list"; scope: "root"; owner: { wide: boolean } };
+    "sidebar.panellist": { kind: "list"; scope: "root"; owner: { size: number; active: boolean } };
     "conversation.session.header": { kind: "single"; scope: "root"; owner: object };
     "conversation.session": { kind: "single"; scope: "root"; owner: object };
     "conversation.composer.bar": { kind: "single"; scope: "root"; owner: Record<string, unknown> };
@@ -177,6 +179,7 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
   const copy: Record<string, [string, string]> = {
     "session.new.label": ["新建任务", "New task"], "session.new": ["新建任务", "New task"],
     "toggle.open": ["展开侧栏", "Expand sidebar"], "toggle.collapse": ["收起侧栏", "Collapse sidebar"],
+    "panels.label": ["主页面", "App pages"],
     "hero.headline": ["One Person Lab", "One Person Lab"], "hero.preview": ["", ""],
     "hero.chooseWorkspace": ["选择工作区", "Choose workspace"], "placeholder.workspace": ["先选择工作区", "Choose a workspace first"],
     "placeholder.hero": ["向 OPL 描述你的目标", "Describe your goal to OPL"], "placeholder.default": ["向 OPL 描述你的目标", "Describe your goal to OPL"],
@@ -204,13 +207,16 @@ function translate(locale: "zh" | "en", key: string, params?: Record<string, unk
 
 // DSH uses null for the current conversation and falls back to the "conversation"
 // main-slot key. A non-null id denotes a global panel and clears row selection.
-const studioPanelInfo: { readonly activePanelId: null } = { activePanelId: null };
-const useConversationPanelInfo = (selector: (info: typeof studioPanelInfo) => unknown) => selector(studioPanelInfo);
-// Studio exposes no global main panels, so the sidebar panel list stays empty
-// and its selection entry point is inert; the conversation is the only panel.
-const studioPanels: readonly { id: string; order: number; label: string }[] = [];
-const useStudioPanels = (selector: (panels: typeof studioPanels) => unknown) => selector(studioPanels);
-const selectStudioPanel = () => undefined;
+function useConversationPanelInfo<T>(selector: (info: { activePanelId: string | null }) => T): T {
+  const studio = useStudio();
+  return selector({ activePanelId: studio.primaryView === "workspace" ? "workspace" : null });
+}
+function useStudioPanels<T>(selector: (panels: readonly { id: string; order: number; label: string }[]) => T): T {
+  const studio = useStudio();
+  return selector(workspaceEntries(studio.uiContributions.entries).length ? [{
+    id: "workspace", order: 10, label: studio.locale === "zh" ? "能力工作台" : "Capability workspace"
+  }] : []);
+}
 // Plain Enter queues while the agent is busy; the accelerated chord steers.
 const studioBusyEnter = "queue" as const;
 const useStudioBusyEnter = (selector: (behavior: typeof studioBusyEnter) => unknown) => selector(studioBusyEnter);
@@ -247,7 +253,8 @@ function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; rende
     narrow: panels.narrow,
     detailsOpen: inspectorOpen,
     openPrimaryView: (view: OplStudioSurface["primaryView"]) => {
-      if (view === "runtime") actions.closeDetails();
+      if (view !== "conversation") actions.closeDetails();
+      setPanels(current => current.narrowExpanded ? {...current, narrowExpanded: false} : current);
       surface.openPrimaryView(view);
     },
     toggleSidebar: actions.toggleSidebar,
@@ -342,13 +349,13 @@ function OplStudioRoot({
 function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; width: number; renderSlot: any }) {
   const studio = useStudio();
   return (
-    <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined}>
+    <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined} data-narrow-expanded={studio.narrow && !collapsed || undefined}>
       <SidebarRoot
         collapsed={collapsed}
         width={width}
         startSession={studio.startSession}
         toggleSidebar={studio.toggleSidebar}
-        selectPanel={selectStudioPanel}
+        selectPanel={(id: string) => { if (id === "workspace") studio.openPrimaryView("workspace"); }}
         usePanels={useStudioPanels}
         useShortcuts={useStudioShortcuts}
         usePanelInfo={useConversationPanelInfo}
@@ -1200,8 +1207,8 @@ export class OplStudioDshSlotHost {
 
   private registerStaticSlots() {
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
-    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" } } }, OplStudioRoot);
-    register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist": { kind: "single", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
+    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
     register({ name: "sidebar.workspaces", registrant: "opl-studio" }, SidebarWorkspacesSlot);
@@ -1226,7 +1233,7 @@ export class OplStudioDshSlotHost {
     register({ name: "conversation.input.model", registrant: "opl-studio" }, ComposerModelSlot);
     register({ name: "conversation.input.dock", id: "queue", order: 20, registrant: "dsh-ui-conversation" }, QueueDockSlot);
     register({ name: "conversation.hero.agentPreset", registrant: "opl-studio" }, HeroActionsSlot);
-    register({ name: "rightbar", registrant: "opl-studio", children: { "runtime.detail": { kind: "list", scope: "root" } } }, DetailsSlot);
+    register({ name: "rightbar", registrant: "opl-studio" }, DetailsSlot);
     register({ name: "shell.overlay", id: "opl-studio-overlay", order: 0, registrant: "opl-studio" }, ShellOverlaySlot);
   }
 
