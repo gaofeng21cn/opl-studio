@@ -428,14 +428,6 @@ async function createDesktopHost(appLogDirectory) {
       } catch (error) {
         activationStatus = error.code ?? "failed";
       }
-      try {
-        const startup = await core.opl.runStartupMaintenance();
-        const temporal = startup.system_action?.details?.temporal_runtime_reconcile;
-        console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status,
-          temporalStatus: temporal?.status, failedStep: temporal?.failed_step }));
-      } catch (error) {
-        console.warn("[OPL:startup] " + JSON.stringify({ status: error.code ?? "failed" }));
-      }
     }
     core.updateMaintenance = createManagedUpdateMaintenance({
       opl: core.opl,
@@ -449,6 +441,16 @@ async function createDesktopHost(appLogDirectory) {
     await core.updateMaintenance.start();
   } else if (updater.snapshot().supported && !updaterQualificationEnabled) {
     void updater.perform("check").catch(() => undefined);
+  }
+  if (windowsRuntime && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1") {
+    try {
+      const startup = await core.opl.runStartupMaintenance();
+      const temporal = startup.system_action?.details?.temporal_runtime_reconcile;
+      console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status,
+        temporalStatus: temporal?.status, failedStep: temporal?.failed_step }));
+    } catch (error) {
+      console.warn("[OPL:startup] " + JSON.stringify({ status: error.code ?? "failed" }));
+    }
   }
   return { core, desktopUpdater: updater };
 }
