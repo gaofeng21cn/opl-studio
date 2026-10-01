@@ -12,7 +12,7 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
   if (source?.schema !== "opl_app_branded_deep_link.v1" || source.scheme !== PROTOCOL_SCHEME
     || JSON.stringify(source.accepted_schemes) !== '["opl"]'
     || JSON.stringify(source.allowed_actions) !== '["navigate"]'
-    || source.action_authority !== "url_hostname_only_with_empty_or_root_path"
+    || !["url_hostname_only_with_empty_path", "url_hostname_only_with_empty_or_root_path"].includes(source.action_authority)
     || source.route_registry?.match_policy !== "exact_path_only_no_query_hash_or_dynamic_segments") {
     throw new Error("Invalid App branded deep-link policy");
   }
