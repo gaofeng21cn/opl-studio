@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import { verifyGuestPayloadFiles } from "./windows-guest-proxy.mjs";
-import { validateWindowsRuntimeIdentity } from "./windows-runtime.mjs";
+import { validateWindowsRuntimeIdentity, windowsBootstrapCohortDigest } from "./windows-runtime.mjs";
 
 const fail = (code, restartRequired = false) => Object.assign(new Error(`OPL Windows setup requires attention (${code}).`), { code, restartRequired });
 const decode = chunks => {
@@ -77,7 +77,8 @@ export function createWindowsProvisioner({ userDataPath, resourcesPath, env = pr
       const identity = validateWindowsRuntimeIdentity(JSON.parse(inspected.stdout));
       const receiptRoot = path.join(userDataPath, "installer", "receipts"); fs.mkdirSync(receiptRoot, { recursive: true });
       const target = path.join(receiptRoot, "windows-wsl2-ready.json");
-      const bytes = JSON.stringify({ schema: "opl_windows_wsl2_provisioning_receipt.v1", status: "ready", observed_at: new Date().toISOString(), distribution: "OPL-Linux", identity }) + "\n";
+      const bytes = JSON.stringify({ schema: "opl_windows_wsl2_provisioning_receipt.v1", status: "ready", observed_at: new Date().toISOString(), distribution: "OPL-Linux",
+        bootstrap_cohort_sha256: windowsBootstrapCohortDigest(manifest.bootstrap), identity }) + "\n";
       fs.writeFileSync(`${target}.pending`, bytes, { mode: 0o600 }); fs.renameSync(`${target}.pending`, target);
       fs.writeFileSync(`${target}.sha256`, crypto.createHash("sha256").update(bytes).digest("hex") + "  windows-wsl2-ready.json\n");
       onProgress({ stage: "ready" });

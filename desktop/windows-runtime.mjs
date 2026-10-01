@@ -34,7 +34,12 @@ export function validateWindowsRuntimeIdentity(value) {
   return value;
 }
 
-export function readWindowsRuntimeReceipt(userDataPath, readFile = fs.readFileSync) {
+export function windowsBootstrapCohortDigest(bootstrap) {
+  if (!record(bootstrap) || !/^[0-9a-f]{40}$/.test(bootstrap.framework_ref)) throw error("wsl_bootstrap_payload_unavailable");
+  return crypto.createHash("sha256").update(JSON.stringify(bootstrap)).digest("hex");
+}
+
+function readWindowsProvisioningReceipt(userDataPath, readFile) {
   const file = path.join(userDataPath, "installer", "receipts", "windows-wsl2-ready.json");
   try {
     const bytes = readFile(file);
@@ -43,11 +48,16 @@ export function readWindowsRuntimeReceipt(userDataPath, readFile = fs.readFileSy
     const receipt = JSON.parse(String(bytes));
     if (receipt.schema !== "opl_windows_wsl2_provisioning_receipt.v1" || receipt.status !== "ready"
       || receipt.distribution !== DISTRIBUTION) throw error("wsl_receipt_invalid");
-    return validateWindowsRuntimeIdentity(receipt.identity);
+    validateWindowsRuntimeIdentity(receipt.identity);
+    return receipt;
   } catch (cause) {
     if (String(cause.code ?? "").startsWith("wsl_")) throw cause;
     throw error("wsl_existing_install_receipt_unavailable");
   }
+}
+
+export function readWindowsRuntimeReceipt(userDataPath, readFile = fs.readFileSync) {
+  return readWindowsProvisioningReceipt(userDataPath, readFile).identity;
 }
 
 function decode(buffer) {
@@ -120,11 +130,15 @@ export function createWindowsRuntime({ userDataPath, env = process.env, spawnImp
     async ensureReady() {
       readyPromise ??= (async () => {
         let receipt;
-        try { receipt = readWindowsRuntimeReceipt(userDataPath, readFile); }
+        let retained;
+        const prepare = async () => {
+          const factory = provisioner ?? (await import("./windows-provisioning.mjs")).createWindowsProvisioner;
+          return factory({ userDataPath, resourcesPath, env, spawnImpl, platform, resumeExecutable, onProgress }).ensureReady();
+        };
+        try { retained = readWindowsProvisioningReceipt(userDataPath, readFile); receipt = retained.identity; }
         catch (cause) {
           if (cause.code !== "wsl_existing_install_receipt_unavailable" || !resourcesPath) throw cause;
-          const factory = provisioner ?? (await import("./windows-provisioning.mjs")).createWindowsProvisioner;
-          receipt = await factory({ userDataPath, resourcesPath, env, spawnImpl, platform, resumeExecutable, onProgress }).ensureReady();
+          receipt = await prepare();
         }
         const inspection = receipt.schema === "opl_studio_linux_runtime_inspection.v1"
           ? ["/usr/local/bin/node", "/opt/opl/studio-bootstrap/inspect.mjs", "--json"]
@@ -136,6 +150,16 @@ export function createWindowsRuntime({ userDataPath, env = process.env, spawnImp
         catch (cause) { if (cause.code) throw cause; throw error("wsl_inspection_invalid"); }
         if (fresh.guest_install_id !== receipt.guest_install_id
           || fresh.distribution_generation !== receipt.distribution_generation) throw error("wsl_foreign_distribution");
+        if (retained && resourcesPath) {
+          const manifest = JSON.parse(String(readFile(path.join(resourcesPath, "opl-wsl-host", "manifest.json"))));
+          if (retained.bootstrap_cohort_sha256 !== windowsBootstrapCohortDigest(manifest.bootstrap)) {
+            if (fresh.active_operation_count > 0) throw error("wsl_runtime_upgrade_busy");
+            const repaired = validateWindowsRuntimeIdentity(await prepare());
+            if (repaired.guest_install_id !== fresh.guest_install_id
+              || repaired.distribution_generation !== fresh.distribution_generation) throw error("wsl_foreign_distribution");
+            fresh = repaired;
+          }
+        }
         identity = fresh;
         return { status: "available", identity, workspaceRoot: identity.workspace_root };
       })();
