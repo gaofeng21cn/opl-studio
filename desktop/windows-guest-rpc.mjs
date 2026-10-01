@@ -46,7 +46,7 @@ export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, t
   input.once("error", close);
   return {
     events, close,
-    emit(value) { write({ type: "event", value }); },
+    emit(value) { if (!closed) write({ type: "event", value }); },
     request(method, payload = {}) {
       return new Promise((resolve, reject) => {
         const id = ++serial;

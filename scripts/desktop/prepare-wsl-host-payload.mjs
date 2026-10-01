@@ -106,7 +106,7 @@ export function validateWslHostPayload(directory, expectedShellRef) {
     throw new Error('Windows guest Host first-install bootstrap identity is missing');
   }
   for (const relative of ['package.json', 'package-lock.json', manifest.entry, 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs',
-    'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
+    'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
     'runtime/node/lib/node_modules/npm/bin/npm-cli.js', bootstrap.codex.path, bootstrap.framework_installer,
     'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
     'resources/opl-official-profile/official-profile-package-apply.ts', 'node_modules/@deepseek-ai/cordis/package.json']) {
@@ -186,7 +186,7 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
   try {
     buildDshPlugins();
     const bootstrap = prepareBootstrapRuntime(staging, appRoot, frameworkRef);
-    for (const relative of ['package.json', 'package-lock.json', 'plugins', 'src/host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
+    for (const relative of ['package.json', 'package-lock.json', 'plugins', 'src/host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-guest-stage.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
       const destination = path.join(staging, relative);
       fs.mkdirSync(path.dirname(destination), { recursive: true });
       fs.cpSync(path.join(root, relative), destination, { recursive: true, dereference: true,
@@ -205,6 +205,13 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
     // NTFS resource extraction must not depend on symlink creation privileges.
     fs.mkdirSync(path.dirname(output), { recursive: true });
     copyMaterializedTree(staging, output, fs.realpathSync(staging));
+    // Transfer the Host closure across the mounted Windows drive as one file;
+    // managed Node/Codex have their own bootstrap activation and stay outside it.
+    const hostFiles = payloadFiles(output).filter(item => !item.path.startsWith('runtime/')).map(item => item.path);
+    const list = path.join(staging, 'guest-host-files');
+    fs.writeFileSync(list, hostFiles.join('\0') + '\0');
+    const archive = spawnSync('tar', ['-czf', path.join(output, 'guest-host.tar.gz'), '--null', '-T', list], { cwd: output, encoding: 'utf8' });
+    if (archive.status !== 0) throw new Error(`Windows guest Host archive failed: ${archive.stderr || archive.error?.message}`);
     fs.writeFileSync(path.join(output, 'manifest.json'), JSON.stringify({
       schema: 'opl_studio_windows_guest_host.v1', platform: 'linux', arch: 'x64',
       entry: 'desktop/windows-guest-host.mjs', shell_ref: shellRef,

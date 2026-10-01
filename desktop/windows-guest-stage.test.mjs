@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { PassThrough } from 'node:stream';
+import { stageWindowsGuestHost } from './windows-guest-stage.mjs';
+import { createGuestRpc } from './windows-guest-rpc.mjs';
+const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+test('guest Host staging verifies the transferred closure, cache reuse, and tamper rejection', context => {
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'opl-stage-test-'));
+ context.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const source=path.join(root,'source'),cache=path.join(root,'cache');fs.mkdirSync(path.join(source,'desktop'),{recursive:true});
+ const entry='desktop/windows-guest-host.mjs';fs.writeFileSync(path.join(source,entry),'export const fixture = true;');
+ assert.equal(spawnSync('tar',['-czf','guest-host.tar.gz',entry],{cwd:source}).status,0);
+ const files=[entry,'guest-host.tar.gz'].map(name=>({path:name,sha256:sha(fs.readFileSync(path.join(source,name)))}));
+ const manifest=JSON.stringify({schema:'opl_studio_windows_guest_host.v1',entry,files});fs.writeFileSync(path.join(source,'manifest.json'),manifest);
+ const digest=sha(manifest),first=stageWindowsGuestHost(source,digest,cache);
+ assert.equal(first.reused,false);assert.equal(stageWindowsGuestHost(source,digest,cache).reused,true);
+ fs.writeFileSync(first.entry,'tampered');assert.throws(()=>stageWindowsGuestHost(source,digest,cache),/byte mismatch/);
+ fs.rmSync(cache,{recursive:true});fs.appendFileSync(path.join(source,'guest-host.tar.gz'),'tampered');assert.throws(()=>stageWindowsGuestHost(source,digest,cache),/archive digest mismatch/);
+ assert.throws(()=>stageWindowsGuestHost(source,'0'.repeat(64),cache),/manifest digest mismatch/);
+});
+test('guest shutdown discards late Codex events and rejects new requests', async () => {
+ const input=new PassThrough(),output=new PassThrough();let written='';output.on('data',b=>written+=b);
+ const rpc=createGuestRpc({input,output,onRequest:async()=>({})});rpc.close();
+ assert.doesNotThrow(()=>rpc.emit({method:'host/availability',params:{available:false}}));
+ assert.equal(written,'');await assert.rejects(rpc.request('invoke'),{code:'guest_host_closed'});
+});

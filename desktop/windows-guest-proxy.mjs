@@ -37,14 +37,16 @@ export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, us
   readFile = fs.readFileSync, verifyPayload = verifyGuestPayloadFiles } = {}) {
   const runtime = await windowsRuntime.ensureReady();
   const hostRoot = path.join(resourcesPath, "opl-wsl-host");
-  const manifest = JSON.parse(readFile(path.join(hostRoot, "manifest.json"), "utf8"));
+  const manifestBytes = readFile(path.join(hostRoot, "manifest.json"), "utf8");
+  const manifest = JSON.parse(manifestBytes);
   if (manifest.schema !== "opl_studio_windows_guest_host.v1" || manifest.platform !== "linux" || manifest.arch !== "x64"
     || manifest.entry !== "desktop/windows-guest-host.mjs" || !/^[0-9a-f]{40}$/.test(manifest.shell_ref)
     || !/^[0-9a-f]{64}$/.test(manifest.package_lock_sha256)) throw new Error("Packaged Windows guest Host manifest is invalid");
   verifyPayload(hostRoot, manifest);
   const guestRoot = await windowsRuntime.projectHostPath(hostRoot);
   const guestDataRoot = await windowsRuntime.projectHostPath(userDataPath);
-  const child = windowsRuntime.spawnGuestHost(`${guestRoot}/desktop/windows-guest-host.mjs`, { env });
+  const entry = await windowsRuntime.stageGuestHost(guestRoot, crypto.createHash("sha256").update(manifestBytes).digest("hex"));
+  const child = windowsRuntime.spawnGuestHost(entry, { env });
   const core = new EventEmitter();
   let closing;
   let capabilities, codexCapabilities;

@@ -47,7 +47,8 @@ function fixture() {
     } }),
     projectHostPath: async target => `/mnt/c/${target.replaceAll("\\", "/").replace(/^C:\//, "")}`,
     projectGuestPath: async target => `\\\\wsl.localhost\\OPL-Linux${target.replaceAll("/", "\\")}`,
-    spawnGuestHost: entry => { assert.match(entry, /\/opl-wsl-host\/desktop\/windows-guest-host\.mjs$/); return child; },
+    stageGuestHost: async (_source, digest) => `/home/opl/.opl/studio-host/${digest}/opl-wsl-host/desktop/windows-guest-host.mjs`,
+    spawnGuestHost: entry => { assert.match(entry, /^\/home\/opl\/\.opl\/studio-host\/[0-9a-f]{64}\/opl-wsl-host\/desktop\/windows-guest-host\.mjs$/); return child; },
     close: async () => { child.emit("close", 0); }
   };
   const proxy = () => createWindowsGuestHost({ windowsRuntime: runtime, resourcesPath: "C:\\App\\resources", userDataPath: "C:\\UserData",

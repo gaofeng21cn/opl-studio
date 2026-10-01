@@ -155,9 +155,23 @@ export function createWindowsRuntime({ userDataPath, env = process.env, spawnImp
       if (result.exitCode !== 0 || !path.win32.isAbsolute(projected) || /[\r\n\0]/.test(projected)) throw error("wsl_path_projection_failed");
       return projected;
     },
+    async stageGuestHost(source, manifestDigest) {
+      if (!identity || closing || typeof source !== "string" || !/^\/mnt\/.*\/opl-wsl-host$/.test(source)
+        || /[\r\n\0]/.test(source) || !/^[0-9a-f]{64}$/.test(manifestDigest)) throw error("wsl_guest_host_entry_invalid");
+      onProgress?.({ stage: "initializing_guest", elapsedSeconds: 0 });
+      const started = Date.now();
+      const progress = setInterval(() => onProgress?.({ stage: "initializing_guest", elapsedSeconds: Math.floor((Date.now() - started) / 1000), heartbeat: true }), 15000);
+      try {
+        const result = await collected(guestArgs(["/usr/local/bin/node", `${source}/desktop/windows-guest-stage.mjs`, source, manifestDigest]), { timeout: 1200000 });
+        if (result.exitCode !== 0) throw error("wsl_guest_host_stage_failed");
+        const staged = JSON.parse(result.stdout);
+        if (staged.entry !== `/home/opl/.opl/studio-host/${manifestDigest}/opl-wsl-host/desktop/windows-guest-host.mjs`) throw error("wsl_guest_host_entry_invalid");
+        return staged.entry;
+      } finally { clearInterval(progress); }
+    },
     spawnGuestHost(entry, options = {}) {
-      if (!identity || closing || typeof entry !== "string" || !entry.startsWith("/mnt/")
-        || !entry.endsWith("/opl-wsl-host/desktop/windows-guest-host.mjs") || /[\r\n\0]/.test(entry)) throw error("wsl_guest_host_entry_invalid");
+      if (!identity || closing || typeof entry !== "string"
+        || !/^\/home\/opl\/\.opl\/studio-host\/[0-9a-f]{64}\/opl-wsl-host\/desktop\/windows-guest-host\.mjs$/.test(entry)) throw error("wsl_guest_host_entry_invalid");
       // The fixed App-owned entry runs on the existing verified managed Node.
       // Agent and Framework calls remain guest-local public owner interfaces.
       const child = spawnImpl(executable, guestArgs(["/usr/bin/env", "HOME=/home/opl", "CODEX_HOME=/home/opl/.codex",
