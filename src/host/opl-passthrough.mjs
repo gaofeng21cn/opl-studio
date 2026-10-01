@@ -905,7 +905,7 @@ export function createOplPassthrough({
       if (env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1") {
         throw Object.assign(new Error("Startup maintenance is disabled in read-only mode"), { code: "blocked_read_only" });
       }
-      const result = await run(command, ["system", "startup-maintenance", "--scope", "runtime_substrate", "--json"], {
+      const result = await run(command, ["system", "startup-maintenance", "--scope", "runtime_recovery", "--json"], {
         cwd, env, timeoutMs: 120_000
       });
       const parsed = jsonValue(result.stdout);

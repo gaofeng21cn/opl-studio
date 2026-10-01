@@ -21,7 +21,7 @@ test("Desktop startup maintenance invokes the Framework runtime scope and respec
   context.after(() => rm(directory, { recursive: true, force: true }));
   const command = path.join(directory, "fake-opl");
   await writeFile(command, `#!/bin/sh
-[ "$*" = "system startup-maintenance --scope runtime_substrate --json" ] || exit 2
+[ "$*" = "system startup-maintenance --scope runtime_recovery --json" ] || exit 2
 printf '%s' '{"system_action":{"status":"completed"}}'
 `);
   await chmod(command, 0o755);
