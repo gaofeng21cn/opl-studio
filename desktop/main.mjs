@@ -126,7 +126,10 @@ function createWindow() {
     }
   });
   mainWindow = window;
-  window.once("ready-to-show", async () => {
+  let windowShown = false;
+  const showMainWindow = async () => {
+    if (windowShown || window.isDestroyed()) return;
+    windowShown = true;
     window.show();
     if (typeof process.send === "function") {
       let accessibilityQualification = null;
@@ -149,7 +152,8 @@ function createWindow() {
         accessibilityQualification
       });
     }
-  });
+  };
+  window.once("ready-to-show", () => { void showMainWindow(); });
   window.webContents.on("will-navigate", (event, url) => {
     if (!trustedRendererUrl(url)) event.preventDefault();
   });
@@ -167,6 +171,8 @@ function createWindow() {
     if (mainWindow === window) mainWindow = null;
   });
   window.webContents.once("did-finish-load", () => {
+    // GPU initialization can suppress ready-to-show even after the renderer loaded.
+    void showMainWindow();
     if (!desktopUpdater) return;
     sendDesktopRendererEvent("desktop/native-app-update", desktopUpdater.snapshot());
   });
