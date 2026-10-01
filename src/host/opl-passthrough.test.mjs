@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -14,6 +14,21 @@ test("App state timeout keeps the interactive default and admits a bounded cold-
   assert.doesNotThrow(() => createOplPassthrough({ readStateTimeoutMs: undefined }));
   assert.doesNotThrow(() => createOplPassthrough({ readStateTimeoutMs: 120_000 }));
   assert.throws(() => createOplPassthrough({ readStateTimeoutMs: 120_001 }), /100 through 120000/);
+});
+
+test("Desktop startup maintenance invokes the Framework runtime scope and respects read-only mode", async context => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-startup-passthrough-test-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const command = path.join(directory, "fake-opl");
+  await writeFile(command, `#!/bin/sh
+[ "$*" = "system startup-maintenance --scope runtime_substrate --json" ] || exit 2
+printf '%s' '{"system_action":{"status":"completed"}}'
+`);
+  await chmod(command, 0o755);
+  const passthrough = createOplPassthrough({ command, cwd: directory });
+  assert.deepEqual(await passthrough.runStartupMaintenance(), { system_action: { status: "completed" } });
+  const readOnly = createOplPassthrough({ command: "/missing/opl", env: { OPL_STUDIO_READ_ONLY: "1" } });
+  await assert.rejects(readOnly.runStartupMaintenance(), error => error.code === "blocked_read_only");
 });
 
 test("domain detail reads use the canonical item/view command and retain owner readback", async () => {

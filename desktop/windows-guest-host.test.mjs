@@ -21,7 +21,7 @@ function fixture({ verifyPayload = () => {} } = {}) {
       busy = true;
       try { return { status: "completed", result: await operation() }; } finally { busy = false; }
     } },
-    opl: { runManagedUpdate: async operation => ({ operation }) },
+    opl: { runManagedUpdate: async operation => ({ operation }), runStartupMaintenance: async () => ({ system_action: { status: "completed" } }) },
     async invoke(method, payload) {
       requests.push({ method, payload });
       if (method === "pickFiles") return bootOptions.platform.pickFiles();
@@ -80,6 +80,7 @@ test("guest stdio proxy retains Linux Framework/Codex ownership and forwards eve
   assert.equal(fx.bootOptions().canonicalThreadHost, "NATIVE-WINDOWS");
   assert.equal(fx.bootOptions().channelBindingFile, "/mnt/c/UserData/channel-transport-bindings.json");
   assert.equal(fx.bootOptions().env.OPL_AIONUI_DATA_DIR, "/mnt/c/UserData");
+  assert.equal(fx.bootOptions().env.OPL_APP_HOST_KIND, "desktop");
   const files = await proxy.invoke("pickFiles");
   assert.equal(files[0].path, "/mnt/c/files/a b.pdf");
   await proxy.invoke("accessThreadWorkspace");
@@ -90,6 +91,7 @@ test("guest stdio proxy retains Linux Framework/Codex ownership and forwards eve
   fx.realCore.emit("event", { method: "codex/thread", params: { id: "guest-thread" } });
   assert.deepEqual(await received, { method: "codex/thread", params: { id: "guest-thread" } });
   assert.deepEqual(await proxy.opl.runManagedUpdate("check"), { operation: "check" });
+  assert.deepEqual(await proxy.opl.runStartupMaintenance(), { system_action: { status: "completed" } });
   const unavailable = new Promise(resolve => proxy.once("event", resolve));
   fx.realCore.emit("event", { method: "host/availability", params: { available: false } });
   await unavailable;

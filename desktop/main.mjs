@@ -421,6 +421,18 @@ async function createDesktopHost(appLogDirectory) {
     void startOfficialProfileFirstInstall({ ...officialOptions, readInitialize: () => core.invoke("readState", { profile: "fast" }) });
   }
   if (managedUpdatesEnabled) {
+    if (windowsRuntime) {
+      try {
+        const activation = await core.opl.runManagedUpdate("activate");
+        activationStatus = activation.runtime_activation?.status ?? "unknown";
+        const startup = await core.opl.runStartupMaintenance();
+        const temporal = startup.system_action?.details?.temporal_runtime_reconcile;
+        console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status,
+          temporalStatus: temporal?.status, failedStep: temporal?.failed_step }));
+      } catch (error) {
+        activationStatus = error.code ?? "failed";
+      }
+    }
     core.updateMaintenance = createManagedUpdateMaintenance({
       opl: core.opl,
       codex: core.codex,

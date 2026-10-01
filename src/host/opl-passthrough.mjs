@@ -901,6 +901,21 @@ export function createOplPassthrough({
       }
     },
     async closeWorkbenchServices() { await workbenchHost?.dispose(); workbenchHost = null; },
+    async runStartupMaintenance() {
+      if (env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1") {
+        throw Object.assign(new Error("Startup maintenance is disabled in read-only mode"), { code: "blocked_read_only" });
+      }
+      const result = await run(command, ["system", "startup-maintenance", "--scope", "runtime_substrate", "--json"], {
+        cwd, env, timeoutMs: 120_000
+      });
+      const parsed = jsonValue(result.stdout);
+      if (result.exitCode !== 0 || !parsed) {
+        throw Object.assign(new Error("Framework startup maintenance failed"), {
+          code: result.timedOut ? "startup_maintenance_timeout" : "startup_maintenance_failed"
+        });
+      }
+      return parsed;
+    },
     async runManagedUpdate(operation) {
       if (!["activate", "check", "plan", "apply", "status"].includes(operation)) {
         throw new Error("Unsupported managed update operation");

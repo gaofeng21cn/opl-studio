@@ -119,7 +119,10 @@ export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, us
   codexCapabilities = initialized.codex;
   core.invoke = (method, payload = {}) => rpc.request("invoke", { method, payload });
   core.capabilities = () => ({ ...capabilities });
-  core.opl = { runManagedUpdate: operation => rpc.request("managedUpdate", { operation }) };
+  core.opl = {
+    runManagedUpdate: operation => rpc.request("managedUpdate", { operation }),
+    runStartupMaintenance: () => rpc.request("startupMaintenance")
+  };
   core.transport = {
     initialized: initialized.capabilities.appServerAvailable,
     async runWhenIdle(operation) {
