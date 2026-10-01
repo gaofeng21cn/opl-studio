@@ -244,11 +244,12 @@ async function createDesktopHost(appLogDirectory) {
   // Recovery updates must remain reachable even if Framework or Host boot fails.
   desktopUpdater = updater;
   const homeDir = app.getPath("home");
+  const reportWindowsSetup = progress => sendDesktopRendererEvent("desktop/runtime-setup", progress);
   const windowsRuntime = app.isPackaged && stableIdentity && process.platform === "win32"
     ? createWindowsRuntime({
       userDataPath: app.getPath("userData"), resourcesPath: process.resourcesPath,
       resumeExecutable: process.execPath, env: process.env,
-      onProgress: (progress) => sendDesktopRendererEvent("desktop/runtime-setup", progress)
+      onProgress: reportWindowsSetup
     }) : null;
   if (windowsRuntime) await windowsRuntime.ensureReady();
   const officialProfileAdmission = app.isPackaged && stableIdentity && !windowsRuntime && !updaterQualificationEnabled
@@ -389,6 +390,7 @@ async function createDesktopHost(appLogDirectory) {
     nativeUpdater: updater
   };
   core = windowsRuntime ? await createWindowsGuestHost({
+      onProgress: reportWindowsSetup,
     ...hostOptions, windowsRuntime, resourcesPath: process.resourcesPath,
     userDataPath: app.getPath("userData"), version: hostEnvironment.OPL_APP_VERSION,
     instanceId: appProcessInstanceId

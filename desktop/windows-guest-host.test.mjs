@@ -11,7 +11,7 @@ import { createWindowsGuestHost, verifyGuestPayloadFiles } from "./windows-guest
 
 function fixture({ verifyPayload = () => {} } = {}) {
   const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });
-  const requests = [], nativeCalls = [];
+  const requests = [], nativeCalls = [], progress = [];
   let bootOptions, busy = false, closed = 0, spawned = false;
   const realCore = Object.assign(new EventEmitter(), {
     capabilities: () => ({ appServerAvailable: true }),
@@ -58,9 +58,10 @@ function fixture({ verifyPayload = () => {} } = {}) {
       pickFiles: async () => [{ kind: "file", name: "a b.pdf", path: "C:\\files\\a b.pdf" }],
       accessWorkspacePath: async value => { nativeCalls.push(value); return { opened: true }; }
     }, nativeUpdater: { perform: async operation => ({ operation }) },
+    onProgress: value => progress.push(value),
     carrierDiagnostics: { read: async () => ({ platform: "win32" }) }
   });
-  return { proxy, requests, nativeCalls, realCore, spawned: () => spawned, bootOptions: () => bootOptions, closed: () => closed,
+  return { proxy, requests, nativeCalls, progress, realCore, spawned: () => spawned, bootOptions: () => bootOptions, closed: () => closed,
     async cleanup() {
       (await worker).rpc.close();
       for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
@@ -72,6 +73,7 @@ function fixture({ verifyPayload = () => {} } = {}) {
 test("guest stdio proxy retains Linux Framework/Codex ownership and forwards events, files and native services", async context => {
   const fx = fixture(); context.after(() => fx.cleanup());
   const proxy = await fx.proxy();
+  assert.equal(fx.progress.at(-1).stage, "ready");
   assert.equal(fx.bootOptions().env.CODEX_HOME, "/home/opl/.codex");
   assert.equal(fx.bootOptions().workspaceRoot, "/home/opl/code");
   assert.equal(fx.bootOptions().env.OPL_CODEX_BIN, "/usr/local/bin/codex");

@@ -952,6 +952,7 @@ export function App({
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [desktopSetupStage, setDesktopSetupStage] = useState<string | null>(null);
+  const [desktopSetupElapsedSeconds, setDesktopSetupElapsedSeconds] = useState<number | null>(null);
   const t = uiCopy[settings.locale];
   const normalizedCapabilityQuery = capabilityQuery.trim().toLowerCase();
   const standardAgentOptions = useMemo<ComposerAgentOption[]>(() => model.packageLifecycle
@@ -2074,6 +2075,8 @@ export function App({
     }
     if (method === "desktop/runtime-setup" && typeof params.stage === "string") {
       setDesktopSetupStage(params.stage === "ready" ? null : params.stage);
+      setDesktopSetupElapsedSeconds(params.stage !== "ready" && typeof params.elapsedSeconds === "number"
+        && Number.isFinite(params.elapsedSeconds) && params.elapsedSeconds >= 0 ? Math.floor(params.elapsedSeconds) : null);
     }
     if (method === "desktop/deep-link") {
       const destination = resolveDeepLinkDestination(params);
@@ -2959,7 +2962,7 @@ export function App({
         installing_owned_distribution: settings.locale === "zh" ? "正在安装 OPL 运行环境" : "Installing the OPL runtime",
         initializing_guest: settings.locale === "zh" ? "正在准备 OPL 组件" : "Preparing OPL components",
         validating_routes: settings.locale === "zh" ? "正在检查 OPL 组件" : "Checking OPL components"
-      } as Record<string, string>)[desktopSetupStage] ?? (settings.locale === "zh" ? "正在准备运行环境" : "Preparing the runtime")}</p> : null}
+      } as Record<string, string>)[desktopSetupStage] ?? (settings.locale === "zh" ? "正在准备运行环境" : "Preparing the runtime")}{desktopSetupElapsedSeconds !== null ? <span>{settings.locale === "zh" ? ` · 已用时 ${desktopSetupElapsedSeconds} 秒` : ` · Elapsed ${desktopSetupElapsedSeconds}s`}</span> : null}</p> : null}
       {(threadDirectoryStatus === "error" || modelCatalogStatus === "error") && <div role="status" data-testid="opl-codex-recovery"><p>{threadDirectoryError || modelCatalogError}</p><button type="button" onClick={() => void retryStartup().catch(error => setThreadActionError(String(error)))}>{settings.locale === "zh" ? "重试连接" : "Retry connection"}</button><a href="https://github.com/gaofeng21cn/opl-studio/issues/new" target="_blank" rel="noreferrer">{settings.locale === "zh" ? "报告启动问题" : "Report startup issue"}</a></div>}
       <CodexServerRequestPanel requests={pendingServerRequests} locale={settings.locale} error={pendingServerRequestError} onRespond={(request, response) => void respondToServerRequest(request, response)} />
       {threadActionError ? <p className="thread-read-error" role="alert">{threadActionError}</p> : null}

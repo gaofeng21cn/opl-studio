@@ -47,7 +47,7 @@ export async function verifyGuestPayloadFiles(root, manifest, { paths } = {}) {
 
 export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, userDataPath, env = process.env,
   version, instanceId, canonicalThreadHost = os.hostname(), platform = {}, nativeUpdater, carrierDiagnostics, candidateActionAllowlist = [],
-  readFile = fs.readFileSync, verifyPayload = verifyGuestPayloadFiles } = {}) {
+  readFile = fs.readFileSync, verifyPayload = verifyGuestPayloadFiles, onProgress = () => {} } = {}) {
   const runtime = await windowsRuntime.ensureReady();
   const hostRoot = path.join(resourcesPath, "opl-wsl-host");
   const manifestBytes = readFile(path.join(hostRoot, "manifest.json"), "utf8");
@@ -102,15 +102,19 @@ export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, us
   child.once("error", disconnected);
   child.once("close", disconnected);
   let initialized;
+  const started = Date.now();
+  onProgress({ stage: "validating_routes", elapsedSeconds: 0 });
+  const progress = setInterval(() => onProgress({ stage: "validating_routes", elapsedSeconds: Math.floor((Date.now() - started) / 1000), heartbeat: true }), 15000);
   try {
     initialized = await rpc.request("initialize", { version, instanceId, canonicalThreadHost,
       identity: runtime.identity, guestDataRoot,
       channelBindingFile: `${guestDataRoot}/channel-transport-bindings.json`, candidateActionAllowlist });
+    onProgress({ stage: "ready", elapsedSeconds: Math.floor((Date.now() - started) / 1000) });
   } catch (cause) {
     child.stdin.end();
     await windowsRuntime.close();
     throw cause;
-  }
+  } finally { clearInterval(progress); }
   capabilities = initialized.capabilities;
   codexCapabilities = initialized.codex;
   core.invoke = (method, payload = {}) => rpc.request("invoke", { method, payload });
