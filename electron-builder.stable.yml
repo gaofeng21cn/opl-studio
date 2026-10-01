@@ -60,8 +60,10 @@ win:
     - zip
 nsis:
   guid: 427792ec-b878-5efa-a09e-f4e17d0b65a9
-  oneClick: false
-  allowToChangeInstallationDirectory: true
+  # Stable uses the same current-user oneClick carrier as Preview so the
+  # supported Windows install path remains automatable and does not depend on
+  # an assisted wizard desktop session.
+  oneClick: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ${productName}
