@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { buildWindowsRuntimeCommand, createWindowsRuntime, readWindowsRuntimeReceipt, validateWindowsRuntimeIdentity, windowsBootstrapCohortDigest } from "./windows-runtime.mjs";
+import { buildWindowsRuntimeCommand, createWindowsRuntime, readWindowsRuntimeReceipt, validateWindowsRuntimeIdentity } from "./windows-runtime.mjs";
 
 function identity(overrides = {}) {
   return { schema: "opl_linux_runtime_inspection.v1", protocol_version: 1, logical_distribution: "OPL-Linux",
@@ -14,8 +14,8 @@ function identity(overrides = {}) {
     codex_command_path: "/usr/local/bin/codex", framework_path: "/home/opl/.opl/one-person-lab/bin/opl", framework_ref: "a".repeat(40),
     ...Object.fromEntries(["carrier_activation_digest", "bootstrap_digest", "codex_digest", "codex_command_digest", "framework_digest"].map(key => [key, `sha256:${"b".repeat(64)}`])), ...overrides };
 }
-function receiptReader(value = identity(), extra = {}) {
-  const bytes = Buffer.from(JSON.stringify({ schema: "opl_windows_wsl2_provisioning_receipt.v1", status: "ready", distribution: "OPL-Linux", identity: value, ...extra }));
+function receiptReader(value = identity()) {
+  const bytes = Buffer.from(JSON.stringify({ schema: "opl_windows_wsl2_provisioning_receipt.v1", status: "ready", distribution: "OPL-Linux", identity: value }));
   return file => file.endsWith(".sha256") ? crypto.createHash("sha256").update(bytes).digest("hex") : bytes;
 }
 function fakeSpawn(fresh = identity()) {
@@ -24,7 +24,7 @@ function fakeSpawn(fresh = identity()) {
     const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), kill: () => true });
     calls.push({ command, args, options, child });
     if (!args.includes("codex-app-server")) queueMicrotask(() => {
-      if (args.includes("/opt/opl/bootstrap/opl-runtime-inspect") || args.includes("/opt/opl/studio-bootstrap/inspect.mjs")) child.stdout.write(Buffer.from(JSON.stringify(fresh), "utf16le"));
+      if (args.includes("/opt/opl/bootstrap/opl-runtime-inspect")) child.stdout.write(Buffer.from(JSON.stringify(fresh), "utf16le"));
       if (args.includes("opl-cli")) child.stdout.write('{"app_state":{"status":"ready"}}');
       child.emit("close", 0);
     });
@@ -43,37 +43,6 @@ test("Windows existing-runtime admission binds the retained receipt to a fresh W
   const changed = fakeSpawn(identity({ guest_install_id: "foreign" }));
   await assert.rejects(createWindowsRuntime({ platform: "win32", userDataPath: "fixture", readFile: receiptReader(), spawnImpl: changed.spawnImpl }).ensureReady(), { code: "wsl_foreign_distribution" });
   assert.throws(() => readWindowsRuntimeReceipt("fixture", file => file.endsWith(".sha256") ? "0".repeat(64) : receiptReader()(file)), { code: "wsl_receipt_digest_mismatch" });
-});
-
-test("Windows upgrade repairs a changed bootstrap cohort once and preserves independently updated runtimes", async () => {
-  const bootstrap = { framework_ref: "c".repeat(40), node: { version: "22.22.0" } };
-  for (const matches of [false, true]) {
-    const fresh = identity({ framework_ref: "d".repeat(40) });
-    const reader = receiptReader(fresh, matches ? { bootstrap_cohort_sha256: windowsBootstrapCohortDigest(bootstrap) } : {});
-    const fake = fakeSpawn(fresh);
-    let repairs = 0;
-    const runtime = createWindowsRuntime({ platform: "win32", userDataPath: "fixture", resourcesPath: "resources",
-      readFile: file => file.endsWith("manifest.json") ? JSON.stringify({ bootstrap }) : reader(file),
-      spawnImpl: fake.spawnImpl, provisioner: () => ({ ensureReady: async () => {
-        repairs++; return identity({ framework_ref: bootstrap.framework_ref });
-      } }) });
-    await runtime.ensureReady(); await runtime.ensureReady();
-    assert.equal(repairs, matches ? 0 : 1);
-    assert.equal(runtime.identity.guest_install_id, fresh.guest_install_id);
-    assert.equal(runtime.identity.framework_ref, matches ? fresh.framework_ref : bootstrap.framework_ref);
-  }
-});
-
-test("Windows bootstrap repair refuses foreign identities and active guest operations before mutation", async () => {
-  for (const [change, code] of [[{ guest_install_id: "foreign" }, "wsl_foreign_distribution"],
-    [{ active_operation_count: 1 }, "wsl_runtime_upgrade_busy"]]) {
-    const fake = fakeSpawn(identity(change));
-    const reader = receiptReader();
-    const runtime = createWindowsRuntime({ platform: "win32", userDataPath: "fixture", resourcesPath: "resources",
-      readFile: file => file.endsWith("manifest.json") ? JSON.stringify({ bootstrap: { framework_ref: "c".repeat(40) } }) : reader(file),
-      spawnImpl: fake.spawnImpl, provisioner: () => { throw new Error("unowned or busy guest must not be repaired"); } });
-    await assert.rejects(runtime.ensureReady(), { code });
-  }
 });
 
 test("Windows runtime rejects native fallbacks, wrong data owners, digest drift and untyped commands", () => {
