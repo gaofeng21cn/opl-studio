@@ -106,7 +106,7 @@ export function validateWslHostPayload(directory, expectedShellRef) {
     throw new Error('Windows guest Host first-install bootstrap identity is missing');
   }
   for (const relative of ['package.json', 'package-lock.json', manifest.entry, 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs',
-    'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
+    'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
     'runtime/node/lib/node_modules/npm/bin/npm-cli.js', bootstrap.codex.path, bootstrap.framework_installer,
     'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
     'resources/opl-official-profile/official-profile-package-apply.ts', 'node_modules/@deepseek-ai/cordis/package.json']) {
@@ -186,7 +186,7 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
   try {
     buildDshPlugins();
     const bootstrap = prepareBootstrapRuntime(staging, appRoot, frameworkRef);
-    for (const relative of ['package.json', 'package-lock.json', 'plugins', 'src/host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-guest-stage.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
+    for (const relative of ['package.json', 'package-lock.json', 'plugins', 'src/host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-guest-stage.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
       const destination = path.join(staging, relative);
       fs.mkdirSync(path.dirname(destination), { recursive: true });
       fs.cpSync(path.join(root, relative), destination, { recursive: true, dereference: true,

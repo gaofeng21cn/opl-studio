@@ -20,7 +20,7 @@ if(manifest.schema!=='opl_studio_windows_guest_host.v1'||b?.node?.root!=='runtim
   ||b?.codex?.path!=='runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex'||b?.framework_installer!=='runtime/opl-install.sh'
   ||!/^v?\d+\.\d+\.\d+$/.test(b.node.version)||!/^\d+\.\d+\.\d+$/.test(b.codex.version)
   ||! /^[0-9a-f]{40}$/.test(b.framework_ref)) throw Error('Invalid bootstrap manifest');
-for(const relative of ['runtime/node/bin/node',b.codex.path,b.framework_installer,'desktop/windows-guest-inspect.mjs']) {
+for(const relative of ['runtime/node/bin/node',b.codex.path,b.framework_installer,'desktop/windows-guest-inspect.mjs','desktop/windows-framework-install.mjs']) {
   const expected=manifest.files.find(item=>item.path===relative)?.sha256;
   if(!expected||crypto.createHash('sha256').update(fs.readFileSync(path.join(root,relative))).digest('hex')!==expected) throw Error('Bootstrap byte mismatch');
 }
@@ -65,10 +65,8 @@ const {captureOfficialProfileAdmission}=await import(pathToFileURL(process.argv[
 captureOfficialProfileAdmission({homeDir:'/home/opl',env:{HOME:'/home/opl',CODEX_HOME:'/home/opl/.codex'}});
 NODE
 runuser -u opl -- /usr/bin/env HOME=/home/opl CODEX_HOME=/home/opl/.codex OPL_CODEX_BIN=/usr/local/bin/codex \
-  OPL_WORKSPACE_ROOT=/home/opl/code OPL_INSTALL_DIR=/home/opl/.opl/one-person-lab \
-  "OPL_INSTALL_BRANCH=$framework_ref" OPL_INSTALL_SOURCE_MODE=archive \
-  "OPL_SOURCE_ARCHIVE_URL=https://github.com/gaofeng21cn/one-person-lab/archive/$framework_ref.tar.gz" \
-  PATH=/usr/local/bin:/usr/bin:/bin /bin/bash "$payload/runtime/opl-install.sh" --headless --skip-packages
+  OPL_WORKSPACE_ROOT=/home/opl/code PATH=/usr/local/bin:/usr/bin:/bin \
+  /usr/local/bin/node "$payload/desktop/windows-framework-install.mjs" "$payload"
 
 "$payload/runtime/node/bin/node" --input-type=module - "$payload" <<'NODE'
 import fs from 'node:fs';import crypto from 'node:crypto';import path from 'node:path';
