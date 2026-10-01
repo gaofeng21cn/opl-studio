@@ -33,7 +33,20 @@ framework_ref=${binding[0]}
 export DEBIAN_FRONTEND=noninteractive
 if [[ "$legacy_identity" != 1 ]] || ! command -v gh >/dev/null || ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates curl git gh ffmpeg python3 build-essential unzip
+  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates curl git ffmpeg python3 build-essential unzip
+fi
+# Ubuntu's older GitHub CLI requires login even to install a public extension.
+# Keep gh owned by apt and consume GitHub's signed native package source.
+if [[ ! -f /etc/apt/sources.list.d/opl-github-cli.list ]] || ! command -v gh >/dev/null; then
+  install -d -m 0755 /etc/apt/keyrings
+  curl --fail --location --connect-timeout 20 --max-time 120 --retry 3 \
+    https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  chmod 0644 /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  printf '%s\n' 'deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' \
+    > /etc/apt/sources.list.d/opl-github-cli.list
+  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends gh
 fi
 if ! id opl >/dev/null 2>&1; then useradd --create-home --shell /bin/bash opl; fi
 [[ "$(getent passwd opl | cut -d: -f6)" == /home/opl ]] || { printf 'OPL guest user has an unexpected home.\n' >&2; exit 65; }
