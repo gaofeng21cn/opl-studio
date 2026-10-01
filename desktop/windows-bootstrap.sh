@@ -31,9 +31,9 @@ NODE
 framework_ref=${binding[0]}
 
 export DEBIAN_FRONTEND=noninteractive
-if [[ "$legacy_identity" != 1 ]]; then
+if [[ "$legacy_identity" != 1 ]] || ! command -v gh >/dev/null || ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates curl git python3 build-essential unzip
+  apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates curl git gh ffmpeg python3 build-essential unzip
 fi
 if ! id opl >/dev/null 2>&1; then useradd --create-home --shell /bin/bash opl; fi
 [[ "$(getent passwd opl | cut -d: -f6)" == /home/opl ]] || { printf 'OPL guest user has an unexpected home.\n' >&2; exit 65; }

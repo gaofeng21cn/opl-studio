@@ -23,6 +23,7 @@ function writePackagedWslHostPayload(payloadRoot, { includeNodeModules = true } 
     'desktop/windows-guest-rpc.mjs': 'rpc',
     'desktop/windows-runtime.mjs': 'runtime',
     'desktop/windows-bootstrap.sh': 'bootstrap',
+    'desktop/windows-framework-install.mjs': 'framework owner adapter',
     'desktop/windows-guest-inspect.mjs': 'inspect',
     'desktop/official-profile.mjs': 'profile',
     'src/host/create-host.mjs': 'create-host',
@@ -203,7 +204,7 @@ test('Windows guest Host requires its Linux dependency closure and exact source 
   try {
     const shellRef = 'a'.repeat(40);
     const names = ['package.json', 'package-lock.json', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs',
-      'desktop/windows-bootstrap.sh', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
+      'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
       'runtime/node/lib/node_modules/npm/bin/npm-cli.js', 'runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex', 'runtime/opl-install.sh',
       'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
       'resources/opl-official-profile/official-profile-package-apply.ts', 'node_modules/@deepseek-ai/cordis/package.json'];
