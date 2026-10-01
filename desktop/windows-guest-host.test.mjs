@@ -81,6 +81,8 @@ test("guest stdio proxy retains Linux Framework/Codex ownership and forwards eve
   assert.equal(fx.bootOptions().channelBindingFile, "/mnt/c/UserData/channel-transport-bindings.json");
   assert.equal(fx.bootOptions().env.OPL_AIONUI_DATA_DIR, "/mnt/c/UserData");
   assert.equal(fx.bootOptions().env.OPL_APP_HOST_KIND, "desktop");
+  assert.equal(fx.bootOptions().env.OPL_FRAMEWORK_PACKAGE_ROOT, "/home/opl/.opl/one-person-lab");
+  assert.equal(fx.bootOptions().env.OPL_FRAMEWORK_UPDATE_TARGET_ROOT, fx.bootOptions().env.OPL_FRAMEWORK_PACKAGE_ROOT);
   const files = await proxy.invoke("pickFiles");
   assert.equal(files[0].path, "/mnt/c/files/a b.pdf");
   await proxy.invoke("accessThreadWorkspace");

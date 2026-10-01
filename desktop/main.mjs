@@ -425,12 +425,16 @@ async function createDesktopHost(appLogDirectory) {
       try {
         const activation = await core.opl.runManagedUpdate("activate");
         activationStatus = activation.runtime_activation?.status ?? "unknown";
+      } catch (error) {
+        activationStatus = error.code ?? "failed";
+      }
+      try {
         const startup = await core.opl.runStartupMaintenance();
         const temporal = startup.system_action?.details?.temporal_runtime_reconcile;
         console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status,
           temporalStatus: temporal?.status, failedStep: temporal?.failed_step }));
       } catch (error) {
-        activationStatus = error.code ?? "failed";
+        console.warn("[OPL:startup] " + JSON.stringify({ status: error.code ?? "failed" }));
       }
     }
     core.updateMaintenance = createManagedUpdateMaintenance({
