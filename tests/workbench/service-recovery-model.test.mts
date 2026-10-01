@@ -118,6 +118,20 @@ test("selects service start when the managed service is not installed", () => {
   assert.equal(model.primaryAction?.kind, "start");
 });
 
+test("a non-applicable Linux supervisor does not invent configuration drift", () => {
+  const model = deriveServiceRecoveryModel({
+    temporal: temporalState({
+      serviceReady: false,
+      supervisor: { applicable: false, required: false, ready: null, installed: false,
+        loaded: false, configuration_current: false, status: "not_applicable" }
+    }),
+    actions,
+    stateFresh: true
+  });
+  assert.equal(model.causalRoot.reasonCode, "service_not_ready");
+  assert.equal(model.primaryAction?.kind, "start");
+});
+
 test("selects a bounded worker restart only from the App action catalog", () => {
   const model = deriveServiceRecoveryModel({
     temporal: temporalState({

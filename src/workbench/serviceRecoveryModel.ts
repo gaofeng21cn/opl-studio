@@ -206,7 +206,7 @@ export function deriveServiceRecoveryModel(input: ServiceRecoveryInput): Service
     if (serviceReady === null && !(supervisorMustBeReady && supervisorReady === false)) {
       status = "unknown";
       reasonCode = "service_readback_missing";
-    } else if (serviceConfigurationCurrent === false) {
+    } else if (supervisorApplicable !== false && serviceConfigurationCurrent === false) {
       status = "attention";
       reasonCode = "service_configuration_drift";
     } else {
@@ -246,7 +246,7 @@ export function deriveServiceRecoveryModel(input: ServiceRecoveryInput): Service
     const repairActionId = stringValue(serviceRepair.action_id);
     const installed = booleanValue(supervisor.installed);
     const loaded = booleanValue(supervisor.loaded);
-    const shouldRepair = serviceConfigurationCurrent === false
+    const shouldRepair = (supervisorApplicable !== false && serviceConfigurationCurrent === false)
       || (repairActionId !== undefined && repairActionId !== "none");
     const shouldRestart = !shouldRepair && installed === true && loaded === true && hasAttentionStatus(rawStatus);
     primaryAction = shouldRestart

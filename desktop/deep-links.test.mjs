@@ -23,6 +23,8 @@ test("deep links consume every exact App route without a second route registry",
   for (const route of routes) {
     assert.deepEqual(parseDeepLinkUrl(`opl://navigate?route=${encodeURIComponent(route)}`, policy),
       { valid: true, payload: payload(route) });
+    assert.deepEqual(parseDeepLinkUrl(`opl://navigate/?route=${encodeURIComponent(route)}`, policy),
+      { valid: true, payload: payload(route) });
     assert.equal(validateDeepLinkPayload(payload(route), policy).valid, true);
   }
 });
@@ -31,7 +33,8 @@ test("deep links reject secret actions, payloads, authority, duplicates and rout
   const invalid = [
     "aionui://navigate?route=/guid", "https://navigate?route=/guid", "opl://provider/add?token=secret",
     "opl://add-provider?data=eyJjcmVkZW50aWFsIjoic2VjcmV0In0=", "opl://user:secret@navigate?route=/guid",
-    "opl://navigate:123?route=/guid", "opl://navigate/?route=/guid", "opl:///navigate?route=/guid",
+    "opl://navigate:123?route=/guid", "opl://navigate/other?route=/guid", "opl:///navigate?route=/guid",
+    "opl://navigate//?route=/guid", "opl://navigate/%2F?route=/guid", "opl://navigate/?route=/guid&token=secret",
     "opl://navigate?route=/guid#", "opl://navigate?route=/guid#secret", "opl://navigate?route=/guid&route=/archived",
     "opl://navigate?route=/guid&source=mail", "opl://navigate?route=/guid&token=secret", "opl://navigate?route=sk-example",
     "opl://navigate?route=Bearer%20secret", "opl://navigate?route=github_pat_secret", "opl://navigate?route=ghp_secret",

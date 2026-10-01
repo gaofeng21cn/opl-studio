@@ -12,7 +12,7 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
   if (source?.schema !== "opl_app_branded_deep_link.v1" || source.scheme !== PROTOCOL_SCHEME
     || JSON.stringify(source.accepted_schemes) !== '["opl"]'
     || JSON.stringify(source.allowed_actions) !== '["navigate"]'
-    || source.action_authority !== "url_hostname_only_with_empty_path"
+    || source.action_authority !== "url_hostname_only_with_empty_or_root_path"
     || source.route_registry?.match_policy !== "exact_path_only_no_query_hash_or_dynamic_segments") {
     throw new Error("Invalid App branded deep-link policy");
   }
@@ -66,7 +66,7 @@ export function parseDeepLinkUrl(raw, policy) {
   if (url.protocol !== `${PROTOCOL_SCHEME}:`) return rejected("invalid_scheme");
   if (url.username || url.password || url.port) return rejected("forbidden_authority");
   if (url.hash || raw.includes("#")) return rejected("fragment_not_allowed");
-  if (url.hostname !== "navigate" || url.pathname !== "") return rejected("unknown_action");
+  if (url.hostname !== "navigate" || !["", "/"].includes(url.pathname)) return rejected("unknown_action");
   const entries = [...url.searchParams];
   for (const [key, value] of entries) {
     if (policy?.forbiddenParameters?.includes(key.toLowerCase()) || sensitive(value, policy)) {
