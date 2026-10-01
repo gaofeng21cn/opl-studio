@@ -34,6 +34,12 @@ function copyMaterializedTree(source, destination, root, ancestors = new Set()) 
   } else throw new Error('Guest Host dependency contains a special file');
 }
 
+export function writeNodeCommandWrappers(nodeRoot) {
+  for (const name of ['npm', 'npx']) {
+    fs.writeFileSync(path.join(nodeRoot, 'bin', name), `#!/bin/sh\nnode_bin=$(dirname "$(readlink -f "$0")")\nexec "$node_bin/node" "$node_bin/../lib/node_modules/npm/bin/${name}-cli.js" "$@"\n`, { mode: 0o755 });
+  }
+}
+
 function prepareBootstrapRuntime(staging, appRoot, frameworkRef) {
   if (!appRoot || !/^[0-9a-f]{40}$/.test(frameworkRef ?? '')) throw new Error('Windows bootstrap requires frozen App pins and Framework ref');
   const pins = JSON.parse(fs.readFileSync(path.join(appRoot, 'contracts/app-windows-bootstrap-pins.json'), 'utf8'));
@@ -67,9 +73,7 @@ function prepareBootstrapRuntime(staging, appRoot, frameworkRef) {
       copyMaterializedTree(extracted, destination, fs.realpathSync(extracted));
     }
     const nodeRoot = path.join(staging, 'runtime/node');
-    for (const name of ['npm', 'npx']) {
-      fs.writeFileSync(path.join(nodeRoot, 'bin', name), `#!/bin/sh\nexec "$(dirname "$0")/node" "$(dirname "$0")/../lib/node_modules/npm/bin/${name}-cli.js" "$@"\n`, { mode: 0o755 });
-    }
+    writeNodeCommandWrappers(nodeRoot);
     const codexPath = 'runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex';
     const codexEntry = path.join(staging, codexPath);
     if (run(path.join(nodeRoot, 'bin/node'), ['--version']) !== `v${pins.node.version}`) throw new Error('Pinned guest Node version mismatch');
