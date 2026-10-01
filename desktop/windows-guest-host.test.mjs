@@ -9,10 +9,10 @@ import test from "node:test";
 import { startWindowsGuestHost } from "./windows-guest-host.mjs";
 import { createWindowsGuestHost, verifyGuestPayloadFiles } from "./windows-guest-proxy.mjs";
 
-function fixture() {
+function fixture({ verifyPayload = () => {} } = {}) {
   const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });
   const requests = [], nativeCalls = [];
-  let bootOptions, busy = false, closed = 0;
+  let bootOptions, busy = false, closed = 0, spawned = false;
   const realCore = Object.assign(new EventEmitter(), {
     capabilities: () => ({ appServerAvailable: true }),
     codex: { capabilities: () => ({ available: true }), reloadConfiguration: async value => ({ reloaded: true, ...value }) },
@@ -48,11 +48,11 @@ function fixture() {
     projectHostPath: async target => `/mnt/c/${target.replaceAll("\\", "/").replace(/^C:\//, "")}`,
     projectGuestPath: async target => `\\\\wsl.localhost\\OPL-Linux${target.replaceAll("/", "\\")}`,
     stageGuestHost: async (_source, digest) => `/home/opl/.opl/studio-host/${digest}/opl-wsl-host/desktop/windows-guest-host.mjs`,
-    spawnGuestHost: entry => { assert.match(entry, /^\/home\/opl\/\.opl\/studio-host\/[0-9a-f]{64}\/opl-wsl-host\/desktop\/windows-guest-host\.mjs$/); return child; },
+    spawnGuestHost: entry => { assert.match(entry, /^\/home\/opl\/\.opl\/studio-host\/[0-9a-f]{64}\/opl-wsl-host\/desktop\/windows-guest-host\.mjs$/); spawned = true; return child; },
     close: async () => { child.emit("close", 0); }
   };
   const proxy = () => createWindowsGuestHost({ windowsRuntime: runtime, resourcesPath: "C:\\App\\resources", userDataPath: "C:\\UserData",
-    version: "26.9.24", instanceId: "instance", canonicalThreadHost: "NATIVE-WINDOWS", verifyPayload: () => {}, readFile: () => JSON.stringify({ schema: "opl_studio_windows_guest_host.v1", platform: "linux", arch: "x64",
+    version: "26.9.24", instanceId: "instance", canonicalThreadHost: "NATIVE-WINDOWS", verifyPayload, readFile: () => JSON.stringify({ schema: "opl_studio_windows_guest_host.v1", platform: "linux", arch: "x64",
       entry: "desktop/windows-guest-host.mjs", shell_ref: "a".repeat(40), package_lock_sha256: "b".repeat(64) }),
     platform: {
       pickFiles: async () => [{ kind: "file", name: "a b.pdf", path: "C:\\files\\a b.pdf" }],
@@ -60,7 +60,7 @@ function fixture() {
     }, nativeUpdater: { perform: async operation => ({ operation }) },
     carrierDiagnostics: { read: async () => ({ platform: "win32" }) }
   });
-  return { proxy, requests, nativeCalls, realCore, bootOptions: () => bootOptions, closed: () => closed,
+  return { proxy, requests, nativeCalls, realCore, spawned: () => spawned, bootOptions: () => bootOptions, closed: () => closed,
     async cleanup() {
       (await worker).rpc.close();
       for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
@@ -111,16 +111,30 @@ test("guest idle lease reserves admission through parent callback and permits up
   assert.deepEqual(await proxy.transport.runWhenIdle(() => proxy.close()), { status: "completed", result: undefined });
 });
 
-test("guest payload admission validates exact files and bytes before launching Linux code", context => {
+test("guest payload admission validates exact files and bytes before launching Linux code", async context => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-wsl-payload-test-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, "package-lock.json"), "fixture");
   const digest = crypto.createHash("sha256").update("fixture").digest("hex");
   const manifest = { package_lock_sha256: digest, files: [{ path: "package-lock.json", sha256: digest }] };
-  assert.doesNotThrow(() => verifyGuestPayloadFiles(root, manifest));
+  await verifyGuestPayloadFiles(root, manifest);
   fs.writeFileSync(path.join(root, "unexpected.js"), "unexpected");
-  assert.throws(() => verifyGuestPayloadFiles(root, manifest), /bytes differ/);
+  await assert.rejects(verifyGuestPayloadFiles(root, manifest), /bytes differ/);
   fs.unlinkSync(path.join(root, "unexpected.js"));
   fs.writeFileSync(path.join(root, "package-lock.json"), "tampered");
-  assert.throws(() => verifyGuestPayloadFiles(root, manifest), /bytes differ/);
+  await assert.rejects(verifyGuestPayloadFiles(root, manifest), /bytes differ/);
+});
+
+
+test("guest launch waits for asynchronous payload admission", async context => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const fx = fixture({ verifyPayload: () => gate }); context.after(() => fx.cleanup());
+  const waiting = fx.proxy();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fx.spawned(), false);
+  release();
+  const proxy = await waiting;
+  assert.equal(fx.spawned(), true);
+  await proxy.close();
 });

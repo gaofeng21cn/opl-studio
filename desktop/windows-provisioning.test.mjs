@@ -12,7 +12,7 @@ function scenario(context, { foreign = false, featureMissing = false, restart = 
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const userDataPath = path.join(root, "data"), resourcesPath = path.join(root, "resources");
   fs.mkdirSync(path.join(resourcesPath, "opl-wsl-host"), { recursive: true });
-  fs.writeFileSync(path.join(resourcesPath, "opl-wsl-host/manifest.json"), JSON.stringify({ bootstrap: { framework_ref: "a".repeat(40) } }));
+  fs.writeFileSync(path.join(resourcesPath, "opl-wsl-host/manifest.json"), JSON.stringify({ files: [], bootstrap: { framework_ref: "a".repeat(40) } }));
   let installed = foreign, enabled = !featureMissing;
   const calls = [], progress = [];
   const identity = { schema: "opl_studio_linux_runtime_inspection.v1", protocol_version: 1,

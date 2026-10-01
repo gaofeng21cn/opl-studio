@@ -48,7 +48,9 @@ export function createWindowsProvisioner({ userDataPath, resourcesPath, env = pr
       const payload = path.join(resourcesPath, "opl-wsl-host");
       const manifest = JSON.parse(fs.readFileSync(path.join(payload, "manifest.json"), "utf8"));
       if (!manifest.bootstrap || !/^[0-9a-f]{40}$/.test(manifest.bootstrap.framework_ref)) throw fail("wsl_bootstrap_payload_unavailable");
-      verifyPayload(payload, manifest);
+      await verifyPayload(payload, manifest, { paths: manifest.files.filter(entry =>
+        entry.path.startsWith("runtime/") || entry.path.startsWith("resources/") || entry.path.startsWith("desktop/")
+        || entry.path === "guest-host.tar.gz" || entry.path === "package-lock.json").map(entry => entry.path) });
       let status = await run(wsl, ["--status"], { timeoutMs: 30000 });
       if (status.exitCode !== 0 || status.timedOut) {
         if (resumeExecutable) successful(await ps("$ErrorActionPreference='Stop';$path='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce';New-Item -Path $path -Force|Out-Null;New-ItemProperty -Path $path -Name 'OnePersonLabSetup' -PropertyType String -Value ('\"'+$env:OPL_SETUP_RESUME_EXE+'\"') -Force|Out-Null", { extraEnv: { OPL_SETUP_RESUME_EXE: resumeExecutable } }), "wsl_resume_registration_failed");
