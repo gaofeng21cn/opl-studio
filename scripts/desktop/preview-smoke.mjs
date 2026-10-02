@@ -323,7 +323,7 @@ async function waitForGatewayState({ evaluate, timeoutMs, requireModelAccess = f
   return evaluate(`(async()=>{const deadline=Date.now()+${timeoutMs}; const project=${projectGatewayState.toString()}; let state=null; let projection=null; while(Date.now()<deadline){state=await window.oplStudio.readState("fast"); projection=project(state); const accountReady=projection?.surfaceKind==="opl_gateway_account_read_model.v1"&&projection.connectionMode==="account"&&projection.status==="connected"&&projection.accountStatus==="active"&&projection.managedKeyStatus==="active"&&projection.freshnessStale!==true; const source=typeof projection?.modelAccessSource==="string"?projection.modelAccessSource.trim().toLowerCase():""; const modelAccessReady=${requireModelAccess ? 'source==="opl_gateway"' : "true"}; if(accountReady&&modelAccessReady) return {state,projection}; await new Promise((resolve)=>setTimeout(resolve,500));} return {state,projection};})()`);
 }
 
-async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
+export async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
   if (!credentials) return { status: "skipped", reason: "credentials_not_provided" };
   const result = await evaluate(`(async()=>{const response=await window.oplStudio.loginGatewayAccount(${JSON.stringify(credentials)}); return {ok:response?.ok===true,stateRefreshRequired:response?.stateRefreshRequired===true,errorCode:response?.ok===true?null:(response?.errorCode||"gateway_account_failed")};})()`);
   const readback = result?.ok === true ? await waitForGatewayState({ evaluate, timeoutMs }) : null;
@@ -372,8 +372,35 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
     const dryRun = action.dryRunSupported
       ? await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:true}); return (${projectGatewayActionReceipt.toString()})(receipt);}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_dry_run_failed"};}})()`)
       : null;
-    const execute = await evaluate(`(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:false}); return (${projectGatewayActionReceipt.toString()})(receipt);}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_execute_failed"};}})()`);
-    const after = execute?.ok === true
+    const executeExpression = `(async()=>{try{const receipt=await window.oplStudio.executeAction({actionId:${JSON.stringify(actionId)},payload:{confirmed:true},dryRun:false}); return (${projectGatewayActionReceipt.toString()})(receipt);}catch(error){return {ok:false,errorCode:error?.code||"gateway_action_execute_failed"};}})()`;
+    let execute = await evaluate(executeExpression);
+    let recovery = null;
+    // A settled owner error is distinct from a lost/unknown mutation outcome.
+    // Reconcile the account and action before one bounded retry; keep both
+    // receipts, and require the same real clean projection afterward.
+    if (execute?.ok === true && execute.status === "error" && execute.dryRun === false
+      && execute.exitCode === 4 && execute.errorCode === "gateway_unavailable") {
+      const reconciled = await evaluate(`(async()=>{const state=await window.oplStudio.readState("fast"); return {projection:(${projectGatewayState.toString()})(state)};})()`);
+      const current = reconciled?.projection;
+      const currentSource = current?.modelAccessSource?.trim?.().toLowerCase?.();
+      const sameAccountAction = current?.surfaceKind === "opl_gateway_account_read_model.v1"
+        && current.connectionMode === "account" && current.status === "connected"
+        && current.accountStatus === "active" && current.managedKeyStatus === "active"
+        && current.modelAccessAction?.actionId === actionId
+        && current.modelAccessAction.confirmationRequired === true
+        && current.modelAccessAction.dryRunSupported === false
+        && current.modelAccessAction.payloadFields?.length === 0;
+      recovery = { firstExecute: execute, reconciledProjection: current ?? null, retryCount: 0, alreadyConfigured: false };
+      if (sameAccountAction && currentSource === "opl_gateway" && current.freshnessStale !== true) {
+        recovery.alreadyConfigured = true;
+      } else if (sameAccountAction && currentSource === modelAccessSource) {
+        execute = await evaluate(executeExpression);
+        recovery.retryCount = 1;
+      }
+    }
+    const after = recovery?.alreadyConfigured === true
+      ? { projection: recovery.reconciledProjection }
+      : execute?.ok === true
       ? execute.status === "executed"
         ? await waitForGatewayState({ evaluate, timeoutMs, requireModelAccess: true })
         : await evaluate(`(async()=>{const state=await window.oplStudio.readState("fast"); return {projection:(${projectGatewayState.toString()})(state)};})()`)
@@ -383,7 +410,10 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
       (action.dryRunSupported !== true || (dryRun?.ok === true && dryRun?.dryRun === true))
       && execute?.ok === true
       && execute?.dryRun === false
-      && execute?.status === "executed"
+      && (execute?.status === "executed" || recovery?.alreadyConfigured === true)
+      && afterProjection?.freshnessStale !== true
+      && afterProjection?.accountStatus === "active"
+      && afterProjection?.managedKeyStatus === "active"
       && afterProjection?.modelAccessSource?.trim?.().toLowerCase?.() === "opl_gateway"
     );
     return {
@@ -394,7 +424,7 @@ async function runGatewayHook({ evaluate, credentials, timeoutMs }) {
       projection: afterProjection ?? projection,
       credentialsProvided: true,
       modelAccessAction: action,
-      confirmation: { dryRun, execute }
+      confirmation: { dryRun, execute, ...(recovery ? { recovery } : {}) }
     };
   }
   return {

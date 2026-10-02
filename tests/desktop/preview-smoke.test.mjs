@@ -6,9 +6,60 @@ import {
   parseRuntimeProfiles,
   projectGatewayState,
   redactSecrets,
+  runGatewayHook,
   runPreviewSmoke
 } from "../../scripts/desktop/preview-smoke.mjs";
 import { parseInstalledIdentityOutput } from "../../scripts/desktop/qualify-clean-vm.mjs";
+
+function gatewayRecoveryFixture({ first = {}, reconciledSource = "missing", ready = true } = {}) {
+  let source = "missing";
+  let calls = 0;
+  const projection = () => ({ surfaceKind: "opl_gateway_account_read_model.v1", status: "connected", connectionMode: "account", accountStatus: "active", managedKeyStatus: "active", freshnessStale: source === "opl_gateway" ? !ready : false, modelAccessSource: source, modelAccessAction: { actionId: "gateway_account_use_for_model_access", confirmationRequired: true, dryRunSupported: false, payloadFields: [] } });
+  return {
+    credentials: { email: "release@example.com", password: "secret" }, timeoutMs: 1,
+    evaluate: async (expression) => {
+      if (expression.includes("loginGatewayAccount")) return { ok: true, stateRefreshRequired: true };
+      if (expression.includes("executeAction")) {
+        calls++;
+        if (calls === 1) return { ok: true, status: "error", dryRun: false, exitCode: 4, errorCode: "gateway_unavailable", ...first };
+        source = "opl_gateway";
+        return { ok: true, status: "executed", dryRun: false, exitCode: 0 };
+      }
+      if (!expression.includes("const project=")) source = reconciledSource;
+      return { projection: projection() };
+    },
+    callCount: () => calls
+  };
+}
+
+test("Gateway setup reconciles one settled unavailable error and retries once with real readiness still required", async () => {
+  const fixture = gatewayRecoveryFixture();
+  const result = await runGatewayHook(fixture);
+  assert.equal(result.status, "passed");
+  assert.equal(fixture.callCount(), 2);
+  assert.equal(result.confirmation.recovery.firstExecute.errorCode, "gateway_unavailable");
+  assert.equal(result.confirmation.recovery.retryCount, 1);
+  const stale = gatewayRecoveryFixture({ ready: false });
+  assert.equal((await runGatewayHook(stale)).status, "partial");
+  assert.equal(stale.callCount(), 2);
+});
+
+test("Gateway recovery does not repeat unknown outcomes, authentication failures, or changed model access", async () => {
+  for (const input of [{ first: { ok: false } }, { first: { status: null } }, { first: { errorCode: "invalid_credentials" } }, { first: { exitCode: null } }, { reconciledSource: "codex_login" }]) {
+    const fixture = gatewayRecoveryFixture(input);
+    assert.equal((await runGatewayHook(fixture)).status, "partial");
+    assert.equal(fixture.callCount(), 1);
+  }
+});
+
+test("Gateway recovery reads an already converged owner without a second mutation", async () => {
+  const fixture = gatewayRecoveryFixture({ reconciledSource: "opl_gateway" });
+  const result = await runGatewayHook(fixture);
+  assert.equal(result.status, "passed");
+  assert.equal(fixture.callCount(), 1);
+  assert.equal(result.confirmation.recovery.alreadyConfigured, true);
+  assert.equal(result.confirmation.recovery.retryCount, 0);
+});
 
 test("clean VM parses plutil raw values without embedding line breaks in JSON strings", () => {
   assert.deepEqual(parseInstalledIdentityOutput(
