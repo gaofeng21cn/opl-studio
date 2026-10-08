@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+bootstrap_stage=payload_validation
+stage() { bootstrap_stage=$1; printf 'OPL_BOOTSTRAP_STAGE=%s\n' "$bootstrap_stage" >&2; }
+trap 'code=$?; printf "OPL_BOOTSTRAP_FAILURE=%s:%s\n" "$bootstrap_stage" "$code" >&2; exit "$code"' ERR
+stage payload_validation
 
 payload=${1:?Missing packaged Linux payload}
 [[ "$payload" == /mnt/*/opl-wsl-host ]] || { printf 'Invalid OPL bootstrap payload path.\n' >&2; exit 64; }
@@ -31,12 +36,14 @@ NODE
 framework_ref=${binding[0]}
 
 export DEBIAN_FRONTEND=noninteractive
+stage system_dependencies
 if [[ "$legacy_identity" != 1 ]] || ! command -v gh >/dev/null || ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ca-certificates curl git ffmpeg python3 build-essential unzip
 fi
 # Ubuntu's older GitHub CLI requires login even to install a public extension.
 # Keep gh owned by apt and consume GitHub's signed native package source.
+stage github_cli
 if [[ ! -f /etc/apt/sources.list.d/opl-github-cli.list ]] || ! command -v gh >/dev/null; then
   install -d -m 0755 /etc/apt/keyrings
   curl --fail --location --connect-timeout 20 --max-time 120 --retry 3 \
@@ -48,9 +55,11 @@ if [[ ! -f /etc/apt/sources.list.d/opl-github-cli.list ]] || ! command -v gh >/d
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
   apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends gh
 fi
+stage guest_user
 if ! id opl >/dev/null 2>&1; then useradd --create-home --shell /bin/bash opl; fi
 [[ "$(getent passwd opl | cut -d: -f6)" == /home/opl ]] || { printf 'OPL guest user has an unexpected home.\n' >&2; exit 65; }
 install -d -m 0755 /opt/opl/studio-runtime /opt/opl/studio-bootstrap /etc/opl-studio
+stage runtime_install
 for binding in node:node codex:codex-root; do
   source=${binding%%:*}
   target=${binding##*:}
@@ -68,6 +77,7 @@ ln -sfn /opt/opl/studio-runtime/codex-root/vendor/x86_64-unknown-linux-musl/bin/
 install -d -o opl -g opl -m 0700 /home/opl/.codex /home/opl/code
 # Persist the first-install intent before Framework creates owner state. Existing
 # upgrades retain their receipt and never enter this path.
+stage profile_admission
 runuser -u opl -- env HOME=/home/opl OPL_STATE_DIR='/home/opl/Library/Application Support/OPL/state' \
   OPL_STUDIO_OFFICIAL_PROFILE_MODULE="$payload/desktop/official-profile.mjs" \
   /usr/local/bin/node --input-type=module -e 'import { pathToFileURL } from "node:url"; const module = await import(pathToFileURL(process.env.OPL_STUDIO_OFFICIAL_PROFILE_MODULE).href); module.captureOfficialProfileAdmission({ homeDir: "/home/opl", env: process.env });'
@@ -77,10 +87,12 @@ import { pathToFileURL } from 'node:url';
 const {captureOfficialProfileAdmission}=await import(pathToFileURL(process.argv[2]+'/desktop/official-profile.mjs').href);
 captureOfficialProfileAdmission({homeDir:'/home/opl',env:{HOME:'/home/opl',CODEX_HOME:'/home/opl/.codex'}});
 NODE
+stage framework_install
 runuser -u opl -- /usr/bin/env HOME=/home/opl CODEX_HOME=/home/opl/.codex OPL_CODEX_BIN=/usr/local/bin/codex \
   OPL_WORKSPACE_ROOT=/home/opl/code PATH=/usr/local/bin:/usr/bin:/bin \
   /usr/local/bin/node "$payload/desktop/windows-framework-install.mjs" "$payload"
 
+stage runtime_identity
 "$payload/runtime/node/bin/node" --input-type=module - "$payload" <<'NODE'
 import fs from 'node:fs';import crypto from 'node:crypto';import path from 'node:path';
 const manifest=JSON.parse(fs.readFileSync(path.join(process.argv[2],'manifest.json'),'utf8'));
@@ -89,4 +101,5 @@ let previous;try{previous=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
 const identity={schema:'opl_studio_linux_runtime_identity.v1',guest_install_id:previous?.guest_install_id||crypto.randomUUID(),distribution_generation:previous?.distribution_generation||1,framework_ref:manifest.bootstrap.framework_ref};
 fs.writeFileSync(file+'.pending',JSON.stringify(identity)+'\n',{mode:0o644});fs.renameSync(file+'.pending',file);
 NODE
+stage runtime_inspection
 runuser -u opl -- /usr/local/bin/node /opt/opl/studio-bootstrap/inspect.mjs --json

@@ -10,6 +10,17 @@ const decode = chunks => {
   const buffer = Buffer.concat(chunks);
   return (buffer.includes(0) ? buffer.toString("utf16le") : buffer.toString("utf8")).replace(/^\uFEFF/, "");
 };
+const bootstrapStages = new Set(["payload_validation", "system_dependencies", "github_cli", "guest_user", "runtime_install",
+  "profile_admission", "framework_install", "runtime_identity", "runtime_inspection"]);
+const bootstrapFailure = result => {
+  const diagnostics = `${result.stderr}\n${result.stdout}`;
+  let stage = "unknown";
+  for (const line of diagnostics.split(/\r?\n/)) {
+    const match = /^(?:OPL_BOOTSTRAP_STAGE=|OPL_BOOTSTRAP_FAILURE=)([a-z_]+)(?::[0-9]+)?$/.exec(line);
+    if (match && bootstrapStages.has(match[1])) stage = match[1];
+  }
+  return { stage, exitCode: result.exitCode, timedOut: result.timedOut === true };
+};
 
 export function createWindowsProvisioner({ userDataPath, resourcesPath, env = process.env, spawnImpl = spawn,
   onProgress = () => {}, resumeExecutable, platform = process.platform, verifyPayload = verifyGuestPayloadFiles } = {}) {
@@ -70,8 +81,19 @@ export function createWindowsProvisioner({ userDataPath, resourcesPath, env = pr
       const result = await run(wsl, guest(["/bin/bash", `${translated}/desktop/windows-bootstrap.sh`, translated], "root"), { stage: "initializing_guest" });
       if (result.exitCode !== 0 || result.timedOut) {
         const diagnostics = `${result.stderr}\n${result.stdout}`;
-        throw fail(/Temporary failure resolving|Could not resolve/i.test(diagnostics) ? "wsl_guest_dns_unavailable"
+        const error = fail(/Temporary failure resolving|Could not resolve/i.test(diagnostics) ? "wsl_guest_dns_unavailable"
           : /Failed to fetch|Could not connect|Connection timed out/i.test(diagnostics) ? "wsl_guest_network_unavailable" : "wsl_guest_bootstrap_failed");
+        const failure = bootstrapFailure(result);
+        const receiptRoot = path.join(userDataPath, "installer", "receipts");
+        fs.mkdirSync(receiptRoot, { recursive: true });
+        const target = path.join(receiptRoot, "windows-wsl2-bootstrap-failed.json");
+        const bytes = JSON.stringify({ schema: "opl_windows_wsl2_bootstrap_failure.v1", status: "failed",
+          observed_at: new Date().toISOString(), errorCode: error.code, failure }) + "\n";
+        fs.writeFileSync(`${target}.pending`, bytes, { mode: 0o600 });
+        fs.renameSync(`${target}.pending`, target);
+        error.message += ` Stage: ${failure.stage}; exit: ${failure.exitCode}; timed out: ${failure.timedOut}.`;
+        error.bootstrapFailure = failure;
+        throw error;
       }
       const inspected = successful(await run(wsl, guest(["/usr/local/bin/node", "/opt/opl/studio-bootstrap/inspect.mjs", "--json"]), { stage: "validating_routes" }), "wsl_new_guest_inspection_failed");
       const identity = validateWindowsRuntimeIdentity(JSON.parse(inspected.stdout));

@@ -290,6 +290,15 @@ Host payload matches its packaged manifest byte for byte. It does not prove WSL2
 provisioning, guest bootstrap, Codex execution, App release admission, or
 production readiness; those remain with their owners.
 
+If first installation reports `wsl_guest_bootstrap_failed`, a running
+`OPL-Linux` distribution confirms only that WSL started. The error now includes
+the last bootstrap stage, process exit code and timeout flag, and saves the same
+bounded facts in `installer/receipts/windows-wsl2-bootstrap-failed.json` under
+the App user-data directory. It never stores guest stdout, stderr, commands,
+credentials or network addresses. Share those stage/exit/timeout facts with the
+App version when reporting an installation failure; a successful later install
+has its separate `windows-wsl2-ready.json` receipt.
+
 ## Codex CLI version ownership
 
 The macOS Standard and Full App bundles do not embed a second Codex CLI.

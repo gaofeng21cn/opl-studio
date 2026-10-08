@@ -4,10 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { createWindowsProvisioner } from "./windows-provisioning.mjs";
 
-function scenario(context, { foreign = false, featureMissing = false, restart = false } = {}) {
+function scenario(context, { foreign = false, featureMissing = false, restart = false, bootstrapError = "" } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-wsl-provision-test-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const userDataPath = path.join(root, "data"), resourcesPath = path.join(root, "resources");
@@ -38,6 +39,7 @@ function scenario(context, { foreign = false, featureMissing = false, restart = 
       else if (args.includes("--install")) installed = true;
       else if (args.includes("/usr/bin/wslpath")) out = "/mnt/c/opl-wsl-host";
       else if (args.includes("/opt/opl/studio-bootstrap/inspect.mjs")) out = JSON.stringify(identity);
+      if (args.includes("/bin/bash") && bootstrapError) { code = 17; child.stderr.end(bootstrapError); }
       child.stdout.end(out); child.emit("close", code);
     });
     return child;
@@ -62,6 +64,37 @@ test("Windows first install refuses a same-name foreign distribution without run
   const fx = scenario(context, { foreign: true });
   await assert.rejects(fx.provisioner.ensureReady(), { code: "wsl_foreign_distribution" });
   assert.equal(fx.calls.some(call => call.args.includes("/bin/bash")), false);
+});
+
+test("guest bootstrap failure preserves the exact safe stage and exit code without raw output", async context => {
+  const fx = scenario(context, { bootstrapError: "OPL_BOOTSTRAP_STAGE=framework_install\nprivate-password user@example.invalid https://private.invalid\nOPL_BOOTSTRAP_FAILURE=framework_install:17\n" });
+  await assert.rejects(fx.provisioner.ensureReady(), error => {
+    assert.equal(error.code, "wsl_guest_bootstrap_failed");
+    assert.deepEqual(error.bootstrapFailure, { stage: "framework_install", exitCode: 17, timedOut: false });
+    assert.match(error.message, /Stage: framework_install; exit: 17/);
+    return true;
+  });
+  const bytes = fs.readFileSync(path.join(fx.userDataPath, "installer/receipts/windows-wsl2-bootstrap-failed.json"), "utf8");
+  assert.doesNotMatch(bytes, /private-password|user@example|private.invalid/);
+  assert.deepEqual(JSON.parse(bytes).failure, { stage: "framework_install", exitCode: 17, timedOut: false });
+  assert.equal(fs.existsSync(path.join(fx.userDataPath, "installer/receipts/windows-wsl2-ready.json")), false);
+});
+
+test("unrecognized guest output cannot become a persisted stage and DNS classification remains intact", async context => {
+  const fx = scenario(context, { bootstrapError: "OPL_BOOTSTRAP_STAGE=private_password\nTemporary failure resolving\n" });
+  await assert.rejects(fx.provisioner.ensureReady(), error => {
+    assert.equal(error.code, "wsl_guest_dns_unavailable");
+    assert.equal(error.bootstrapFailure.stage, "unknown");
+    return true;
+  });
+});
+
+test("the packaged Bash error trap reports the failing bootstrap stage and original exit code", () => {
+  const script = fs.readFileSync(new URL("./windows-bootstrap.sh", import.meta.url), "utf8");
+  const setup = script.slice(0, script.indexOf("payload=${1:"));
+  const result = spawnSync("bash", ["-c", `${setup}\nstage framework_install\n(exit 17)\n`], { encoding: "utf8" });
+  assert.equal(result.status, 17);
+  assert.match(result.stderr, /^OPL_BOOTSTRAP_FAILURE=framework_install:17$/m);
 });
 
 test("Windows feature enablement preserves UAC and an explicit restart-resume state", async context => {
