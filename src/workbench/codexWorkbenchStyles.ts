@@ -3164,7 +3164,11 @@ export const codexWorkbenchStyles = `
   .settings-action-dialog-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 40;
+    /* The confirmation dialog is mounted in the root shell overlay, a sibling of
+       the settings modal (SettingsRoot/DSH Modal at z-index 1000). It must sit
+       above that modal or it is painted behind it and looks like the confirm
+       step never appeared. */
+    z-index: 1100;
     display: grid;
     place-items: center;
     padding: 24px;

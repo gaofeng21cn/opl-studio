@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Wrench, LoaderCircle } from "lucide-react";
 import { trapDialogFocus, formatStatus, formatBytes } from "./presentation";
 import type { SettingsPanelProps } from "./types";
@@ -7,7 +8,7 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
  const confirmationCancelRef = useRef<HTMLButtonElement>(null);
  const open = Boolean(pendingConfirmation);
  useEffect(() => { if (!open) return; const previous = document.activeElement; confirmationCancelRef.current?.focus(); return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); }; }, [open]);
- return (pendingConfirmation ? (
+ return (pendingConfirmation ? createPortal(
         <div className="settings-action-dialog-backdrop" role="presentation">
           <section
             ref={confirmationDialogRef}
@@ -50,6 +51,6 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
               </button>
             </div>
           </section>
-        </div>
-      ) : null);
+        </div>,
+        document.body) : null);
 }
