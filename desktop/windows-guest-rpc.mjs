@@ -47,10 +47,10 @@ export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, t
   return {
     events, close,
     emit(value) { if (!closed) write({ type: "event", value }); },
-    request(method, payload = {}) {
+    request(method, payload = {}, { timeoutMs: requestTimeoutMs = timeoutMs } = {}) {
       return new Promise((resolve, reject) => {
         const id = ++serial;
-        const timer = setTimeout(() => { pending.delete(id); reject(Object.assign(new Error("Guest Host request timed out"), { code: "guest_request_timeout" })); }, timeoutMs);
+        const timer = requestTimeoutMs === 0 ? null : setTimeout(() => { pending.delete(id); reject(Object.assign(new Error("Guest Host request timed out"), { code: "guest_request_timeout" })); }, requestTimeoutMs);
         pending.set(id, { resolve, reject, timer });
         try { write({ type: "request", id, method, payload }); }
         catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }

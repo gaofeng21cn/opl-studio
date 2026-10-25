@@ -204,7 +204,7 @@ test('Windows guest Host requires its Linux dependency closure and exact source 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-wsl-host-'));
   try {
     const shellRef = 'a'.repeat(40);
-    const names = ['package.json', 'package-lock.json', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/windows-runtime.mjs',
+    const names = ['package.json', 'package-lock.json', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/guest-host-core.mjs', 'desktop/node-host-runtime.mjs', 'desktop/node-host-policy.json', 'desktop/windows-runtime.mjs',
       'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
       'runtime/node/lib/node_modules/npm/bin/npm-cli.js', 'runtime/codex/vendor/x86_64-unknown-linux-musl/bin/codex', 'runtime/opl-install.sh',
       'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
@@ -221,6 +221,9 @@ test('Windows guest Host requires its Linux dependency closure and exact source 
       files: names.sort((a, b) => a.localeCompare(b)).map(name => ({ path: name, sha256: crypto.createHash('sha256').update('{}').digest('hex') })) };
     fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify(manifest));
     assert.equal(validateWslHostPayload(root, shellRef).shell_ref, shellRef);
+    fs.rmSync(path.join(root, 'desktop/guest-host-core.mjs'));
+    assert.throws(() => validateWslHostPayload(root, shellRef), /guest-host-core/);
+    fs.writeFileSync(path.join(root, 'desktop/guest-host-core.mjs'), '{}');
     assert.throws(() => validateWslHostPayload(root, 'b'.repeat(40)), /identity/);
     fs.writeFileSync(path.join(root, 'package-lock.json'), '{"changed":true}');
     assert.throws(() => validateWslHostPayload(root, shellRef), /lock digest/);

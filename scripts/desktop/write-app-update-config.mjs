@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
+import { resolveHostNode } from "../../desktop/node-host-runtime.mjs";
 
 const EXPECTED_OWNER = "gaofeng21cn";
 
@@ -55,20 +56,16 @@ export default async function afterPack(context) {
     platform,
   });
   process.stdout.write(`Studio updater config written: ${outputPath}\n`);
-  const config = context?.packager?.config;
-  const productName = config?.productName || "One Person Lab";
   const appDir = platform === "darwin" ? resolvePackagedAppDir(context.appOutDir) : context.appOutDir;
   const resources = platform === "darwin" ? path.join(appDir, "Contents", "Resources") : path.join(appDir, "resources");
-  const executable = platform === "darwin" ? path.join(appDir, "Contents", "MacOS", productName)
-    : platform === "win32" ? path.join(appDir, `${config?.executableName || productName}.exe`)
-      : path.join(appDir, config?.linux?.executableName || config?.executableName || productName);
-  const smoke = path.join(resources, "app.asar", "src", "host", "packaged-host-smoke.mjs");
+  const smoke = path.join(resources, "app.asar.unpacked", "src", "host", "packaged-host-smoke.mjs");
   // Cross-architecture packaging is validated on the matching native runner.
   const nativeArchitecture = context.arch === 3 ? "arm64" : context.arch === 1 ? "x64" : null;
   if (platform !== process.platform || (nativeArchitecture && nativeArchitecture !== process.arch)) return;
-  const output = execFileSync(executable, [smoke], {
+  const node = resolveHostNode({ nodeExecutable: process.execPath });
+  const output = execFileSync(node.command, [smoke], {
     cwd: os.tmpdir(),
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_PATH: "", NODE_OPTIONS: "" },
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "", NODE_PATH: "", NODE_OPTIONS: "" },
     timeout: 30_000,
     encoding: "utf8"
   });

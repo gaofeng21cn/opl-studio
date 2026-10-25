@@ -12,7 +12,7 @@ const runtimeBootstrap = fs.readFileSync(path.join(root, "desktop", "runtime-boo
 const settingsPanel = fs.readFileSync(path.join(root, "src", "workbench", "SettingsPanel.tsx"), "utf8") + fs.readdirSync(path.join(root, 'src/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'src/workbench/settings', file), 'utf8')).join('\n');
 
 test("Electron is a thin, isolated adapter over the shared host core", () => {
-  assert.match(main, /createOplHostCore/);
+  assert.match(main, /createLocalNodeHost/);
   assert.match(main, /workspaceRoot:\s*desktopCodexWorkspaceRoot\(\)/);
   assert.match(main, /app\.getPath\("home"\)/);
   assert.match(main, /ensureStudioDesktopRuntime/);

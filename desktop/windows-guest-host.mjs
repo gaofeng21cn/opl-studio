@@ -1,18 +1,19 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createGuestRpc } from "./windows-guest-rpc.mjs";
+import { nativeHostOptions, startGuestHostCore } from "./guest-host-core.mjs";
 import { validateWindowsRuntimeIdentity } from "./windows-runtime.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 
 export async function startWindowsGuestHost({ input = process.stdin, output = process.stdout, createCore,
   platform = process.platform, arch = process.arch } = {}) {
   if (platform !== "linux" || arch !== "x64") throw new Error("Windows guest Host requires Linux x64");
-  let core, booting, closing, lease, profileOptions;
-  const native = (method, payload) => rpc.request("native", { method, payload });
-  const rpc = createGuestRpc({ input, output, onRequest: async (method, payload = {}) => {
-    if (method === "initialize") {
-      if (booting) return booting;
-      booting = (async () => {
+  let profileOptions;
+  return startGuestHostCore({ input, output,
+    createCore: async options => {
+      if (!createCore) ({ createOplHostCore: createCore } = await import("../src/host/create-host.mjs"));
+      return createCore(options);
+    },
+    prepare: async (payload, native, emit) => {
         const identity = validateWindowsRuntimeIdentity(payload.identity);
         if (typeof payload.canonicalThreadHost !== "string" || !payload.canonicalThreadHost.trim()
           || /[\r\n\0]/.test(payload.canonicalThreadHost)) throw new Error("Canonical Windows thread host is missing");
@@ -29,56 +30,22 @@ export async function startWindowsGuestHost({ input = process.stdin, output = pr
           OPL_APP_HOST_KIND: "desktop", OPL_STUDIO_READ_ONLY: "0", PATH: "/home/opl/.opl/one-person-lab/bin:/home/opl/.npm-global/bin:/home/opl/.local/bin:/usr/local/bin:/usr/bin:/bin" };
         // Set process HOME as well: Framework profile imports read process.env.
         Object.assign(process.env, env);
-        if (!createCore) ({ createOplHostCore: createCore } = await import("../src/host/create-host.mjs"));
-        core = await createCore({ env, workspaceRoot: "/home/opl/code", canonicalThreadHost: payload.canonicalThreadHost,
+        const options = { env, workspaceRoot: "/home/opl/code", canonicalThreadHost: payload.canonicalThreadHost,
           channelBindingFile: payload.channelBindingFile,
           candidateActionAllowlist: payload.candidateActionAllowlist ?? [],
-          platform: Object.fromEntries(["beginWindowDrag", "pickFiles", "pickDirectory", "classifyInputPaths", "releaseInputs", "notifyCompletion", "accessWorkspacePath"]
-            .map(name => [name, value => native(`platform.${name}`, value)])),
-          nativeUpdater: { perform: (operation, value) => native("updater", { operation, value }) },
-          carrierDiagnostics: { read: () => native("diagnostics.read"), setLogDirectory: value => native("diagnostics.setLogDirectory", value) }
-        });
+          ...nativeHostOptions(native)
+        };
         const admission = captureOfficialProfileAdmission({ homeDir: "/home/opl", env });
         profileOptions = { admission, resourcesPath: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../resources"),
-          env, nodeCommand: "/usr/local/bin/node", readinessTimeoutMs: 0, readInitialize: () => core.invoke("readInitialize"),
-          logEvent: result => rpc.emit({ method: "host/official-profile", params: { status: result.status } }) };
-        core.on("event", value => rpc.emit(value));
-        return { capabilities: core.capabilities(), codex: core.codex.capabilities() };
-      })();
-      return booting;
+          env, nodeCommand: "/usr/local/bin/node", readinessTimeoutMs: 0, logEvent: result => emit({ method: "host/official-profile", params: { status: result.status } }) };
+
+      return { options, afterInvoke(method, result) {
+        if (method === "readInitialize" && profileOptions?.admission.eligible) {
+          void startOfficialProfileFirstInstall({ ...profileOptions, readInitialize: async () => result });
+        }
+      } };
     }
-    if (!core) throw Object.assign(new Error("Guest Host has not initialized"), { code: "guest_host_not_ready" });
-    if (method === "invoke") {
-      const result = await core.invoke(payload.method, payload.payload ?? {});
-      if (payload.method === "readInitialize" && profileOptions?.admission.eligible) {
-        void startOfficialProfileFirstInstall({ ...profileOptions, readInitialize: async () => result });
-      }
-      return result;
-    }
-    if (method === "managedUpdate") return core.opl.runManagedUpdate(payload.operation);
-    if (method === "startupMaintenance") return core.opl.runStartupMaintenance();
-    if (method === "reloadConfiguration") return core.codex.reloadConfiguration(payload);
-    if (method === "leaseRelease") { lease?.(); lease = undefined; return { released: true }; }
-    if (method === "leaseAcquire") {
-      if (lease) return { status: "deferred", reasonCode: "app_server_busy" };
-      return new Promise((resolve, reject) => {
-        const operation = core.transport.runWhenIdle(async () => {
-          const held = new Promise(release => { lease = release; });
-          resolve({ status: "held" });
-          await held;
-        });
-        void operation.then(result => { if (result.status === "deferred") resolve(result); }, reject);
-      });
-    }
-    if (method === "close") {
-      lease?.(); lease = undefined;
-      closing ??= core.close(); await closing;
-      return { closed: true };
-    }
-    throw Object.assign(new Error("Unknown guest Host request"), { code: "guest_method_not_found" });
-  } });
-  rpc.events.on("close", () => { lease?.(); if (core) void core.close().catch(() => {}); });
-  return { rpc, close: async () => { lease?.(); if (core) await core.close(); rpc.close(); } };
+  });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime } from "./runtime-bootstrap.mjs";
+import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
 
 function createPayload(root, overrides = {}) {
   const resourcesPath = path.join(root, "Resources");
@@ -206,6 +206,55 @@ test("packaged Standard reuses the exact installed Framework identity without re
   assert.equal(result.env.PRESERVED, "yes");
 });
 
+test("an installed Framework with unsafe Node uses only the canonical Node maintenance entry", async context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-installed-node-update-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  createInstalledFramework(homeDir, "b".repeat(40));
+  const identity = path.join(homeDir, ".opl", "one-person-lab", ".opl-framework-installed-source-identity.json");
+  const original = fs.readFileSync(identity, "utf8");
+  const custom = path.join(homeDir, ".opl", "one-person-lab", "custom.txt");
+  fs.writeFileSync(custom, "preserved");
+  const systemBin = path.join(root, "system");
+  fs.mkdirSync(systemBin);
+  const unsafe = path.join(systemBin, "node");
+  const unsafeBytes = '#!/bin/sh\necho \'{"node":"26.10.0","electron":null}\'\n';
+  fs.writeFileSync(unsafe, unsafeBytes, { mode: 0o755 });
+  const resourcesPath = createStandardBootstrap(root, { installerBody: `#!/bin/bash
+set -euo pipefail
+test "$1" = --ensure-node
+mkdir -p "$HOME/.opl/toolchain/node-v22.23.4/bin"
+cat > "$HOME/.opl/toolchain/node-v22.23.4/bin/node" <<'NODE'
+#!/bin/sh
+echo '{"node":"22.23.4","electron":null}'
+NODE
+chmod +x "$HOME/.opl/toolchain/node-v22.23.4/bin/node"
+` });
+  const actual = await ensureDesktopHostNode({ resourcesPath, homeDir, env: { PATH: [systemBin, "/usr/bin", "/bin"].join(path.delimiter) }, platform: "linux" });
+  assert.equal(actual.version, "22.23.4");
+  assert.equal(actual.command, fs.realpathSync(path.join(homeDir, ".opl/toolchain/node-v22.23.4/bin/node")));
+  assert.equal(fs.readFileSync(identity, "utf8"), original);
+  assert.equal(fs.readFileSync(custom, "utf8"), "preserved");
+  assert.equal(fs.readFileSync(unsafe, "utf8"), unsafeBytes);
+});
+
+test("an unsafe Full Node cannot win over an already verified Framework toolchain Node", async context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-full-node-selection-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const resourcesPath = createPayload(root);
+  const payloadNode = path.join(resourcesPath, "opl-studio-full-runtime/runtime/current/node/bin/node");
+  fs.mkdirSync(path.dirname(payloadNode), { recursive: true });
+  fs.writeFileSync(payloadNode, '#!/bin/sh\necho \'{"node":"26.10.0","electron":null}\'\n', { mode: 0o755 });
+  const safe = path.join(homeDir, ".opl/toolchain/node-v22.23.4/bin/node");
+  fs.mkdirSync(path.dirname(safe), { recursive: true });
+  fs.writeFileSync(safe, '#!/bin/sh\necho \'{"node":"22.23.4","electron":null}\'\n', { mode: 0o755 });
+  const runtime = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: "linux" });
+  const actual = await ensureDesktopHostNode({ runtime, homeDir, env: {} });
+  assert.equal(actual.version, "22.23.4");
+  assert.equal(actual.command, fs.realpathSync(safe));
+});
+
 test("packaged Standard preserves a newer managed Framework identity across App starts", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-standard-update-test-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -254,7 +303,10 @@ printf '{"schema":"opl_framework_installed_source_identity.v1","framework_sha":"
 printf '#!/bin/sh\\nexit 0\\n' > "$HOME/.local/bin/opl"
 chmod +x "$HOME/.local/bin/opl"
 mkdir -p "$HOME/.opl/toolchain/node-v22/bin"
-printf '#!/bin/sh\\nexit 0\\n' > "$HOME/.opl/toolchain/node-v22/bin/node"
+cat > "$HOME/.opl/toolchain/node-v22/bin/node" <<'NODE'
+#!/bin/sh
+echo '{"node":"22.23.4","electron":null}'
+NODE
 chmod +x "$HOME/.opl/toolchain/node-v22/bin/node"
 `;
   const resourcesPath = createStandardBootstrap(root, { frameworkRef, installerBody });
@@ -271,7 +323,7 @@ chmod +x "$HOME/.opl/toolchain/node-v22/bin/node"
   assert.equal(result.source, "packaged_standard_bootstrap");
   assert.equal(result.version, frameworkRef);
   assert.equal(result.env.OPL_APP_OPL_BIN, path.join(homeDir, ".local", "bin", "opl"));
-  assert.equal(result.nodeExecutable, path.join(homeDir, ".opl", "toolchain", "node-v22", "bin", "node"));
+  assert.equal(result.nodeExecutable, fs.realpathSync(path.join(homeDir, ".opl", "toolchain", "node-v22", "bin", "node")));
 });
 
 test("Stable macOS captures Official Profile intent before the Standard installer creates Framework state", async (t) => {

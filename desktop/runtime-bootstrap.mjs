@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { resolveHostNode } from "./node-host-runtime.mjs";
 
 const FULL_RUNTIME_RESOURCE_DIR = "opl-studio-full-runtime";
 const FULL_RUNTIME_MANIFEST = "full-package-manifest.json";
@@ -362,9 +363,9 @@ async function supportsRuntimeActivation(env) {
   });
 }
 
-function runBootstrapInstaller(installerPath, env) {
+function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip-packages"]) {
   return new Promise((resolve, reject) => {
-    const child = spawn("/bin/bash", [installerPath, "--headless", "--skip-packages"], {
+    const child = spawn("/bin/bash", [installerPath, ...args], {
       env,
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -400,7 +401,9 @@ function executableFile(filePath) {
 function resolveManagedNodeExecutable({ runtimeHome, homeDir, platform = process.platform } = {}) {
   const nodeName = platform === "win32" ? "node.exe" : "node";
   const runtimeNode = path.join(runtimeHome, "node", "bin", nodeName);
-  if (executableFile(runtimeNode)) return runtimeNode;
+  if (executableFile(runtimeNode)) {
+    try { return resolveHostNode({ nodeExecutable: runtimeNode }).command; } catch {}
+  }
 
   const toolchainRoot = path.join(homeDir, ".opl", "toolchain");
   try {
@@ -410,7 +413,10 @@ function resolveManagedNodeExecutable({ runtimeHome, homeDir, platform = process
       .filter(executableFile)
       .sort()
       .reverse();
-    return candidates[0] ?? null;
+    for (const candidate of candidates) {
+      try { return resolveHostNode({ nodeExecutable: candidate }).command; } catch {}
+    }
+    return null;
   } catch {
     return null;
   }
@@ -494,4 +500,18 @@ export async function ensureStudioDesktopRuntime({
     source: "packaged_standard_bootstrap",
     env: installedEnv
   };
+}
+
+// Reuse the frozen Framework installer for Node-only security maintenance.
+// Existing Framework source, Packages and system Node remain with their owners.
+export async function ensureDesktopHostNode({ runtime, resourcesPath, homeDir = os.homedir(), env = process.env, platform = process.platform } = {}) {
+  const effectiveEnv = runtime?.env ?? env;
+  try { return resolveHostNode({ nodeExecutable: runtime?.nodeExecutable, env: effectiveEnv }); }
+  catch (cause) {
+    const standard = resourcesPath && resolveStandardBootstrap(resourcesPath);
+    if (!standard) throw cause;
+    await runBootstrapInstaller(standard.installerPath, { ...effectiveEnv, HOME: homeDir }, ["--ensure-node"]);
+    const nodeExecutable = resolveManagedNodeExecutable({ runtimeHome: runtime?.runtimeHome ?? installedFrameworkRoot(homeDir), homeDir, platform });
+    return resolveHostNode({ nodeExecutable, env: effectiveEnv });
+  }
 }

@@ -60,7 +60,7 @@ for (const marker of ["buildRenderer", "dist", "desktop", "index.html", "rendere
 for (const marker of ["Boolean(window.oplStudio)", "installWebTransport", 'document.getElementById("root")']) {
   assert(rendererEntry.includes(marker), `missing shared renderer entry marker ${marker}`);
 }
-assert(desktopMain.includes("createOplHostCore") && desktopMain.includes('ipcMain.handle("opl:invoke"'), "desktop host must adapt the shared host core through IPC");
+assert(desktopMain.includes("createLocalNodeHost") && desktopMain.includes('ipcMain.handle("opl:invoke"'), "desktop host must adapt the shared host core through IPC");
 assert(desktopPreload.includes('contextBridge.exposeInMainWorld("oplStudio"'), "desktop preload must expose the shared bridge ABI");
 for (const marker of ['<div id="root"></div>']) {
   assert(rendererShell.includes(marker), `missing renderer shell marker ${marker}`);

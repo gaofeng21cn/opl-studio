@@ -5,13 +5,13 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createOplHostCore } from "../src/host/create-host.mjs";
+import { createLocalNodeHost } from "./local-node-host.mjs";
 import { createOplPassthrough } from "../src/host/opl-passthrough.mjs";
 import { createManagedUpdateMaintenance } from "../src/host/managed-update-maintenance.mjs";
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
-import { ensureStudioDesktopRuntime } from "./runtime-bootstrap.mjs";
+import { ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 import { createShutdownController } from "./shutdown.mjs";
 import { createDesktopTray } from "./tray.mjs";
@@ -377,12 +377,13 @@ async function createDesktopHost(appLogDirectory) {
     },
     nativeUpdater: updater
   };
+  const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: hostEnvironment });
   core = windowsRuntime ? await createWindowsGuestHost({
       onProgress: reportWindowsSetup,
     ...hostOptions, windowsRuntime, resourcesPath: process.resourcesPath,
     userDataPath: app.getPath("userData"), version: hostEnvironment.OPL_APP_VERSION,
     instanceId: appProcessInstanceId
-  }) : await createOplHostCore(hostOptions);
+  }) : await createLocalNodeHost({ ...hostOptions, nodeExecutable: nodeHost.command });
 
   core.on("event", (event) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -392,7 +393,7 @@ async function createDesktopHost(appLogDirectory) {
   if (officialProfileAdmission && bootstrapStatus === "available") {
     // The packaged App may run under Electron without a system Node binary.
     // Use the exact managed Node selected by runtime bootstrap.
-    const officialNodeCommand = runtime?.nodeExecutable || process.execPath;
+    const officialNodeCommand = core.nodeHostIdentity.command;
     const officialOptions = {
       admission: officialProfileAdmission, resourcesPath: process.resourcesPath,
       env: { ...hostEnvironment, OPL_STATE_DIR: officialProfileAdmission.stateDir },

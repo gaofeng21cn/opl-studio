@@ -166,7 +166,15 @@ do not own product or runtime behavior:
 
 - Electron packages the renderer and host core for macOS, Windows, and Linux,
   exposing the typed `window.oplStudio` ABI through an isolated preload and
-  allowlisted IPC;
+  allowlisted IPC. macOS/Linux run the same Host in the standalone Node selected
+  by Framework, with private parent/child pipes reusing the Windows guest
+  protocol. Native callbacks remain in Electron; domain execution, profile tools
+  and their single update lease remain in the Host. Node admission enforces the
+  October 2026 TLS fixes and reads back the actual executable version and digest.
+  Existing unsafe Node installations use the same frozen Framework installer's
+  Node-only entry, preserving Framework source, Packages and system Node. Host
+  code and its original dependency closure are physically unpacked from ASAR;
+  Electron is never a Node fallback;
 - OPL Workspace exposes the same host core through loopback HTTP/SSE for
   standalone WebUI and headless operation;
 - the Docker carrier runs the Node host core and WebUI only. It

@@ -1,6 +1,11 @@
 appId: cn.onepersonlab.opl.studio.preview
 productName: One Person Lab Preview
 asar: true
+asarUnpack:
+  - desktop/**/*
+  - src/host/**/*
+  - node_modules/**/*
+  - package.json
 npmRebuild: false
 directories:
   output: out

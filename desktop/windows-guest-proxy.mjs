@@ -1,11 +1,8 @@
-import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
-import { createGuestRpc } from "./windows-guest-rpc.mjs";
-
-const nativeMethods = new Set(["beginWindowDrag", "pickFiles", "pickDirectory", "classifyInputPaths", "releaseInputs", "notifyCompletion", "accessWorkspacePath"]);
+import { createGuestCoreProxy } from "./guest-core-proxy.mjs";
 
 export async function verifyGuestPayloadFiles(root, manifest, { paths } = {}) {
   const declared = manifest.files;
@@ -60,84 +57,10 @@ export async function createWindowsGuestHost({ windowsRuntime, resourcesPath, us
   const guestDataRoot = await windowsRuntime.projectHostPath(userDataPath);
   const entry = await windowsRuntime.stageGuestHost(guestRoot, crypto.createHash("sha256").update(manifestBytes).digest("hex"));
   const child = windowsRuntime.spawnGuestHost(entry, { env });
-  const core = new EventEmitter();
-  let closing;
-  let capabilities, codexCapabilities;
-  const rpc = createGuestRpc({ input: child.stdout, output: child.stdin,
-    onEvent: event => {
-      if (event?.method === "host/availability" && typeof event.params?.available === "boolean") {
-        if (capabilities) capabilities.appServerAvailable = event.params.available;
-        if (codexCapabilities) codexCapabilities.available = event.params.available;
-        if (core.transport) core.transport.initialized = event.params.available;
-      }
-      core.emit("event", event);
-    },
-    onRequest: async (method, request = {}) => {
-      if (method !== "native") throw new Error("Unknown native Host request");
-      if (request.method === "updater") {
-        if (!["status", "check", "apply", "restart"].includes(request.payload?.operation)) throw new Error("Unknown native updater operation");
-        return nativeUpdater.perform(request.payload.operation, request.payload.value);
-      }
-      if (request.method === "diagnostics.read") return carrierDiagnostics?.read();
-      if (request.method === "diagnostics.setLogDirectory") return carrierDiagnostics?.setLogDirectory(request.payload);
-      const name = request.method?.startsWith("platform.") ? request.method.slice(9) : "";
-      if (!nativeMethods.has(name) || typeof platform[name] !== "function") throw new Error("Native platform capability unavailable");
-      let input = request.payload;
-      if (name === "accessWorkspacePath") input = { ...input, path: await windowsRuntime.projectGuestPath(input.path) };
-      const result = await platform[name](input);
-      if (["pickFiles", "pickDirectory", "classifyInputPaths"].includes(name) && Array.isArray(result)) {
-        return Promise.all(result.map(async item => ({ ...item, path: await windowsRuntime.projectHostPath(item.path) })));
-      }
-      return result;
-    }
-  });
-  child.stderr.on("data", () => {}); // Guest diagnostics may contain user paths; never echo them into release logs.
-  const disconnected = () => {
-    if (capabilities) capabilities.appServerAvailable = false;
-    if (codexCapabilities) codexCapabilities.available = false;
-    if (core.transport) core.transport.initialized = false;
-    rpc.close();
-    core.emit("event", { method: "host/availability", params: { available: false, code: "guest_host_closed" } });
-  };
-  child.once("error", disconnected);
-  child.once("close", disconnected);
-  let initialized;
-  const started = Date.now();
-  onProgress({ stage: "validating_routes", elapsedSeconds: 0 });
-  const progress = setInterval(() => onProgress({ stage: "validating_routes", elapsedSeconds: Math.floor((Date.now() - started) / 1000), heartbeat: true }), 15000);
-  try {
-    initialized = await rpc.request("initialize", { version, instanceId, canonicalThreadHost,
-      identity: runtime.identity, guestDataRoot,
-      channelBindingFile: `${guestDataRoot}/channel-transport-bindings.json`, candidateActionAllowlist });
-    onProgress({ stage: "ready", elapsedSeconds: Math.floor((Date.now() - started) / 1000) });
-  } catch (cause) {
-    child.stdin.end();
-    await windowsRuntime.close();
-    throw cause;
-  } finally { clearInterval(progress); }
-  capabilities = initialized.capabilities;
-  codexCapabilities = initialized.codex;
-  core.invoke = (method, payload = {}) => rpc.request("invoke", { method, payload });
-  core.capabilities = () => ({ ...capabilities });
-  core.opl = {
-    runManagedUpdate: operation => rpc.request("managedUpdate", { operation }),
-    runStartupMaintenance: () => rpc.request("startupMaintenance")
-  };
-  core.transport = {
-    initialized: initialized.capabilities.appServerAvailable,
-    async runWhenIdle(operation) {
-      const admission = await rpc.request("leaseAcquire");
-      if (admission.status !== "held") return admission;
-      try { return { status: "completed", result: await operation() }; }
-      finally { if (!closing) await rpc.request("leaseRelease"); }
-    }
-  };
-  core.codex = { transport: core.transport, capabilities: () => ({ ...codexCapabilities }),
-    reloadConfiguration: options => rpc.request("reloadConfiguration", options) };
-  core.close = () => closing ??= (async () => {
-    await core.updateMaintenance?.close();
-    try { await rpc.request("close"); } finally { child.stdin.end(); }
-    await windowsRuntime.close();
-  })();
-  return core;
+  return createGuestCoreProxy({ child, platform, nativeUpdater, carrierDiagnostics, onProgress,
+    initialize: { version, instanceId, canonicalThreadHost, identity: runtime.identity, guestDataRoot,
+      channelBindingFile: `${guestDataRoot}/channel-transport-bindings.json`, candidateActionAllowlist },
+    projectHostPath: value => windowsRuntime.projectHostPath(value),
+    projectGuestPath: value => windowsRuntime.projectGuestPath(value),
+    closeChild: () => windowsRuntime.close() });
 }

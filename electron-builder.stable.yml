@@ -9,6 +9,11 @@ extraMetadata:
   name: One Person Lab
   oplReleaseChannel: stable
 asar: true
+asarUnpack:
+  - desktop/**/*
+  - src/host/**/*
+  - node_modules/**/*
+  - package.json
 npmRebuild: false
 directories:
   output: out
