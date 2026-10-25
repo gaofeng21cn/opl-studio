@@ -264,8 +264,12 @@ async function createDesktopHost(appLogDirectory) {
     bootstrapStatus = "framework_bootstrap_failed";
     return null;
   });
+  const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
+  const runtimeEnvironment = nodeHost ? { ...(runtime?.env ?? process.env),
+    PATH: [path.dirname(nodeHost.command), (runtime?.env ?? process.env).PATH].filter(Boolean).join(path.delimiter)
+  } : process.env;
   const activationEnvironment = resolveDesktopRuntimeEnvironment({
-    env: runtime?.env ?? process.env,
+    env: runtimeEnvironment,
     homeDir,
     resourcesPath: process.resourcesPath
   });
@@ -287,7 +291,7 @@ async function createDesktopHost(appLogDirectory) {
   }
   const hostEnvironment = resolveDesktopRuntimeEnvironment({
     env: {
-      ...(runtime?.env ?? process.env), OPL_APP_PROCESS_INSTANCE_ID: appProcessInstanceId
+      ...runtimeEnvironment, OPL_APP_PROCESS_INSTANCE_ID: appProcessInstanceId
     },
     homeDir,
     activatedCodexPath,
@@ -377,7 +381,6 @@ async function createDesktopHost(appLogDirectory) {
     },
     nativeUpdater: updater
   };
-  const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: hostEnvironment });
   core = windowsRuntime ? await createWindowsGuestHost({
       onProgress: reportWindowsSetup,
     ...hostOptions, windowsRuntime, resourcesPath: process.resourcesPath,
