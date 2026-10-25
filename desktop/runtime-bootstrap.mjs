@@ -510,7 +510,7 @@ export async function ensureDesktopHostNode({ runtime, resourcesPath, homeDir = 
   catch (cause) {
     const standard = resourcesPath && resolveStandardBootstrap(resourcesPath);
     if (!standard) throw cause;
-    await runBootstrapInstaller(standard.installerPath, { ...effectiveEnv, HOME: homeDir }, ["--ensure-node"]);
+    await runBootstrapInstaller(standard.installerPath, { ...effectiveEnv, HOME: homeDir }, ["--headless", "--ensure-node"]);
     const nodeExecutable = resolveManagedNodeExecutable({ runtimeHome: runtime?.runtimeHome ?? installedFrameworkRoot(homeDir), homeDir, platform });
     return resolveHostNode({ nodeExecutable, env: effectiveEnv });
   }

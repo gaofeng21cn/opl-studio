@@ -222,7 +222,8 @@ test("an installed Framework with unsafe Node uses only the canonical Node maint
   fs.writeFileSync(unsafe, unsafeBytes, { mode: 0o755 });
   const resourcesPath = createStandardBootstrap(root, { installerBody: `#!/bin/bash
 set -euo pipefail
-test "$1" = --ensure-node
+test "$1" = --headless
+test "$2" = --ensure-node
 mkdir -p "$HOME/.opl/toolchain/node-v22.23.4/bin"
 cat > "$HOME/.opl/toolchain/node-v22.23.4/bin/node" <<'NODE'
 #!/bin/sh
