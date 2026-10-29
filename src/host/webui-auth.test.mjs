@@ -123,3 +123,48 @@ test("expired login failures are pruned and tracked sources stay bounded", async
   clock += 15 * 60 * 1_000 + 1;
   assert.equal(auth.checkLogin(expiring, "opl", "correct").ok, true);
 });
+
+
+test("trusted deployment prefix scopes session cookies and rejects ambiguous paths", async () => {
+  const env = {
+    OPL_WEBUI_DEPLOYMENT_MODE: "cloud",
+    OPL_WEBUI_PASSWORD: "correct",
+    OPL_WEBUI_SESSION_SECRET: "0123456789abcdef0123456789abcdef"
+  };
+  const auth = await createWebUiAuth({ env });
+  const req = request();
+  req.headers["x-forwarded-prefix"] = "/w/workspace_0123456789abcdef0123456789abcdef";
+  const base = "/w/workspace_0123456789abcdef0123456789abcdef/";
+  assert.equal(auth.basePath(req), base);
+  const res = response();
+  auth.issueSession(res, req);
+  assert.ok(res.headers.get("set-cookie").includes(`; Path=${base};`));
+  auth.clearSession(res, req);
+  assert.ok(res.headers.get("set-cookie").includes(`; Path=${base};`));
+  for (const prefix of ["//evil.example", "/w/../other", "/w/%2e%2e/", "/w/x?next=1", "/w/x#hash", "/w/x;Path=/", "/w/x, /w/y", "/w/x\n", ["/w/x", "/w/y"]]) {
+    req.headers["x-forwarded-prefix"] = prefix;
+    assert.throws(() => auth.basePath(req), /Invalid trusted WebUI prefix/);
+  }
+  const local = await createWebUiAuth({ env: {} });
+  req.headers["x-forwarded-prefix"] = "/w/ignored";
+  assert.equal(local.basePath(req), "/");
+  assert.equal(auth.basePath(request()), "/");
+});
+
+test("Workspace sessions take precedence over a retained root cookie without authentication fallback", async () => {
+  const auth = await createWebUiAuth({ env: {
+    OPL_WEBUI_DEPLOYMENT_MODE: "cloud",
+    OPL_WEBUI_PASSWORD: "correct",
+    OPL_WEBUI_SESSION_SECRET: "0123456789abcdef0123456789abcdef"
+  } });
+  const req = request();
+  req.headers["x-forwarded-prefix"] = "/w/workspace_0123456789abcdef0123456789abcdef";
+  const res = response();
+  const session = auth.issueSession(res, req);
+  const cookie = res.headers.get("set-cookie").split(";")[0];
+  // Cookie ordering matches the browser's longest-path-first ordering.
+  const migrated = request({ cookie: `${cookie}; ${auth.cookieName}=stale-root-session`, csrf: session.csrfToken });
+  assert.equal(auth.requireSession(migrated, { csrf: true }).ok, true);
+  const invalidSpecific = request({ cookie: `${auth.cookieName}=invalid-specific-session; ${cookie}` });
+  assert.equal(auth.requireSession(invalidSpecific).status, 401);
+});

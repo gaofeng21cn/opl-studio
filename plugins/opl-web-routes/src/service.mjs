@@ -1,6 +1,7 @@
 import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { renderIndexInjections } from "@deepseek-ai/dsh-host-webserver";
 import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
 
 function json(res, status, value) {
@@ -247,7 +248,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
           if (!webAuth.enabled) return json(res, 200, { authenticated: true, username: "opl", csrfToken: null });
           const result = webAuth.checkLogin(req, value.username, value.password);
           if (!result.ok) return authError(res, result);
-          json(res, 200, { authenticated: true, ...webAuth.issueSession(res) });
+          json(res, 200, { authenticated: true, ...webAuth.issueSession(res, req) });
         } catch (error) {
           errorResponse(res, error);
         }
@@ -270,7 +271,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
         if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
         const result = webAuth.requireSession(req, { csrf: true });
         if (!result.ok) return authError(res, result);
-        webAuth.clearSession(res);
+        webAuth.clearSession(res, req);
         json(res, 200, { authenticated: false });
       }
     }),
@@ -330,7 +331,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.registerFallback(async (req, res) => {
       const auth = webAuth.requireSession(req);
       if (!auth.ok) {
-        res.writeHead(302, { location: "/login", "cache-control": "no-store" });
+        res.writeHead(302, { location: `${webAuth.basePath(req)}login`, "cache-control": "no-store" });
         res.end();
         return;
       }
@@ -346,7 +347,13 @@ export function registerOplHttpRoutes(webServer, hostCore, {
         path.resolve(webRoot),
         path.resolve(webRoot, "index.html"),
         () => true,
-        async () => webServer.renderIndex(await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")))
+        async () => webServer.applyIndexTaps(renderIndexInjections(
+          await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")),
+          [
+            { kind: "html", placement: "head", html: `<base href="${webAuth.basePath(req)}">` },
+            ...webServer.collectIndexInjections()
+          ]
+        ))
       );
     })
   ];

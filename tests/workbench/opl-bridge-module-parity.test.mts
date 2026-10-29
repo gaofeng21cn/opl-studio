@@ -98,3 +98,56 @@ test("representative normalizers retain their public readback behavior", () => {
     sourceKind: "codex"
   });
 });
+
+
+test("WebUI transport resolves API, upload, download, SSE and login against its document base", async () => {
+  const originals = new Map(["document", "window", "location", "fetch", "EventSource"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const eventUrls: string[] = [];
+  const redirects: string[] = [];
+  let unauthorized = false;
+  const fakeLink = { href: "", download: "", click() {}, remove() {} };
+  try {
+    Object.assign(globalThis, {
+      window: { setTimeout() {} },
+      location: { replace: (url: string) => redirects.push(url) },
+      document: { baseURI: "https://workspace.example/", createElement: () => fakeLink, body: { append() {} } },
+      EventSource: class { constructor(url: string) { eventUrls.push(url); } close() {} },
+      fetch: async (url: string, init?: RequestInit) => {
+        calls.push({ url: String(url), init });
+        if (unauthorized) return Response.json({}, { status: 401 });
+        if (url.includes("/auth/user")) return Response.json({ csrfToken: "test-csrf" });
+        if (url.includes("/inputs") && init?.method === "POST" && !url.includes("complete")) return Response.json({ id: "input-1" });
+        if (url.includes("/complete")) return Response.json({ inputs: [{ kind: "file", name: "note.txt", path: "/data/note.txt" }] });
+        if (url.includes("/download")) return new Response("download");
+        return Response.json({});
+      }
+    });
+    const { installWebTransport } = await import("../../src/bridge/webTransport");
+    for (const prefix of ["/", "/w/workspace_0123456789abcdef0123456789abcdef/"]) {
+      document.baseURI = `https://workspace.example${prefix}`;
+      installWebTransport();
+      const surface = window.oplStudio!;
+      await surface.readState("fast");
+      await surface.listThreads({});
+      await surface.resolveDroppedInputs([new File(["hello"], "note.txt")]);
+      const close = surface.subscribeEvents(() => {});
+      close();
+      await surface.accessThreadWorkspace({ threadId: "thread-1", relativePath: "note.txt", action: "download" });
+      const urls = calls.splice(0);
+      expect(urls.every(({ url }) => url.startsWith(`https://workspace.example${prefix}api/`))).toBe(true);
+      expect(urls.some(({ url }) => url.endsWith("api/opl/state?profile=fast"))).toBe(true);
+      expect(urls.some(({ url }) => url.includes("api/inputs/input-1/files?path=note.txt"))).toBe(true);
+      expect(new Headers(urls.find(({ url }) => url.endsWith("/threads/list"))?.init?.headers).get("x-csrf-token")).toBe("test-csrf");
+      expect(eventUrls.at(-1)).toBe(`https://workspace.example${prefix}api/opl-events`);
+    }
+    unauthorized = true;
+    await expect(window.oplStudio!.readState("fast")).rejects.toMatchObject({ code: "authentication_required" });
+    expect(redirects.at(-1)).toBe("https://workspace.example/w/workspace_0123456789abcdef0123456789abcdef/login");
+  } finally {
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});

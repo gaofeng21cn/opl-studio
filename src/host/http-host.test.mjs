@@ -498,3 +498,56 @@ test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the 
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
 });
+
+
+test("trusted path entry keeps renderer boot, login, session and SSE in the same Workspace", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-prefix-"));
+  await writeFile(path.join(directory, "index.html"), '<!doctype html><html><head><script src="./renderer.js"></script></head><body></body></html>');
+  await writeFile(path.join(directory, "renderer.js"), 'globalThis.rendererLoaded = true;');
+  const transport = new CodexAppServerTransport({
+    command: process.execPath, args: [fixture], cwd: directory, env: process.env,
+    requestTimeoutMs: 2_000, turnTimeoutMs: 2_000
+  });
+  const host = await createWebUiHost({
+    transport, webRoot: directory,
+    opl: { readState: async () => ({ profile: "fast" }) },
+    env: { ...process.env, OPL_DATA_DIR: directory, OPL_WEBUI_DEPLOYMENT_MODE: "cloud",
+      OPL_WEBUI_PASSWORD: "cloud-password", OPL_WEBUI_SESSION_SECRET: "0123456789abcdef0123456789abcdef" }
+  });
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
+  const prefix = "/w/workspace_0123456789abcdef0123456789abcdef";
+  const headers = { "x-forwarded-prefix": prefix };
+  const redirect = await fetch(`${host.url}/settings`, { headers, redirect: "manual" });
+  assert.equal(redirect.status, 302);
+  assert.equal(redirect.headers.get("location"), `${prefix}/login`);
+  const loginPage = await (await fetch(`${host.url}/login`, { headers })).text();
+  assert.ok(loginPage.includes("fetch('./api/auth/login'"));
+  assert.ok(loginPage.includes("location.replace('./')"));
+  const login = await fetch(`${host.url}/api/auth/login`, {
+    method: "POST", headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify({ username: "opl", password: "cloud-password" })
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  assert.ok(login.headers.get("set-cookie").includes(`; Path=${prefix}/;`));
+  const body = await login.json();
+  const authenticated = { ...headers, cookie };
+  const html = await (await fetch(`${host.url}/`, { headers: authenticated })).text();
+  assert.equal(html.match(/<base /g)?.length, 1);
+  assert.ok(html.includes(`<base href="${prefix}/">`));
+  assert.ok(html.indexOf("<base ") < html.indexOf('src="./renderer.js"'));
+  assert.equal(html.match(/__DSH_BOOT_READY__.*resolve/g)?.length, 1);
+  const base = new URL(prefix + "/", host.url);
+  assert.equal(new URL("./renderer.js", base).pathname, `${prefix}/renderer.js`);
+  assert.equal(await (await fetch(`${host.url}/renderer.js`, { headers: authenticated })).text(), 'globalThis.rendererLoaded = true;');
+  assert.equal((await fetch(`${host.url}/api/opl/state?profile=fast`, { headers: authenticated })).status, 200);
+  const events = await fetch(`${host.url}/api/opl-events`, { headers: authenticated });
+  assert.equal(events.status, 200);
+  assert.match(events.headers.get("content-type"), /text\/event-stream/);
+  await events.body.cancel();
+  const logout = await fetch(`${host.url}/api/auth/logout`, {
+    method: "POST", headers: { ...authenticated, "x-csrf-token": body.csrfToken }
+  });
+  assert.equal(logout.status, 200);
+  assert.ok(logout.headers.get("set-cookie").includes(`; Path=${prefix}/;`));
+});

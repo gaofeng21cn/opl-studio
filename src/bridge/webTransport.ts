@@ -26,15 +26,23 @@ class WebTransportError extends Error {
   }
 }
 
+function deploymentUrl(path: string): string {
+  return new URL(`.${path}`, document.baseURI).href;
+}
+
+function requireAuthentication(response: Response): void {
+  if (response.status !== 401) return;
+  csrfTokenPromise = undefined;
+  globalThis.location?.replace(deploymentUrl("/login"));
+  throw new WebTransportError("authentication_required", "Authentication required");
+}
+
 let csrfTokenPromise: Promise<string | null> | undefined;
 
 async function csrfToken(): Promise<string | null> {
-  csrfTokenPromise ??= fetch("/api/auth/user")
+  csrfTokenPromise ??= fetch(deploymentUrl("/api/auth/user"))
     .then(async (response) => {
-      if (response.status === 401) {
-        globalThis.location?.replace("/login");
-        throw new WebTransportError("authentication_required", "Authentication required");
-      }
+      requireAuthentication(response);
       const value = await response.json() as { csrfToken?: unknown };
       return typeof value.csrfToken === "string" ? value.csrfToken : null;
     })
@@ -57,12 +65,13 @@ async function authenticatedInit(init: RequestInit = {}): Promise<RequestInit> {
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, await authenticatedInit(init));
+    response = await fetch(deploymentUrl(url), await authenticatedInit(init));
   } catch (error) {
     throw new WebTransportError("local_host_unavailable", "Local WebUI host is unavailable", {
       cause: String(error)
     });
   }
+  requireAuthentication(response);
   const value = await response.json() as T & {
     error?: { code?: string; message?: string; details?: Record<string, unknown> };
   };
@@ -152,7 +161,7 @@ function connectServerEvents(
 }
 
 export function installWebTransport(): void {
-  const eventSourceUrl = "/api/opl-events";
+  const eventSourceUrl = deploymentUrl("/api/opl-events");
   const subscribeEvents = (onEvent: (event: OplBridgeEvent) => void) => connectServerEvents(eventSourceUrl, onEvent);
   const surface: WebSurface = {
     eventSourceUrl,
@@ -195,9 +204,10 @@ export function installWebTransport(): void {
     readThreadWorkspaceFile: (request) => postJson("/api/threads/workspace/read", request),
     accessThreadWorkspace: async (request) => {
       if (request.action !== "download") throw new WebTransportError("desktop_capability_unavailable", "Download files to open them on this device");
-      const response = await fetch("/api/threads/workspace/download", await authenticatedInit({
+      const response = await fetch(deploymentUrl("/api/threads/workspace/download"), await authenticatedInit({
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request)
       }));
+      requireAuthentication(response);
       if (!response.ok) {
         const value = await response.json();
         throw new WebTransportError(value.error?.code ?? "workspace_download_failed", value.error?.message ?? "Unable to download workspace file");

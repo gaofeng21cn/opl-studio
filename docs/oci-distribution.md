@@ -59,6 +59,16 @@ signed sessions through `OPL_WEBUI_DEPLOYMENT_MODE=cloud`,
 bytes. The signed `opl-studio-session` cookie is HttpOnly, SameSite=Lax, valid for
 30 days, and all state-changing requests require a session-bound CSRF token.
 
+The trusted deployment proxy supplies a single `X-Forwarded-Prefix` when it
+strips a Workspace path. Studio accepts that header only in Cloud mode or when
+`OPL_WEBUI_TRUST_PROXY=1`; the proxy must replace client-supplied values and must
+keep the host inaccessible except through that boundary. A validated prefix
+sets the renderer's HTML base, API and SSE URLs, downloads, login redirects and
+session-cookie Path. A root deployment keeps `/`. Invalid trusted prefixes are
+rejected. Renderer requests never derive a Workspace from cookies or rewrite
+another Workspace's route. Index injection uses the pinned official DSH renderer
+once, preserving its boot rows and readiness signal.
+
 Studio does not terminate public TLS or own Workspace routing and tenant
 isolation. Those remain Cloud proxy responsibilities; the manager continues to
 bind its local distribution to loopback.

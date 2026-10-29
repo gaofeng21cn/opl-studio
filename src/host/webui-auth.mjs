@@ -28,7 +28,9 @@ function parseCookies(header = "") {
   for (const item of header.split(";")) {
     const separator = item.indexOf("=");
     if (separator < 1) continue;
-    cookies.set(item.slice(0, separator).trim(), item.slice(separator + 1).trim());
+    const name = item.slice(0, separator).trim();
+    // Browsers send the more-specific path first; retain it during root-cookie migration.
+    if (!cookies.has(name)) cookies.set(name, item.slice(separator + 1).trim());
   }
   return cookies;
 }
@@ -45,7 +47,7 @@ function sourceAddress(req, trustProxy) {
 }
 
 function loginHtml() {
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One Person Lab</title><style>html{color-scheme:light dark}body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f5f7;color:#16181d}.login{width:min(360px,calc(100vw - 40px));padding:28px;background:#fff;border:1px solid #d9dde5;border-radius:8px;box-shadow:0 12px 36px #16203318}.brand{font-size:22px;font-weight:700;margin:0 0 22px}.field{display:grid;gap:7px;margin:14px 0}.field input{height:42px;border:1px solid #b9c0cc;border-radius:6px;padding:0 11px;font:inherit}.submit{height:42px;width:100%;border:0;border-radius:6px;background:#1769e0;color:white;font:600 15px system-ui;cursor:pointer}.error{min-height:20px;color:#b42318;font-size:13px;margin:10px 0}@media(prefers-color-scheme:dark){body{background:#17191e;color:#f2f4f7}.login{background:#22252b;border-color:#3c414b}.field input{background:#17191e;color:#fff;border-color:#555c68}}</style></head><body><main class="login"><h1 class="brand">One Person Lab</h1><form id="login"><label class="field"><span>用户名</span><input name="username" autocomplete="username" required></label><label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label><p class="error" id="error" role="alert"></p><button class="submit" type="submit">登录</button></form></main><script>document.getElementById('login').addEventListener('submit',async(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);const response=await fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:form.get('username'),password:form.get('password')})});if(response.ok){location.replace('/');return}const value=await response.json().catch(()=>({}));document.getElementById('error').textContent=value.error?.message||'登录失败';});</script></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One Person Lab</title><style>html{color-scheme:light dark}body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f5f7;color:#16181d}.login{width:min(360px,calc(100vw - 40px));padding:28px;background:#fff;border:1px solid #d9dde5;border-radius:8px;box-shadow:0 12px 36px #16203318}.brand{font-size:22px;font-weight:700;margin:0 0 22px}.field{display:grid;gap:7px;margin:14px 0}.field input{height:42px;border:1px solid #b9c0cc;border-radius:6px;padding:0 11px;font:inherit}.submit{height:42px;width:100%;border:0;border-radius:6px;background:#1769e0;color:white;font:600 15px system-ui;cursor:pointer}.error{min-height:20px;color:#b42318;font-size:13px;margin:10px 0}@media(prefers-color-scheme:dark){body{background:#17191e;color:#f2f4f7}.login{background:#22252b;border-color:#3c414b}.field input{background:#17191e;color:#fff;border-color:#555c68}}</style></head><body><main class="login"><h1 class="brand">One Person Lab</h1><form id="login"><label class="field"><span>用户名</span><input name="username" autocomplete="username" required></label><label class="field"><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label><p class="error" id="error" role="alert"></p><button class="submit" type="submit">登录</button></form></main><script>document.getElementById('login').addEventListener('submit',async(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);const response=await fetch('./api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:form.get('username'),password:form.get('password')})});if(response.ok){location.replace('./');return}const value=await response.json().catch(()=>({}));document.getElementById('error').textContent=value.error?.message||'登录失败';});</script></body></html>`;
 }
 
 export async function createWebUiAuth({ env = process.env, now = () => Date.now() } = {}) {
@@ -117,7 +119,17 @@ export async function createWebUiAuth({ env = process.env, now = () => Date.now(
     return { ok: true, session };
   }
 
-  function issueSession(res) {
+  // The deployment proxy owns this prefix. Local hosts ignore forwarded input.
+  function basePath(req) {
+    const prefix = trustProxy ? req?.headers["x-forwarded-prefix"] : undefined;
+    if (prefix === undefined || prefix === "") return "/";
+    if (typeof prefix !== "string" || !/^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?)?$/.test(prefix)) {
+      throw new Error("Invalid trusted WebUI prefix");
+    }
+    return prefix.endsWith("/") ? prefix : `${prefix}/`;
+  }
+
+  function issueSession(res, req) {
     const sessionId = crypto.randomBytes(24).toString("base64url");
     const payload = Buffer.from(JSON.stringify({
       username,
@@ -125,13 +137,13 @@ export async function createWebUiAuth({ env = process.env, now = () => Date.now(
       expiresAt: now() + SESSION_MAX_AGE_SECONDS * 1_000
     })).toString("base64url");
     const secure = deploymentMode === "cloud" ? "; Secure" : "";
-    res.setHeader("set-cookie", `${SESSION_COOKIE}=${payload}.${sign(payload)}; Path=/; Max-Age=${SESSION_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`);
+    res.setHeader("set-cookie", `${SESSION_COOKIE}=${payload}.${sign(payload)}; Path=${basePath(req)}; Max-Age=${SESSION_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`);
     return { username, csrfToken: csrfFor(sessionId) };
   }
 
-  function clearSession(res) {
+  function clearSession(res, req) {
     const secure = deploymentMode === "cloud" ? "; Secure" : "";
-    res.setHeader("set-cookie", `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`);
+    res.setHeader("set-cookie", `${SESSION_COOKIE}=; Path=${basePath(req)}; Max-Age=0; HttpOnly; SameSite=Lax${secure}`);
   }
 
   function checkLogin(req, candidateUsername, candidatePassword) {
@@ -155,6 +167,7 @@ export async function createWebUiAuth({ env = process.env, now = () => Date.now(
     mode: authMode,
     deploymentMode,
     cookieName: SESSION_COOKIE,
+    basePath,
     loginHtml,
     readSession,
     requireSession,
