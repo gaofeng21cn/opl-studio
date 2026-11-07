@@ -97,7 +97,7 @@ owner action，不维护业务状态表；其执行器要求显式受限权限�
 
 `opl-studio-client` 在 Cordis 生命周期内安装 `opl-workspace-client` 子模块，
 通过官方 `sidebar.footer.action` 和 `shell.overlay` 插槽提供工作台入口。
-它只消费 Framework 已投影到 `settings.section` 的根级 `list_detail`、
+类型化模块视图消费 Framework 已投影到 `settings.section` 的根级 `list_detail`、
 `timeline`、`approval_diff` 与 `activity_log` 视图，不扫描插件、不另建能力目录，
 也不根据 Persona、Relay 等 Package 名称决定是否显示。停用或卸载后视图随投影移除。
 
@@ -121,7 +121,32 @@ owner action，不维护业务状态表；其执行器要求显式受限权限�
 成功且通过当前 Package/ref/operation 校验的动作可以返回 `presentation.mode=browser` 和
 `presentation.url`。工作区显示“打开工作台”链接，复用模块自己的 WebUI。客户端只接受无
 URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存，不进入全局执行摘要或偏好。
-这使不支持 MCP Apps 渲染的宿主仍可打开同一界面，不引入另一套领域界面或状态。
+浏览器入口与内嵌 MCP App 共用模块界面，供需要顶层浏览器能力的场景使用。
+
+### 标准 MCP Apps
+
+能力工作台的 MCP Apps 页从当前 Codex 对话连接的 MCP 目录发现 UI 工具。
+模型调用完成后，聊天中的“打开应用”入口读取同一对话的 canonical tool result，
+不重放原工具；手动打开仅执行声明为只读的工具。目录不维护 Package 名称白名单，
+共享 OPL Apps 与 Relay 独立工作台使用同一宿主。
+
+固定 DSH `0.2.1-rc.2`（`687f282e8625c6b8d11ff58211a90524be2e4317`）
+及核对的官方 `dsh-v0.2.2-rc.1` 提供 MCP client/tools/resources，尚无标准
+MCP App UI 宿主。因此使用官方 `@modelcontextprotocol/ext-apps` `2.0.4`
+的 `AppBridge` 和 `PostMessageTransport`，放入现有 DSH 工作台 slot；后续
+DSH 升级需重新评估这个缺口。`opl-codex-native` 继续持有 MCP 连接、凭据、
+审批和线程，宿主只保存临时 view binding。
+
+支持 `ui.resourceUri` 与旧 `ui/resourceUri`、`openai/outputTemplate`
+元数据、标准 MIME 的文本或 base64 HTML、同 server 的 App-visible 工具、
+声明资源读取、主题/语言/尺寸与展开模式。资源 list/read 中声明的 CSP 被应用到
+不含 `allow-same-origin` 的 opaque iframe；仅允许声明的 HTTPS 外部 origin，
+不授予宿主同源访问。工具权限仍由 Codex 与领域 owner 检查，UI 不构成审批。
+
+`ui/update-model-context` 将有大小限制的非可信资料带到同一对话后续用户消息；
+`ui/message` 仅准备输入草稿，由用户发送。外链需用户点击。关闭、切换对话或视图
+释放绑定，晚到结果不能写入新对话。暂不声明 sampling 或 subscription 支持。
+桌面 IPC 与认证 WebUI 路由复用同一 Host 实现；浏览器实测与安装包验收分别记录。
 
 此工作台是现有 Studio 客户端插件的一部分，随 Studio 分发，不需要恢复已退役的
 `opl-aion-shell`，也不引入独立 Persona App。安装新版领域 Package 后仍需用其真实

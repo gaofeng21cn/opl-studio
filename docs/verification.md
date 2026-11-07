@@ -59,6 +59,17 @@ is the command owner.
 
 ## Three-Carrier Candidate Evidence
 
+For the standard MCP App host, `npm run test:mcp-apps` checks resource formats,
+canonical completed-call reuse, tool visibility, thread/server isolation, CSP,
+and bounded model context. `npm run test:webui-host` covers the authenticated
+HTTP bridge and initialize extension negotiation. Both are included in the
+normal source suites. Browser qualification uses the actual `McpAppWorkspace`
+component with the installed OPL Apps server and Relay's synthetic mail profile;
+verify view discovery, read/edit/context roundtrips, confirmation cancellation,
+opaque-origin isolation, and teardown. A synthetic mailbox must not call real
+send/publish actions. These checks do not constitute installed Desktop or
+published-carrier acceptance.
+
 `npm run package` reads the `opl-studio` carrier evidence contract from the App
 root selected by `OPL_APP_REPO_ROOT`. It rejects tracked source changes, binds
 the manifest to the exact Studio `HEAD`, runs the qualification commands named

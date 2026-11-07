@@ -112,6 +112,11 @@ export function createBrowserBridge(): OplBridge {
       const promise = candidate?.executeAction?.(request) ?? Promise.resolve(createPlaceholderActionReceipt(request));
       return Promise.resolve(promise).then((value) => normalizeActionReceipt(value, request));
     },
+    listMcpApps: request => candidate?.listMcpApps?.(request) ?? Promise.reject(new Error("MCP Apps are unavailable in this host")),
+    openMcpApp: request => candidate?.openMcpApp?.(request) ?? Promise.reject(new Error("MCP Apps are unavailable in this host")),
+    callMcpAppTool: request => candidate?.callMcpAppTool?.(request) ?? Promise.reject(new Error("MCP Apps are unavailable in this host")),
+    readMcpAppResource: request => candidate?.readMcpAppResource?.(request) ?? Promise.reject(new Error("MCP Apps are unavailable in this host")),
+    closeMcpApp: request => candidate?.closeMcpApp?.(request) ?? Promise.reject(new Error("MCP Apps are unavailable in this host")),
     readCodexModels() {
       const promise = candidate?.readCodexModels?.() ?? Promise.resolve({ models: [], simulated: true });
       return Promise.resolve(promise).then(normalizeCodexModelCatalog);

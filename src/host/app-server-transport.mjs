@@ -1,3 +1,4 @@
+import { MCP_APP_EXTENSION } from "./mcp-app-host.mjs";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import os from "node:os";
@@ -217,7 +218,8 @@ export class CodexAppServerTransport extends EventEmitter {
       },
       capabilities: {
         experimentalApi: true,
-        requestAttestation: false
+        requestAttestation: false,
+        extensions: MCP_APP_EXTENSION
       }
     }, 30_000, { skipStart: true });
     this.notify("initialized");

@@ -1,3 +1,4 @@
+import type { McpAppOpen } from "../bridge/mcpApps";
 import { useWorkbenchShortcuts } from "./shortcuts";
 import { VoiceInput } from "./VoiceInput";
 import { appendVoiceTranscript, voiceInputContextKey, type VoiceInputContext } from "../composition/voiceInputModel";
@@ -417,6 +418,8 @@ export function App({
   const [activeContextTab, setActiveContextTab] = useState<ContextTabId>(detailTabs[0]?.id ?? "opl-project-progress-panel");
   const [activeFilesView, setActiveFilesView] = useState<FilesDetailView>("workspace");
   const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
+  const [mcpAppLaunch, setMcpAppLaunch] = useState<(McpAppOpen & { title: string }) | undefined>();
+  const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [desktopSetupStage, setDesktopSetupStage] = useState<string | null>(null);
@@ -1613,6 +1616,15 @@ export function App({
       return;
     }
     if (method === "item/completed") {
+      const item = params.item as Record<string, unknown> | undefined;
+      const threadId = typeof params.threadId === "string" ? params.threadId : selectedThreadIdRef.current;
+      if (threadId && item?.type === "mcpToolCall" && item.status === "completed" && typeof item.server === "string" && typeof item.tool === "string" && typeof item.id === "string") {
+        const launch = { threadId, server: item.server, tool: item.tool, callId: item.id };
+        void bridge.listMcpApps({ threadId }).then(({ apps }) => {
+          const app = apps.find(app => app.server === launch.server && app.tool === launch.tool);
+          if (app && selectedThreadIdRef.current === threadId) setMcpAppLaunch({ ...launch, title: app.title });
+        }).catch(() => {});
+      }
       const completedText = eventCompletedText(event);
       if (!completedText) return;
       const completedItem = params.item as Record<string, unknown> | undefined;
@@ -1919,6 +1931,8 @@ export function App({
       .map((skill) => ({ type: "skill" as const, name: skill.name, path: skill.path }));
   }
 
+  const mcpAppContext = useRef<{ threadId: string; text: string } | null>(null);
+
   function sendCodexMessage(modeOrEvent?: ComposerSubmitMode | FormEvent) {
     const mode = typeof modeOrEvent === "string" ? modeOrEvent : "queue";
     if (typeof modeOrEvent === "object") modeOrEvent.preventDefault();
@@ -1941,6 +1955,7 @@ export function App({
     if (sendState === "running") {
       const queuedAgentSelection = selectedAgentSnapshot();
       const item = queuedItemFromComposer(text, pendingSelections, queuedAgentSelection);
+      if (mcpAppContext.current?.threadId === codexThreadId && mcpAppContext.current) item.prompt = `${item.prompt}\n\n${mcpAppContext.current.text}`;
       replaceEphemeralQueue(ephemeralQueueRef.current.concat(item));
       updatePrompt("");
       setComposerSelections([]);
@@ -1976,7 +1991,7 @@ export function App({
     };
     void bridge
       .sendMessage({
-        prompt: text,
+        prompt: mcpAppContext.current && mcpAppContext.current.threadId === codexThreadId ? `${text}\n\n${mcpAppContext.current.text}` : text,
         inputs: [
           ...pendingSelections.map((selection) => selection.input),
           ...selectedAgentInputs()
@@ -2421,6 +2436,7 @@ export function App({
           {message.role === "assistant" ? <span data-testid="opl-codex-reply" hidden /> : null}
         </>} />
       {historyControls}
+      {mcpAppLaunch?.threadId === codexThreadId && mcpAppLaunch ? <button onClick={() => { setMcpAppSelectedLaunch(mcpAppLaunch); setPrimaryView("workspace"); }}>{settings.locale === "zh" ? "打开应用：" : "Open app: "}{mcpAppLaunch.title}</button> : null}
     </div>
   );
 
@@ -2676,6 +2692,12 @@ export function App({
     sending: sendState === "running",
     queue: ephemeralQueue,
     contributionOwner,
+    mcpApps: {
+      bridge,
+      launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
+      onContext: (threadId, text) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
+      onMessage: (threadId, text) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
+    },
     uiContributions: model.uiContributions,
     threadProjects: visibleThreadProjects,
     threadDirectoryStatus,

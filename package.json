@@ -55,6 +55,7 @@
     "@lexical/plain-text": "0.49.0",
     "@lexical/text": "0.49.0",
     "@lexical/utils": "0.49.0",
+    "@modelcontextprotocol/ext-apps": "2.0.4",
     "@modelcontextprotocol/sdk": "1.31.0",
     "@objectivex666/dsh-settings-search": "1.2.0",
     "@one-person-lab/opl-codex-native": "file:plugins/opl-codex-native",
@@ -174,7 +175,7 @@
     "test:source": "npm run test:ownership && npm run typecheck && npm run test:node-suite && npm run test:bun-suites && npm run validate:candidate",
     "test:ownership": "node scripts/check-test-ownership.mjs",
     "test:node-suite": "node --test desktop/*.test.mjs scripts/*.test.mjs scripts/desktop/*.test.mjs src/host/*.test.mjs tests/desktop/*.test.mjs tests/headless/*.test.mjs tests/oci/*.test.mjs tests/renderer/*.test.mjs",
-    "test:bun-suites": "bun test tests/workbench/feature-status.test.mts tests/workbench/feature-fixtures.test.mts tests/workbench/studio-vm-fixture.test.mts && bun test tests/workbench/gateway-account-cache.test.mts && bun run scripts/gateway-account-projection-regression.ts && bun test tests/workbench/package-projection.test.mts && bun test tests/workbench/runtime-projection.test.mts tests/workbench/service-recovery-model.test.mts && npm run test:ui-contributions && bun test tests/conformance/client-cordis-conformance.test.mts && bun test tests/workbench/opl-bridge-module-parity.test.mts tests/workbench/storage-migration.test.mts && bun test tests/workbench/thread-directory-projection.test.mts && bun test tests/workbench/conversation-details.test.mts tests/workbench/canonical-thread-reconcile.test.mts tests/workbench/composer-submission-lifecycle.test.mts && bun test tests/workbench/domain-detail-bridge.test.mts tests/workbench/domain-detail-views.test.mts tests/workbench/ecosystem-workspace-provider.test.mts tests/workbench/managed-computer-use.test.mts tests/workbench/project-progress.test.mts tests/workbench/run-detail-model.test.mts tests/workbench/runtime-overview-cache.test.mts tests/workbench/settings-actions.test.mts tests/workbench/settings-presentation.test.mts tests/workbench/gateway-disconnect-affordance.test.mts tests/workbench/settings-confirmation-layer.test.mts",
+    "test:bun-suites": "bun test tests/workbench/feature-status.test.mts tests/workbench/feature-fixtures.test.mts tests/workbench/studio-vm-fixture.test.mts && bun test tests/workbench/gateway-account-cache.test.mts && bun run scripts/gateway-account-projection-regression.ts && bun test tests/workbench/package-projection.test.mts && bun test tests/workbench/runtime-projection.test.mts tests/workbench/service-recovery-model.test.mts && npm run test:ui-contributions && bun test tests/conformance/client-cordis-conformance.test.mts && bun test tests/workbench/opl-bridge-module-parity.test.mts tests/workbench/storage-migration.test.mts && bun test tests/workbench/thread-directory-projection.test.mts && bun test tests/workbench/conversation-details.test.mts tests/workbench/canonical-thread-reconcile.test.mts tests/workbench/composer-submission-lifecycle.test.mts && bun test tests/workbench/domain-detail-bridge.test.mts tests/workbench/domain-detail-views.test.mts tests/workbench/ecosystem-workspace-provider.test.mts tests/workbench/managed-computer-use.test.mts tests/workbench/project-progress.test.mts tests/workbench/run-detail-model.test.mts tests/workbench/runtime-overview-cache.test.mts tests/workbench/settings-actions.test.mts tests/workbench/settings-presentation.test.mts tests/workbench/gateway-disconnect-affordance.test.mts tests/workbench/settings-confirmation-layer.test.mts && bun test tests/workbench/mcp-app-host.test.mts",
     "validate:candidate": "node scripts/validate-opl-studio-candidate.mjs",
     "validate:state-model": "node scripts/validate-state-model.mjs",
     "validate:package": "node scripts/validate-desktop-package.mjs",
@@ -198,6 +199,7 @@
     "build-mac:x64": "node scripts/desktop/build-release.mjs x64",
     "build:plugins": "node scripts/build-dsh-plugins.mjs",
     "prepare": "npm run build:plugins",
-    "test:dsh-plugins": "node --test scripts/dsh-plugin-packages.test.mjs"
+    "test:dsh-plugins": "node --test scripts/dsh-plugin-packages.test.mjs",
+    "test:mcp-apps": "node --test src/host/mcp-app-host.test.mjs && bun test tests/workbench/mcp-app-host.test.mts"
   }
 }

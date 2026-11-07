@@ -1,3 +1,4 @@
+import { McpAppWorkspace } from "./McpAppWorkspace";
 import { useEffect, useState, type ReactNode } from "react";
 import { Boxes, ChevronLeft, ChevronRight, RefreshCw, Search, X } from "lucide-react";
 import { diffLines } from "diff";
@@ -192,6 +193,8 @@ export function installWorkspaceClientPlugin(core: SlotCore, useSurface: () => O
     const surface = useSurface();
     const [selection, setSelection] = useState<string | null>(() => selectedView);
     const [revision, setRevision] = useState(0);
+    const [showMcp, setShowMcp] = useState(Boolean(surface.mcpApps?.launch));
+    useEffect(() => { if (surface.mcpApps?.launch) setShowMcp(true); }, [surface.mcpApps?.launch?.callId]);
     const entries = workspaceEntries(surface.uiContributions.entries);
     const groups = workspaceGroups(entries);
     const current = entries.find(entry => entry.contributionKey === selection) ?? entries[0];
@@ -199,8 +202,8 @@ export function installWorkspaceClientPlugin(core: SlotCore, useSurface: () => O
     const groupLabel = (key: string) => ({personal: zh ? "个人" : "Personal", communications: zh ? "通信" : "Communication", knowledge: zh ? "知识" : "Knowledge", other: zh ? "其他能力" : "Other capabilities"}[key] ?? key);
     return <section className="opl-workspace-page" aria-label={zh ? "能力工作台" : "Capability workspace"}>
       <header><div><Boxes size={18} aria-hidden="true"/><h2>{zh ? "能力工作台" : "Capability workspace"}</h2></div><span title={surface.workspacePath}>{surface.workspacePath.split("/").filter(Boolean).at(-1)}</span><button type="button" aria-label={zh ? "刷新" : "Refresh"} title={zh ? "刷新" : "Refresh"} onClick={() => setRevision(value => value + 1)}><RefreshCw size={16}/></button><button type="button" aria-label={zh ? "返回聊天" : "Back to chat"} title={zh ? "返回聊天" : "Back to chat"} onClick={() => surface.openPrimaryView("conversation")}><ChevronLeft size={18}/></button></header>
-      <div className="opl-workspace-body"><nav aria-label={zh ? "工作台视图" : "Workspace views"}>{groups.map(group => <section key={group.key}><h3>{groupLabel(group.key)}</h3>{group.entries.map(entry => <button key={entry.contributionKey} type="button" title={surface.contributionOwner.developerDetails ? entry.packageId : undefined} aria-current={current?.contributionKey === entry.contributionKey ? "page" : undefined} onClick={() => {selectedView = entry.contributionKey; setSelection(selectedView);}}>{contributionLabel(entry.view?.title ?? {}, surface.locale, entry.contributionId)}</button>)}</section>)}</nav>
-        <div className="opl-workspace-content">{current ? <ProjectedContribution key={current.contributionKey} entry={current} owner={{...surface.contributionOwner, refreshRevision: surface.contributionOwner.refreshRevision + revision}}/> : <p role="status">{zh ? "当前没有可用的能力视图，请检查模块安装和运行状态。" : "No capability views are available. Check module installation and runtime status."}</p>}</div>
+      <div className="opl-workspace-body"><nav aria-label={zh ? "工作台视图" : "Workspace views"}>{surface.mcpApps ? <button aria-current={showMcp ? "page" : undefined} onClick={() => setShowMcp(true)}>MCP Apps</button> : null}{groups.map(group => <section key={group.key}><h3>{groupLabel(group.key)}</h3>{group.entries.map(entry => <button key={entry.contributionKey} type="button" title={surface.contributionOwner.developerDetails ? entry.packageId : undefined} aria-current={!showMcp && current?.contributionKey === entry.contributionKey ? "page" : undefined} onClick={() => {setShowMcp(false); selectedView = entry.contributionKey; setSelection(selectedView);}}>{contributionLabel(entry.view?.title ?? {}, surface.locale, entry.contributionId)}</button>)}</section>)}</nav>
+        <div className="opl-workspace-content">{showMcp && surface.mcpApps ? <McpAppWorkspace {...surface.mcpApps} locale={surface.locale} threadId={surface.currentThreadId} revision={revision}/> : current ? <ProjectedContribution key={current.contributionKey} entry={current} owner={{...surface.contributionOwner, refreshRevision: surface.contributionOwner.refreshRevision + revision}}/> : <p role="status">{zh ? "当前没有可用的能力视图，请检查模块安装和运行状态。" : "No capability views are available. Check module installation and runtime status."}</p>}</div>
       </div>
     </section>;
   }
