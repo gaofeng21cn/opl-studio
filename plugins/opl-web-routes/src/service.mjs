@@ -80,6 +80,12 @@ async function dispatchApi(req, res, hostCore) {
     json(res, 200, await hostCore.invoke("executeAction", await body(req)));
     return;
   }
+  const mcpMethods = { list: "listMcpApps", open: "openMcpApp", call: "callMcpAppTool", read: "readMcpAppResource", close: "closeMcpApp" };
+  const mcpOperation = url.pathname.match(/^\/api\/mcp-apps\/(list|open|call|read|close)$/)?.[1];
+  if (req.method === "POST" && mcpOperation) {
+    json(res, 200, await hostCore.invoke(mcpMethods[mcpOperation], await body(req)));
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/codex/models") {
     json(res, 200, await hostCore.invoke("readCodexModels"));
     return;

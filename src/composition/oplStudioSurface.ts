@@ -1,3 +1,4 @@
+import type { McpAppsBridge, McpAppOpen } from "../bridge/mcpApps";
 import type { ReactNode } from "react";
 import type { SettingsDestinationId } from "../workbench/SettingsPanel";
 import type { AgentPackageSelectionIntent, WorkbenchProjectGroup } from "../workbench/workbenchModel";
@@ -33,6 +34,7 @@ export type OplStudioSurface = {
     text: string | null;
   }>;
   contributionOwner: OplContributionSlotOwner;
+  mcpApps?: { bridge: McpAppsBridge; launch?: McpAppOpen; onContext(threadId: string, context: string): void; onMessage(threadId: string, text: string): void };
   uiContributions: OplUiContributionsProjection;
   threadProjects: WorkbenchProjectGroup[];
   threadDirectoryStatus: "loading" | "ready" | "error";

@@ -82,6 +82,26 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
     await host.close();
   });
   const baseUrl = host.url;
+  const requestOwner = transport.request.bind(transport);
+  transport.request = async (method, params, ...rest) => {
+    if (method === "mcpServerStatus/list") return { data: [{ name: "review", resources: [], tools: {
+      open: { name: "open", annotations: { readOnlyHint: true }, _meta: { ui: { resourceUri: "ui://review" } } },
+      save: { name: "save", _meta: { ui: { visibility: ["app"] } } }
+    } }] };
+    if (method === "mcpServer/tool/call") return { content: [], structuredContent: { tool: params.tool } };
+    if (method === "mcpServer/resource/read") return { contents: [{ uri: params.uri, mimeType: "text/html;profile=mcp-app", text: "<h1>Review</h1>" }] };
+    return requestOwner(method, params, ...rest);
+  };
+  const apps = await post(baseUrl, "/api/mcp-apps/list", { threadId: "t1" });
+  assert.equal(apps.body.apps[0].tool, "open");
+  const view = await post(baseUrl, "/api/mcp-apps/open", { threadId: "t1", server: "review", tool: "open" });
+  assert.equal(view.status, 200);
+  const binding = { id: view.body.id, threadId: "t1" };
+  assert.equal((await post(baseUrl, "/api/mcp-apps/call", { ...binding, name: "save" })).body.structuredContent.tool, "save");
+  assert.equal((await post(baseUrl, "/api/mcp-apps/call", { ...binding, threadId: "another", name: "save" })).status, 400);
+  assert.equal((await post(baseUrl, "/api/mcp-apps/close", binding)).body.closed, true);
+  transport.request = requestOwner;
+
 
   const capabilities = await fetch(`${baseUrl}/api/capabilities`).then((response) => response.json());
   assert.equal(capabilities.localHost, true);
@@ -279,6 +299,7 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   assert.equal(canonicalTurn.items.at(-1).type, "agentMessage");
   assert.equal(canonicalTurn.items.at(-1).text, chat.body.finalMessage);
   const frames = (await readFile(appServerLog, "utf8")).trim().split("\n").map(JSON.parse);
+  assert.deepEqual(frames.find(frame => frame.method === "initialize").params.capabilities.extensions, { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } });
   const turnStart = frames.find((frame) => frame.method === "turn/start");
   const turnSteer = frames.find((frame) => frame.method === "turn/steer");
   assert.deepEqual(turnStart.params.input.map((input) => input.type), ["text", "localImage", "mention", "skill"]);

@@ -1,3 +1,4 @@
+import { McpAppHost } from "../../../src/host/mcp-app-host.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
 import { OplCodexNative } from "../../opl-codex-native/src/service.mjs";
@@ -98,6 +99,7 @@ export class OplHostCore extends EventEmitter {
     this.codex = codex ?? new OplCodexNative(options);
     this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex });
     this.transport = this.codex.transport;
+    this.mcpApps = new McpAppHost(this.transport);
     this.threads = this.codex.threads;
     this.threadWorkspace = threadWorkspace ?? createThreadWorkspaceService({ threads: this.threads });
     this.opl = this.framework.opl;
@@ -246,6 +248,11 @@ export class OplHostCore extends EventEmitter {
       case "readDomainDetailView": return this.opl.readDomainDetailView(payload);
       case "readContribution": return this.opl.readContribution(payload);
       case "executeAction": return this.executeAction(payload);
+      case "listMcpApps": return this.mcpApps.list(payload);
+      case "openMcpApp": return this.mcpApps.open(payload);
+      case "callMcpAppTool": return this.mcpApps.call(payload);
+      case "readMcpAppResource": return this.mcpApps.read(payload);
+      case "closeMcpApp": return this.mcpApps.close(payload);
       case "readCodexModels": return this.transport.listModels();
       case "readCodexCapabilities": return this.transport.listCapabilities(payload.threadId);
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
@@ -298,6 +305,7 @@ export class OplHostCore extends EventEmitter {
   }
 
   async close() {
+    this.mcpApps.dispose();
     this.closePromise ??= (async () => {
       await this.updateMaintenance?.close();
       await Promise.allSettled([...this.manualUpdateOperations]);
