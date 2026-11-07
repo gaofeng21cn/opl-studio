@@ -215,8 +215,8 @@ function formatReceipt(value: unknown): string {
   }
 }
 
-function contributionReceiptForDisplay(entry: OplUiContribution, receipt: OplActionReceipt): OplActionReceipt | Record<string, unknown> {
-  if (entry.view?.viewType !== "remote_companion_access") return receipt;
+function contributionReceiptForDisplay(entry: OplUiContribution, receipt: OplActionReceipt, transientPresentation = false): OplActionReceipt | Record<string, unknown> {
+  if (entry.view?.viewType !== "remote_companion_access" && !transientPresentation) return receipt;
   // Remote pairing input and provider output are transient; keep only action metadata in the global receipt panel.
   return {
     actionId: receipt.actionId,
@@ -1688,13 +1688,13 @@ export function App({
       const actionRequest = createOplContributionActionRequest(entry, command, confirmed);
       actionRequest.payload.input = input;
       const receipt = await bridge.executeAction(actionRequest);
-      setLastDryRun(formatReceipt(contributionReceiptForDisplay(entry, receipt)));
+      const outcome = contributionActionOutcome(receipt.stdoutJson, entry, command);
+      setLastDryRun(formatReceipt(contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))));
       if (receipt.status === "executed" || receipt.status === "no_op") {
-        const outcome = contributionActionOutcome(receipt.stdoutJson, entry, command);
         if (outcome.status !== "succeeded") return {...outcome, message: settings.locale === "zh" ? "尚未确认操作完成，请刷新核实；输入已保留" : "Completion not confirmed; refresh to inspect. Input retained"};
         await loadState(settings.runtimeProfile);
         setContributionRefreshRevision((revision) => revision + 1);
-        return {status: "succeeded" as const, message: actionReceiptView(receipt).summary};
+        return {...outcome, message: outcome.presentation ? (settings.locale === "zh" ? "工作台已准备就绪" : "Workbench ready") : actionReceiptView(receipt).summary};
       }
       return {status: "failed" as const, retryable: !receipt.timedOut, message: receipt.timedOut ? (settings.locale === "zh" ? "执行结果尚不确定，请刷新核实；不会重复提交" : "Execution outcome is unknown; refresh to inspect, not resend") : receipt.blockedReason || receipt.stderr || (settings.locale === "zh" ? "操作未完成，请核实状态后重试" : "Action not completed; inspect before retrying")};
     } catch (error) {

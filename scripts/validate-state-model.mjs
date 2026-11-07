@@ -125,7 +125,8 @@ assert(workbenchModelSource.includes("nonReadyBoundaryStatusPattern"), "artifact
 assert(workbenchModelSource.includes('"app_canonical"'), "artifactStatus missing explicit canonical ready source");
 assert(!appSource.includes("Context ready"), "fallback UI still displays Context ready");
 assert(!appSource.includes('status="connected"'), "fallback UI still displays connected status");
-const composerRunStateSource = appSource.match(/data-testid="opl-composer-run-state"[\s\S]*?<\/span>/)?.[0];
+const composerSource = fs.readFileSync(path.join(root, "src/workbench/ComposerAccessory.tsx"), "utf8");
+const composerRunStateSource = composerSource.match(/data-testid="opl-composer-run-state"[\s\S]*?<\/span>/)?.[0];
 assert(composerRunStateSource, "composer run-state surface missing");
 assert(!composerRunStateSource.includes(': "Ready"'), "composer idle state still displays Ready");
 assert(!bridgeSource.includes('canExecute: receiptKind !== "confirmation_required"'), "placeholder receipt still allows execution by default");

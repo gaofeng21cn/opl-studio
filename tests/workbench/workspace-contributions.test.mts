@@ -63,6 +63,17 @@ test("item actions cannot escape the descriptor command allowlist", () => {
   expect(actions).toEqual([{command: entry.commands[0], input: {expected_digest: digest}}]);
 });
 
+test("browser workbench handoff requires the current owner envelope and an allowed URL", () => {
+  const envelope = {surface_kind: "opl_app_package_contribution.v1", package_id: entry.packageId, ref: entry.commands[0].actionRef, operation: "execute",
+    response: {schema_version: "opl-package-app-contribution-response.v1", ref: entry.commands[0].actionRef, operation: "execute", ok: true, result: {presentation: {mode: "browser", url: "http://127.0.0.1:41234/#transient-capability"}}}};
+  expect(contributionActionOutcome({opl_app_contribution: envelope}, entry, entry.commands[0])).toEqual({status: "succeeded", presentation: {mode: "browser", url: "http://127.0.0.1:41234/#transient-capability"}});
+  for (const url of ["javascript:alert(1)", "file:///private/mail", "http://external.example.test", "https://user:password@example.test", "/relative", "not-a-url"]) {
+    const changed = {...envelope, response: {...envelope.response, result: {presentation: {mode: "browser", url}}}};
+    expect(contributionActionOutcome({opl_app_contribution: changed}, entry, entry.commands[0]).presentation).toBeUndefined();
+  }
+  expect(contributionActionOutcome({opl_app_contribution: {...envelope, package_id: "another-package"}}, entry, entry.commands[0]).status).toBe("failed");
+});
+
 test("input projection parses structured fields and rejects malformed or missing review inputs", () => {
   const fields = {expected_digest: {type: "string" as const, required: true}, decision: {type: "string" as const, required: true, enum: ["approve", "reject"]}, source_refs: {type: "string_list" as const, required: true}, settings: {type: "object" as const, required: false}, enabled: {type: "boolean" as const, required: true}};
   expect(parseWorkspaceInput(fields, {expected_digest: "sha256:reviewed", decision: "approve", source_refs: "source:a\nsource:b", settings: '{"mode":"mail"}', enabled: false})).toEqual({expected_digest: "sha256:reviewed", decision: "approve", source_refs: ["source:a", "source:b"], settings: {mode: "mail"}, enabled: false});

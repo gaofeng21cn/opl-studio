@@ -648,6 +648,6 @@ describe("OPL Studio DSH contribution composition", () => {
 
     const appSource = readFileSync(new URL("../../src/workbench/App.tsx", import.meta.url), "utf8");
     expect(appSource).toMatch(/function contributionReceiptForDisplay/);
-    expect(appSource).toMatch(/setLastDryRun\(formatReceipt\(contributionReceiptForDisplay\(entry, receipt\)\)\)/);
+    expect(appSource).toContain("contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))");
   });
 });
