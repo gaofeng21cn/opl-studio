@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { McpAppHost, MCP_APP_MIME, MCP_APP_EXTENSION } from "./mcp-app-host.mjs";
+import { McpAppHost } from "../../plugins/opl-mcp-apps/src/service.mjs";
+import { MCP_APP_MIME, MCP_APP_EXTENSION } from "./mcp-app-protocol.mjs";
 
 function fixture() {
   const calls = [];

@@ -1,4 +1,4 @@
-import type { McpAppSession } from "../bridge/mcpApps";
+import type { McpAppSession } from "../../../../src/bridge/mcpApps";
 
 export function allowedMcpLink(value: string): string | null {
   try {

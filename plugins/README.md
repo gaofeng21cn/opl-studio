@@ -43,3 +43,15 @@ npm 发布，也不改变 App 内置插件随 App 发布的更新责任。
 
 本目录不放 Codex 插件市场的领域能力包；微信等由 Framework 托管的能力通过
 `opl-framework-bridge` 接入。它们有自己的 ABI，不是 DSH 插件。
+
+## MCP Apps
+
+`opl-mcp-apps` owns the standard MCP Apps host service and client bridge. Its
+Host entry injects `oplCodexNative`; its client entry provides `oplMcpAppsClient`
+for the Studio composition. Cordis disposes bindings and the React view tears down
+AppBridge sessions. Desktop, WebUI and Docker use this same npm package.
+
+The pinned official DSH MCP client supplies tools/resources but no UI host. The
+plugin therefore reuses the official ext-apps SDK and canonical Codex transport.
+Revisit this gap on every upstream upgrade. Framework owns the host-neutral task
+workbench resource; domain packages own research payloads and actions.

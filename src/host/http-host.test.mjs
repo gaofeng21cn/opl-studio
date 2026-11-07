@@ -127,6 +127,7 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
       ["@one-person-lab/opl-dsh-tool-mcp", true, "active"],
       ["@one-person-lab/opl-codex-native", true, "active"],
       ["@one-person-lab/opl-framework-bridge", true, "active"],
+      ["@one-person-lab/opl-mcp-apps", true, "active"],
       ["@one-person-lab/opl-host-core", true, "active"],
       ["@one-person-lab/opl-web-routes", true, "active"]
     ]

@@ -327,7 +327,7 @@ function assertApplicationHost(evidence) {
   assert(host.dsh_base_loaded === false, "Application Host must not load dsh-base");
   assert(host.active_shell_adopted === "app_owned" && host.release_ready === false, "Application Host implementation must not claim active-shell adoption or release readiness");
   assert(!profile.includes("dsh-base"), "Studio DSH profile must exclude dsh-base");
-  for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-host-core", "plugin-inventory"]) {
+  for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-mcp-apps", "opl-host-core", "plugin-inventory"]) {
     assert(profile.includes(`id: ${id}`), `Studio DSH profile is missing ${id}`);
   }
   for (const id of ["client-modules", "opl-studio-client", "opl-web-routes"]) {

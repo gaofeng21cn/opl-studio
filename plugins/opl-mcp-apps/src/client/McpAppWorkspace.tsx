@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../bridge/mcpApps";
+import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../../../../src/bridge/mcpApps";
 import { allowedMcpLink, modelContextText, sandboxDocument } from "./mcpAppHost";
 
-type Props = {
+export type McpAppProps = {
   bridge: McpAppsBridge; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
   onContext(threadId: string, context: string): void;
   onMessage(threadId: string, text: string): void;
 };
 
-export function McpAppFrame({ session, bridge: host, locale, onContext, onMessage }: Props & { session: McpAppSession }) {
+export function McpAppFrame({ session, bridge: host, locale, onContext, onMessage }: McpAppProps & { session: McpAppSession }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const activeBridge = useRef<AppBridge | null>(null);
   const [error, setError] = useState("");
@@ -81,7 +81,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
   </div>;
 }
 
-export function McpAppWorkspace(props: Props) {
+export function McpAppWorkspace(props: McpAppProps) {
   const { bridge, threadId, locale, revision } = props;
   const [apps, setApps] = useState<McpAppDescriptor[]>([]);
   const [selected, setSelected] = useState("");
@@ -111,7 +111,7 @@ export function McpAppWorkspace(props: Props) {
       else await bridge.closeMcpApp(view);
     }).catch(reason => { if (ticket === generation.current) setError(String(reason)); })
       .finally(() => { if (ticket === generation.current) setBusy(false); });
-  }, [bridge, threadId, props.launch?.callId]);
+  }, [bridge, threadId, props.launch]);
   const current = apps.find(app => `${app.server}:${app.tool}` === selected) ?? apps[0];
   async function open() {
     if (!current || !threadId || busy) return;

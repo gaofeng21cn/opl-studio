@@ -65,8 +65,8 @@ backend. The OPL plugin tree is:
 ```text
 opl-dsh-tool-mcp
   -> opl-codex-native
-       -> opl-framework-bridge
-            -> opl-host-core
+       -> opl-framework-bridge ─┐
+       -> opl-mcp-apps ─────────┴─> opl-host-core
                  -> opl-web-routes (Web overlay only)
 ```
 
@@ -391,3 +391,15 @@ The official DSH Web server requires a concrete local bind address. Studio resol
 wildcard request to the single external interface of a container; hosts with multiple matching
 interfaces must supply the intended concrete address. Desktop and tool-only startup retain their
 loopback default. Authentication and route ownership stay in the existing Studio Web adapter.
+
+## Standard MCP Apps plugin
+
+`opl-mcp-apps` provides the Host service and the client components through Cordis.
+It injects the canonical Codex transport and owns ephemeral view bindings; Studio
+core only delegates. The client consumes the official ext-apps AppBridge, an
+opaque iframe and the existing authenticated bridges on every carrier.
+
+Runtime task and research routes use the same Framework MCP App resource as
+Codex. Studio keeps cross-Agent summaries, while stage timelines, research paths,
+evidence and human decisions live in the shared workbench. Studio no longer
+parses MAS research snapshots or maintains a MAS-specific detail renderer.
