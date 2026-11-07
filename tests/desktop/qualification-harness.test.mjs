@@ -136,21 +136,26 @@ test("clean VM rejects a partial external Codex identity", () => {
 });
 
 test("clean VM binds exact Framework source inputs for Standard bootstrap", () => {
+  const productFrameworkRef = "1f57e11848d1ac832f4550dcf17ac354a2af43a3";
+  const sourceFrameworkCommit = "a904acd9eaee8dad80051e77171a15ffba851026";
   const options = parseCleanVmArgs([
     "--framework-source-archive", "fixtures/one-person-lab-framework.tar.gz",
-    "--framework-ref", "1f57e11848d1ac832f4550dcf17ac354a2af43a3"
+    "--framework-ref", productFrameworkRef,
+    "--framework-source-commit", sourceFrameworkCommit
   ]);
   assert.equal(options.frameworkSourceArchive, path.resolve(root, "fixtures/one-person-lab-framework.tar.gz"));
-  assert.equal(options.frameworkRef, "1f57e11848d1ac832f4550dcf17ac354a2af43a3");
+  assert.equal(options.frameworkRef, productFrameworkRef);
+  assert.equal(options.frameworkSourceCommit, sourceFrameworkCommit);
 
   const command = buildGuestLaunchCommand({
     appExecutable: "/Applications/One Person Lab Preview.app/Contents/MacOS/One Person Lab Preview",
     logPath: "/tmp/preview.log",
     frameworkSourceArchive: "/tmp/framework.tar.gz",
-    frameworkRef: options.frameworkRef
+    frameworkRef: options.frameworkRef,
+    frameworkSourceCommit: options.frameworkSourceCommit
   });
   assert.match(command, /OPL_SOURCE_ARCHIVE_URL='file:\/\/\/tmp\/framework\.tar\.gz'/);
-  assert.match(command, /OPL_FRAMEWORK_SOURCE_COMMIT='1f57e11848d1ac832f4550dcf17ac354a2af43a3'/);
+  assert.match(command, /OPL_FRAMEWORK_SOURCE_COMMIT='a904acd9eaee8dad80051e77171a15ffba851026'/);
 });
 
 test("clean VM rejects partial or attach-mode Framework source preparation", () => {
@@ -165,6 +170,10 @@ test("clean VM rejects partial or attach-mode Framework source preparation", () 
       "--framework-ref", "1f57e11848d1ac832f4550dcf17ac354a2af43a3"
     ]),
     /cannot be used with --attach/
+  );
+  assert.throws(
+    () => parseCleanVmArgs(["--framework-source-commit", "a904acd9eaee8dad80051e77171a15ffba851026"]),
+    /requires --framework-source-archive and --framework-ref/
   );
 });
 

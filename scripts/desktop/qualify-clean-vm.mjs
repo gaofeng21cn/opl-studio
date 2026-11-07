@@ -213,6 +213,7 @@ export function buildGuestLaunchCommand({
   codexBinary = null,
   frameworkSourceArchive = null,
   frameworkRef = null,
+  frameworkSourceCommit = null,
   caBundle = null,
   publicMetadataBin = null,
   allowActions = false
@@ -223,7 +224,7 @@ export function buildGuestLaunchCommand({
     caBundle ? `SSL_CERT_FILE=${shellQuote(caBundle)}` : null,
     codexBinary ? `OPL_CODEX_BIN=${shellQuote(codexBinary)}` : null,
     frameworkSourceArchive ? `OPL_SOURCE_ARCHIVE_URL=${shellQuote(`file://${frameworkSourceArchive}`)}` : null,
-    frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
+    frameworkSourceCommit ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkSourceCommit)}` : null,
     allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
     "nohup",
     shellQuote(appExecutable),
@@ -252,7 +253,8 @@ export function parseArgs(argv) {
     codexPlatformPackageTarball: null,
     codexVersion: null,
     frameworkSourceArchive: null,
-    frameworkRef: null
+    frameworkRef: null,
+    frameworkSourceCommit: null
   };
   const smokeArgv = [];
   const takeValue = (arg, index) => {
@@ -294,6 +296,12 @@ export function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === "--framework-source-commit") {
+      cleanOptions.frameworkSourceCommit = takeValue(arg, index).trim();
+      invariant(/^[0-9a-f]{40}$/.test(cleanOptions.frameworkSourceCommit), "--framework-source-commit must be an exact lowercase 40-character SHA");
+      index += 1;
+      continue;
+    }
     if (["--require-gateway-setup", "--require-codex-turn"].includes(arg)) { smokeArgv.push(arg); continue; }
     if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path", "--screenshots-dir"].includes(arg)) {
       const value = takeValue(arg, index);
@@ -316,6 +324,10 @@ export function parseArgs(argv) {
   invariant(
     Boolean(cleanOptions.frameworkSourceArchive) === Boolean(cleanOptions.frameworkRef),
     "--framework-source-archive and --framework-ref must be provided together"
+  );
+  invariant(
+    !cleanOptions.frameworkSourceCommit || cleanOptions.frameworkSourceArchive,
+    "--framework-source-commit requires --framework-source-archive and --framework-ref"
   );
   invariant(!cleanOptions.attach || !cleanOptions.allowActions, "--allow-actions cannot be used with --attach");
   invariant(!cleanOptions.attach || !cleanOptions.frameworkSourceArchive, "Framework source preparation cannot be used with --attach");
@@ -430,7 +442,9 @@ export async function qualifyCleanVm(options) {
     framework: options.frameworkSourceArchive
       ? {
         status: "pending",
-        expectedRef: options.frameworkRef,
+        expectedRef: options.frameworkSourceCommit ?? options.frameworkRef,
+        productCohortRef: options.frameworkRef,
+        sourceRef: options.frameworkSourceCommit ?? options.frameworkRef,
         archive: path.basename(options.frameworkSourceArchive),
         archiveSha256: sha256File(options.frameworkSourceArchive),
         source: "exact_runner_checkout_archive",
@@ -570,6 +584,7 @@ export async function qualifyCleanVm(options) {
         codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
         frameworkSourceArchive: !fullRuntime && options.frameworkSourceArchive ? guestFrameworkArchive : null,
         frameworkRef: fullRuntime ? null : options.frameworkRef,
+        frameworkSourceCommit: fullRuntime ? null : options.frameworkSourceCommit ?? options.frameworkRef,
         caBundle: trust ? guestCaBundle : null,
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
@@ -628,7 +643,7 @@ export async function qualifyCleanVm(options) {
       const identityResult = guestRun(options, ip, "cat \"$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json\"");
       const installedIdentity = JSON.parse(identityResult.stdout);
       const identityPassed = installedIdentity?.schema === "opl_framework_installed_source_identity.v1"
-        && installedIdentity.framework_sha === options.frameworkRef
+        && installedIdentity.framework_sha === (options.frameworkSourceCommit ?? options.frameworkRef)
         && installedIdentity.install_mode === "archive";
       checks.framework = {
         ...checks.framework,
