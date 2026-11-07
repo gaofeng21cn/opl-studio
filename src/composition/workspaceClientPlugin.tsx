@@ -154,7 +154,7 @@ export function WorkspaceCollectionView({ collection, entry, owner, onRead, read
     const spec = collection.commandInputs[command.actionRef];
     if (!command.confirmationRequired && spec && Object.entries(spec.fields).every(([name, field]) => !field.required || name in defaults)) void runAction(command, defaults).catch(reason => setFeedback(String(reason)));
     else if (spec && Object.keys(spec.fields).length) setAction({command, defaults, title});
-    else if (spec || Object.keys(defaults).length) void runAction(command, defaults).catch(reason => setFeedback(String(reason)));
+    else void runAction(command, defaults).catch(reason => setFeedback(String(reason)));
   };
   const advancedFields = Object.fromEntries(Object.entries(collection.readInput.fields).filter(([name]) => !["query", "status", "offset", "limit"].includes(name)));
   const advanced = Object.keys(advancedFields).length && onRead ? <WorkspaceInputForm title={zh ? "读取" : "Read"} spec={{...collection.readInput, fields: advancedFields}} defaults={readValues} zh={zh} available={!readBusy} submitInput={async input => {onRead({...readValues, ...input, offset: 0}); return {status: "succeeded"};}}/> : null;
