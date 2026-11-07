@@ -84,7 +84,6 @@ import {
 } from "./settingsModel";
 import { codexWorkbenchStyles } from "./codexWorkbenchStyles";
 import { RuntimeOverviewPage } from "./RuntimeOverviewPage";
-import type { DomainDetailViewReadRequest } from "./domainDetailViews";
 import {
   readRuntimeOverviewCache,
   runtimeOverviewModelFromCache,
@@ -299,10 +298,6 @@ export function App({
   onHostStateDispose
 }: AppProps) {
   const bridge = useMemo(() => createBrowserBridge(), []);
-  const readDomainDetailView = useCallback(
-    (request: DomainDetailViewReadRequest) => bridge.readDomainDetailView(request),
-    [bridge]
-  );
   const persistedUi = useMemo(() => readPersistedWorkbenchUi(), []);
   const cachedRuntime = useMemo(() => readRuntimeOverviewCache(), []);
   const conversationRef = useRef<HTMLElement | null>(null);
@@ -419,6 +414,7 @@ export function App({
   const [activeFilesView, setActiveFilesView] = useState<FilesDetailView>("workspace");
   const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
   const [mcpAppLaunch, setMcpAppLaunch] = useState<(McpAppOpen & { title: string }) | undefined>();
+  const [mcpTaskTarget, setMcpTaskTarget] = useState<{ itemId: string; viewId?: string; threadId?: string } | undefined>();
   const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [startupAttempt, setStartupAttempt] = useState(0);
@@ -1761,6 +1757,9 @@ export function App({
       workItemScopeId: selectedRuntimeWorkItem.workItemScopeId,
       identityState: "resolved" as const
     } } : {}),
+    openRuntimeWorkbench: selectedRuntimeWorkItem ? () => {
+      setMcpTaskTarget({ itemId: selectedRuntimeWorkItem.id, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace");
+    } : undefined,
     refreshRevision: contributionRefreshRevision,
     readData: readContributionData,
     onAction: handleContributionAction
@@ -2436,7 +2435,7 @@ export function App({
           {message.role === "assistant" ? <span data-testid="opl-codex-reply" hidden /> : null}
         </>} />
       {historyControls}
-      {mcpAppLaunch?.threadId === codexThreadId && mcpAppLaunch ? <button onClick={() => { setMcpAppSelectedLaunch(mcpAppLaunch); setPrimaryView("workspace"); }}>{settings.locale === "zh" ? "打开应用：" : "Open app: "}{mcpAppLaunch.title}</button> : null}
+      {mcpAppLaunch?.threadId === codexThreadId && mcpAppLaunch ? <button onClick={() => { setMcpTaskTarget(undefined); setMcpAppSelectedLaunch(mcpAppLaunch); setPrimaryView("workspace"); }}>{settings.locale === "zh" ? "打开应用：" : "Open app: "}{mcpAppLaunch.title}</button> : null}
     </div>
   );
 
@@ -2482,7 +2481,7 @@ export function App({
             <strong>{settings.locale === "zh" ? "当前项目" : "Current project"}</strong>
             <button type="button" aria-label={t.refresh} title={t.refresh} onClick={() => void loadState(settings.runtimeProfile)}><RefreshCw aria-hidden="true" size={14} /></button>
           </div>
-          <ProjectProgressPanel locale={settings.locale} progress={selectedRuntimeWorkItem?.workspacePath ? selectProjectProgress(selectedRuntimeWorkItem.workspacePath, model.workItemRuntime, settings.locale) : projectProgress} refreshing={stateStatus === "loading"} />
+          <ProjectProgressPanel onOpen={itemId => { setMcpTaskTarget({ itemId, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace"); }} locale={settings.locale} progress={selectedRuntimeWorkItem?.workspacePath ? selectProjectProgress(selectedRuntimeWorkItem.workspacePath, model.workItemRuntime, settings.locale) : projectProgress} refreshing={stateStatus === "loading"} />
         </section>
         <section data-testid="opl-files-results-panel" className="context-block opl-files-surface" hidden={activeContextTab !== "opl-files-results-panel"}>
           <nav className="opl-files-section-nav" aria-label={settings.locale === "zh" ? "文件与结果" : "Files and results"}>
@@ -2680,6 +2679,13 @@ export function App({
     workspacePath: selectedProject?.workspace ?? currentProject,
     locale: settings.locale, revision: openThreadSequence.current };
   voiceInputContextRef.current = voiceInputContext;
+  const mcpApps = {
+      bridge,
+      task: mcpTaskTarget?.threadId === codexThreadId ? mcpTaskTarget : undefined,
+      launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
+      onContext: (threadId: string, text: string) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
+      onMessage: (threadId: string, text: string) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
+    };
   return renderShell({
     locale: settings.locale,
     projectTitle: currentProject,
@@ -2692,12 +2698,7 @@ export function App({
     sending: sendState === "running",
     queue: ephemeralQueue,
     contributionOwner,
-    mcpApps: {
-      bridge,
-      launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
-      onContext: (threadId, text) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
-      onMessage: (threadId, text) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
-    },
+    mcpApps,
     uiContributions: model.uiContributions,
     threadProjects: visibleThreadProjects,
     threadDirectoryStatus,
@@ -2770,7 +2771,7 @@ export function App({
         requestDetails("opl-project-progress-panel");
       }}
       onOpenThread={openCanonicalThreadRef}
-      readDomainDetailView={readDomainDetailView}
+      mcpApps={{ ...mcpApps, threadId: codexThreadId }}
     />,
     openPrimaryView: setPrimaryView,
     composerAccessory: <><ComposerAccessory

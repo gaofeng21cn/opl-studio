@@ -1,3 +1,4 @@
+import type { McpAppProps } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
 import { useMemo, useState } from "react";
 import {
   Activity,
@@ -15,8 +16,7 @@ import type { WorkItemRuntimeItem, WorkItemRuntimeProjection } from "./workbench
 import type { ServiceRecoveryAction, ServiceRecoveryModel } from "./serviceRecoveryModel";
 import {
   DomainDetailViewEntryList,
-  DomainDetailViews,
-  type DomainDetailViewRead
+  DomainDetailViews
 } from "./domainDetailViews";
 
 type RuntimeOverviewPageProps = {
@@ -34,14 +34,14 @@ type RuntimeOverviewPageProps = {
   onRunServiceRecovery(action: ServiceRecoveryAction): void;
   onOpenWorkItem(item: WorkItemRuntimeItem): void;
   onOpenThread?(threadId: string): Promise<string | null>;
-  readDomainDetailView?: DomainDetailViewRead;
+  mcpApps?: Omit<McpAppProps, "locale">;
 };
 
 type StatusFilter = "all" | "running" | "attention" | "paused" | "completed" | "stopped";
 
 type ActiveDomainDetailRoute = {
   itemId: string;
-  viewId: string;
+  viewId?: string;
 };
 
 function statusCategory(item: WorkItemRuntimeItem): Exclude<StatusFilter, "all"> | "other" {
@@ -134,7 +134,7 @@ export function RuntimeOverviewPage({
   onRunServiceRecovery,
   onOpenWorkItem,
   onOpenThread,
-  readDomainDetailView
+  mcpApps
 }: RuntimeOverviewPageProps) {
   const [threadError, setThreadError] = useState("");
   const [openingThread, setOpeningThread] = useState(false);
@@ -253,7 +253,7 @@ export function RuntimeOverviewPage({
     if (!item) return undefined;
     return {
       ...item,
-      domainDetailViews: (item.domainDetailViews ?? []).filter((view) => view.viewId === activeDomainDetailRoute.viewId)
+      domainDetailViews: (item.domainDetailViews ?? []).filter((view) => !activeDomainDetailRoute.viewId || view.viewId === activeDomainDetailRoute.viewId)
     };
   }, [activeDomainDetailRoute, projection?.items]);
   const activeDomainDetailView = activeDomainDetailItem?.domainDetailViews?.[0];
@@ -279,7 +279,7 @@ export function RuntimeOverviewPage({
   };
 
   if (activeDomainDetailRoute) {
-    const route = `/runtime/item/${encodeURIComponent(activeDomainDetailRoute.itemId)}/insights/${encodeURIComponent(activeDomainDetailRoute.viewId)}`;
+    const route = `/runtime/item/${encodeURIComponent(activeDomainDetailRoute.itemId)}/insights/${encodeURIComponent(activeDomainDetailRoute.viewId ?? "task")}`;
     return (
       <section className="opl-runtime-overview runtime-domain-view" data-testid="opl-runtime-domain-detail-page" data-route={route} aria-labelledby="runtime-domain-view-title">
         <header className="runtime-overview-header runtime-domain-view-header">
@@ -295,16 +295,16 @@ export function RuntimeOverviewPage({
             </button>
             <div className="runtime-domain-view-title">
               <span>{activeDomainDetailItem?.projectDisplayName ?? copy.title}</span>
-              <h1 id="runtime-domain-view-title">{activeDomainDetailView?.title ?? activeDomainDetailRoute.viewId}</h1>
+              <h1 id="runtime-domain-view-title">{activeDomainDetailRoute.viewId ? (activeDomainDetailView?.title ?? activeDomainDetailRoute.viewId) : (locale === "zh" ? "任务工作台" : "Task workbench")}</h1>
             </div>
           </div>
         </header>
-        {activeDomainDetailItem && activeDomainDetailView ? (
+        {activeDomainDetailItem && (!activeDomainDetailRoute.viewId || activeDomainDetailView) ? (
           <DomainDetailViews
             item={activeDomainDetailItem}
             locale={locale}
-            readDomainDetailView={readDomainDetailView}
-            initialViewId={activeDomainDetailView.viewId}
+            mcpApps={mcpApps}
+            initialViewId={activeDomainDetailRoute.viewId}
           />
         ) : (
           <p className="runtime-overview-empty" role="status">{locale === "zh" ? "此任务详情视图暂不可用" : "This work item detail view is unavailable"}</p>
@@ -432,7 +432,7 @@ export function RuntimeOverviewPage({
           return (
             <article className="runtime-work-row" key={item.id} data-status={category} data-selected={selected}>
               <div className="runtime-work-identity">
-                <button type="button" aria-label={`${copy.openDetails}: ${item.title}`} onClick={() => onOpenWorkItem(item)}>
+                <button type="button" aria-label={`${copy.openDetails}: ${item.title}`} onClick={() => setActiveDomainDetailRoute({ itemId: item.id })}>
                   <strong>{item.projectDisplayName}</strong>
                   <h3>{item.title}</h3>
                   <span><UserRound aria-hidden="true" size={13} />{item.agentDisplayName}</span>

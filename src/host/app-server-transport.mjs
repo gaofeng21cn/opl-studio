@@ -1,4 +1,4 @@
-import { MCP_APP_EXTENSION } from "./mcp-app-host.mjs";
+import { MCP_APP_EXTENSION } from "./mcp-app-protocol.mjs";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import os from "node:os";

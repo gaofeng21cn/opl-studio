@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { ThreadAdapterError } from "./thread-adapter.mjs";
+import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
 
-export const MCP_APP_MIME = "text/html;profile=mcp-app";
-export const MCP_APP_EXTENSION = { "io.modelcontextprotocol/ui": { mimeTypes: [MCP_APP_MIME] } };
+import { MCP_APP_MIME } from "../../../src/host/mcp-app-protocol.mjs";
 const object = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const fail = (code, message) => { throw new ThreadAdapterError(code, message, {}, 400); };
 const required = (value, field) => typeof value === "string" && value.trim() ? value : fail("invalid_mcp_app_request", `${field} is required`);

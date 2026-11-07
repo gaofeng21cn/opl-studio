@@ -5,6 +5,7 @@ type ProjectProgressPanelProps = {
   locale: "zh" | "en";
   progress: ProjectProgressViewModel;
   refreshing: boolean;
+  onOpen?(itemId: string): void;
 };
 
 function attentionLabel(value: string, locale: "zh" | "en"): string {
@@ -16,7 +17,7 @@ function attentionLabel(value: string, locale: "zh" | "en"): string {
   return labels[value]?.[locale === "zh" ? 0 : 1] ?? value;
 }
 
-export function ProjectProgressPanel({ locale, progress, refreshing }: ProjectProgressPanelProps) {
+export function ProjectProgressPanel({ locale, progress, refreshing, onOpen }: ProjectProgressPanelProps) {
   const copy = locale === "zh"
     ? {
         noProjection: "项目进度暂时不可用。",
@@ -67,6 +68,7 @@ export function ProjectProgressPanel({ locale, progress, refreshing }: ProjectPr
             </dl>
             {item.attention || item.blocker ? <div className="project-progress-attention"><AlertTriangle aria-hidden="true" size={14} /><span><strong>{item.attention ? attentionLabel(item.attention, locale) : item.lifecycleStatusLabel}</strong>{item.blocker ? <small>{item.blocker}</small> : null}</span></div> : null}
             {item.nextAction ? <div className="project-progress-next"><strong>{copy.next}</strong><span>{item.nextAction.title ?? item.nextAction.summary}</span>{item.nextAction.title && item.nextAction.summary ? <small>{item.nextAction.summary}</small> : null}{item.nextAction.owner ? <small>{copy.owner}: {item.nextAction.owner}</small> : null}</div> : null}
+            {onOpen ? <button type="button" onClick={() => onOpen(item.id)}>{locale === "zh" ? "打开任务工作台" : "Open task workbench"}</button> : null}
           </article>
         ))}
       </div> : <p className="context-empty">{copy.noMatch}</p>}

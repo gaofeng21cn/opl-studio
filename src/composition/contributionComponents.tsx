@@ -16,7 +16,6 @@ import {
   type OplUiContribution,
   type OplUiContributionBadge
 } from "./contributionProjection";
-import { buildRuntimeDetailResultViewModel, type RuntimeDetailSection } from "../workbench/runDetailModel";
 import { readWorkspaceCollection, workspaceReadInput, WORKSPACE_VIEW_TYPES } from "./workspaceViewModel";
 import { WorkspaceCollectionView } from "./workspaceClientPlugin";
 
@@ -129,40 +128,6 @@ function fieldLabel(value: string, locale: OplContributionSlotOwner["locale"]): 
   const localized = labels[value.toLowerCase()];
   if (localized) return localized[locale === "zh" ? 0 : 1];
   return value.replaceAll("_", " ");
-}
-
-function runtimeDetailSectionLabel(section: RuntimeDetailSection, locale: OplContributionSlotOwner["locale"]): string {
-  const labels: Record<RuntimeDetailSection["id"], [string, string]> = {
-    identity: ["任务", "Work item"],
-    agent: ["智能体", "Agent"],
-    phase: ["当前阶段", "Current phase"],
-    "work.active": ["进行中", "Active"],
-    "work.queued": ["待执行", "Queued"],
-    "work.pending": ["待处理", "Pending"],
-    hypotheses: ["研究假设", "Hypotheses"],
-    roadmap: ["路线图", "Roadmap"]
-  };
-  return labels[section.id][locale === "zh" ? 0 : 1];
-}
-
-function RuntimeDetailResult({ sections, locale }: {
-  sections: RuntimeDetailSection[];
-  locale: OplContributionSlotOwner["locale"];
-}) {
-  return <div className="opl-runtime-detail-result">
-    {sections.map((section) => <section key={section.id}>
-      <h4>{runtimeDetailSectionLabel(section, locale)}</h4>
-      {section.kind === "rows" ? (
-        <dl className="opl-structured-fields">
-          {section.rows.map((row) => <div key={row.id}><dt>{fieldLabel(row.id, locale)}</dt><dd><StructuredValue value={row.value} locale={locale} /></dd></div>)}
-        </dl>
-      ) : section.items.length ? (
-        <ul className="opl-structured-list">
-          {section.items.map((item) => <li key={item.id}><strong>{item.id}</strong><dl className="opl-structured-fields">{item.rows.map((row) => <div key={row.id}><dt>{fieldLabel(row.id, locale)}</dt><dd><StructuredValue value={row.value} locale={locale} /></dd></div>)}</dl></li>)}
-        </ul>
-      ) : <p className="opl-structured-empty">{locale === "zh" ? "暂无内容" : "No items"}</p>}
-    </section>)}
-  </div>;
 }
 
 function StructuredValue({ value, locale, depth = 0 }: {
@@ -400,6 +365,9 @@ function ContributionView({ entry, owner }: {
   entry: OplUiContribution;
   owner: OplContributionSlotOwner;
 }) {
+  if (entry.slot === "runtime.detail") return owner.runtimeDetailIdentity && owner.openRuntimeWorkbench
+    ? <button type="button" onClick={owner.openRuntimeWorkbench}>{owner.locale === "zh" ? "打开任务工作台" : "Open task workbench"}</button>
+    : <p role="status">{owner.locale === "zh" ? "请选择一个任务后打开工作台" : "Select a task to open the workbench"}</p>;
   if (entry.view?.viewType === "channel_access") return <ChannelAccessView entry={entry} owner={owner} />;
   if (entry.view?.viewType === "remote_companion_access") return <RemoteCompanionAccessView entry={entry} owner={owner} />;
   const identity = owner.runtimeDetailIdentity;
@@ -456,19 +424,6 @@ function StructuredContributionView({ entry, owner }: {
       ? (owner.locale === "zh" ? "任务身份当前不可用" : "Work-item identity is unavailable")
       : (view.emptyState ? contributionLabel(view.emptyState, owner.locale, "") : (owner.locale === "zh" ? "模块数据当前不可用" : "Module data is unavailable"));
     return <p className="opl-contribution-fallback" role="status" title={error}><StateDot state="warning" size={10} />{errorLabel}</p>;
-  }
-  const runtimeDetail = entry.slot === "runtime.detail" ? buildRuntimeDetailResultViewModel({
-    workItemIdentity: owner.runtimeDetailIdentity,
-    readback: result
-  }) : null;
-  if (runtimeDetail?.state === "ready") {
-    return <div className="opl-contribution-result" data-view-type={view.viewType} data-testid={`opl-ui-contribution-result-${entry.contributionKey}`}><RuntimeDetailResult sections={runtimeDetail.sections} locale={owner.locale} /></div>;
-  }
-  if (runtimeDetail?.state === "unavailable" && runtimeDetail.diagnostic.code !== "unsupported_surface") {
-    const unavailableLabel = runtimeDetail.diagnostic.code === "identity_unavailable"
-      ? (owner.locale === "zh" ? "任务身份当前不可用" : "Work-item identity is unavailable")
-      : (owner.locale === "zh" ? "任务详情当前不可用" : "Runtime detail is unavailable");
-    return <p className="opl-contribution-fallback" role="status" title={runtimeDetail.diagnostic.message}><StateDot state="warning" size={10} />{unavailableLabel}</p>;
   }
   if (entry.slot === "settings.section" && view.viewType === "service_status") {
     return <div className="opl-contribution-result" data-view-type={view.viewType} data-testid={`opl-ui-contribution-result-${entry.contributionKey}`}>

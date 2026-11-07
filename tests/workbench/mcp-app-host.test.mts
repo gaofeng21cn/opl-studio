@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { allowedMcpLink, modelContextText, sandboxDocument } from "../../src/composition/mcpAppHost";
+import { allowedMcpLink, modelContextText, sandboxDocument } from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
 
 test("sandbox enforces a restrictive policy before server markup", () => {
   const html = sandboxDocument({ uri: "ui://test", mimeType: "text/html;profile=mcp-app", text: '<script>window.test=true</script>', _meta: { ui: { csp: { resourceDomains: ["https://assets.example", "https://evil.example/;script-src *", "data:", "http://127.0.0.1"], connectDomains: [] } } } });

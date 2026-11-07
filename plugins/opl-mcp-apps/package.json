@@ -1,0 +1,35 @@
+{
+  "name": "@one-person-lab/opl-mcp-apps",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "immediately": true
+    },
+    "manifestVersion": 1
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "Standard MCP Apps host using canonical Codex connections and sandboxed client views.",
+  "engines": {
+    "node": ">=20",
+    "dsh": "0.2.1-alpha.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "react": "18.3.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.4"
+  }
+}

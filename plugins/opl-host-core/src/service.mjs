@@ -1,4 +1,4 @@
-import { McpAppHost } from "../../../src/host/mcp-app-host.mjs";
+import { McpAppHost } from "../../opl-mcp-apps/src/service.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
 import { OplCodexNative } from "../../opl-codex-native/src/service.mjs";
@@ -87,6 +87,7 @@ export class OplHostCore extends EventEmitter {
   constructor({
     codex,
     framework,
+    mcpApps,
     managedByDsh = false,
     platform = defaultPlatformServices(),
     nativeUpdater = defaultNativeUpdater(),
@@ -99,7 +100,8 @@ export class OplHostCore extends EventEmitter {
     this.codex = codex ?? new OplCodexNative(options);
     this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex });
     this.transport = this.codex.transport;
-    this.mcpApps = new McpAppHost(this.transport);
+    if (managedByDsh && !mcpApps) throw new Error("DSH MCP Apps service is required");
+    this.mcpApps = mcpApps ?? new McpAppHost(this.transport);
     this.threads = this.codex.threads;
     this.threadWorkspace = threadWorkspace ?? createThreadWorkspaceService({ threads: this.threads });
     this.opl = this.framework.opl;
@@ -305,7 +307,7 @@ export class OplHostCore extends EventEmitter {
   }
 
   async close() {
-    this.mcpApps.dispose();
+    if (!this.managedByDsh) this.mcpApps.dispose();
     this.closePromise ??= (async () => {
       await this.updateMaintenance?.close();
       await Promise.allSettled([...this.manualUpdateOperations]);

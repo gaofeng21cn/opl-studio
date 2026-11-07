@@ -132,7 +132,7 @@ export function validateWslHostPayload(directory, expectedShellRef) {
   for (const relative of ['package.json', 'package-lock.json', manifest.entry, 'desktop/windows-guest-rpc.mjs', 'desktop/guest-host-core.mjs', 'desktop/node-host-runtime.mjs', 'desktop/node-host-policy.json', 'desktop/windows-runtime.mjs',
     'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/windows-guest-stage.mjs', 'guest-host.tar.gz', 'desktop/official-profile.mjs', 'runtime/node/bin/node', 'runtime/node/bin/npm',
     'runtime/node/lib/node_modules/npm/bin/npm-cli.js', bootstrap.codex.path, bootstrap.framework_installer,
-    'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
+    'node_modules/@one-person-lab/opl-mcp-apps/lib/index.mjs', 'node_modules/@one-person-lab/opl-host-core/lib/index.mjs', 'resources/opl-official-profile/manifest.json', 'resources/opl-official-profile/app-product-profile.json',
     'resources/opl-official-profile/official-profile-package-apply.ts', 'node_modules/@deepseek-ai/cordis/package.json']) {
     if (!fs.statSync(path.join(directory, relative)).isFile()) throw new Error(`Missing Windows guest Host payload: ${relative}`);
   }

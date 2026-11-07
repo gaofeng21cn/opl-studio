@@ -24,6 +24,9 @@
 - id: opl-framework-bridge
   name: '@one-person-lab/opl-framework-bridge'
 
+- id: opl-mcp-apps
+  name: '@one-person-lab/opl-mcp-apps'
+
 - id: opl-host-core
   name: '@one-person-lab/opl-host-core'
 

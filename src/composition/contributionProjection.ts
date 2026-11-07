@@ -174,6 +174,7 @@ export type OplContributionSlotOwner = {
   actionAvailable: boolean;
   developerDetails?: boolean;
   runtimeDetailIdentity?: OplRuntimeDetailIdentity;
+  openRuntimeWorkbench?(): void;
   readData(entry: OplUiContribution, input?: OplContributionInput): Promise<unknown>;
   refreshRevision: number;
   onAction: OplContributionAction;
