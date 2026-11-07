@@ -177,8 +177,12 @@ export async function preparePublicReleaseMetadata(directory, frameworkArchive, 
     invariant(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(source.repository ?? ""), "Invalid public dependency repository");
     const endpoint = `repos/${source.repository}/releases/latest`;
     const release = await fetchRelease(endpoint);
+    // GitHub can redirect a repository to its canonical owner (for example,
+    // facebook/zstd -> meta/zstd) while keeping the requested API endpoint.
+    // Validate the returned release as an official GitHub release without
+    // pinning the response to the pre-redirect repository path.
     invariant(release?.draft === false && release?.prerelease === false && typeof release?.tag_name === "string"
-      && release.url?.startsWith(`https://api.github.com/repos/${source.repository}/releases/`), `Invalid stable public dependency metadata: ${endpoint}`);
+      && /^https:\/\/api\.github\.com\/repos\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/[1-9][0-9]*$/.test(String(release.url ?? "")), `Invalid stable public dependency metadata: ${endpoint}`);
     releases[endpoint] = release;
   }
   const contents = JSON.stringify({ schema: "opl_clean_vm_public_release_metadata.v1", releases });

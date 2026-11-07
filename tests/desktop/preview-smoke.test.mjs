@@ -37,6 +37,22 @@ test("Guest public metadata transport reads exact Framework sources and rejects 
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
 
+test("Guest public metadata accepts a stable release after a GitHub repository redirect", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-metadata-redirect-test-"));
+  try {
+    const source = path.join(root, "one-person-lab", "contracts", "opl-framework");
+    await fs.mkdir(source, { recursive: true });
+    await fs.writeFile(path.join(source, "dependency-release-sources.json"), JSON.stringify({ sources: { zstd: { kind: "github-release", repository: "facebook/zstd" } } }));
+    const archive = path.join(root, "framework.tar.gz");
+    assert.equal(spawnSync("tar", ["-czf", archive, "-C", root, "one-person-lab"]).status, 0);
+    const metadata = await preparePublicReleaseMetadata(root, archive, async endpoint => {
+      assert.equal(endpoint, "repos/facebook/zstd/releases/latest");
+      return { draft: false, prerelease: false, tag_name: "v1.5.7", url: "https://api.github.com/repos/meta/zstd/releases/201293731" };
+    });
+    assert.equal(metadata.endpoints[0], "repos/facebook/zstd/releases/latest");
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
 test("Full Temporal proof executes the packaged CLI and observes each real lifecycle boundary", async () => {
   const home = "/Users/guest";
   const databasePath = `${home}/Library/Application Support/OPL/state/family-runtime/temporal-server/temporal.sqlite`;
