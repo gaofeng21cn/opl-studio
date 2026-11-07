@@ -144,7 +144,7 @@ export const emptyUiContributionsProjection: OplUiContributionsProjection = {
   entries: []
 };
 
-export type OplContributionActionOutcome = { status: "succeeded" | "cancelled" | "failed" | "pending"; message?: string; retryable?: boolean };
+export type OplContributionActionOutcome = { status: "succeeded" | "cancelled" | "failed" | "pending"; message?: string; retryable?: boolean; presentation?: { mode: "browser"; url: string } };
 export type OplContributionAction = (
   entry: OplUiContribution,
   command: OplUiContributionCommand,
@@ -238,6 +238,15 @@ export function contributionActionOutcome(
   const ownerResult = asRecord(response.result)!;
   if (["queued", "running", "pending", "unknown"].includes(String(ownerResult.execution_status))) return {status: "pending", retryable: false};
   if (ownerResult.ok === false || ["error", "failed", "unsupported", "blocked"].includes(String(ownerResult.status))) return {status: "failed"};
+  const presentation = asRecord(ownerResult.presentation);
+  if (presentation?.mode === "browser" && typeof presentation.url === "string") {
+    try {
+      const url = new URL(presentation.url);
+      if (!url.username && !url.password && (url.protocol === "https:" || (url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))) {
+        return {status: "succeeded", presentation: {mode: "browser", url: url.href}};
+      }
+    } catch {}
+  }
   return {status: "succeeded"};
 }
 

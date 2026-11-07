@@ -135,16 +135,18 @@ export function WorkspaceCollectionView({ collection, entry, owner, onRead, read
   const [selected, setSelected] = useState<string | null>(null);
   const [action, setAction] = useState<{command: OplUiContributionCommand; defaults: Record<string, unknown>; title?: string} | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [presentation, setPresentation] = useState<OplContributionActionOutcome["presentation"]>();
   const zh = owner.locale === "zh";
   const items = collection.items.map((item, index) => ({item, id: itemIdentity(item, index), title: itemTitle(item, index, owner.locale), summary: itemSummary(item, owner.locale)}));
   const serverSearch = Boolean(onRead && collection.readInput.fields.query);
   const filtered = serverSearch ? items : items.filter(({item, title, summary}) => `${title} ${summary} ${valueText(item.status)}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const current = filtered.find(item => item.id === selected) ?? filtered[0];
   const collectionActions = declaredItemActions({actions: collection.collectionActions}, entry.commands);
-  useEffect(() => { setAction(null); setSelected(null); setQuery(""); }, [entry.contributionKey]);
+  useEffect(() => { setAction(null); setSelected(null); setQuery(""); setPresentation(undefined); }, [entry.contributionKey]);
   const runAction = async (command: OplUiContributionCommand, defaults: Record<string, unknown>) => {
     const result = await owner.onAction(entry, command, defaults, current?.item);
     const outcome = result ?? {status: "failed" as const, message: zh ? "未收到执行结果，请刷新核实" : "No execution result; refresh to inspect"};
+    setPresentation(outcome.status === "succeeded" ? outcome.presentation : undefined);
     setFeedback(outcome.message ?? (outcome.status === "succeeded" ? (zh ? "操作已完成" : "Completed") : zh ? "已取消，输入已保留" : "Cancelled; input retained"));
     return outcome;
   };
@@ -163,6 +165,7 @@ export function WorkspaceCollectionView({ collection, entry, owner, onRead, read
     {readBusy ? <p role="status">{zh ? "正在读取" : "Loading"}</p> : null}
     {readError ? <p role="alert">{readError}<button type="button" onClick={() => onRead?.(readValues)}>{zh ? "重新读取" : "Retry read"}</button></p> : null}
     {feedback ? <p role="status" className="opl-workspace-feedback">{feedback}</p> : null}
+    {presentation ? <p><a href={presentation.url} target="_blank" rel="noopener noreferrer">{zh ? "打开工作台" : "Open workbench"}</a></p> : null}
     <div className="opl-workspace-commandbar">{collectionActions.map(({command, input, label}) => <button key={command.commandId} type="button" disabled={!owner.actionAvailable} onClick={() => prepareAction(command, input, contributionLabel(label ?? command.label, owner.locale, command.commandId))}>{contributionLabel(label ?? command.label, owner.locale, command.commandId)}</button>)}</div>
     {action && collection.commandInputs[action.command.actionRef] ? <WorkspaceInputForm key={`${action.command.actionRef}:${valueText(action.defaults)}`} title={action.title ?? contributionLabel(action.command.label, owner.locale, action.command.commandId)} defaults={action.defaults} spec={collection.commandInputs[action.command.actionRef]} zh={zh} available={owner.actionAvailable} developer={owner.developerDetails} submitInput={input => runAction(action.command, input)} close={() => setAction(null)}/> : null}
     {collection.state !== "ready" ? <p role="status" title={collection.reason}>{collection.state === "input_required" ? (zh ? "请选择读取对象" : "Choose what to read") : (zh ? "数据暂不可用" : "Data unavailable")}</p> : !filtered.length ? <p className="opl-workspace-empty" role="status">{query ? (zh ? "没有匹配条目" : "No matches") : contributionLabel(entry.view?.emptyState ?? {}, owner.locale, zh ? "暂无条目" : "No items")}</p> : <div className="opl-workspace-split" data-view-type={entry.view?.viewType}>

@@ -118,6 +118,11 @@ owner action，不维护业务状态表；其执行器要求显式受限权限�
 审核内容指纹由领域模块检查，语音、场景切换和打开工作台都不构成邮件发送或网站发布授权。
 界面不持久化个人数据，人物、记忆、收件箱及提案状态归当前 Profile Workspace 内的领域模块。
 
+成功且通过当前 Package/ref/operation 校验的动作可以返回 `presentation.mode=browser` 和
+`presentation.url`。工作区显示“打开工作台”链接，复用模块自己的 WebUI。客户端只接受无
+URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存，不进入全局执行摘要或偏好。
+这使不支持 MCP Apps 渲染的宿主仍可打开同一界面，不引入另一套领域界面或状态。
+
 此工作台是现有 Studio 客户端插件的一部分，随 Studio 分发，不需要恢复已退役的
 `opl-aion-shell`，也不引入独立 Persona App。安装新版领域 Package 后仍需用其真实
 描述文件投影验收；仅有仓库中的视图声明不代表已安装载体自动更新。
