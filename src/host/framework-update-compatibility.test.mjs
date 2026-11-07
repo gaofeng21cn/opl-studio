@@ -44,7 +44,7 @@ test('eligible apply binds the owner command to the inspected immutable artifact
   const f = await fixture(t);
   const command = path.join(f.directory, 'fake-opl');
   const record = path.join(f.directory, 'calls.jsonl');
-  await fs.writeFile(command, `#!${process.execPath}\nimport fs from 'node:fs';
+  await fs.writeFile(command, `#!/usr/bin/env node\nimport fs from 'node:fs';
 fs.appendFileSync(${JSON.stringify(record)}, JSON.stringify({args:process.argv.slice(2),artifact:process.env.OPL_FRAMEWORK_ARTIFACT_REF})+'\\n');
 console.log(JSON.stringify(process.argv[3]==='plan'?${JSON.stringify(f.plan)}:{managed_update:{execution:{status:'completed'}}}));\n`, { mode: 0o755 });
   const opl = createOplPassthrough({ command, env: f.env, cwd: f.directory });
