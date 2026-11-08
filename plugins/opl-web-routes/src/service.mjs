@@ -128,6 +128,10 @@ async function dispatchApi(req, res, hostCore) {
     json(res, 200, await hostCore.invoke("configureCodexApiKey", await body(req)));
     return;
   }
+  if (req.method === "POST" && url.pathname === "/api/opl-runtime/connection-access-approve") {
+    json(res, 200, await hostCore.invoke("approveConnectionAccess", await body(req)));
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/native-app-update/status") {
     json(res, 200, await hostCore.invoke("readNativeAppUpdateStatus"));
     return;

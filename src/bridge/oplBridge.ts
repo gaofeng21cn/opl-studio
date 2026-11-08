@@ -57,7 +57,8 @@ export function createBrowserBridge(): OplBridge {
       workspaceRootSelection: candidate?.platformCapabilities?.workspaceRootSelection === true,
       nativeWorkspaceFileAccess: candidate?.platformCapabilities?.nativeWorkspaceFileAccess === true,
       codexInstall: candidate?.platformCapabilities?.codexInstall === true,
-      modelAccessSecretInput: candidate?.platformCapabilities?.modelAccessSecretInput === true
+      modelAccessSecretInput: candidate?.platformCapabilities?.modelAccessSecretInput === true,
+      connectionAccessApproval: candidate?.platformCapabilities?.connectionAccessApproval === true
     },
     beginWindowDrag() {
       candidate?.beginWindowDrag?.();
@@ -262,6 +263,12 @@ export function createBrowserBridge(): OplBridge {
         return Promise.resolve({ ok: false, errorCode: "codex_configuration_failed", stateRefreshRequired: false });
       }
       return candidate.configureCodexApiKey(request);
+    },
+    approveConnectionAccess(request) {
+      if (!candidate?.approveConnectionAccess) {
+        return Promise.resolve({ ok: false, errorCode: "connection_authorization_approval_unavailable" });
+      }
+      return candidate.approveConnectionAccess(request);
     },
     readNativeAppUpdateStatus() {
       return candidate?.readNativeAppUpdateStatus?.() ?? Promise.resolve(nativeUpdaterPlaceholder("status"));

@@ -394,6 +394,38 @@ test("loopback HTTP host exposes the dedicated Gateway secret route without gene
   assert.deepEqual(calls, [{ email: "user@example.com", password: "route-secret" }]);
 });
 
+test("loopback HTTP host exposes the dedicated Connect approval route without generic actions", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-connect-approval-test-"));
+  const transport = new CodexAppServerTransport({
+    command: process.execPath,
+    args: [fixture],
+    cwd: directory,
+    env: process.env,
+    requestTimeoutMs: 2_000,
+    turnTimeoutMs: 2_000
+  });
+  const calls = [];
+  const host = await createWebUiHost({
+    transport,
+    opl: {
+      readState: async () => ({}),
+      readFullDrilldown: async () => ({}),
+      readContribution: async () => ({}),
+      executeAction: async () => { throw new Error("approval must not use generic actions"); }
+    },
+    connectionAccessApproval: async (request) => {
+      calls.push(request);
+      return { ok: true, stateRefreshRequired: true };
+    },
+    webRoot: directory
+  });
+  t.after(async () => { await host.close(); });
+
+  const result = await post(host.url, "/api/opl-runtime/connection-access-approve", { requestId: "request-123" });
+  assert.deepEqual(result, { status: 200, body: { ok: true, stateRefreshRequired: true } });
+  assert.deepEqual(calls, [{ requestId: "request-123" }]);
+});
+
 test("loopback HTTP host sends model credentials only through the dedicated stdin bridge", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-codex-key-test-"));
   const transport = new CodexAppServerTransport({

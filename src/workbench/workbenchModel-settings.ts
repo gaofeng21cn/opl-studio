@@ -1,4 +1,9 @@
 import type {
+  ConnectionAccessRequest,
+  ConnectionAuthorizationProjection,
+  ConnectionGrant,
+  ConnectionInvocation,
+  AuthorizedConnectionSummary,
   RuntimeMaintenanceActionRef,
   WorkbenchGatewayAccount,
   WorkbenchSettingsProjection
@@ -232,6 +237,145 @@ function deriveExternalConnections(
     }));
 }
 
+function deriveConnectionCapabilities(value: unknown) {
+  return (Array.isArray(value) ? value : []).flatMap((rawCapability) => {
+    const capability = asRecord(rawCapability);
+    const id = typeof rawCapability === "string"
+      ? asString(rawCapability)
+      : asString(capability?.capability_id) ?? asString(capability?.id);
+    const label = asString(capability?.label) ?? id;
+    const risk = asString(capability?.risk);
+    return id && label ? [{ id, label, ...(risk ? { risk } : {}) }] : [];
+  });
+}
+
+function deriveAuthorizedConnection(value: Record<string, unknown> | null): AuthorizedConnectionSummary | null {
+  const id = asString(value?.connection_id) ?? asString(value?.id);
+  const displayName = asString(value?.display_name) ?? asString(value?.name) ?? asString(value?.connection_display_name) ?? id;
+  if (!id || !displayName) return null;
+  const revision = asFiniteNumber(value?.security_revision);
+  return {
+    id,
+    displayName,
+    ...(asString(value?.provider_type) ?? asString(value?.connection_provider_type) ?? asString(value?.connection_type)
+      ? { providerType: (asString(value?.provider_type) ?? asString(value?.connection_provider_type) ?? asString(value?.connection_type)) as string }
+      : {}),
+    ...(asString(value?.status) ? { status: asString(value?.status) as string } : {}),
+    ...(revision !== null && Number.isSafeInteger(revision) && revision >= 0 ? { securityRevision: revision } : {}),
+    ...(asString(value?.account_label) ? { accountLabel: asString(value?.account_label) as string } : {}),
+    capabilities: deriveConnectionCapabilities(value?.capabilities)
+  };
+}
+
+function deriveConnectionRequest(value: Record<string, unknown>): ConnectionAccessRequest | null {
+  const requestId = asString(value.request_id);
+  const status = asString(value.status);
+  const consumer = asRecord(value.consumer);
+  const packageId = asString(consumer?.package_id) ?? asString(value.consumer_package_id);
+  const displayName = asString(consumer?.display_name) ?? asString(value.consumer_display_name) ?? packageId;
+  const connection = deriveAuthorizedConnection(asRecord(value.connection) ?? {
+    connection_id: value.connection_id,
+    connection_display_name: value.connection_display_name,
+    connection_type: value.connection_provider_type,
+    provider_type: value.provider_type,
+    status: value.connection_status,
+    security_revision: value.connection_security_revision,
+    account_label: value.connection_account_label
+  });
+  if (!requestId || !status || !packageId || !displayName || !connection) return null;
+  return {
+    requestId,
+    status,
+    consumer: {
+      packageId,
+      displayName
+    },
+    connection,
+    capabilities: deriveConnectionCapabilities(value.capabilities ?? value.capability_ids),
+    ...(asString(value.requested_at) ?? asString(value.created_at)
+      ? { requestedAt: (asString(value.requested_at) ?? asString(value.created_at)) as string }
+      : {})
+  };
+}
+
+function deriveConnectionAuthorization(value: Record<string, unknown> | null): ConnectionAuthorizationProjection | undefined {
+  if (!value || (value.schema !== "opl_connection_authorization_projection.v1"
+    && value.surface_kind !== "opl_connection_authorization_projection.v1")) return undefined;
+  const requests = asRecordArray(value.requests).flatMap((item) => {
+    const request = deriveConnectionRequest(item);
+    return request ? [request] : [];
+  });
+  const grants = asRecordArray(value.grants).flatMap((item): ConnectionGrant[] => {
+    const request = deriveConnectionRequest(item);
+    const grantId = asString(item.grant_id);
+    return request && grantId ? [{
+      ...request,
+      grantId,
+      ...(asString(item.granted_at) ?? asString(item.decided_at) ?? asString(item.created_at)
+        ? { grantedAt: (asString(item.granted_at) ?? asString(item.decided_at) ?? asString(item.created_at)) as string }
+        : {}),
+      ...(asString(item.stale_reason) ? { staleReason: asString(item.stale_reason) as string } : {})
+    }] : [];
+  });
+  const invocations = asRecordArray(value.invocations).flatMap((item): ConnectionInvocation[] => {
+    const invocationId = asString(item.invocation_id);
+    const consumerPackageId = asString(item.consumer_package_id);
+    const consumerDisplayName = asString(item.consumer_display_name) ?? asString(item.consumer_package_id);
+    const connectionId = asString(item.connection_id);
+    const connectionDisplayName = asString(item.connection_display_name) ?? asString(item.connection_id);
+    const capabilityId = asString(item.capability_id);
+    const capabilityLabel = asString(item.capability_label) ?? capabilityId;
+    const disposition = asString(item.disposition);
+    return invocationId && consumerPackageId && consumerDisplayName && connectionId && connectionDisplayName
+      && capabilityId && capabilityLabel && disposition ? [{
+        invocationId,
+        consumerPackageId,
+        consumerDisplayName,
+        connectionId,
+        connectionDisplayName,
+        capabilityId,
+        capabilityLabel,
+        disposition,
+        ...(asString(item.started_at) ? { startedAt: asString(item.started_at) as string } : {}),
+        ...(asString(item.finished_at) ? { finishedAt: asString(item.finished_at) as string } : {})
+      }] : [];
+  }).slice(0, 20);
+  const connections = asRecordArray(value.connections).flatMap((item) => {
+    const connection = deriveAuthorizedConnection(item);
+    return connection ? [connection] : [];
+  });
+  const availableRelayConnections = asRecordArray(value.available_connections).flatMap((item) => {
+    const mailboxRef = asString(item.mailbox_ref);
+    const displayName = asString(item.display_name) ?? asString(item.name) ?? mailboxRef;
+    return mailboxRef && displayName ? [{
+      mailboxRef,
+      displayName,
+      ...(asString(item.account_label) ? { accountLabel: asString(item.account_label) as string } : {})
+    }] : [];
+  });
+  return { requests, grants, invocations, connections, availableRelayConnections };
+}
+
+const connectionActionIds = [
+  "connection_access_request_deny",
+  "connection_grant_revoke",
+  "connection_relay_import"
+];
+
+function deriveConnectionActions(actionRecords: ReadonlyMap<string, Record<string, unknown>>) {
+  return connectionActionIds.flatMap((actionId) => {
+    const action = actionRecords.get(actionId);
+    if (!action) return [];
+    return [{
+      actionId,
+      label: asString(action.label) ?? actionId,
+      payloadFields: asStringArray(action.payload_fields),
+      confirmationRequired: asBoolean(action.confirmation_required),
+      dryRunSupported: asBoolean(action.dry_run_supported)
+    }];
+  });
+}
+
 function deriveDockerWebui(
   dockerWebui: Record<string, unknown> | null,
   actionRecords: ReadonlyMap<string, Record<string, unknown>>
@@ -362,6 +506,8 @@ export function deriveWorkbenchSettingsProjection({
         localEnvironment: deriveLocalEnvironment(localEnvironment),
         workspace: deriveWorkspace(workspaceServices),
         externalConnections: deriveExternalConnections(asRecord(appSettingsReadModel?.connections)),
+        connectionAuthorization: deriveConnectionAuthorization(asRecord(asRecord(appSettingsReadModel?.connections)?.authorization)),
+        connectionActions: deriveConnectionActions(actionRecords),
         dockerWebui: deriveDockerWebui(asRecord(appSettingsReadModel?.docker_webui), actionRecords),
         personalization: derivePersonalization(codexPersonalization),
         storage: deriveStorage(asRecord(appSettingsReadModel?.storage_lifecycle), actionRecords)

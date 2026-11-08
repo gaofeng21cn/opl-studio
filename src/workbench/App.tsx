@@ -1255,6 +1255,72 @@ export function App({
     }
   }
 
+  async function approveConnectionAccess(requestId: string): Promise<boolean> {
+    const key = `connection-approve:${requestId}`;
+    setSettingsActionBusyKey(key);
+    setSettingsActionFeedback(null);
+    setSettingsActionReceipt(null);
+    try {
+      const latest = await loadState(settings.runtimeProfile);
+      const pending = latest?.settingsProjection?.connectionAuthorization?.requests.some(
+        (request) => request.requestId === requestId && request.status === "requested"
+      );
+      if (!pending) {
+        setSettingsActionFeedback({
+          tone: "attention",
+          message: settings.locale === "zh" ? "此访问请求已变化；请检查最新状态。" : "This access request has changed; review the latest state."
+        });
+        return false;
+      }
+      const result = await bridge.approveConnectionAccess({ requestId });
+      if (!result.ok) {
+        setSettingsActionFeedback({
+          tone: "attention",
+          message: settings.locale === "zh" ? `授权未完成（${result.errorCode ?? "未知错误"}）。` : `Approval did not complete (${result.errorCode ?? "unknown error"}).`
+        });
+        return false;
+      }
+      if (!result.stateRefreshRequired) {
+        setSettingsActionFeedback({
+          tone: "attention",
+          message: settings.locale === "zh" ? "授权命令未要求状态回读，结果暂不可确认。请刷新连接状态。" : "The approval result did not request state readback. Refresh connection status before proceeding."
+        });
+        return false;
+      }
+      try {
+        const verified = await loadState(settings.runtimeProfile);
+        const authorization = verified?.settingsProjection?.connectionAuthorization;
+        const granted = authorization?.grants.some((grant) => grant.requestId === requestId && grant.status === "granted");
+        if (!granted) {
+          setSettingsActionFeedback({
+            tone: "attention",
+            message: settings.locale === "zh" ? "授权命令已返回成功，但最新状态尚未确认该授权；请刷新后查看，不要重复授权。" : "The approval command returned success, but fresh state has not confirmed the grant. Refresh state before taking further action."
+          });
+          return false;
+        }
+      } catch {
+        setSettingsActionFeedback({
+          tone: "attention",
+          message: settings.locale === "zh" ? "授权命令已返回成功，但状态刷新未完成；请先刷新状态，不要重复授权。" : "The approval command returned success, but state refresh failed. Refresh state before taking further action."
+        });
+        return false;
+      }
+      setSettingsActionFeedback({
+        tone: "success",
+        message: settings.locale === "zh" ? "已向该智能体授予所列连接能力。" : "The listed connection capabilities were granted to this Agent."
+      });
+      return true;
+    } catch {
+      setSettingsActionFeedback({
+        tone: "attention",
+        message: settings.locale === "zh" ? "授权结果暂不可确认，请刷新连接状态后再处理。" : "The approval result is unconfirmed. Refresh connection status before acting again."
+      });
+      return false;
+    } finally {
+      setSettingsActionBusyKey(null);
+    }
+  }
+
   async function reconcileCanonicalThread(threadId: string, reason: string, expectedTurnId?: string, snapshot?: CodexThread): Promise<CodexThread> {
     const sequence = (reconcileSequenceRef.current.get(threadId) ?? 0) + 1;
     reconcileSequenceRef.current.set(threadId, sequence);
@@ -2672,6 +2738,7 @@ export function App({
       onAction={(request) => void runSettingsAction(request)}
       onHostAction={(intent) => void runSettingsHostAction(intent)}
       onGatewayLogin={loginGatewayAccount}
+      onApproveConnectionAccess={bridge.platformCapabilities.connectionAccessApproval ? approveConnectionAccess : undefined}
       manifestInstallAction={projectedManifestInstallAction}
       actionBusyKey={settingsActionBusyKey}
       actionReceipt={settingsActionReceipt}

@@ -169,7 +169,8 @@ export function installWebTransport(): void {
       workspaceRootSelection: false,
       nativeWorkspaceFileAccess: false,
       codexInstall: false,
-      modelAccessSecretInput: true
+      modelAccessSecretInput: true,
+      connectionAccessApproval: true
     },
     beginWindowDrag: () => undefined,
     readState: (profile = "fast") => requestJson<OplStateReadback>(`/api/opl/state?profile=${encodeURIComponent(profile)}`),
@@ -243,6 +244,7 @@ export function installWebTransport(): void {
     interruptTurn: (request) => postJson("/api/turns/interrupt", request),
     loginGatewayAccount: (request) => postJson("/api/opl-runtime/gateway-account-login", request),
     configureCodexApiKey: (request) => postJson("/api/opl-runtime/configure-codex", request),
+    approveConnectionAccess: (request) => postJson("/api/opl-runtime/connection-access-approve", request),
     readNativeAppUpdateStatus: () => requestJson("/api/native-app-update/status"),
     checkNativeAppUpdate: () => postJson("/api/native-app-update/check", {}),
     applyNativeAppUpdate: () => postJson("/api/native-app-update/apply", {}),

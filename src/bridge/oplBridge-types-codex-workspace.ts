@@ -183,6 +183,10 @@ export type CodexApiKeyConfigurationResult =
   | { ok: true; stateRefreshRequired: true }
   | { ok: false; errorCode: CodexApiKeyConfigurationErrorCode; stateRefreshRequired: false };
 
+export type ConnectionAccessApprovalResult =
+  | { ok: true; stateRefreshRequired: true }
+  | { ok: false; errorCode: string };
+
 
 export type CodexPendingServerRequest = {
   id: string | number;

@@ -1,6 +1,7 @@
 import { createWorkbenchTaskExecutor } from "../../../src/host/workbench-task-executor.mjs";
 import { loadFrameworkCordisProfiles, createFrameworkChannelCallbackRegistrar } from "../../../src/host/framework-channel-bootstrap.mjs";
 import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "../../../src/host/gateway-account-login.mjs";
+import { createConnectionAccessApproval } from "../../../src/host/connection-access-approval.mjs";
 import { createOplPassthrough } from "../../../src/host/opl-passthrough.mjs";
 
 export class OplFrameworkBridge {
@@ -11,6 +12,7 @@ export class OplFrameworkBridge {
     channelCallbackRegistrar,
     gatewayAccountLogin,
     codexApiKeyConfiguration,
+    connectionAccessApproval,
     codex,
     env = process.env
   } = {}) {
@@ -35,6 +37,11 @@ export class OplFrameworkBridge {
       env
     });
     this.codexApiKeyConfiguration = codexApiKeyConfiguration ?? createCodexApiKeyConfiguration({
+      command: oplCommand,
+      cwd: workspaceRoot,
+      env
+    });
+    this.connectionAccessApproval = connectionAccessApproval ?? createConnectionAccessApproval({
       command: oplCommand,
       cwd: workspaceRoot,
       env

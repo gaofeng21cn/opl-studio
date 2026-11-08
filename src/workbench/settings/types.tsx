@@ -95,6 +95,7 @@ export type SettingsPanelProps = {
   onAction: (request: SettingsActionRequest) => void;
   onHostAction?: (intent: SettingsHostActionIntent) => void;
   onGatewayLogin?: (credentials: { email: string; password: string }) => Promise<boolean>;
+  onApproveConnectionAccess?: (requestId: string) => Promise<boolean>;
   manifestInstallAction?: {
     actionId: string;
     payloadFields: string[];
