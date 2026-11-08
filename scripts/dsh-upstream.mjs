@@ -56,6 +56,8 @@ function assertPackageAlignment(packageJson, packageLock, cohort) {
     for (const [source, dependencies] of dependencySources) {
       assert(dependencies?.[name] === version, `${source} DSH dependency ${name} must be ${version}`);
     }
+    assert(packageLock?.packages?.[`node_modules/${name}`]?.version === version,
+      `package-lock.json resolved DSH dependency ${name} must be ${version}`);
   }
 }
 
