@@ -567,7 +567,8 @@ test("Framework managed updates reuse the projected App action bus", () => {
   assert.match(settingsActionFlow, /payload: \{ \.\.\.request\.payload, confirmed: true \}[\s\S]*dryRun: false/);
   assert.match(settingsActionFlow, /payload: \{ \.\.\.confirmation\.request\.payload, confirmed: true,[^\n]*confirmationId[^\n]*receiptId[^\n]*\}[\s\S]*dryRun: false/);
   assert.match(settingsActionFlow, /captureManagedUpdateReceipt\(receipt\)/);
-  assert.match(settingsActionFlow, /await loadState\(settings\.runtimeProfile\)/);
+  assert.match(settingsActionFlow, /model\.managedCompanions\.some\([^\n]+\? "full" : settings\.runtimeProfile/);
+  assert.match(settingsActionFlow, /await loadState\(profile\)/);
   assert.doesNotMatch(app, /Framework 尚未投影此更新操作|Framework has not projected this update operation/);
 });
 
@@ -794,9 +795,9 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
   assert.equal(candidateEvidence.application_host.release_ready, false);
 });
 
-test("primary canvas hides its scrollbar without disabling scrolling", () => {
+test("primary surfaces preserve scrolling and settings expose a narrow scrollbar", () => {
   assert.match(conversationStyles, /\.scrollBody \{[^}]*overflow-y: auto;/s);
-  assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;[^}]*scrollbar-width: none;/s);
+  assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;[^}]*scrollbar-width: thin;/s);
   const workspaceStyles = read("src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css");
   assert.match(workspaceStyles, /\.list \{[\s\S]*overflow-y: auto;/);
   assert.match(styles, /\.opl-workspace-browser-seat \{[^}]*overflow-y: auto;/s);
@@ -1009,8 +1010,8 @@ test("composer places dynamic OPL standard agents before Skills and keeps other 
 
 test("capability surfaces project dynamic OPL packages and dependency checks", () => {
   assert.match(app, /id: "opl-modules"/);
-  assert.match(app, /model\.packageLifecycle\s*\.filter\(\(item\) => item\.official && item\.packageId !== "missing_bridge"\)/s);
-  assert.match(app, /model\.packageLifecycle\.flatMap\(\(owner\) => owner\.dependencies\.map/);
+  assert.match(app, /model\.packageLifecycle\s*\.filter\(\(item\) => item\.appEnabled && item\.official && item\.packageId !== "missing_bridge"\)/s);
+  assert.match(app, /model\.packageLifecycle\.filter\(\(owner\) => owner\.appEnabled\)\.flatMap\(\(owner\) => owner\.dependencies\.map/);
   assert.match(app, /group\.id === "opl-modules" \|\| normalizedCapabilityQuery/);
   assert.doesNotMatch(app, /item\.packageId\.startsWith\("opl-"\)/);
   assert.match(settingsPanel, /owner\.dependencies\.map\(\(dependency\)/);
