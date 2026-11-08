@@ -147,7 +147,7 @@ import type {
   OplUiContributionsProjection,
   RenderOplContributionSlot
 } from "../composition/contributionProjection";
-import { groupSettingsContributions, settingsContributionDestination } from "../composition/contributionProjection";
+import { settingsContributionDestination } from "../composition/contributionProjection";
 import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
@@ -425,6 +425,7 @@ export function App({
   const standardAgentOptions = useMemo<ComposerAgentOption[]>(() => model.packageLifecycle
     .filter((item) => (
       item.packageRole === "standard_agent"
+      && item.appEnabled
       && item.readiness.selectable
       && item.homeShortcuts.some((shortcut) => Boolean(shortcut.route))
     ))
@@ -448,7 +449,7 @@ export function App({
       };
     }), [model.packageLifecycle, settings.locale]);
   const oplCapabilityOptions = useMemo<ComposerOplCapabilityOption[]>(() => model.packageLifecycle
-    .filter((item) => item.official && item.packageId !== "missing_bridge" && item.packageRole !== "standard_agent")
+    .filter((item) => item.appEnabled && item.official && item.packageId !== "missing_bridge" && item.packageRole !== "standard_agent")
     .flatMap((item) => {
       // A package owns one shortcut; its remaining required Skills stay available in the generic Skills group.
       const skill = item.requiredSkillIds
@@ -467,14 +468,14 @@ export function App({
     }), [capabilityCatalog.skills, model.packageLifecycle, settings.locale]);
   const oplModuleItems = useMemo(() => {
     const packageItems = model.packageLifecycle
-      .filter((item) => item.official && item.packageId !== "missing_bridge")
+      .filter((item) => item.appEnabled && item.official && item.packageId !== "missing_bridge")
       .map((item) => ({
         id: `package:${item.packageId}`,
         name: settings.locale === "zh" ? item.displayNameI18n.zh ?? item.label : item.displayNameI18n.en ?? item.label,
         detail: (settings.locale === "zh" ? item.descriptionI18n.zh : item.descriptionI18n.en) ?? item.description,
         active: item.readiness.callable !== false && item.activated !== false
       }));
-    const dependencyItems = model.packageLifecycle.flatMap((owner) => owner.dependencies.map((dependency) => ({
+    const dependencyItems = model.packageLifecycle.filter((owner) => owner.appEnabled).flatMap((owner) => owner.dependencies.map((dependency) => ({
       id: `dependency:${dependency.packageId}`,
       name: dependency.packageId,
       detail: settings.locale === "zh" ? `${owner.label} 的必需能力包` : `Required by ${owner.label}`,
@@ -484,6 +485,16 @@ export function App({
       items.findIndex((candidate) => candidate.id === item.id) === index
     ));
   }, [model.packageLifecycle, settings.locale]);
+  const disabledAppPackages = useRef(new Set<string>());
+  disabledAppPackages.current = new Set(model.packageLifecycle.filter((item) => !item.appEnabled).map((item) => item.packageId));
+  useEffect(() => {
+    if (selectedAgent && disabledAppPackages.current.has(selectedAgent.packageId)) setSelectedAgent(null);
+    if (contributionActionConfirmation && disabledAppPackages.current.has(contributionActionConfirmation.entry.packageId)) {
+      contributionActionResolver.current?.({ status: "cancelled" });
+      contributionActionResolver.current = null;
+      setContributionActionConfirmation(null);
+    }
+  }, [model.packageLifecycle, selectedAgent, contributionActionConfirmation]);
   const capabilityGroups = [
     {
       id: "opl-modules",
@@ -930,18 +941,24 @@ export function App({
       const diagnostic = request.actionId === "settings_diagnose_docker_webui"
         ? dockerDiagnosticFromReceipt(receipt)
         : null;
+      let stateReadFailed = false;
       if (diagnostic) setDockerDiagnostic(diagnostic);
       if (receipt.status === "executed") {
         captureManagedUpdateReceipt(receipt);
         if (request.actionId === "settings_diagnose_docker_webui") {
           // The doctor is a receipt-only read; its result is already authoritative
           // for this check and does not require a second full App-state read.
-        } else if (model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === request.actionId))) await loadState("full");
-        else await loadState(settings.runtimeProfile);
+        } else {
+          const profile = model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === request.actionId)) ? "full" : settings.runtimeProfile;
+          stateReadFailed = await loadState(profile) === null;
+        }
         if (initializationActionIds.has(request.actionId)) await loadInitialize();
       }
       setSettingsActionReceipt(actionReceiptView(receipt));
-      setSettingsActionFeedback(diagnostic ? {
+      setSettingsActionFeedback(stateReadFailed ? {
+        tone: "attention",
+        message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
+      } : diagnostic ? {
         tone: diagnostic.status === "attention" || (diagnostic.attentionCount ?? 0) > 0 ? "attention" : "success",
         message: settings.locale === "zh"
           ? `诊断完成${diagnostic.attentionCount ? `，发现 ${diagnostic.attentionCount} 项需要处理` : "，未发现需要处理的项目"}。`
@@ -965,14 +982,18 @@ export function App({
         payload: { ...confirmation.request.payload, confirmed: true, ...(confirmation.confirmationId ? { confirmationId: confirmation.confirmationId } : {}), ...(confirmation.receiptId ? { receiptId: confirmation.receiptId } : {}) },
         dryRun: false
       });
+      let stateReadFailed = false;
       if (receipt.status === "executed") {
         captureManagedUpdateReceipt(receipt);
-        if (model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === confirmation.request.actionId))) await loadState("full");
-        else await loadState(settings.runtimeProfile);
+        const profile = model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === confirmation.request.actionId)) ? "full" : settings.runtimeProfile;
+        stateReadFailed = await loadState(profile) === null;
         if (initializationActionIds.has(confirmation.request.actionId)) await loadInitialize();
       }
       setSettingsActionReceipt(actionReceiptView(receipt));
-      setSettingsActionFeedback(settingsReceiptFeedback(receipt, confirmation.request.label));
+      setSettingsActionFeedback(stateReadFailed ? {
+        tone: "attention",
+        message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
+      } : settingsReceiptFeedback(receipt, confirmation.request.label));
       setSettingsActionConfirmation(null);
     } catch (error) {
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
@@ -1693,6 +1714,7 @@ export function App({
     confirmed: boolean,
     input: Record<string, unknown> = {}
   ) {
+    if (disabledAppPackages.current.has(entry.packageId)) return { status: "cancelled" as const };
     setContributionActionBusy(true);
     setContributionActionConfirmation(null);
     try {
@@ -1732,6 +1754,7 @@ export function App({
     resolve?.(await executeContributionAction(pending.entry, pending.command, true, pending.input));
   }
   const handleContributionAction: OplContributionAction = (entry, command, input = {}, preview) => {
+    if (disabledAppPackages.current.has(entry.packageId)) return Promise.resolve({ status: "cancelled" });
     if (!contributionActionAvailable || contributionActionResolver.current) return Promise.resolve({status: "failed", message: settings.locale === "zh" ? "其他操作仍在处理，请稍后重试" : "Another action is in progress"});
     if (command.confirmationRequired) {
       return new Promise(resolve => {
@@ -1742,6 +1765,7 @@ export function App({
     return executeContributionAction(entry, command, false, input);
   };
   const readContributionData = useCallback((entry: OplUiContributionsProjection["entries"][number], input: Record<string, unknown> = {}) => {
+    if (disabledAppPackages.current.has(entry.packageId)) return Promise.reject(new Error("Contribution is disabled in OPL App"));
     if (!entry.view) return Promise.reject(new Error("Contribution view is unavailable"));
     return bridge.readContribution({ packageId: entry.packageId, ref: entry.view.dataRef, input }).then((readback) => readback.result);
   }, [bridge]);
@@ -2189,7 +2213,7 @@ export function App({
     if (!agent || agent.packageRole !== "standard_agent") {
       return settings.locale === "zh" ? "智能体目录已变化，请重新选择。" : "The agent directory changed. Please select again.";
     }
-    if (!agent.readiness.selectable || !agent.homeShortcuts.some(shortcut => shortcut.route)) {
+    if (!agent.appEnabled || !agent.readiness.selectable || !agent.homeShortcuts.some(shortcut => shortcut.route)) {
       setSettingsNavigation(current => ({ destination: "agents", revision: (current?.revision ?? 0) + 1 }));
       return agentAvailabilityDetail(agent, settings.locale);
     }
@@ -2655,26 +2679,14 @@ export function App({
       pendingConfirmation={null}
       onConfirmAction={() => void confirmSettingsAction()}
       onCancelAction={() => setSettingsActionConfirmation(null)}
-      contributions={(() => {
-        const destination = activeDestination === "resources" || activeDestination === "services" || activeDestination === "capabilities"
-          ? activeDestination
-          : null;
-        if (!destination || !hasContribution("settings.section")) return null;
-        const packageLabels = new Map(model.packageLifecycle.map((item) => [item.packageId, item.label]));
-        const groups = groupSettingsContributions(model.uiContributions.entries.filter((entry) => (
-          entry.slot === "settings.section" && settingsContributionDestination(entry) === destination
-        )));
-        return groups.length ? groups.map((group, index) => (
-          <section className="settings-contribution-package" data-package-id={group.packageId} key={group.packageId}>
-            {settings.developerDetails ? <small>{packageLabels.get(group.packageId) ?? group.packageId}</small> : null}
-            <div className="opl-contribution-slot">
-              {group.entries.map((entry) => (
-                <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>
-              ))}
-            </div>
-          </section>
-        )) : null;
-      })()}
+      renderPackageContributions={(packageId) => {
+        const entries = model.uiContributions.entries.filter((entry) => (
+          entry.slot === "settings.section" && entry.packageId === packageId && settingsContributionDestination(entry) !== null
+        ));
+        return entries.length ? <div className="opl-contribution-slot" data-package-id={packageId}>
+          {entries.map((entry) => <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>)}
+        </div> : null;
+      }}
     />
   );
 
@@ -2721,7 +2733,7 @@ export function App({
         selection: null
       },
       ...model.packageLifecycle.filter((item) => (
-        item.packageRole === "standard_agent" && item.official
+        item.appEnabled && item.packageRole === "standard_agent" && item.official
           && (item.homeShortcuts.some(shortcut => Boolean(shortcut.route) && shortcut.visible)
             || !item.readiness.selectable)
       )).sort((left, right) => (

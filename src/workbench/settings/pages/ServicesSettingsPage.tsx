@@ -1,11 +1,11 @@
 import { statusTone, formatDate } from "../../settings/presentation";
-import { SettingRow, SettingsGroup, StatusValue, SettingsContributionSection } from "../../settings/primitives";
+import { SettingRow, SettingsGroup, StatusValue } from "../../settings/primitives";
 import { componentReadinessStatus } from "../../settings/packages";
 
 import { RuntimeActionButton } from "../../settings/actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ServicesSettingsPage({ runtime, settings, projection, refreshRevision, contributions, zh, navigate, copy, actionBusyKey, onAction, locale }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "refreshRevision" | "contributions" | "zh" | "navigate" | "copy" | "actionBusyKey" | "onAction" | "locale">) {
+export function ServicesSettingsPage({ runtime, settings, projection, zh, navigate, copy, actionBusyKey, onAction, locale }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "navigate" | "copy" | "actionBusyKey" | "onAction" | "locale">) {
 
       const runtimeActions = runtime?.maintenanceActions ?? [];
       const serviceAction = runtimeActions.find((action) => action.actionId === (runtime?.temporal.serviceReady === false ? "provider_service_start" : "provider_service_status"));
@@ -18,7 +18,6 @@ export function ServicesSettingsPage({ runtime, settings, projection, refreshRev
             <SettingRow label={settings.locale === "zh" ? "智能体与能力" : "Agents and capabilities"}><StatusValue status={projection?.statusSummary.agentPackageHealth} locale={settings.locale} /></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "运行环境" : "Runtime environment"}><StatusValue status={projection?.statusSummary.runtimeSourceHealth} locale={settings.locale} /></SettingRow>
           </SettingsGroup>
-          <SettingsContributionSection key={refreshRevision} contributions={contributions} locale={settings.locale} destination="services" />
           <SettingsGroup title={settings.locale === "zh" ? "后台任务" : "Background tasks"}>
             <p className="settings-inline-note">{zh ? "服务状态只负责运行条件；创建与查看任务请打开计划任务。" : "Service status describes runtime requirements. Manage tasks in Scheduled Tasks."} <button className="settings-inline-command" type="button" onClick={() => navigate("schedules")}>{copy.schedules}</button></p>
             <SettingRow label={settings.locale === "zh" ? "任务服务" : "Task service"}>

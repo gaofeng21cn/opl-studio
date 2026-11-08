@@ -188,16 +188,37 @@ const projectionState = {
   }
 };
 
+test("App-disabled packages leave all contribution slots while remaining natively enabled", () => {
+  const host = new OplStudioDshSlotHost();
+  const initial = readUiContributionsProjection(projectionState);
+  host.replaceHostDerivedProjection(initial);
+  expect(host.core.entries("runtime.detail")).toHaveLength(1);
+  expect(host.core.entries("composer.palette")).toHaveLength(1);
+  const hidden = readUiContributionsProjection({ app_state: { ...projectionState.app_state,
+    agent_packages: {
+      directory: { entries: [{ package_id: "mas", app_enabled: false, installed: true, activated: true }] },
+      status_index: { packages: { mag: { app_enabled: false, installed: true, activated: true } } }
+    }
+  } });
+  expect(hidden.entries).toHaveLength(0);
+  host.replaceHostDerivedProjection(hidden);
+  expect(host.core.entries("runtime.detail")).toHaveLength(0);
+  expect(host.core.entries("composer.palette")).toHaveLength(0);
+  host.replaceHostDerivedProjection(initial);
+  expect(host.core.entries("runtime.detail")).toHaveLength(1);
+  host.clearProjection();
+});
+
 describe("OPL Studio DSH contribution composition", () => {
-  test("routes settings contributions by declared view semantics", () => {
-    expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("resources");
-    expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("resources");
-    expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("services");
+  test("routes package settings to the unified catalog", () => {
+    expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("capabilities");
+    expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("capabilities");
+    expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("capabilities");
     expect(settingsContributionDestination({ view: { viewId: "fleet", viewType: "activity_log", title: {}, dataRef: "fleet#state" } })).toBeNull();
     expect(settingsContributionDestination({ view: { viewId: "capability", viewType: "table", title: {}, dataRef: "capability#state" } })).toBe("capabilities");
   });
 
-  test("shows service status in Services while hiding technical activity logs", () => {
+  test("groups package status and settings in the catalog while hiding technical activity logs", () => {
     const projection = readUiContributionsProjection({
       ui_contributions: {
         surface_kind: "opl_app_ui_contributions_projection.v1",
@@ -285,18 +306,18 @@ describe("OPL Studio DSH contribution composition", () => {
     });
     const fleetEntries = projection.entries.filter((entry) => entry.packageId === "opl-fleet-agent");
     expect(fleetEntries).toHaveLength(2);
-    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === "services")).toBe(true);
+    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === "capabilities")).toBe(true);
 
     const activityEntry = projection.entries.find((entry) => entry.packageId === "legacy-fleet-agent");
     expect(activityEntry && settingsContributionDestination(activityEntry)).toBeNull();
 
     const weixinEntry = projection.entries.find((entry) => entry.packageId === "opl-channel-weixin");
-    expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("resources");
+    expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("capabilities");
 
     const groups = groupSettingsContributions(projection.entries.filter((entry) => settingsContributionDestination(entry) === "capabilities"));
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ packageId: "generic-package" });
-    expect(groups[0]?.entries.map((entry) => entry.contributionId)).toEqual(["overview", "details"]);
+    expect(groups).toHaveLength(3);
+    const generic = groups.find((group) => group.packageId === "generic-package");
+    expect(generic?.entries.map((entry) => entry.contributionId)).toEqual(["overview", "details"]);
   });
 
   test("summarizes service status without exposing operational payload fields by default", () => {

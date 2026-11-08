@@ -10,7 +10,7 @@ export const navigationCopy = {
       account_models: "账户与模型",
       connections_deployment: "连接与访问",
       workspace: "工作区",
-      agents_capabilities: "智能体与能力",
+      agents_capabilities: "扩展与应用",
       runtime_maintenance: "运行与维护",
       preferences: "偏好"
     },
@@ -22,7 +22,7 @@ export const navigationCopy = {
       workspace: "工作目录",
       storage: "数据与存储",
       agents: "智能体",
-      capabilities: "能力",
+      capabilities: "扩展与应用",
       instructions: "指令",
       memory: "记忆",
       schedules: "后台任务",
@@ -39,7 +39,7 @@ export const navigationCopy = {
       account_models: "Account & Models",
       connections_deployment: "Connections & Access",
       workspace: "Workspace",
-      agents_capabilities: "Agents & Capabilities",
+      agents_capabilities: "Extensions & Apps",
       runtime_maintenance: "Runtime & Maintenance",
       preferences: "Preferences"
     },
@@ -51,7 +51,7 @@ export const navigationCopy = {
       workspace: "Working Directory",
       storage: "Data & Storage",
       agents: "Agents",
-      capabilities: "Capabilities",
+      capabilities: "Extensions & Apps",
       instructions: "Instructions",
       memory: "Memory",
       schedules: "Background tasks",
@@ -93,8 +93,8 @@ export function navigationGroups(locale: WorkbenchSettings["locale"]): Navigatio
       id: "agents_capabilities",
       label: copy.groups.agents_capabilities,
       destinations: [
-        { id: "agents", label: copy.destinations.agents },
         { id: "capabilities", label: copy.destinations.capabilities },
+        { id: "agents", label: copy.destinations.agents },
         { id: "instructions", label: copy.destinations.instructions },
         { id: "memory", label: copy.destinations.memory }
       ]
@@ -190,8 +190,8 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Agents & capabilities", description: "Manage agents, workflows, updates, repairs, and favorite entry points." }
   },
   capabilities: {
-    zh: { eyebrow: "智能体与能力", description: "查看可用的技能、插件、连接应用和配套能力。" },
-    en: { eyebrow: "Agents & capabilities", description: "Explore available skills, plugins, connected apps, and supporting capabilities." }
+    zh: { eyebrow: "智能体与能力", description: "统一管理扩展的安装、更新和状态，选择在 OPL App 中启用的应用；查看提供的技能与连接能力。" },
+    en: { eyebrow: "Agents & capabilities", description: "Manage extension installation, updates and status; choose which apps appear in OPL App and explore their skills and connections." }
   },
   instructions: {
     zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "设置工作习惯与补充说明，管理新会话使用的上下文。" },

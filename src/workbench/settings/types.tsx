@@ -107,7 +107,7 @@ export type SettingsPanelProps = {
   pendingConfirmation: SettingsActionConfirmation | null;
   onConfirmAction: () => void;
   onCancelAction: () => void;
-  contributions?: ReactNode;
+  renderPackageContributions?: (packageId: string) => ReactNode;
 };
 
 export type SettingsActionFeedback = {

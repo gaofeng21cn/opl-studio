@@ -34,27 +34,6 @@ export function StatusValue({ status, locale }: { status?: string; locale: Workb
   );
 }
 
-export function SettingsContributionSection({
-  contributions,
-  locale,
-  destination
-}: {
-  contributions?: ReactNode;
-  locale: WorkbenchSettings["locale"];
-  destination: "resources" | "services" | "capabilities";
-}) {
-  if (!contributions) return null;
-  const titles = locale === "zh"
-    ? { resources: "消息与连接", services: "已安装服务", capabilities: "模块扩展" }
-    : { resources: "Messages & connections", services: "Installed services", capabilities: "Module extensions" };
-  return (
-    <section className="settings-contribution-section" data-testid="opl-settings-contributions">
-      <h2>{titles[destination]}</h2>
-      <div className="opl-contribution-slot">{contributions}</div>
-    </section>
-  );
-}
-
 export type OfficialDshCapability = {
   id: string;
   pluginIds: string[];

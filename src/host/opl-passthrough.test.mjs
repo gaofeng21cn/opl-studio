@@ -497,6 +497,7 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
           entries: [{
             package_id: "future.agent",
             display_name: "Future Agent",
+            app_enabled: false,
             display_name_i18n: { "en-US": "Future Agent", "zh-CN": "未来智能体" },
             description_i18n: { "en-US": "Research helper" },
             session_routing_summary_i18n: { "en-US": "Routes research tasks" },
@@ -592,6 +593,13 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
               payload: { package_id: "future.agent", private: "x".repeat(20_000) },
               required_payload_fields: ["package_id"],
               confirmation_required: true
+            }, {
+              action_id: "package_app_set_enabled",
+              action_ref: "app_state.actions#package_app_set_enabled",
+              semantic: "preferences",
+              payload: { package_id: "future.agent", enabled: true },
+              required_payload_fields: ["package_id", "enabled"],
+              confirmation_required: false
             }],
             managed_runtime_source: { bootstrap_command: ["x".repeat(20_000)] },
             lifecycle_receipts: [{ receipt_ref: "private://receipt", physical_surface: { payload: "x".repeat(20_000) } }],
@@ -642,6 +650,7 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
   assert.equal("internal_trace" in state.actions[0], false);
   const entry = state.agent_packages.directory.entries[0];
   assert.equal(entry.display_name, "Future Agent");
+  assert.equal(entry.app_enabled, false);
   assert.equal(entry.display_name_i18n["zh-CN"], "未来智能体");
   assert.equal(entry.description_i18n["en-US"], "Research helper");
   assert.equal(entry.session_routing_summary_i18n["en-US"], "Routes research tasks");
@@ -666,6 +675,7 @@ test("fast state keeps GUI package fields without copying deep runtime payloads"
   assert.equal("legacy_lifecycle_state_present" in entry.installed_readiness, false);
   assert.equal(entry.available_actions[0].action_id, "agent_package_update");
   assert.deepEqual(entry.available_actions[0].payload, { package_id: "future.agent" });
+  assert.deepEqual(entry.available_actions[1].payload, { package_id: "future.agent", enabled: true });
   assert.equal("source_ref" in entry.installed_carrier_readback, false);
   assert.equal("managed_runtime_source" in entry, false);
   assert.equal("lifecycle_receipts" in entry, false);

@@ -1,63 +1,50 @@
 # Studio 设置页投影实现
 
-本文解释 Studio 如何执行 App 产品配置中的设置页归属与贡献准入规则。页面
-语义和文案决策由 App 合同管理；安装、启用、可调用、连接和载体关系由 App/
-Framework projection 提供。实现入口为 `src/composition/contributionProjection.ts`
-和 `src/workbench/SettingsPanel.tsx`，本文不定义独立产品规则。
+本文解释 Studio 如何消费 App 产品合同。App 持有页面语义；Framework 提供
+Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 state/action bridge
+展示和操作，不维护第二套安装目录或生命周期。
 
-## 用户任务与页面归属
+## 统一扩展目录
 
-| 用户要做什么 | 设置页位置 | Studio 读取的 owner projection | 展示规则 |
-| --- | --- | --- | --- |
-| 登录 OPL Gateway、切换 API Key 或账户 | 账户与访问 | `app_state.settings_control_center.app_settings_read_model` | 未连接、API Key、OPL Gateway 账户三种状态互斥；已登录时只展示账户详情和“更换访问方式” |
-| 连接微信、查看绑定状态、扫码或退出 | 资源与连接 | `settings.section` 中 `view_type=channel_access` | 微信是连接/通道能力，不进入智能体目录；操作继续通过 App action 执行 |
-| 查看标准智能体和工作流 | 智能体 | `app_state.agent_packages.directory + status_index` | 只显示 `standard_agent` 与 `workflow_profile`；保留“官方 / 全部”筛选；显示安装、启用、调用、启动四个状态轴 |
-| 添加自行开发或第三方智能体 | 智能体 | `app_state.actions#install_from_manifest_url` | 输入作者提供的 manifest URL 和明确 trust tier；先 dry-run，用户确认后才执行并刷新目录 |
-| 查看 Skills、插件、能力包和模块贡献 | 能力 | 包目录 + placement policy 准入的 `settings.section` 贡献 | 展示 capability package 及其包详情；通用渲染，不硬编码某个包的 ID 或页面 |
-| 查看后台服务、运行环境与修复动作 | 服务状态 | `app_state.settings_control_center` + runtime projection | 只展示 owner 提供的状态和 action，不在 Studio 推断服务健康 |
-| 查看安装包和数据用量 | 数据与存储 | `app_settings_read_model.storage_lifecycle` | 未盘点/过期/未配置不能显示为 0；刷新只触发 owner inventory action |
+“扩展与应用”（`capabilities` 路由）是安装、更新、修复、卸载、状态与 App
+开关的统一入口。它默认展示全部动态发现的包，包括私有本地安装；“官方”只是
+可选筛选。领域智能体、工作流、应用与共享能力使用同一 `PackageCatalog`。
+“智能体”页是该目录的角色筛选视图。
 
-## 目录口径
+每项展示版本、发布者、安装状态及来源。可用动作来自该包投影的
+`available_actions`，通过 App action 执行。自定义安装仍消费作者提供的
+manifest URL 与 trust tier，复用原有安装通道。
 
-智能体页只接收 `standard_agent` 和 `workflow_profile`。`官方` 是 OPL publisher
-提供的基线目录，`全部` 是基线加用户手动安装的标准智能体/工作流；两者的筛选
-不能混入 Skills、插件、连接或 capability package。
+安装不意味着必须在 OPL App 中使用。`app_enabled` 单独控制 OPL App 的页面、
+新任务入口、命令与状态读取，默认启用。`package_app_set_enabled` 保存此偏好；
+关闭后安装、原生平台启用状态、Codex Skills 和 MCP 能力保持原状。目录始终
+保留已关闭的包，可筛选并重新启用。已有页面在贡献被撤销时退出到聊天。
 
-当前只有官方条目时，“官方”和“全部”结果相同是正确状态，不代表切换失效；Studio
-必须明确提示“当前没有自定义智能体”。自定义条目不会因为被安装就自动成为首页
-默认快捷入口，是否显示仍由 App 的 exposure preference action 决定。
+## 状态按包归属
 
-“添加智能体”只消费 `install_from_manifest_url`。这个 action 必须由 App/Framework
-提供 `manifest_url`、`trust_tier`、`dry_run_supported` 和确认要求；Studio 不解析、
-下载、安装或维护第二份 Package registry。能力包、Skills、插件和连接模块进入
-能力或资源页面，由它们各自的 owner projection 提供；只有 App 合同明确准入的
-`service_status` view 才能进入服务状态，技术型 `activity_log` 仍不会自动进入普通 Settings。
+| 用户任务 | 位置 | 数据与动作归口 |
+| --- | --- | --- |
+| 登录 Gateway、切换账户或 API Key | 账户与访问 | App settings read model 与 action |
+| 查看包安装、版本、升级或 App 开关 | 扩展与应用的包详情 | Framework Package 投影与 action |
+| 查看包服务状态、绑定微信或远端设备 | 同一包的展开详情 | 包声明的 `settings.section` typed contribution |
+| 查看 Skills、原生插件及连接能力 | 扩展与应用内的能力目录 | Codex App Server capability catalog |
+| 查看任务服务、执行进程和定时服务 | 服务状态 | Framework runtime projection |
+| 查看磁盘用量及清理动作 | 数据与存储 | Framework storage lifecycle |
 
-## Fleet Agent 关系边界
+包详情关闭时不挂载贡献视图；展开且 `app_enabled=true` 才开始读取。包状态不再
+自动堆在服务状态或资源与连接页。`channel_access`、`remote_companion_access`、
+`service_status` 和其他已准入类型均按 Package 分组；`activity_log` 仍不是普通
+设置页入口。新包依 descriptor 接入，不增加固定包名单或专用状态页。
 
-`opl-fleet-agent` 是一个可选的 `capability_package` 集成适配器，由一个 Codex
-plugin carrier 安装。它通过 App 明确准入的 `service_status` typed view 提供本机
-Fleet Agent 遥测和诊断 read refs，并投影到“服务状态”；这不等于独立 macOS Fleet
-Agent App 的安装、运行或生命周期控制。
+Package 适配器的安装不证明独立桌面 App 的安装或进程状态。例如 Fleet 或 iPhone
+Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替代其独立 App
+的生命周期。
 
-`activity_log` 是技术型 read model，不是 Studio 可自行解释的 Settings 页面语义。
-因此 Studio 不会把这类贡献自动挂到“服务状态”，也不会在普通 Settings 中生成
-telemetry/doctor 两个区块。Fleet 的两个 `service_status` view 是 App 合同明确准入的
-例外；其他未声明准入的技术日志仍保持隐藏。
+## 实现入口
 
-Framework Package/贡献投影只证明适配器关系，不足以证明独立 macOS Fleet Agent
-App 的安装、进程状态或载体等价。若未来需要显示独立 App，必须由 App/Framework
-新增明确的 carrier/runtime projection；Studio 不通过路径、进程名或包 ID 猜测。
+`src/workbench/settings/packages.tsx` 复用目录与生命周期操作；
+`src/composition/contributionProjection.ts` 消费 App 使用偏好并过滤贡献；
+`src/workbench/App.tsx` 将包详情懒渲染及动作接入既有 bridge。
 
-## 当前实现与剩余边界
-
-主导航按概览、账户与模型、连接与访问、工作区、智能体与能力、运行与维护、偏好、关于分组。组内二级导航始终保留当前页，选中状态使用 `aria-current`；能力贡献跟随实际二级目的地渲染。窄屏使用横向导航，页面内容独立滚动。
-
-通用设置搜索复用 `@objectivex666/dsh-settings-search` 本地搜索插件，Studio 适配主要目的地、子页和偏好项，并补足方向键、Enter、焦点定位与清空按钮名称。外观和字号直接复用 DSH 控件；字号持久化后作用于会话内容。插件来源与版本选择见[生态客户端](ecosystem-client-plugins.md)。
-
-- 已实现：只有 App placement policy 明确准入的 view 语义才嵌入既有设置页；`service_status` 进入服务
-  状态，Fleet telemetry/doctor 使用这一通用类型；微信连接视图归入资源与连接且不成为顶级设置项；
-  `activity_log` 继续隐藏；智能体页保留官方/全部筛选并提供 App-owned 的添加入口。
-- 保留：包生命周期动作、连接动作、运行服务动作仍只走 App action contract。
-- 未宣称：独立 Fleet App 的安装/运行资格、发布资格或载体替换；这些不是当前
-  Studio projection 的证据。
+设置搜索、外观与字号继续复用现有 DSH 客户端能力，来源见[生态客户端](ecosystem-client-plugins.md)。
+源码实现与本地渲染不等于已发布或已安装的 App 版本。

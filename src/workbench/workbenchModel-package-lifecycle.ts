@@ -547,6 +547,7 @@ function packageLifecycleItem(
     dependencies,
     installed,
     activated: asOptionalBoolean(record.activated),
+    appEnabled: record.app_enabled !== false,
     readiness,
     ...(firstStringField(record, ["selected_version", "installed_version", "stable_version"])
       ? { version: firstStringField(record, ["selected_version", "installed_version", "stable_version"]) as string }

@@ -430,6 +430,7 @@ export type AgentPackageLifecycleRef = {
   dependencies: AgentPackageDependencyRef[];
   installed: boolean | null;
   activated: boolean | null;
+  appEnabled: boolean;
   readiness: AgentPackageReadinessRef;
   version?: string;
   currentness: string;
@@ -807,6 +808,7 @@ export const initialWorkbenchModel: WorkbenchModel = {
       dependencies: [],
       installed: null,
       activated: null,
+      appEnabled: true,
       readiness: {
         status: "unknown",
         operationalReady: null,

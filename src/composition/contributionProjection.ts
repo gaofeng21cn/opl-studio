@@ -115,9 +115,9 @@ export function settingsContributionDestination(
   switch (entry.view?.viewType) {
     case "channel_access":
     case "remote_companion_access":
-      return "resources";
+      return "capabilities";
     case "service_status":
-      return "services";
+      return "capabilities";
     case "activity_log":
       // An activity log is a technical read model, not an App-admitted Settings
       // destination. Keep it available to other typed renderers without
@@ -823,8 +823,21 @@ export function readUiContributionsProjection(state: unknown): OplUiContribution
     return emptyUiContributionsProjection;
   }
 
+  const packages = asRecord(appState?.agent_packages);
+  const directory = asRecord(packages?.directory);
+  const statusPackages = asRecord(asRecord(packages?.status_index)?.packages);
+  const appEnabled = new Map<string, boolean>();
+  for (const [packageId, value] of Object.entries(statusPackages ?? {})) {
+    const row = asRecord(value);
+    if (typeof row?.app_enabled === "boolean") appEnabled.set(packageId, row.app_enabled);
+  }
+  for (const value of Array.isArray(directory?.entries) ? directory.entries : []) {
+    const row = asRecord(value);
+    const packageId = asString(row?.package_id);
+    if (packageId && typeof row?.app_enabled === "boolean") appEnabled.set(packageId, row.app_enabled);
+  }
   const entries = Array.isArray(projection.entries)
-    ? projection.entries.map(parseEntry).filter((entry): entry is OplUiContribution => entry !== null)
+    ? projection.entries.map(parseEntry).filter((entry): entry is OplUiContribution => entry !== null && appEnabled.get(entry.packageId) !== false)
     : [];
   return {
     surfaceKind: "opl_app_ui_contributions_projection.v1",

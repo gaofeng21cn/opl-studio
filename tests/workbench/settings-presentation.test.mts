@@ -56,15 +56,15 @@ test("schedule history presents human states rather than internal executor value
 test("settings navigation exposes primary categories with related destinations grouped inside", () => {
   assert.deepEqual(
     presentation.settingsDestinations("zh").map((destination) => destination.id),
-    ["overview", "account", "resources", "workspace", "agents", "services", "preferences", "about"]
+    ["overview", "account", "resources", "workspace", "capabilities", "services", "preferences", "about"]
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("account", "zh").map((destination) => destination.id),
     ["account", "models"]
   );
   assert.deepEqual(
-    presentation.settingsSubDestinations("agents", "zh").map((destination) => destination.id),
-    ["agents", "capabilities", "instructions", "memory"]
+    presentation.settingsSubDestinations("capabilities", "zh").map((destination) => destination.id),
+    ["capabilities", "agents", "instructions", "memory"]
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("services", "zh").map((destination) => destination.id),
@@ -243,8 +243,8 @@ test("agent catalog keeps agent and workflow packages together while excluding c
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "framework_capability_package" }), false);
 });
 
-test("agent catalog keeps Official and All scoped to agents while exposing App-owned manifest install", () => {
-  assert.match(settingsSource, /useState<"official" \| "all">\("official"\)/);
+test("package catalog defaults to All while exposing App-owned manifest install", () => {
+  assert.match(settingsSource, /useState<"official" \| "all">\("all"\)/);
   assert.match(settingsSource, /scope === "all" \|\| item\.official/);
   assert.match(settingsSource, /当前没有自定义\$\{catalogLabel\}/);
   assert.match(settingsSource, /添加\$\{catalogLabel\}/);
@@ -458,4 +458,24 @@ test("an unknown gateway error code falls back to a localized sentence, never ra
   assert.notEqual(gatewayAccountErrorMessage(undefined, "zh-CN"), "undefined");
   assert.equal(gatewayAccountErrorMessage(undefined, "zh-CN"), "登录失败。");
   assert.equal(gatewayAccountErrorMessage(undefined, "en-US"), "Login failed.");
+});
+
+
+test("unified catalog includes private capability packages and defers package status reads", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
+    { package_id: "private-phone", package_role: "capability_package", display_name: "Private Phone", publisher: "Local owner", installed: true, activated: true, app_enabled: false, selected_version: "2.7" },
+    { package_id: "future-app", package_role: "future_extension", display_name: "Future App", installed: true, app_enabled: true }
+  ] } } } });
+  let statusReads = 0;
+  const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, renderPackageContributions() { statusReads++; return null; } }));
+  assert.match(html, /Private Phone/);
+  assert.match(html, /Future App/);
+  assert.match(html, /版本 2.7/);
+  assert.match(html, /OPL App 已关闭/);
+  assert.match(html, /在 OPL App 中启用 Private Phone/);
+  assert.equal(statusReads, 0);
 });

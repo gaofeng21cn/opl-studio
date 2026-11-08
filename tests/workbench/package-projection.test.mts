@@ -6,6 +6,20 @@ import {
   deriveWorkbenchModelFromState
 } from "../../src/workbench/workbenchModel.ts";
 
+test("App visibility preserves native installation and callable package metadata", () => {
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
+    directory: { entries: [{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
+      package_role: "capability_package", display_name: "Private phone", presence: { callable: true } },
+      { package_id: "new-extension", installed: true }] }
+  } } });
+  const hidden = model.packageLifecycle.find((item) => item.packageId === "private-phone")!;
+  assert.equal(hidden.appEnabled, false);
+  assert.equal(hidden.installed, true);
+  assert.equal(hidden.activated, true);
+  assert.equal(hidden.readiness.callable, true);
+  assert.equal(model.packageLifecycle.find((item) => item.packageId === "new-extension")?.appEnabled, true);
+});
+
 test("current Package directory entries replace retired private lifecycle fields", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {

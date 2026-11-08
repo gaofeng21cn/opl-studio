@@ -198,7 +198,14 @@ export function installWorkspaceClientPlugin(core: SlotCore, useSurface: () => O
     useEffect(() => { if (surface.mcpApps?.launch || surface.mcpApps?.task) setShowMcp(true); }, [surface.mcpApps?.launch, surface.mcpApps?.task]);
     const entries = workspaceEntries(surface.uiContributions.entries);
     const groups = workspaceGroups(entries);
-    const current = entries.find(entry => entry.contributionKey === selection) ?? entries[0];
+    const current = selection ? entries.find(entry => entry.contributionKey === selection) : entries[0];
+    useEffect(() => {
+      if (!showMcp && selection && !current) {
+        selectedView = null;
+        setSelection(null);
+        surface.openPrimaryView("conversation");
+      }
+    }, [current, selection, showMcp, surface.openPrimaryView]);
     const zh = surface.locale === "zh";
     const groupLabel = (key: string) => ({personal: zh ? "个人" : "Personal", communications: zh ? "通信" : "Communication", knowledge: zh ? "知识" : "Knowledge", other: zh ? "其他能力" : "Other capabilities"}[key] ?? key);
     return <section className="opl-workspace-page" aria-label={zh ? "能力工作台" : "Capability workspace"}>

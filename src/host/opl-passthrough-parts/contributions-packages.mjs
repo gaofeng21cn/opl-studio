@@ -74,7 +74,7 @@ const packageFields = [
   "source_kind", "install_origin",
   "required_skill", "requiredSkill", "skill_id", "skill_ref", "required_skills",
   "source_surface", "installed_version", "selected_version", "stable_version", "projected_version",
-  "installed", "activated", "codex_visible", "official", "manifest_url", "physical_surface_status"
+  "installed", "activated", "app_enabled", "codex_visible", "official", "manifest_url", "physical_surface_status"
 ];
 
 function compactHomeShortcut(value) {
@@ -170,7 +170,7 @@ function compactUiContributions(value) {
 function compactPackageActionPayload(value) {
   return selectedFields(value, [
     "package_id", "manifest_url", "registry_url", "trust_tier", "source_kind",
-    "exposure_action", "shortcut_id", "visible", "sort_order"
+    "exposure_action", "shortcut_id", "visible", "sort_order", "enabled"
   ]);
 }
 

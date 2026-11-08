@@ -1,12 +1,12 @@
 import { actionPayloadComplete } from "../../settingsActions";
 
 import { dockerDiagnosticPresentation } from "../../settings/presentation";
-import { SettingRow, SettingsGroup, StatusValue, SettingsContributionSection } from "../../settings/primitives";
+import { SettingRow, SettingsGroup, StatusValue } from "../../settings/primitives";
 
 import { RuntimeActionButton } from "../../settings/actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, refreshRevision, contributions, onAction }: Pick<SettingsPageContext, "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "refreshRevision" | "contributions" | "onAction">) {
+export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, onAction }: Pick<SettingsPageContext, "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "onAction">) {
 
       const dockerActions = projection?.dockerWebui.actions ?? [];
       const diagnoseAction = dockerActions.find((action) => action.actionId === "settings_diagnose_docker_webui");
@@ -31,7 +31,6 @@ export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnos
               <SettingRow key={connection.id} label={connection.name}><StatusValue status={connection.status} locale={settings.locale} /></SettingRow>
             )) : <SettingRow label={settings.locale === "zh" ? "连接" : "Connections"}><span className="settings-muted">{settings.locale === "zh" ? "暂无外部连接" : "No external connections"}</span></SettingRow>}
           </SettingsGroup> : null}
-          <SettingsContributionSection key={refreshRevision} contributions={contributions} locale={settings.locale} destination="resources" />
           <SettingsGroup title={settings.locale === "zh" ? "网页访问" : "Web access"}>
             <SettingRow label={zh ? "部署网页端" : "Deploy WebUI"} detail={zh ? "网页端独立部署。指南包含安装、访问认证、数据目录和启动步骤。" : "WebUI is a separate deployment. The guide covers installation, authentication, data directories and startup."}><a className="settings-support-link" target="_blank" rel="noreferrer" href="https://github.com/gaofeng21cn/opl-studio/blob/main/docs/oci-distribution.md">{zh ? "配置指南" : "Setup guide"}</a></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "运行检查" : "Runtime check"} detail={diagnosticStatus === "checking"
