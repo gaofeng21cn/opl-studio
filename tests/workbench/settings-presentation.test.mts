@@ -78,9 +78,6 @@ test("settings pages expose a purpose statement for every destination", () => {
     assert.ok(page.eyebrow.length > 0);
     assert.ok(page.description.length > 0);
   }
-  const capabilities = presentation.settingsPagePresentationFor("capabilities", "zh");
-  assert.match(capabilities.description, /技能/);
-  assert.match(presentation.settingsPagePresentationFor("capabilities", "en").description, /skills/);
 });
 
 test("official DSH capabilities expose adoption status and owner semantics", () => {
@@ -246,7 +243,6 @@ test("agent catalog keeps agent and workflow packages together while excluding c
 test("package catalog defaults to All while exposing App-owned manifest install", () => {
   assert.match(settingsSource, /useState<"official" \| "all">\("all"\)/);
   assert.match(settingsSource, /scope === "all" \|\| item\.official/);
-  assert.match(settingsSource, /当前没有自定义\$\{catalogLabel\}/);
   assert.match(settingsSource, /添加\$\{catalogLabel\}/);
   assert.match(settingsSource, /manifest_url: manifestUrl\.trim\(\), trust_tier: trustTier/);
   assert.match(settingsSource, /actionId: manifestInstallAction\.actionId/);
@@ -475,7 +471,7 @@ test("unified catalog includes private capability packages and defers package st
   assert.match(html, /Private Phone/);
   assert.match(html, /Future App/);
   assert.match(html, /版本 2.7/);
-  assert.match(html, /OPL App 已关闭/);
+  assert.match(html, /role="switch" aria-checked="false" aria-label="在 OPL App 中启用 Private Phone"/);
   assert.match(html, /在 OPL App 中启用 Private Phone/);
   assert.equal(statusReads, 0);
 });

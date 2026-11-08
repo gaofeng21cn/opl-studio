@@ -93,7 +93,7 @@ export function navigationGroups(locale: WorkbenchSettings["locale"]): Navigatio
       id: "agents_capabilities",
       label: copy.groups.agents_capabilities,
       destinations: [
-        { id: "capabilities", label: copy.destinations.capabilities },
+        { id: "capabilities", label: locale === "zh" ? "全部扩展" : "All extensions" },
         { id: "agents", label: copy.destinations.agents },
         { id: "instructions", label: copy.destinations.instructions },
         { id: "memory", label: copy.destinations.memory }
@@ -190,8 +190,8 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Agents & capabilities", description: "Manage agents, workflows, updates, repairs, and favorite entry points." }
   },
   capabilities: {
-    zh: { eyebrow: "智能体与能力", description: "统一管理扩展的安装、更新和状态，选择在 OPL App 中启用的应用；查看提供的技能与连接能力。" },
-    en: { eyebrow: "Agents & capabilities", description: "Manage extension installation, updates and status; choose which apps appear in OPL App and explore their skills and connections." }
+    zh: { eyebrow: "智能体与能力", description: "安装和管理扩展，选择在 OPL App 中使用的应用。" },
+    en: { eyebrow: "Agents & capabilities", description: "Install and manage extensions, and choose the apps you use in OPL App." }
   },
   instructions: {
     zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "设置工作习惯与补充说明，管理新会话使用的上下文。" },

@@ -1,3 +1,4 @@
+import { Switch } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Plus, ArrowDown, ArrowUp, Bot, Boxes, ChevronDown, LoaderCircle, Search } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -160,7 +161,6 @@ export function PackageCatalog({
   const catalogLabelEn = kind === "agents" ? "agents and workflows" : "extensions and apps";
   const packages = model.packageLifecycle.filter((item) => item.packageId !== "missing_bridge" && (kind === "all" || isAgentCatalogPackage(item)));
   const scoped = packages.filter((item) => scope === "all" || item.official);
-  const customCount = packages.filter((item) => !item.official).length;
   const manifestInstallAvailable = Boolean(
     manifestInstallAction
     && manifestInstallAction.dryRunSupported
@@ -178,7 +178,7 @@ export function PackageCatalog({
     if (statusFilter === "app_hidden" ? item.appEnabled : statusFilter !== "all" && agentPackagePresentationStatus(item) !== statusFilter) return false;
     return !normalizedQuery || item.searchMetadata.query.includes(normalizedQuery);
   });
-  const launchableCount = scoped.filter((item) => agentPackagePresentationStatus(item) === "ready").length;
+  const installedCount = packages.filter((item) => item.installed === true).length;
   const groups = [
     { key: "standard_agent", label: locale === "zh" ? "领域智能体" : "Domain agents", icon: Bot },
     { key: "workflow_profile", label: locale === "zh" ? "工作流" : "Workflows", icon: Boxes },
@@ -188,19 +188,11 @@ export function PackageCatalog({
 
   return (
     <div className="agent-catalog" data-testid="opl-settings-agent-catalog">
-      <div className="settings-page-summary">
-        <span>{locale === "zh" ? `${scoped.length} 个${catalogLabel}` : `${scoped.length} ${catalogLabelEn}`}</span>
-        <StatusValue status={`${launchableCount}/${scoped.length}`} locale={locale} />
-      </div>
       <div className="agent-catalog-toolbar">
         <label className="settings-search-field">
           <Search aria-hidden="true" size={14} />
           <input aria-label={locale === "zh" ? `搜索${catalogLabel}、名称或来源` : `Search ${catalogLabelEn}`} value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder={locale === "zh" ? `搜索${catalogLabel}、名称或来源` : `Search ${catalogLabelEn}`} />
         </label>
-        <div className="segmented-control" role="group" aria-label={locale === "zh" ? "目录范围" : "Catalog scope"}>
-          <button type="button" data-active={scope === "official"} aria-pressed={scope === "official"} onClick={() => setScope("official")}>{locale === "zh" ? "官方" : "Official"}</button>
-          <button type="button" data-active={scope === "all"} aria-pressed={scope === "all"} onClick={() => setScope("all")}>{locale === "zh" ? "全部" : "All"}</button>
-        </div>
         <button
           ref={installTriggerRef}
           className="settings-action-button primary"
@@ -215,41 +207,31 @@ export function PackageCatalog({
           {locale === "zh" ? `添加${catalogLabel}` : "Add extension"}
         </button>
       </div>
-      <p className="settings-inline-note">{locale === "zh" ? "安装与更新由原执行平台管理。在此关闭应用，只隐藏 OPL App 的入口与状态，Codex 中仍可使用。" : "Installation and updates stay with the execution platform. Turning an app off here hides its OPL App entries and status; it remains available in Codex."}</p>
-      {model.officialProfileRestore ? <div className="settings-inline-note">
-        <span>{locale === "zh" ? "升级保留已有安装选择。如缺少原有智能体，可恢复官方组合，或逐项安装。" : "Upgrades preserve installed package choices. Restore the official combination or install missing agents individually."}</span>
-        <button type="button" className="settings-inline-command" data-testid="settings-agents-restore-official-profile" disabled={actionBusyKey !== null}
-          onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id,
-            label: locale === "zh" ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" },
-            confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>
-          {locale === "zh" ? "恢复官方组合" : "Restore official combination"}
-        </button>
-      </div> : null}
-      {scope === "all" && customCount === 0 ? (
-        <div className="settings-inline-note" role="status">
-          {locale === "zh" ? `当前没有自定义${catalogLabel}，因此“全部”与“官方”内容相同。` : "There are no custom modules yet, so All currently matches Official."}
-        </div>
-      ) : null}
+      <p className="settings-inline-note">{locale === "zh" ? "开关控制扩展在 OPL App 中的入口和状态。关闭后仍可在 Codex 中使用。" : "Switches control entries and status in OPL App. Turning one off keeps it available in Codex."}</p>
       <div className="agent-catalog-filters">
+        <div className="segmented-control" role="group" aria-label={locale === "zh" ? "目录范围" : "Catalog scope"}>
+          <button type="button" data-active={scope === "official"} aria-pressed={scope === "official"} onClick={() => setScope("official")}>{locale === "zh" ? "官方" : "Official"}</button>
+          <button type="button" data-active={scope === "all"} aria-pressed={scope === "all"} onClick={() => setScope("all")}>{locale === "zh" ? "全部" : "All"}</button>
+        </div>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.currentTarget.value)} aria-label={locale === "zh" ? "按状态筛选" : "Filter by status"}>
           <option value="all">{locale === "zh" ? "全部状态" : "All statuses"}</option>
           <option value="app_hidden">{locale === "zh" ? "在 OPL App 中已关闭" : "Off in OPL App"}</option>
-          {statusOptions.map((status) => <option key={status} value={status}>{formatStatus(status, locale)}</option>)}
+          {statusOptions.map((status) => <option key={status} value={status}>{formatStatus(status === "ready" ? "installed" : status, locale)}</option>)}
         </select>
-        <span>{locale === "zh" ? `${visible.length} 项` : `${visible.length} items`}</span>
+        <span>{locale === "zh" ? `${visible.length} 个结果 · 已安装 ${installedCount} 个` : `${visible.length} results · ${installedCount} installed`}</span>
       </div>
       {groups.length ? groups.map((group) => (
         <section key={group.key} className="agent-catalog-group">
-          <h2><group.icon aria-hidden="true" size={15} />{group.label}<span>{group.items.length}</span></h2>
+          <h2><group.icon aria-hidden="true" size={15} />{group.label}</h2>
           <div className="agent-package-list">
             {group.items.map((item) => {
               const appAction = item.actions.find((action) => action.actionId === "package_app_set_enabled" && action.status === "available");
               const executableActions = item.actions.filter((action) => action.actionId !== "package_app_set_enabled" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields));
               const preferenceAction = item.actions.find((action) => action.kind === "preferences" && action.actionId !== "package_app_set_enabled" && action.status === "available");
+              const presentationStatus = agentPackagePresentationStatus(item);
               const primaryAction = executableActions.find((action) => action.actionId === item.recommendedActionId)
                 ?? (item.installed === false ? executableActions.find((action) => action.kind === "install") : undefined)
-                ?? (agentPackagePresentationStatus(item) === "unavailable" ? executableActions.find((action) => action.kind === "repair") : undefined)
-                ?? executableActions.find((action) => action.kind === "update");
+                ?? (agentPackagePresentationStatus(item) === "unavailable" ? executableActions.find((action) => action.kind === "repair") : undefined);
               return (
                 <details key={item.id} className="agent-package-row" data-testid="opl-settings-agent-row" data-package-id={item.packageId}
                   onToggle={(event) => { const open = event.currentTarget.open; setExpandedPackages(previous => { const next = new Set(previous); if (open) next.add(item.packageId); else next.delete(item.packageId); return next; }); }}>
@@ -260,12 +242,11 @@ export function PackageCatalog({
                       <span className="agent-package-meta">
                         {item.version ? <span>{locale === "zh" ? `${item.versionKind === "installed" ? "已安装版本" : "可安装版本"} ${item.version}` : `${item.versionKind === "installed" ? "Installed version" : "Available version"} ${item.version}`}</span> : null}
                         <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
-                        {!item.appEnabled ? <span>{locale === "zh" ? "OPL App 已关闭" : "Off in OPL App"}</span> : null}
                         {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
                       </span>
                     </span>
                     <span className="agent-package-summary-actions">
-                      <StatusValue status={agentPackagePresentationStatus(item)} locale={locale} />
+                      <StatusValue status={presentationStatus === "ready" ? "installed" : presentationStatus} locale={locale} />
                       {primaryAction ? (
                         <button
                           className="settings-action-button primary"
@@ -286,20 +267,18 @@ export function PackageCatalog({
                           {packageActionLabel(primaryAction, locale)}
                         </button>
                       ) : null}
+                      {item.installed === true ? <span className="agent-package-app-toggle" onClick={(event) => event.stopPropagation()}>
+                        <span>OPL App</span>
+                        <Switch checked={item.appEnabled} disabled={!appAction || actionBusyKey !== null}
+                          label={locale === "zh" ? `在 OPL App 中启用 ${item.label}` : `Enable ${item.label} in OPL App`}
+                          onChange={(enabled) => { if (appAction) onAction({ key: `app:${item.packageId}:enabled`, actionId: appAction.actionId,
+                            label: locale === "zh" ? `${enabled ? "启用" : "关闭"} ${item.label} 的 OPL App 入口` : `${enabled ? "Enable" : "Turn off"} ${item.label} in OPL App`,
+                            payload: { ...appAction.payload, package_id: item.packageId, enabled }, confirmationRequired: false, dryRunSupported: appAction.dryRunSupported }); }} />
+                      </span> : null}
                       <ChevronDown className="agent-package-chevron" aria-hidden="true" size={15} />
                     </span>
                   </summary>
                   <div className="agent-package-details">
-                    <div className="home-shortcut-preference">
-                      <label>
-                        <input type="checkbox" role="switch" checked={item.appEnabled} disabled={!appAction || actionBusyKey !== null}
-                          aria-label={locale === "zh" ? `在 OPL App 中启用 ${item.label}` : `Enable ${item.label} in OPL App`}
-                          onChange={(event) => { if (appAction) onAction({ key: `app:${item.packageId}:enabled`, actionId: appAction.actionId,
-                            label: locale === "zh" ? `${event.currentTarget.checked ? "启用" : "关闭"} ${item.label} 的 OPL App 入口` : `${event.currentTarget.checked ? "Enable" : "Turn off"} ${item.label} in OPL App`,
-                            payload: { ...appAction.payload, package_id: item.packageId, enabled: event.currentTarget.checked }, confirmationRequired: false, dryRunSupported: appAction.dryRunSupported }); }} />
-                        <span className="home-shortcut-copy"><strong>{locale === "zh" ? "在 OPL App 中启用" : "Enable in OPL App"}</strong><small>{locale === "zh" ? "控制此应用的页面、快捷入口和状态读取。关闭后保留安装及 Codex 中的使用。" : "Controls this app’s pages, shortcuts and status reads. Turning it off preserves installation and Codex access."}</small></span>
-                      </label>
-                    </div>
                     {(agentPackagePresentationStatus(item) !== "ready" || (item.packageRole === "standard_agent" && !agentPackageHasHomeShortcutRoute(item))) ? <p className="settings-inline-note">{agentAvailabilityDetail(item, locale)}</p> : null}
                     {(item.readiness.reason || item.readiness.statusReadError) && agentPackagePresentationStatus(item) !== "ready" ? <details className="settings-secondary-details"><summary>{locale === "zh" ? "检查详情" : "Check details"}</summary><p>{item.readiness.reason}</p><code>{item.readiness.statusReadError}</code></details> : null}
                     <dl className="agent-state-axis-grid">
@@ -405,6 +384,16 @@ export function PackageCatalog({
       )) : (
           <div className="settings-empty-state"><Search aria-hidden="true" size={18} /><span>{locale === "zh" ? "没有符合条件的项目" : "No matching items"}</span></div>
       )}
+      {model.officialProfileRestore ? <details className="settings-secondary-details agent-catalog-recovery">
+        <summary>{locale === "zh" ? "找不到原有扩展？" : "Missing a previously installed extension?"}</summary>
+        <p className="settings-inline-note">{locale === "zh" ? "升级会保留安装选择。可恢复官方组合，或通过“添加扩展”逐项安装。" : "Upgrades preserve installation choices. Restore the official combination or use Add extension to install individually."}</p>
+        <button type="button" className="settings-inline-command" data-testid="settings-agents-restore-official-profile" disabled={actionBusyKey !== null}
+          onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id,
+            label: locale === "zh" ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" },
+            confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>
+          {locale === "zh" ? "恢复官方组合" : "Restore official combination"}
+        </button>
+      </details> : null}
       {installOpen ? (
         <div className="settings-action-dialog-backdrop" role="presentation">
           <form

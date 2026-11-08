@@ -405,7 +405,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   }
 
   .agent-catalog {
-    gap: 22px;
+    gap: 16px;
   }
 
   .agent-catalog-toolbar {
@@ -456,8 +456,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 7px;
-    margin-top: -12px;
+    gap: 8px;
   }
 
   .agent-catalog-filters select {
@@ -557,6 +556,21 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     gap: 8px;
   }
 
+  .agent-package-app-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    white-space: nowrap;
+  }
+
+  .agent-catalog > .settings-inline-note,
+  .settings-page .agent-catalog-recovery {
+    margin: 0;
+  }
+
   .agent-package-chevron {
     color: var(--opl-faint);
     transition: transform 140ms ease;
@@ -583,7 +597,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   }
 
   .agent-package-details > .agent-state-axis-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .agent-package-details dl div,

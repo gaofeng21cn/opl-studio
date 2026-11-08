@@ -172,6 +172,8 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
   .settings-page .opl-contribution-result p { font-size: 13px; line-height: 21px; color: var(--dsw-alias-label-secondary); }
   .settings-page :is(button, input, select, textarea, summary, a):focus-visible { outline: 2px solid var(--dsw-alias-label-secondary); outline-offset: 3px; }
   .settings-page .settings-secondary-details { margin-block: 12px; }
+  .settings-page .settings-action-receipt { padding-bottom: 12px; border-bottom: .5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 21px; }
+  .settings-page .settings-action-receipt p { margin: 4px 0; overflow-wrap: anywhere; }
   .settings-page .settings-action-button, .settings-page .settings-inline-command { white-space: normal; }
   @media (max-width: 640px) {
     .settings-page .settings-issue { flex-wrap: wrap; }

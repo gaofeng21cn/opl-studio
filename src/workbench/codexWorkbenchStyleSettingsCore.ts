@@ -1,14 +1,19 @@
 export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
+    width: 6px;
+    height: 6px;
   }
 
   .settings-detail {
     min-width: 0;
     height: 100%;
     overflow-y: auto;
-    scrollbar-width: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--opl-border) transparent;
+  }
+
+  .settings-detail::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: var(--opl-border);
   }
 
   .settings-detail-header,
