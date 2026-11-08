@@ -531,6 +531,10 @@ function packageLifecycleItem(
     packageDisplayRef("Shortcut preferences", packageFileRef(record, "home_shortcut_preferences_file"), "Physical exposure preferences file surfaced as a ref only.")
   ].filter((item): item is PackageLifecycleDisplayRef => Boolean(item));
   const homeShortcuts = packageHomeShortcuts(record);
+  const installedVersion = installed === true
+    ? firstStringField(record, ["installed_version"]) ?? asString(asRecord(record.installed_carrier_readback)?.version)
+    : null;
+  const version = installedVersion ?? firstStringField(record, ["selected_version", "stable_version"]);
   return {
     id: `package-lifecycle-${packageId}`,
     packageId,
@@ -549,9 +553,7 @@ function packageLifecycleItem(
     activated: asOptionalBoolean(record.activated),
     appEnabled: record.app_enabled !== false,
     readiness,
-    ...(firstStringField(record, ["selected_version", "installed_version", "stable_version"])
-      ? { version: firstStringField(record, ["selected_version", "installed_version", "stable_version"]) as string }
-      : {}),
+    ...(version ? { version, versionKind: installedVersion ? "installed" as const : "available" as const } : {}),
     currentness: asString(packageCurrentness?.status) ?? "unknown",
     sourceMode: packageSourceMode(record),
     automaticUpdate: packageAutomaticUpdate(record),

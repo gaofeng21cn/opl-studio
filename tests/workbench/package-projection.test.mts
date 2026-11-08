@@ -425,3 +425,15 @@ test("selection availability fails open for unknown diagnostics and blocks expli
   assert.equal(notReady?.readiness.selectionStatus, "unavailable");
   assert.equal(notReady?.readiness.selectable, false);
 });
+
+
+test("package version prefers installed identity over the available release", () => {
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
+    { package_id: "native-package", installed: true, installed_version: "1.2", selected_version: "1.3" },
+    { package_id: "available-package", installed: false, selected_version: "2.1" }
+  ] } } } });
+  assert.equal(model.packageLifecycle[0]?.version, "1.2");
+  assert.equal(model.packageLifecycle[0]?.versionKind, "installed");
+  assert.equal(model.packageLifecycle[1]?.version, "2.1");
+  assert.equal(model.packageLifecycle[1]?.versionKind, "available");
+});

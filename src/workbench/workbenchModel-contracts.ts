@@ -433,6 +433,7 @@ export type AgentPackageLifecycleRef = {
   appEnabled: boolean;
   readiness: AgentPackageReadinessRef;
   version?: string;
+  versionKind?: "installed" | "available";
   currentness: string;
   sourceMode: string;
   automaticUpdate: boolean | null;

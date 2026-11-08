@@ -258,7 +258,7 @@ export function PackageCatalog({
                       <strong>{item.label}</strong>
                       <small>{localizedPackageDescription(item, locale)}</small>
                       <span className="agent-package-meta">
-                        {item.version ? <span>{locale === "zh" ? `版本 ${item.version}` : `Version ${item.version}`}</span> : null}
+                        {item.version ? <span>{locale === "zh" ? `${item.versionKind === "installed" ? "已安装版本" : "可安装版本"} ${item.version}` : `${item.versionKind === "installed" ? "Installed version" : "Available version"} ${item.version}`}</span> : null}
                         <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
                         {!item.appEnabled ? <span>{locale === "zh" ? "OPL App 已关闭" : "Off in OPL App"}</span> : null}
                         {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
