@@ -68,79 +68,34 @@ export async function runRuntimeRefresh({ evaluate, timeoutMs }) {
   return { ...result, status: result?.panelReady === true && result?.buttonReadyBefore === true && result?.clicked === true && result?.busyObserved === true && result?.buttonReadyAfter === true && result?.errorVisible === false ? "passed" : "failed" };
 }
 
-export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt, projection = null, expectedRootPackageIds = [], timeoutMs = 120_000 }) {
-  if (projection) {
-    const missing = expectedRootPackageIds.filter((id) => !projection.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
-    if (missing.length > 0) {
-      // The first projection can precede background package installation.
-      const deadline = Date.now() + timeoutMs;
-      let refreshedProjection = { ...projection, missingRootPackageIds: missing };
-      do {
-        const attempt = typeof readFirstInstallAttempt === "function" ? await readFirstInstallAttempt() : null;
-        if (attempt?.status === "failed") {
-          refreshedProjection = { ...refreshedProjection, firstInstallStatus: "failed" };
-          break;
-        }
-        const refreshed = await evaluate(`window.oplStudio.readState('fast')`);
-        refreshedProjection = projectFrameworkReadiness(refreshed, expectedRootPackageIds);
-        if (refreshedProjection.missingRootPackageIds.length === 0) break;
-        if ((refreshedProjection.initializeExitCode !== null && refreshedProjection.initializeExitCode !== 0)
-          || (refreshedProjection.stateExitCode !== null && refreshedProjection.stateExitCode !== 0)) break;
-        const delay = Math.min(1000, deadline - Date.now());
-        if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
-      } while (Date.now() < deadline);
-      return {
-        ...refreshedProjection,
-        expectedRootPackageIds,
-        missingRootPackageIds: refreshedProjection.missingRootPackageIds,
-        status: refreshedProjection.initializeExitCode === 0
-          && refreshedProjection.stateExitCode === 0
-          && refreshedProjection.launchReady === true
-          && refreshedProjection.packageDirectoryPresent === true
-          && refreshedProjection.missingRootPackageIds.length === 0 ? "passed" : "failed"
-      };
-    }
-    return {
-      ...projection,
-      expectedRootPackageIds,
-      missingRootPackageIds: missing,
-      status: projection.initializeExitCode === 0
-        && projection.stateExitCode === 0
-        && projection.launchReady === true
-        && projection.packageDirectoryPresent === true
-        && missing.length === 0 ? "passed" : "failed"
-    };
-  }
-  const result = await evaluate(`(async()=>{
-    const expected=${JSON.stringify(expectedRootPackageIds)};
-    const deadline=Date.now()+${Number(timeoutMs)};
-    let result;
+export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt, projection = null, expectedRootPackageIds = [], requireRootPackages = false, timeoutMs = 120_000 }) {
+  let observed = projection ?? projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')"), expectedRootPackageIds);
+  let attempt = typeof readFirstInstallAttempt === "function" ? await readFirstInstallAttempt() : null;
+  const missingRoots = () => expectedRootPackageIds.filter((id) => !observed.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
+  const hostReady = () => observed.initializeExitCode === 0
+    && observed.stateExitCode === 0
+    && observed.launchReady === true
+    && observed.packageDirectoryPresent === true;
+  // Standard is a host: optional Profile installation stays visible as
+  // diagnostics, without delaying its readiness. Full verifies its selected seed.
+  if (requireRootPackages && hostReady() && missingRoots().length > 0 && attempt?.status !== "failed") {
+    const deadline = Date.now() + timeoutMs;
     do {
-    const state=await window.oplStudio.readState('fast');
-    const outer=state?.app_state??state;const root=outer?.app_state??outer;
-    const packages=root?.agent_packages;
-    const entries=packages?.directory?.entries;
-    result={
-      initializeExitCode:state?.readback?.exitCode??state?.readback?.status??null,
-      stateExitCode:state?.readback?.exitCode??state?.readback?.status??null,
-      // readState is the live owner projection used by the renderer; a
-      // successful read after launch is the authoritative readiness signal.
-      launchReady:root?.system_initialize?.setup_flow?.ready_to_launch===true
-        || state?.readback?.exitCode===0
-        || state?.readback?.status===0,
-      packageDirectoryPresent:Array.isArray(entries),
-      packageSource:packages?.source??null,
-      packages:Array.isArray(entries)?entries.map((entry)=>({id:entry.package_id??null,present:entry.installed===true||entry.presence?.present===true,installed:entry.installed===true||entry.presence?.installed===true,role:entry.package_role??null})):[]
-    };
-    if(result.initializeExitCode===0&&result.stateExitCode===0&&result.launchReady&&result.packageDirectoryPresent&&expected.every((id)=>result.packages.some((entry)=>entry.id===id&&entry.installed&&entry.present))) return result;
-    await new Promise((resolve)=>setTimeout(resolve,1000));
-    } while(Date.now()<deadline);
-    return result;
-  })()`);
-  const missing = expectedRootPackageIds.filter((id) => !result?.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
+      observed = projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')"), expectedRootPackageIds);
+      attempt = typeof readFirstInstallAttempt === "function" ? await readFirstInstallAttempt() : null;
+      if (!hostReady() || missingRoots().length === 0 || attempt?.status === "failed") break;
+      const delay = Math.min(1000, deadline - Date.now());
+      if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+    } while (Date.now() < deadline);
+  }
+  const missingRootPackageIds = missingRoots();
   return {
-    ...result, expectedRootPackageIds, missingRootPackageIds: missing,
-    status: result?.initializeExitCode === 0 && result?.stateExitCode === 0 && result?.launchReady === true && result?.packageDirectoryPresent === true && missing.length === 0 ? "passed" : "failed"
+    ...observed,
+    expectedRootPackageIds,
+    requireRootPackages,
+    missingRootPackageIds,
+    firstInstallStatus: attempt?.status ?? null,
+    status: hostReady() && (!requireRootPackages || (missingRootPackageIds.length === 0 && attempt?.status !== "failed")) ? "passed" : "failed"
   };
 }
 
@@ -170,6 +125,7 @@ export async function runStableSmoke(context) {
     readFirstInstallAttempt: context.readFirstInstallAttempt,
     projection: preview.checks.runtime?.standard?.frameworkProjection ?? preview.checks.runtime?.full?.frameworkProjection,
     expectedRootPackageIds: context.options?.expectedRootPackageIds,
+    requireRootPackages: Object.hasOwn(preview.checks.runtime ?? {}, "full"),
     timeoutMs: frameworkReadinessTimeoutMs
   });
   progress({ phase: "framework-readiness", status: frameworkReadiness.status, at: new Date().toISOString(), missing: frameworkReadiness.missingRootPackageIds });
@@ -190,7 +146,7 @@ export async function runStableSmoke(context) {
     generationRequested: false,
     blockers: [...preview.blockers,
       ...(checks.codexReadiness?.status === "passed" ? [] : ["codex_protocol_readiness_not_proven"]),
-      ...(checks.frameworkReadiness?.status === "passed" ? [] : ["framework_launch_and_official_profile_projection_not_proven"]),
+      ...(checks.frameworkReadiness?.status === "passed" ? [] : ["framework_host_or_selected_full_seed_not_proven"]),
       ...(checks.runtimeRefresh?.status === "passed" ? [] : ["production_runtime_refresh_not_proven"])]
   };
 }
@@ -204,7 +160,11 @@ export function validateStableRuntimeEvidence(summary) {
   const refresh = summary.checks?.runtimeRefresh;
   invariant(refresh?.status === "passed" && refresh.panelReady === true && refresh.buttonReadyBefore === true && refresh.clicked === true && refresh.busyObserved === true && refresh.buttonReadyAfter === true && refresh.errorVisible === false, "Production Runtime UI refresh is not proven");
   invariant(summary.checks?.gateway?.status === "passed", "Dedicated Gateway login and model-access readiness are not proven");
-  invariant(summary.checks?.frameworkReadiness?.status === "passed" && summary.checks.frameworkReadiness.launchReady === true && summary.checks.frameworkReadiness.packageDirectoryPresent === true && summary.checks.frameworkReadiness.missingRootPackageIds?.length === 0, "Framework launch and Official Profile package projection are not proven");
+  const framework = summary.checks?.frameworkReadiness;
+  const requireRootPackages = Object.hasOwn(summary.checks?.runtime ?? {}, "full");
+  invariant(framework?.status === "passed" && framework.launchReady === true && framework.packageDirectoryPresent === true
+    && framework.requireRootPackages === requireRootPackages
+    && (!requireRootPackages || (framework.missingRootPackageIds?.length === 0 && framework.firstInstallStatus !== "failed")), "Framework host readiness or selected Full seed is not proven");
   return { schema: "opl_settings_runtime_refresh_evidence_verification.v1", status: "passed", shell: "opl-studio", production_default_targets_required: true, synthetic_target_injection_allowed: false, generation_requested: false, runtime_surface: "opl-runtime-overview-page" };
 }
 

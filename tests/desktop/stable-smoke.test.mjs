@@ -20,7 +20,7 @@ function completeEvidence() {
     schema: "opl_studio_stable_smoke.v1", status: "passed", package: STABLE_PRODUCT, generationRequested: false,
     checks: {
       gateway: { status: "passed" }, codexTurn: { status: "skipped" },
-      frameworkReadiness: { status: "passed", launchReady: true, packageDirectoryPresent: true, missingRootPackageIds: [] },
+      frameworkReadiness: { status: "passed", launchReady: true, packageDirectoryPresent: true, requireRootPackages: false, missingRootPackageIds: [] },
       codexReadiness: { status: "passed", generationRequested: false, modelListValid: true, threadListValid: true, simulated: false },
       runtimeRefresh: { status: "passed", panelReady: true, buttonReadyBefore: true, clicked: true, busyObserved: true, buttonReadyAfter: true, errorVisible: false }
     }
@@ -45,13 +45,34 @@ test("Stable smoke forwards a bounded phase timeout and emits readiness progress
   assert.ok(events.some((event) => event.phase === "stable-smoke" && event.status === "started"));
 });
 
-test("Framework readiness requires owner-projected installed Official Profile roots", async () => {
-  const readback = { initializeExitCode: 0, stateExitCode: 0, launchReady: true, packageDirectoryPresent: true, packages: [{ id: "mas", present: true, installed: true }] };
-  assert.equal((await runFrameworkReadiness({ evaluate: async () => readback, expectedRootPackageIds: ["mas"] })).status, "passed");
-  const missing = await runFrameworkReadiness({ evaluate: async () => readback, expectedRootPackageIds: ["mas", "mag"] });
-  assert.equal(missing.status, "failed");
-  assert.deepEqual(missing.missingRootPackageIds, ["mag"]);
-  assert.equal((await runFrameworkReadiness({ evaluate: async () => ({ ...readback, launchReady: false }), expectedRootPackageIds: ["mas"] })).status, "failed");
+test("Standard readiness reports optional Profile failures without waiting or masking host failures", async () => {
+  const projection = { initializeExitCode: 0, stateExitCode: 0, launchReady: true,
+    packageDirectoryPresent: true, packages: [] };
+  for (const status of ["running", "failed", "completed"]) {
+    const readback = await runFrameworkReadiness({ projection, expectedRootPackageIds: ["selected-package"],
+      readFirstInstallAttempt: async () => ({ status }),
+      evaluate: async () => { throw new Error("optional packages must not cause a second read"); } });
+    assert.equal(readback.status, "passed");
+    assert.equal(readback.requireRootPackages, false);
+    assert.equal(readback.firstInstallStatus, status);
+    assert.deepEqual(readback.missingRootPackageIds, ["selected-package"]);
+  }
+  for (const failure of [{ initializeExitCode: 1 }, { stateExitCode: 3 }, { launchReady: false }, { packageDirectoryPresent: false }]) {
+    assert.equal((await runFrameworkReadiness({ projection: { ...projection, ...failure } })).status, "failed");
+  }
+});
+
+test("Framework readiness projects a real owner read when no cached projection exists", async () => {
+  let reads = 0;
+  const result = await runFrameworkReadiness({ expectedRootPackageIds: ["selected-package"],
+    evaluate: async expression => {
+      assert.equal(expression, "window.oplStudio.readState('fast')");
+      reads += 1;
+      return { readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [] } } } };
+    } });
+  assert.equal(reads, 1);
+  assert.equal(result.status, "passed");
+  assert.deepEqual(result.missingRootPackageIds, ["selected-package"]);
 });
 
 test("Stable smoke gives background Official Profile installation its own bounded budget", async () => {
@@ -84,7 +105,7 @@ test("Framework readiness reuses the Standard runtime projection without a secon
   assert.equal(result.status, "passed");
 });
 
-test("Framework readiness waits for background Official Profile installation", async () => {
+test("Full readiness waits for selected seeded Package installation", async () => {
   const incomplete = {
     initializeExitCode: 0,
     stateExitCode: 0,
@@ -103,7 +124,7 @@ test("Framework readiness waits for background Official Profile installation", a
   let reads = 0;
   const result = await runFrameworkReadiness({
     projection: incomplete,
-    expectedRootPackageIds: ["mas"],
+    expectedRootPackageIds: ["mas"], requireRootPackages: true,
     timeoutMs: 1500,
     evaluate: async () => { reads += 1; return reads === 1 ? { readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } } : completeState; }
   });
@@ -111,12 +132,12 @@ test("Framework readiness waits for background Official Profile installation", a
   assert.equal(result.status, "passed");
   assert.deepEqual(result.missingRootPackageIds, []);
 
-  const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], timeoutMs: 0, evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } }) });
+  const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0, evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } }) });
   assert.equal(missing.status, "failed");
   assert.deepEqual(missing.missingRootPackageIds, ["mas"]);
 
   let failedReads = 0;
-  const failed = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], timeoutMs: 1500, evaluate: async () => {
+  const failed = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 1500, evaluate: async () => {
     failedReads += 1;
     return { readback: { exitCode: 3 }, app_state: { agent_packages: { directory: { entries: [] } } } };
   } });
@@ -124,11 +145,11 @@ test("Framework readiness waits for background Official Profile installation", a
   assert.equal(failed.status, "failed");
 });
 
-test("Framework readiness stops on current first-install failure without waiting out the package budget", async () => {
+test("Full readiness stops on current first-install failure without waiting out the package budget", async () => {
   const projection = { initializeExitCode: 0, stateExitCode: 0, launchReady: true,
     packageDirectoryPresent: true, packages: [] };
   const failed = await runFrameworkReadiness({
-    projection, expectedRootPackageIds: ["mas"], timeoutMs: 900_000,
+    projection, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 900_000,
     readFirstInstallAttempt: async () => ({ status: "failed" }),
     evaluate: async () => { throw new Error("must stop before another bridge call"); }
   });
@@ -137,7 +158,7 @@ test("Framework readiness stops on current first-install failure without waiting
   assert.deepEqual(failed.missingRootPackageIds, ["mas"]);
   for (const attempt of [null, { status: "running" }, { status: "completed" }]) {
     const ready = await runFrameworkReadiness({
-      projection, expectedRootPackageIds: ["mas"], timeoutMs: 0,
+      projection, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0,
       readFirstInstallAttempt: async () => attempt,
       evaluate: async () => ({ readback: { exitCode: 0 }, app_state: {
         agent_packages: { directory: { entries: [{ package_id: "mas", installed: true }] } }
@@ -169,6 +190,20 @@ test("Runtime refresh requires real click, busy transition and returned ready st
 
 test("Stable evidence validator fails closed on old Preview and incomplete readback", () => {
   assert.equal(validateStableRuntimeEvidence(completeEvidence()).status, "passed");
+  const optional = completeEvidence();
+  optional.checks.frameworkReadiness.missingRootPackageIds = ["selected-package"];
+  optional.checks.frameworkReadiness.firstInstallStatus = "failed";
+  assert.equal(validateStableRuntimeEvidence(optional).status, "passed");
+  const full = completeEvidence();
+  full.checks.runtime = { full: { status: "passed" } };
+  assert.throws(() => validateStableRuntimeEvidence(full), /selected Full seed/);
+  full.checks.frameworkReadiness.requireRootPackages = true;
+  assert.equal(validateStableRuntimeEvidence(full).status, "passed");
+  full.checks.frameworkReadiness.missingRootPackageIds = ["selected-package"];
+  assert.throws(() => validateStableRuntimeEvidence(full), /selected Full seed/);
+  full.checks.frameworkReadiness.missingRootPackageIds = [];
+  full.checks.frameworkReadiness.firstInstallStatus = "failed";
+  assert.throws(() => validateStableRuntimeEvidence(full), /selected Full seed/);
   const preview = completeEvidence(); preview.schema = "opl_studio_preview_smoke.v1";
   assert.throws(() => validateStableRuntimeEvidence(preview), /passed Studio Stable/);
   const failure = completeEvidence(); failure.checks.runtimeRefresh.busyObserved = false;

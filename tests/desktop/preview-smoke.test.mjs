@@ -201,13 +201,13 @@ test("first launch waits only while this App process has an active first-install
   }
 });
 
-test("Stable Full first launch reads the normal owner projection and rejects failed readback", async () => {
-  for (const exitCode of [0, -1]) {
+test("Stable explicit or default Full first launch reads the normal owner projection and rejects failed readback", async () => {
+  for (const [exitCode, runtimeProfiles] of [[0, ["full"]], [-1, ["full"]], [0, undefined]]) {
     const calls = [];
     const result = await runStableSmoke({
       credentials: { email: "release@example.com", password: "fixture-password" },
       identity: { status: "passed" },
-      options: { runtimeProfiles: ["full"], expectedRootPackageIds: ["mas"], timeoutMs: 1000 },
+      options: { runtimeProfiles, expectedRootPackageIds: ["mas"], timeoutMs: 1000 },
       evaluate: async (expression) => {
         calls.push(expression);
         if (expression.includes("bootstrapStatus")) return { exitCode: 0, bootstrapStatus: "available" };
@@ -222,6 +222,7 @@ test("Stable Full first launch reads the normal owner projection and rejects fai
     assert.equal(result.checks.runtime.full.bridgeProfile, "fast");
     assert.equal(result.checks.runtime.full.status, exitCode === 0 ? "passed" : "partial");
     assert.equal(result.checks.runtime.full.frameworkProjection.packages[0].installed, true);
+    assert.equal(result.checks.frameworkReadiness.requireRootPackages, true);
     assert.equal(result.checks.frameworkReadiness.status, exitCode === 0 ? "passed" : "failed");
     assert.equal(result.status, "failed");
     assert.equal(calls.some(expression => expression.includes('readState("full")')), false);
