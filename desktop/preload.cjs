@@ -30,7 +30,8 @@ contextBridge.exposeInMainWorld("oplStudio", {
     workspaceRootSelection: true,
     nativeWorkspaceFileAccess: true,
     codexInstall: true,
-    modelAccessSecretInput: true
+    modelAccessSecretInput: true,
+    connectionAccessApproval: true
   },
   beginWindowDrag: () => invoke("beginWindowDrag"),
   retryDesktopHost: () => invoke("retryDesktopHost"),
@@ -70,6 +71,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   interruptTurn: (request) => invoke("interruptTurn", request),
   loginGatewayAccount: (request) => invoke("loginGatewayAccount", request),
   configureCodexApiKey: (request) => invoke("configureCodexApiKey", request),
+  approveConnectionAccess: (request) => invoke("approveConnectionAccess", request),
   readNativeAppUpdateStatus: () => invoke("readNativeAppUpdateStatus"),
   checkNativeAppUpdate: () => invoke("checkNativeAppUpdate"),
   applyNativeAppUpdate: () => invoke("applyNativeAppUpdate"),

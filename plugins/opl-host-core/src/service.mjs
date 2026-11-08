@@ -93,12 +93,13 @@ export class OplHostCore extends EventEmitter {
     nativeUpdater = defaultNativeUpdater(),
     carrierDiagnostics,
     threadWorkspace,
+    connectionAccessApproval,
     env = process.env
   } = {}, legacyOptions) {
     super();
     const options = legacyOptions ?? arguments[0] ?? {};
     this.codex = codex ?? new OplCodexNative(options);
-    this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex });
+    this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex, connectionAccessApproval });
     this.transport = this.codex.transport;
     if (managedByDsh && !mcpApps) throw new Error("DSH MCP Apps service is required");
     this.mcpApps = mcpApps ?? new McpAppHost(this.transport);
@@ -107,6 +108,8 @@ export class OplHostCore extends EventEmitter {
     this.opl = this.framework.opl;
     this.gatewayAccountLogin = this.framework.gatewayAccountLogin;
     this.codexApiKeyConfiguration = this.framework.codexApiKeyConfiguration;
+    this.connectionAccessApproval = connectionAccessApproval ?? this.framework.connectionAccessApproval
+      ?? (async () => ({ ok: false, errorCode: "connection_authorization_approval_unavailable" }));
     this.managedByDsh = managedByDsh;
     this.hostContext = null;
     this.platform = { ...defaultPlatformServices(), ...platform };
@@ -285,6 +288,7 @@ export class OplHostCore extends EventEmitter {
       case "interruptTurn": return this.transport.interruptMessage(payload);
       case "loginGatewayAccount": return this.gatewayAccountLogin(payload);
       case "configureCodexApiKey": return this.configureCodexApiKey(payload);
+      case "approveConnectionAccess": return this.connectionAccessApproval(payload);
       case "readNativeAppUpdateStatus": return this.nativeUpdater.perform("status", payload);
       case "checkNativeAppUpdate": return this.nativeUpdater.perform("check", payload);
       case "applyNativeAppUpdate": return this.nativeUpdater.perform("apply", payload);

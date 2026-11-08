@@ -23,6 +23,7 @@ import type {
   CodexPendingServerRequest,
   CodexPermissionProfileCatalog,
   CodexPickedInput,
+  ConnectionAccessApprovalResult,
   GatewayAccountLoginRequest,
   GatewayAccountLoginResult,
   ThreadWorkspaceAccessRequest,
@@ -51,6 +52,7 @@ export type OplPlatformCapabilities = {
   nativeWorkspaceFileAccess?: boolean;
   codexInstall: boolean;
   modelAccessSecretInput: boolean;
+  connectionAccessApproval: boolean;
 };
 
 export type NativeAppUpdateOperation = "status" | "check" | "apply" | "restart";
@@ -117,7 +119,7 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  keyof McpAppsBridge | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  keyof McpAppsBridge | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -158,6 +160,7 @@ export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   interruptTurn(request: ThreadInterruptRequest): Promise<ThreadInterruptResult>;
   loginGatewayAccount(request: GatewayAccountLoginRequest): Promise<GatewayAccountLoginResult>;
   configureCodexApiKey(request: { apiKey: string }): Promise<CodexApiKeyConfigurationResult>;
+  approveConnectionAccess(request: { requestId: string }): Promise<ConnectionAccessApprovalResult>;
   readNativeAppUpdateStatus(): Promise<NativeAppUpdateResult>;
   checkNativeAppUpdate(): Promise<NativeAppUpdateResult>;
   applyNativeAppUpdate(): Promise<NativeAppUpdateResult>;
