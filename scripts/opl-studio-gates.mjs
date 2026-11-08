@@ -25,6 +25,7 @@ export const slotHostSourcePaths = [
 export const rendererSourcePaths = [
   ...slotHostSourcePaths,
   "src/workbench/App.tsx",
+  "src/workbench/composerAttachments.ts",
   "src/workbench/ProjectProgressPanel.tsx",
   "src/workbench/SettingsPanel.tsx",
   "src/workbench/WorkspaceFilesPanel.tsx",

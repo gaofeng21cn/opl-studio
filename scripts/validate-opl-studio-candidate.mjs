@@ -294,7 +294,7 @@ assert(
   "candidate package must use the selected Electron carrier without AionUI, AionCore, or Tauri dependencies"
 );
 
-const app = read("src/workbench/App.tsx");
+const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachments.ts")].join("\n");
 const rendererSource = readRendererSource();
 const evidence = readJson("src/candidateContractEvidence.json");
 assert(

@@ -11,7 +11,7 @@ import { assistantDisplayMarkdown } from "../../src/workbench/messageDisplay.ts"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
-const app = read("src/workbench/App.tsx");
+const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachments.ts")].join("\n");
 const main = read("src/main.tsx");
 const bridge = [
   read("src/bridge/oplBridge.ts"),
