@@ -753,7 +753,7 @@
           "SettingsRoot"
         ],
         "slot_runtime": [
-          "SlotCore",
+          "SlotRegistry",
           "createSlotRenderer",
           "registerStaticSlots"
         ],
@@ -823,7 +823,7 @@
     "application_host_runtime_adopted": true,
     "dsh_product_runtime_authority_adopted": false,
     "adopted_patterns": [
-      "SlotCore typed slot registry and disposer lifecycle",
+      "Official SlotRegistry typed slots, stores, factories and Cordis disposer lifecycle",
       "createSlotRenderer React composition and entry error isolation",
       "byte-identical AppFrame SidebarRoot WorkspaceBrowser ConversationRoot EmptyHero InputBar AgentPresetSeat and SettingsRoot GUI source plus the DSH Menu primitive",
       "DSH-owned typography spacing layout color state and interaction without an OPL parallel visual system",

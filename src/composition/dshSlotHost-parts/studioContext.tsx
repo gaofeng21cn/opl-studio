@@ -1,4 +1,5 @@
-import { type HostObservable, type SlotCore, type StandardSourceBinding } from "@deepseek-ai/dsh-client-ui-slots";
+import type { Context } from "@deepseek-ai/cordis";
+import type { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { zh as workspaceZh, en as workspaceEn } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/locales.ts";
 import { zh as conversationZh, en as conversationEn } from "../../vendor/deepseek-harness/packages/client/ui-conversation/src/client/locales.ts";
 import { zh as modelZh, en as modelEn } from "../../vendor/deepseek-harness/packages/client/ui-model-selection/src/client/locales.ts";
@@ -11,7 +12,6 @@ import { workspaceEntries } from "../workspaceViewModel";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
-    root: { kind: "single"; scope: "root" };
     sidebar: { kind: "single"; scope: "root"; owner: { collapsed: boolean; width: number } };
     main: { kind: "keyed"; scope: "root"; owner: object };
     rightbar: { kind: "single"; scope: "root"; owner: { width: number; viewportWidth: number; canShow: boolean } };
@@ -47,7 +47,6 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-export const emptyRootBinding: StandardSourceBinding = Object.freeze({ key: undefined, hooks: Object.freeze({}), keyedHooks: Object.freeze({}), props: Object.freeze({}) });
 const focusableSelector = 'summary, button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export const SettingsNavigationContext = createContext<{ destination: SettingsDestinationId | null; navigate(destination: SettingsDestinationId): void } | null>(null);
 export const SettingsContributionSlotContext = createContext<((options?: { only?: string }) => ReactNode) | null>(null);
@@ -112,10 +111,6 @@ export function useSettingsDialogFocus(rootRef: RefObject<HTMLElement | null>) {
   }, [rootRef]);
 }
 
-export function constantObservable<T>(snapshot: T): HostObservable<T> {
-  return { getSnapshot: () => snapshot, subscribe: () => () => undefined };
-}
-
 export function useDshSnapshot<T, S>(store: { getSnapshot(): T; subscribe(listener: () => void): () => void }, selector: (value: T) => S): S {
   return selector(useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot));
 }
@@ -128,9 +123,16 @@ export type StudioContextValue = OplStudioSurface & {
 };
 
 export const StudioContext = createContext<StudioContextValue | null>(null);
-export const SlotCoreContext = createContext<SlotCore | null>(null);
+export const ClientContext = createContext<Context | null>(null);
+export function useClientContext(): Context {
+  const ctx = useContext(ClientContext);
+  if (!ctx) throw new Error("OPL Studio slot rendered outside its Cordis client context");
+  return ctx;
+}
 
-export function useSlotCore(): SlotCore {
+export const SlotCoreContext = createContext<SlotRegistry | null>(null);
+
+export function useSlotCore(): SlotRegistry {
   const value = useContext(SlotCoreContext);
   if (!value) throw new Error("OPL Studio DSH slot rendered without the slot host core");
   return value;

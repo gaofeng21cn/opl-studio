@@ -2,7 +2,8 @@ import { Activity, Bot, Cable, ChevronDown, CircleHelp, Files, Folder, Gauge, Pa
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Menu, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { SettingsRoot } from "@opl-vendor/dsh-settings-root";
-import { createSnapshotStore } from "../../integrations/deepseek-harness/runtimeShim";
+import type { PropsStore } from "@deepseek-ai/dsh-client-store";
+import type { createSettingsShellStore } from "../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store";
 import { createEcosystemLocale, mountSettingsSearch } from "../../integrations/deepseek-harness/ecosystemClients";
 import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../../integrations/deepseek-harness/ecosystemSettingsSearch";
 import { settingsDestinations, settingsSubDestinations, searchableSettings, type SettingsDestinationId } from "../../workbench/SettingsPanel";
@@ -12,9 +13,8 @@ import {
   SettingsNavigationContext,
   focusableElements,
   translate,
-  useDshSnapshot,
   useSettingsDialogFocus,
-  useSlotCore,
+  useClientContext,
   useStudio,
   useStudioShortcuts
 } from "./studioContext";
@@ -146,18 +146,10 @@ export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiC
   return targets.filter((item, index, all) => all.findIndex(other => other.label === item.label) === index);
 }
 
-export function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: any }) {
+export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: boolean; renderSlot: any } & PropsStore<ReturnType<typeof createSettingsShellStore>>) {
   const studio = useStudio();
-  const slotCore = useSlotCore();
+  const ctx = useClientContext();
   const [navigatedDestination, setNavigatedDestination] = useState<SettingsDestinationId | null>(null);
-  const settingsStore = useMemo(() => createSnapshotStore<{ open: boolean; activeId: string | undefined }>({ open: false, activeId: undefined }), []);
-  const settingsUseStore = useCallback((selector: (state: { open: boolean; activeId: string | undefined }) => unknown) => useDshSnapshot(settingsStore, selector), [settingsStore]);
-  const settingsActions = useMemo(() => ({
-    open: () => settingsStore.update((state) => { state.open = true }),
-    close: () => settingsStore.update((state) => { state.open = false; state.activeId = undefined }),
-    select: (id: string) => settingsStore.update((state) => { state.activeId = id }),
-    openSection: (id: string) => settingsStore.update((state) => { state.activeId = id; state.open = true })
-  }), [settingsStore]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useSettingsDialogFocus(rootRef);
   const localeRef = useRef(studio.locale);
@@ -171,28 +163,15 @@ export function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: 
     : undefined, []);
   useEffect(() => {
     let active = true;
-    let dispose: (() => void) | undefined;
-    const aliases: Record<string, SettingsDestinationId> = { general: "preferences", plugins: "agents", "web-ui-plugins": "workspace" };
+    let dispose: (() => Promise<void>) | undefined;
     void mountSettingsSearch({
+      ctx,
       locale: searchLocale.current,
-      slots: {
-        entries(name) {
-          const locale = localeRef.current;
-          if (name === "settings.section") return settingsSearchTargets(locale, contributionsRef.current).map((entry, order) => ({ options: { id: `opl-search-${order} ${entry.keywords ?? ""}`, label: entry.label, order } }));
-          return [];
-        },
-        subscribe: (_name, listener) => searchLocale.current.subscribe(listener),
-        register: (options, Component) => {
-          const { locale: namespace, ...registration } = options;
-          const translate = searchLocale.current.bind(String(namespace));
-          return slotCore.register({ ...registration, registrant: "@objectivex666/dsh-settings-search" } as any, ((props: Record<string, unknown>) => <Component {...props} t={translate} />) as any);
-        },
-        inject: (_name, activate) => activate(),
-      }
-    }).then((cleanup) => { if (active) dispose = cleanup; else cleanup(); })
+      readSections: () => settingsSearchTargets(localeRef.current, contributionsRef.current).map((entry, order) => ({ options: { id: `opl-search-${order} ${entry.keywords ?? ""}`, label: entry.label, order } })),
+    }).then((cleanup) => { if (active) dispose = cleanup; else void cleanup(); })
       .catch((error) => console.error("Settings search plugin failed to load", error));
-    return () => { active = false; dispose?.(); };
-  }, []);
+    return () => { active = false; void dispose?.(); };
+  }, [ctx]);
 
   const studioRows = settingsDestinations(studio.locale).map((destination, index) => ({
     id: settingsSectionId(destination.id),
@@ -218,13 +197,17 @@ export function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: 
   const requestedPrimary = requestedSettings?.destination
     ? settingsDestinations(studio.locale).find(primary => settingsSubDestinations(primary.id, studio.locale).some(item => item.id === requestedSettings.destination))?.id
     : undefined;
-  const navigationRequest = requestedSettings ? { sectionId: requestedPrimary ? settingsSectionId(requestedPrimary) : undefined, revision: requestedSettings.revision } : undefined;
+  useEffect(() => {
+    if (!requestedSettings) return;
+    if (requestedPrimary) actions.openSection(settingsSectionId(requestedPrimary));
+    else actions.open();
+  }, [requestedSettings?.revision, requestedPrimary, actions]);
   const navigate = (destination: SettingsDestinationId) => {
     setNavigatedDestination(destination);
     const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
-    if (primary) settingsActions.select(settingsSectionId(primary.id));
+    if (primary) actions.select(settingsSectionId(primary.id));
   };
-  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot navigationRequest={navigationRequest} wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={settingsUseStore} actions={settingsActions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
+  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
 }
 
 export function SettingsTriggerSlot({ wide }: { wide: boolean }) {

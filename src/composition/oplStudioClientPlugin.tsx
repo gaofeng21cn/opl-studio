@@ -6,18 +6,10 @@ import {
   provideOplStudioClientContributions,
   type OplClientContributionsService
 } from "./clientCordis";
-import { installOplWorkspaceClient, renderOplStudioRoot } from "./dshSlotHost";
+import { OplStudioDshSlotHost } from "./dshSlotHost";
 import { adoptEcosystemModuleSystem } from "../integrations/deepseek-harness/ecosystemClients";
 
-export type OplStudioUiRenderer = {
-  mount(container: HTMLElement): () => void;
-};
-
-declare module "@deepseek-ai/cordis" {
-  interface Context {
-    uiRenderer: OplStudioUiRenderer;
-  }
-}
+export type { UiRendererService as OplStudioUiRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/index.ts";
 
 export const name = "opl-studio-client";
 
@@ -28,11 +20,12 @@ export function apply(ctx: Context) {
   const webLoader = ctx.get("loader") as { internal?: unknown } | undefined;
   adoptEcosystemModuleSystem(ctx.get("modules") ?? webLoader?.internal);
   const contributions = provideOplStudioClientContributions(ctx);
-  ctx.effect(() => installOplWorkspaceClient());
+  const slotHost = new OplStudioDshSlotHost(ctx, contributions);
+  ctx.effect(() => slotHost.installWorkspaceClient());
   ctx.provide("uiRenderer", {
     mount(container: HTMLElement) {
       const root = createRoot(container);
-      root.render(<McpAppsClientContext.Provider value={mcpApps}>{renderOplStudioRoot(contributions)}</McpAppsClientContext.Provider>);
+      root.render(<McpAppsClientContext.Provider value={mcpApps}>{slotHost.renderRoot()}</McpAppsClientContext.Provider>);
       return () => root.unmount();
     }
   });

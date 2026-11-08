@@ -20,8 +20,12 @@
 - Use OPL App state/action contracts as the only interface to Framework-owned
   runtime and Package truth; `opl-framework-bridge` remains a consumer bridge,
   not a second owner.
+- DSH native plugin composition and repeatable upstream upgrades are engineering
+  constraints. Use the official SlotRegistry, Cordis lifecycle and Settings
+  store/actions; do not recreate generic loaders, store/factory hosts or source
+  interception when a public extension point covers the requirement.
 - Keep the pinned DSH ref, package cohort, vendored GUI manifest, Host profile,
-  overlay patches, and focused Host/MCP tests synchronized so upstream upgrades
+  profile patches, and focused Host/MCP tests synchronized so upstream upgrades
   remain replayable and reviewable.
 - `npm run package` is the App-contract-driven three-carrier candidate evidence
   entry. Run it only from committed, tracked-clean Studio source and bind it to

@@ -181,9 +181,22 @@ npm run dsh:status
 npm run dsh:preflight -- --source /absolute/path/to/clean/deepseek-harness
 ```
 
-升级时必须同步更新清单和依赖版本组，重新同步清单声明的 GUI 源码目录，重放
-Studio 配置和覆盖层，并通过宿主、渲染器与候选版的专项验证。仅完成依赖安装
-或确认 GUI 源码字节一致，不能证明宿主与插件兼容。
+预检从干净的官方源码读取实际包版本；可选版本与分支参数必须与源码一致。
+选定升级目标后，同步修改清单、精确依赖版本组和 lockfile，再执行：
+
+```bash
+npm run dsh:replay -- --source /absolute/path/to/clean/deepseek-harness
+```
+
+重放只接受已固定的 source ref/cohort，使用既有 vendor 命令同步源码，再校验字节、
+实际安装版本和官方 DSH 插件兼容性。随后构建插件，以官方 API 生成并验证 Desktop/Web
+profile schema，运行真实 Host inventory/生命周期、客户端、类型、MCP、headless 和
+candidate 检查。任一步失败即停止，修复具体断点后继续验证。
+
+只验证适配器、无需重新生成 vendor 时，使用 `npm run dsh:verify -- --source <checkout>`。
+客户端使用官方 `SlotRegistry` 管理 store、factory 与卸载；设置导航使用官方共享
+store/actions，社区搜索通过 Cordis 注入与释放。每次升级重新检查公开扩展点，删除
+已被上游覆盖的适配。源码兼容验证与 App 的构建、安装和发布验收各有独立证据。
 
 ## 验证
 

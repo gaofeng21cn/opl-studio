@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { resolveDeepLinkDestination } from "../../src/workbench/deepLinkNavigation.ts";
 import { createDeepLinkPolicy } from "../../desktop/deep-links.mjs";
 import { resolveAppRepoRoot } from "../../scripts/resolve-app-repo-root.mjs";
-import { applySettingsNavigationOverlay, SETTINGS_NAVIGATION_ANCHOR, verifySettingsNavigationOverlay } from "../../scripts/dsh-settings-navigation-overlay.mjs";
+import { createSettingsShellStore } from "../../src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appRoot = resolveAppRepoRoot(root);
@@ -55,14 +55,19 @@ test("preload installs the live listener before taking pending links and does no
   assert.equal(events.length, 1);
 });
 
-test("settings navigation overlay binds pristine upstream bytes and rejects an ambiguous or changed anchor", () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "src/composition/deepseekHarnessSourceManifest.json"), "utf8"));
-  const transformed = verifySettingsNavigationOverlay(root, manifest);
-  assert.match(transformed, /openSection\(navigationRequest.sectionId\)/);
-  assert.match(transformed, /if \(!navigationRequest.sectionId\) \{ close\(\); return \}/);
-  assert.throws(() => applySettingsNavigationOverlay("changed source"), /one exact pinned source anchor/);
-  assert.throws(() => applySettingsNavigationOverlay(SETTINGS_NAVIGATION_ANCHOR.repeat(2)), /one exact pinned source anchor/);
-  const changed = structuredClone(manifest);
-  changed.build_overlays[0].source_sha256 = "0".repeat(64);
-  assert.throws(() => verifySettingsNavigationOverlay(root, changed), /exact source and pinned target/);
+test("native settings store shares section navigation and dialog dismissal across entry points", () => {
+  const settings = createSettingsShellStore().create();
+  assert.deepEqual(settings.getSnapshot(), { open: false, activeId: undefined });
+
+  settings.actions.openSection("opl-studio-settings-preferences");
+  assert.deepEqual(settings.getSnapshot(), { open: true, activeId: "opl-studio-settings-preferences" });
+
+  settings.actions.select("opl-studio-settings-agents");
+  assert.deepEqual(settings.getSnapshot(), { open: true, activeId: "opl-studio-settings-agents" });
+
+  settings.actions.close();
+  assert.deepEqual(settings.getSnapshot(), { open: false, activeId: undefined });
+
+  settings.actions.openSection("opl-studio-settings-account");
+  assert.deepEqual(settings.getSnapshot(), { open: true, activeId: "opl-studio-settings-account" });
 });

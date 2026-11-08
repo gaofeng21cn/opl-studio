@@ -166,7 +166,7 @@
     "test:gateway-account-projection": "bun test tests/workbench/gateway-account-cache.test.mts && bun run scripts/gateway-account-projection-regression.ts",
     "test:package-projection": "bun test tests/workbench/package-projection.test.mts",
     "test:runtime-projection": "bun test tests/workbench/runtime-projection.test.mts tests/workbench/service-recovery-model.test.mts",
-    "test:ui-contributions": "bun test tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts",
+    "test:ui-contributions": "bun test tests/workbench/native-settings-lifecycle.test.mts tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts",
     "test:client-cordis": "bun test tests/conformance/client-cordis-conformance.test.mts",
     "validate:client-conformance": "bun run scripts/validate-client-conformance.mjs",
     "test:storage-migration": "bun test tests/workbench/storage-migration.test.mts",
@@ -201,6 +201,8 @@
     "build:plugins": "node scripts/build-dsh-plugins.mjs",
     "prepare": "npm run build:plugins",
     "test:dsh-plugins": "node --test scripts/dsh-plugin-packages.test.mjs",
-    "test:mcp-apps": "node --test src/host/mcp-app-host.test.mjs && bun test tests/workbench/mcp-app-host.test.mts"
+    "test:mcp-apps": "node --test src/host/mcp-app-host.test.mjs && bun test tests/workbench/mcp-app-host.test.mts",
+    "dsh:replay": "node scripts/dsh-upgrade.mjs replay",
+    "dsh:verify": "node scripts/dsh-upgrade.mjs verify"
   }
 }

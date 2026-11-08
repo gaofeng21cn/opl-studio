@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { Context } from "@deepseek-ai/cordis";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   OPL_UI_CONTRIBUTION_SLOTS,
@@ -71,10 +72,60 @@ test("startup does not retry unrelated validation failures", async () => {
   }, () => true)).rejects.toThrow("invalid_projection");
   expect(attempts).toBe(1);
 });
+const contexts: Context[] = [];
+afterEach(async () => { for (const ctx of contexts.splice(0)) await ctx.fiber.dispose(); });
+function createHost() {
+  const ctx = new Context();
+  contexts.push(ctx);
+  return new OplStudioDshSlotHost(ctx, {} as never);
+}
 const { OplStudioDshSlotHost } = await import("../../src/composition/dshSlotHost.tsx");
 const { installWorkspaceClientPlugin } = await import("../../src/composition/workspaceClientPlugin.tsx");
+test("native slot stores and factories follow the client plugin lifetime", async () => {
+  const ctx = new Context();
+  contexts.push(ctx);
+  let host!: InstanceType<typeof OplStudioDshSlotHost>;
+  const fiber = await ctx.plugin({ name: "studio-slot-lifetime", apply(child: Context) {
+    host = new OplStudioDshSlotHost(child, {} as never);
+  } });
+  const rendererHost = (host.renderRoot() as any).props.value;
+  expect(rendererHost.scope("session").current.getSnapshot().key).toBeUndefined();
+  host.threadScope.select("codex-thread-one");
+  const selected = rendererHost.scope("session").current.getSnapshot();
+  expect(selected.key).toBe("codex-thread-one");
+  expect(host.threadScope.bindingSource("unknown").getSnapshot().key).toBeUndefined();
+  host.threadScope.select(undefined);
+  await Promise.resolve();
+  expect(rendererHost.scope("session").current.getSnapshot().key).toBeUndefined();
+  expect(selected.ctx.fiber.uid).toBeNull();
+  const settings = host.core.entries("sidebar.settings")[0]!;
+  const state = rendererHost.storeOf(settings);
+  expect(state).toBeDefined();
+  state.actions.openSection("opl-studio-settings-preferences");
+  expect(state.getSnapshot()).toEqual({ open: true, activeId: "opl-studio-settings-preferences" });
+  expect(rendererHost.storeOf(settings)).toBe(state);
+
+  const { createSettingsShellStore } = await import("../../src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts");
+  const child = await ctx.plugin({ name: "native-factory", inject: ["slots"], apply(child: Context) {
+    child.get("slots").registerFactory({ name: "test.settings", scope: "root", store: createSettingsShellStore } as never, (() => null) as never);
+  } });
+  const factory = rendererHost.factoryOf("test.settings");
+  const occurrence = {};
+  const first = rendererHost.factoryStoreOf(factory, undefined, occurrence);
+  const second = rendererHost.factoryStoreOf(factory, undefined, {});
+  first.actions.openSection("one");
+  expect(first.getSnapshot().activeId).toBe("one");
+  expect(second.getSnapshot().activeId).toBeUndefined();
+  expect(rendererHost.factoryStoreOf(factory, undefined, occurrence)).toBe(first);
+  await child.dispose();
+  expect(rendererHost.factoryOf("test.settings")).toBeUndefined();
+  await fiber.dispose();
+  expect(host.core.entries("root")).toHaveLength(0);
+  expect(() => rendererHost.storeOf(settings)).toThrow("store handle is not registered");
+});
+
 test("capability workspace installs into DSH main and sidebar panel slots and disposes both", () => {
-  const host = new OplStudioDshSlotHost();
+  const host = createHost();
   const beforeMain = host.core.entries("main").length;
   const beforeOverlay = host.core.entries("shell.overlay").length;
   const dispose = installWorkspaceClientPlugin(host.core, () => ({} as never));
@@ -189,7 +240,7 @@ const projectionState = {
 };
 
 test("App-disabled packages leave all contribution slots while remaining natively enabled", () => {
-  const host = new OplStudioDshSlotHost();
+  const host = createHost();
   const initial = readUiContributionsProjection(projectionState);
   host.replaceHostDerivedProjection(initial);
   expect(host.core.entries("runtime.detail")).toHaveLength(1);
@@ -352,7 +403,7 @@ describe("OPL Studio DSH contribution composition", () => {
   });
 
   test("registers each static list-slot occupant with a stable id", () => {
-    const host = new OplStudioDshSlotHost();
+    const host = createHost();
     expect(host.core.entries("root")[0]?.children?.["runtime.detail"]).toEqual({ kind: "list", scope: "root" });
     expect(host.core.entries("rightbar")[0]?.children?.["runtime.detail"]).toBeUndefined();
     expect(host.core.entries("main").find(entry => entry.registrant === "dsh-ui-conversation")?.children?.["conversation.hero.options"]).toEqual({ kind: "list", scope: "root" });
@@ -389,7 +440,7 @@ describe("OPL Studio DSH contribution composition", () => {
   });
 
   test("uses DSH registration and disposer lifecycle for projection changes", () => {
-    const host = new OplStudioDshSlotHost();
+    const host = createHost();
     const projection = readUiContributionsProjection(projectionState);
     host.replaceHostDerivedProjection(projection);
 
@@ -409,12 +460,15 @@ describe("OPL Studio DSH contribution composition", () => {
   });
 
   test("contains a failed contribution at its DSH entry boundary", () => {
-    const host = new OplStudioDshSlotHost();
+    const host = createHost();
     host.replaceHostDerivedProjection(readUiContributionsProjection(projectionState));
     const entry = host.core.entries("runtime.detail")[0];
     expect(entry).toBeDefined();
 
-    host.core.reportEntryError("runtime.detail", entry!, new Error("fixture crash"), { abdicate: true });
+    // Exercise the official renderer host error boundary rather than bypassing
+    // the registry through SlotCore internals.
+    const rendererHost = (host.renderRoot() as any).props.value;
+    rendererHost.reportEntryError("runtime.detail", entry!, new Error("fixture crash"), { abdicate: true });
     expect(host.core.entries("runtime.detail")).toHaveLength(1);
     expect(host.core.entriesOfSlot("runtime.detail")).toHaveLength(0);
     expect(host.core.entriesOfSlot("composer.palette")).toHaveLength(1);

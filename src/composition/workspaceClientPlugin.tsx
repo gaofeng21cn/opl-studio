@@ -187,7 +187,7 @@ export const name = "opl-workspace-client";
 
 // DSH owns the main-page and sidebar slots. This client plugin consumes the
 // admitted Package views and keeps only the selected view across page visits.
-export function installWorkspaceClientPlugin(core: SlotCore, useSurface: () => OplStudioSurface) {
+export function installWorkspaceClientPlugin(core: Pick<SlotCore, "register">, useSurface: () => OplStudioSurface) {
   let selectedView: string | null = null;
   function Page() {
     const surface = useSurface();

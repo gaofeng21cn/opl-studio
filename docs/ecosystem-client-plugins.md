@@ -25,6 +25,19 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 验证覆盖 workspace bridge 的二进制窗口、跨任务/越界拒绝、取消、响应一致性与符号链接；文件预览复用官方 Markdown primitive。Office/Excel/PDF 的完整官方 Remote 接入仍是待完成的载体能力，不以源码存在替代运行时验收。
 
+## 客户端扩展与设置生命周期
+
+`opl-studio-client` 在现有 Cordis context 中安装官方 `SlotRegistry` 和 renderer。
+静态界面与 Framework contribution 共用原生注册入口；store、factory occurrence、
+声明依赖和卸载由 DSH 负责。每个客户端实例独立，不再使用模块级 slot host、空 store
+实现。官方 renderer 所需的 session scope 由当前 canonical Codex 线程的薄投影提供，
+未选择线程时为空，切换时销毁旧视图 fiber；不维护第二套 session 数据。
+
+`sidebar.settings` 注册官方 `createSettingsShellStore`，`SettingsRoot` 和 App 导航共用
+其 actions。vendor 保持上游原字节，设置导航无需构建期源码 overlay。社区搜索通过
+真实 Cordis 插件依赖注入和卸载接入；仅搜索目录和语言绑定映射到 App 当前投影，
+不建立第二份设置持久状态。升级入口及验收见 [验证指南](verification.md#dsh-upstream-upgrade-gate)。
+
 ## DSH sandbox reuse boundary
 
 At the pinned `0.1.7-rc.2` source, `dsh-sandbox` defines subprocess

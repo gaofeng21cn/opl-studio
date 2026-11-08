@@ -109,17 +109,6 @@
     "dsh_agent_loop",
     "dsh_credentials"
   ],
-  "build_overlays": [
-    {
-      "id": "opl-settings-host-navigation",
-      "source": "scripts/dsh-settings-navigation-overlay.mjs",
-      "source_sha256": "95ee6c676d5524887b3b0928e620bd686371677ca49e34c948174d159ce4f5bb",
-      "target": "packages/client/ui-settings-general/src/client/SettingsRoot.tsx",
-      "target_upstream_sha256": "01966a7299b66d16b2f80106c72dd1f37c541bbfe2d3a0397ca9edd96c21f466",
-      "application": "bun_build_onLoad_exact_anchor",
-      "purpose": "optional_validated_navigation_request_uses_native_settings_open_and_selection_state"
-    }
-  ],
   "files": [
     {
       "path": "LICENSE",

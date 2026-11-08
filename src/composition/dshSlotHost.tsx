@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
-import { SlotCore, type SlotRendererHost } from "@deepseek-ai/dsh-client-ui-slots";
+import type { Context } from "@deepseek-ai/cordis";
+import { SlotRegistry } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
+import { createSettingsShellStore } from "../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
+import { CodexThreadScope } from "./codexThreadScope";
+import type { OplStudioSurface } from "./oplStudioSurface";
 import { createSlotRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx";
 import App from "../workbench/App";
 import { ProjectedContribution } from "./contributionComponents";
@@ -7,8 +11,7 @@ import type { OplClientContributionsService } from "./clientCordis";
 import {
   OPL_UI_CONTRIBUTION_SLOTS,
   type OplUiContribution,
-  type OplUiContributionsProjection,
-  type OplUiContributionSlot
+  type OplUiContributionsProjection
 } from "./contributionProjection";
 import { installWorkspaceClientPlugin } from "./workspaceClientPlugin";
 import { settingsDestinations } from "../workbench/SettingsPanel";
@@ -42,21 +45,27 @@ import {
   QueueDockSlot
 } from "./dshSlotHost-parts/composerSlots";
 import {
-  constantObservable,
-  emptyRootBinding,
   SlotCoreContext,
-  translate,
+  ClientContext,
   useStudio
 } from "./dshSlotHost-parts/studioContext";
 
 type ActiveRegistration = { fingerprint: string; dispose(): void };
 
+function CodexScopedFrame({ surface, renderSlot, scope }: { surface: OplStudioSurface; renderSlot: any; scope: CodexThreadScope }) {
+  useEffect(() => { scope.select(surface.currentThreadId); }, [scope, surface.currentThreadId]);
+  useEffect(() => () => scope.select(undefined), [scope]);
+  return <StudioFrame surface={surface} renderSlot={renderSlot} />;
+}
+
 function OplStudioRoot({
   renderSlot,
-  contributions
+  contributions,
+  slotHost
 }: {
   renderSlot: any;
   contributions: OplClientContributionsService;
+  slotHost: OplStudioDshSlotHost;
 }) {
   const latestHostState = useRef<unknown>(null);
 
@@ -67,53 +76,47 @@ function OplStudioRoot({
       unsubscribe();
       slotHost.clearProjection();
     };
-  }, [contributions]);
+  }, [contributions, slotHost]);
 
   const updateHostState = useCallback((state: unknown) => {
     latestHostState.current = state;
     contributions.updateHostState(state);
-  }, [contributions]);
+  }, [contributions, slotHost]);
   const clearHostState = useCallback(() => {
     latestHostState.current = null;
     contributions.updateHostState(null);
     slotHost.clearProjection();
-  }, [contributions]);
+  }, [contributions, slotHost]);
 
-  return <SlotCoreContext.Provider value={slotHost.core}><App detailTabs={contributions.detailsTabs} renderShell={(surface) => <StudioFrame surface={surface} renderSlot={renderSlot} />} renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)} onHostStateChange={updateHostState} onHostStateDispose={clearHostState} /></SlotCoreContext.Provider>;
+  return <ClientContext.Provider value={slotHost.ctx}><SlotCoreContext.Provider value={slotHost.core}><App detailTabs={contributions.detailsTabs} renderShell={(surface) => <CodexScopedFrame surface={surface} renderSlot={renderSlot} scope={slotHost.threadScope} />} renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)} onHostStateChange={updateHostState} onHostStateDispose={clearHostState} /></SlotCoreContext.Provider></ClientContext.Provider>;
 }
 
 export class OplStudioDshSlotHost {
-  readonly core = new SlotCore();
-  private readonly renderer = createSlotRenderer();
+  readonly core: SlotRegistry;
+  readonly threadScope: CodexThreadScope;
   private readonly registrations = new Map<string, ActiveRegistration>();
-  private readonly host: SlotRendererHost;
 
-  constructor() {
-    const emptySessionScope = { current: constantObservable(emptyRootBinding), bindingSource: () => constantObservable(emptyRootBinding), resolve: () => undefined };
-    this.host = {
-      subscribe: (key, listener) => this.core.subscribe(key, listener), getVersion: (key) => this.core.getVersion(key),
-      entriesOf: (key) => this.core.entries(key), entriesOfSlot: (key) => this.core.entriesOfSlot(key),
-      reportEntryError: (key, entry, error, info) => this.core.reportEntryError(key, entry, error, info), specOf: (key) => this.core.specDynamic(key),
-      reportFactoryError: (name, registration, error) => this.core.reportFactoryError(name, registration, error),
-      isLive: (entry) => this.core.isLive(entry), storeOf: () => undefined,
-      factoryStoreOf: () => undefined, retainFactoryOccurrence: () => () => undefined,
-      subscribeFactory: (name, listener) => this.core.subscribeFactory(name, listener),
-      getFactoryVersion: (name) => this.core.factoryVersion(name), factoryOf: (name) => this.core.factory(name),
-      isFactoryLive: (definition) => this.core.isFactoryLive(definition),
-      root: constantObservable(emptyRootBinding), scopeRevision: constantObservable(0), scope: () => emptySessionScope
-    };
-    this.core.onEntryError((key, entry, error) => console.error("OPL Studio UI slot failed", { slot: key, registrant: entry.registrant, error }));
+  constructor(readonly ctx: Context, private readonly contributions: OplClientContributionsService) {
+    new SlotRegistry(ctx);
+    // Use the Cordis service proxy so registrations and stores belong to this
+    // client plugin's fiber, including contributions added after initial mount.
+    this.core = ctx.get("slots", false) as SlotRegistry;
+    this.threadScope = new CodexThreadScope(ctx);
+    this.core.installScope("session", this.threadScope);
+    this.core.install(createSlotRenderer());
+    ctx.effect(() => this.core.onEntryError((key, entry, error) => console.error("OPL Studio UI slot failed", { slot: key, registrant: entry.registrant, error })));
     this.registerStaticSlots();
+    ctx.effect(() => () => this.clearProjection());
   }
 
   private registerStaticSlots() {
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
-    register({ name: "root", registrant: "opl-studio", children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    register({ name: "root", registrant: "opl-studio", inject: () => ({ slotHost: this, contributions: this.contributions }), children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" } } }, OplStudioRoot);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
     register({ name: "sidebar.workspaces", registrant: "opl-studio" }, SidebarWorkspacesSlot);
-    register({ name: "sidebar.settings", registrant: "dsh-ui-settings", children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
+    register({ name: "sidebar.settings", registrant: "dsh-ui-settings", store: createSettingsShellStore, children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
     register({ name: "settings.trigger", registrant: "opl-studio" }, SettingsTriggerSlot);
     register({ name: "settings.header", registrant: "opl-studio" }, SettingsHeaderSlot);
     register({ name: "settings.close", registrant: "opl-studio" }, SettingsCloseSlot);
@@ -138,8 +141,12 @@ export class OplStudioDshSlotHost {
     register({ name: "shell.overlay", id: "opl-studio-overlay", order: 0, registrant: "opl-studio" }, ShellOverlaySlot);
   }
 
-  renderRoot(contributions: OplClientContributionsService) {
-    return this.renderer.renderRoot(this.host, { contributions });
+  renderRoot() {
+    return this.core.renderSlot("root", {});
+  }
+
+  installWorkspaceClient() {
+    return installWorkspaceClientPlugin(this.core, useStudio);
   }
 
   // Package occupants come only from the Framework Host projection. Static DSH
@@ -163,16 +170,5 @@ export class OplStudioDshSlotHost {
   }
 }
 
-const slotHost = new OplStudioDshSlotHost();
-
-export function installOplWorkspaceClient() {
-  return installWorkspaceClientPlugin(slotHost.core, useStudio);
-}
-
-export function renderOplStudioRoot(contributions: OplClientContributionsService) {
-  return slotHost.renderRoot(contributions);
-}
-export function clearOplStudioContributionProjection() { slotHost.clearProjection(); }
-export function dshSlotSnapshot(slot?: OplUiContributionSlot) { return slotHost.core.snapshot(slot); }
 export { OPL_UI_CONTRIBUTION_SLOTS };
 export { settingsSearchTargets } from "./dshSlotHost-parts/shellSettingsSlots";

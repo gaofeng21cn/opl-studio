@@ -41,7 +41,9 @@ is the command owner.
 | `npm run verify:dsh-gui` | Byte parity of the pinned DSH GUI source manifest |
 | `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
 | `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
-| `npm run test:dsh-upgrade` | No-write DSH status/preflight command and scoped-package binding tests |
+| `npm run test:dsh-upgrade` | Official source/cohort admission, replay and verification orchestration tests |
+| `npm run dsh:replay -- --source <checkout>` | Replay the pinned source and execute native plugin compatibility, profile, lifecycle and source gates |
+| `npm run dsh:verify -- --source <checkout>` | Execute the same compatibility checks without regenerating vendor sources |
 | `npm run validate:state-model` | Runtime-backed App-state projection mapping; requires a real `opl` CLI/state source and is not part of default PR/main source CI |
 | `npm run smoke:webui` | Local WebUI host/renderer smoke |
 | `npm run smoke:visual` | Source-level visual smoke |
@@ -128,12 +130,15 @@ write-set, package-version policy, required validation commands, and manual
 authority/Preview acceptance steps. It never edits the repository and does not
 call an upgrade complete.
 
-When a target cohort is approved, update the manifest/package cohort together,
-run `npm run vendor:dsh-gui -- --source <checkout>`, then replay the
-`opl-studio` profile and Web/profile/bundle patches. Run `verify:dsh-gui`,
-typecheck, WebUI Host/MCP tests, headless tests, renderer source tests, and the
-candidate validator. Passing only package installation or GUI byte parity does
-not prove Host/plugin compatibility.
+When a target cohort is selected, update the manifest/package cohort and lockfile
+ together, install that lockfile, then run `npm run dsh:replay -- --source <checkout>`.
+The command verifies the actual installed cohort and native DSH plugin metadata,
+replays the existing vendor command, validates Desktop/Web profile schemas using
+official APIs, and runs packed-plugin inventory/lifecycle, Client Cordis, type,
+Host/MCP, headless and candidate gates. `dsh:verify` runs the same checks without
+regenerating vendor sources. Optional `--source` also verifies upstream bytes.
+An unsupported or failing step stops execution for repair. Neither command
+installs or publishes the App.
 
 The manifest owns the exact upstream cohort. Host fallback initialization,
 static-index authorization, renderer binding, and composer submission must all
