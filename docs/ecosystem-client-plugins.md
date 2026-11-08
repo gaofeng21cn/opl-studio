@@ -157,6 +157,14 @@ Connect 连接使用能力必须由 Framework 在已验证的 installed Package 
 具备可信 Package 绑定的 owner host 可接入 Connect 的公开能力，页面仅收到连接引用、
 授权状态和业务结果，凭据生命周期继续由 provider/carrier 管理。
 
+共享工作台的 `opl-workspace://artifact?ref=...&start=...&end=...` 链接通过当前
+对话的 `readThread().workspace` 绑定工作区，然后复用现有分块读取、symlink
+containment 和系统打开/浏览器下载接口。`ref` 必须是当前 thread workspace 内的
+绝对产物路径，越界或相对路径一律拒绝；Framework 注册 workspace 与 thread cwd
+没有已证明的一致合同前，宿主不猜测映射。Studio 当前提供媒体预览及起止时码，关闭
+Mini App 时释放预览，文件不跨对话共享或落入持久状态。独立设备应用的启动 deep link
+不属于此工作区文件合同，继续由 owner 的产品/平台入口定义。
+
 `ui/update-model-context` 将有大小限制的非可信资料带到同一对话后续用户消息；
 `ui/message` 仅准备输入草稿，由用户发送。外链需用户点击。关闭、切换对话或视图
 释放绑定，晚到结果不能写入新对话。暂不声明 sampling 或 subscription 支持。

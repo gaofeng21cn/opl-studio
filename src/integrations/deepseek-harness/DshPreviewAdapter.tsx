@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MarkdownText, type MarkdownLabels } from "../../vendor/deepseek-harness/packages/client/ui-primitives/src/index";
 import type { EcosystemWorkspaceBridge } from "./ecosystemWorkspaceProvider";
 
-type PreviewProps = EcosystemWorkspaceBridge & { relativePath: string; locale: "zh" | "en" };
+type PreviewProps = EcosystemWorkspaceBridge & { relativePath: string; locale: "zh" | "en"; startSeconds?: number; endSeconds?: number };
 type LoadedFile = { data: Uint8Array; sizeBytes: number };
 
 const textExtensions = new Set([
@@ -11,6 +11,7 @@ const textExtensions = new Set([
   "kt", "swift", "c", "cpp", "h", "hpp", "sh", "bash", "xml"
 ]);
 const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "svg"]);
+const mediaTypes: Record<string, string> = { mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg", flac: "audio/flac" };
 
 function extensionOf(value: string): string {
   const name = value.replaceAll("\\", "/").split("/").at(-1) ?? value;
@@ -62,33 +63,50 @@ const markdownLabels: MarkdownLabels = {
 export function DshPreviewAdapter(props: PreviewProps): ReactNode {
   const [state, setState] = useState<{ status: "loading" | "ready" | "error"; file?: LoadedFile }>({ status: "loading" });
   const [imageUrl, setImageUrl] = useState<string>();
+  const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const extension = extensionOf(props.relativePath);
   const isText = textExtensions.has(extension);
   const isImage = imageExtensions.has(extension);
+  const mediaType = mediaTypes[extension];
+  const supported = isText || isImage || Boolean(mediaType) || extension === "pdf";
 
   useEffect(() => {
     const controller = new AbortController();
     setState({ status: "loading" });
+    if (!supported) return () => controller.abort();
     void readComplete(props, props.relativePath, controller.signal).then(
       file => { if (!controller.signal.aborted) setState({ status: "ready", file }); },
       () => { if (!controller.signal.aborted) setState({ status: "error" }); },
     );
     return () => controller.abort();
-  }, [props.threadId, props.relativePath]);
+  }, [props.threadId, props.relativePath, supported]);
 
-  const text = useMemo(() => state.status === "ready" && state.file ? textFor(state.file.data) : "", [state]);
+  const text = useMemo(() => isText && state.status === "ready" && state.file ? textFor(state.file.data) : "", [isText, state]);
 
   useEffect(() => {
-    if (state.status !== "ready" || !state.file || !isImage) { setImageUrl(undefined); return; }
-    const mime = extension === "svg" ? "image/svg+xml" : `image/${extension === "jpg" ? "jpeg" : extension}`;
+    if (state.status !== "ready" || !state.file || (!isImage && !mediaType && extension !== "pdf")) { setImageUrl(undefined); return; }
+    const mime = mediaType || (extension === "pdf" ? "application/pdf" : extension === "svg" ? "image/svg+xml" : `image/${extension === "jpg" ? "jpeg" : extension}`);
     const url = URL.createObjectURL(new Blob([state.file.data], { type: mime }));
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [extension, isImage, state]);
+  }, [extension, isImage, mediaType, state]);
 
+  const seek = () => { if (media.current && props.startSeconds !== undefined) media.current.currentTime = props.startSeconds; };
+  useEffect(seek, [props.startSeconds, imageUrl]);
+  const stopAtEnd = () => {
+    if (!media.current || props.endSeconds === undefined || media.current.currentTime <= props.endSeconds) return;
+    media.current.currentTime = props.endSeconds;
+    media.current.pause();
+  };
+
+  if (!supported) return <p role="status">{props.locale === "zh" ? "请使用系统应用打开或下载此文件。" : "Open this file in the system app or download it."}</p>;
   if (state.status === "loading") return <p role="status">{props.locale === "zh" ? "正在加载文件..." : "Loading file..."}</p>;
   if (state.status === "error" || !state.file) return <p role="alert">{props.locale === "zh" ? "无法读取此文件。" : "This file could not be read."}</p>;
   if (isImage && imageUrl) return <img src={imageUrl} alt={props.relativePath} style={{ maxWidth: "100%", maxHeight: "60vh", objectFit: "contain", alignSelf: "center" }} />;
+  if (mediaType && imageUrl) return mediaType.startsWith("video/")
+    ? <video ref={media} src={imageUrl} controls preload="metadata" onLoadedMetadata={seek} onTimeUpdate={stopAtEnd} onSeeking={stopAtEnd} style={{ width: "100%", maxHeight: "60vh" }} />
+    : <audio ref={media} src={imageUrl} controls preload="metadata" onLoadedMetadata={seek} onTimeUpdate={stopAtEnd} />;
+  if (extension === "pdf" && imageUrl) return <iframe title={props.relativePath} src={imageUrl} style={{ border: 0, width: "100%", height: "100%" }} />;
   if (extension === "md" || extension === "markdown") return <div style={{ overflow: "auto" }}><MarkdownText text={text} labels={markdownLabels} /></div>;
   if (isText) return <pre style={{ margin: 0, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre>;
   return <p role="status">{props.locale === "zh" ? "官方 DSH 文档预览运行时尚未在当前文件面板启用；请使用系统应用打开。" : "The official DSH document preview runtime is not enabled in this file panel yet; use the system app to open this file."}</p>;

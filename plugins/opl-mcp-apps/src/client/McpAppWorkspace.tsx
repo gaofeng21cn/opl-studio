@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../../../../src/bridge/mcpApps";
-import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument } from "./mcpAppHost";
+import type { OplBridge } from "../../../../src/bridge/oplBridge";
+import { EcosystemFilePreview } from "../../../../src/integrations/deepseek-harness/EcosystemFilePreview";
+import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, workspaceArtifactLink, workspaceArtifactPath, type WorkspaceArtifact } from "./mcpAppHost";
 
 export type McpAppProps = {
-  bridge: McpAppsBridge; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
+  bridge: McpAppsBridge & Partial<Pick<OplBridge, "readThread" | "listThreadWorkspace" | "readThreadWorkspaceBytes" | "accessThreadWorkspace" | "platformCapabilities">>; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
   onContext(threadId: string, context: string): void;
   onMessage(threadId: string, text: string): void;
 };
@@ -17,6 +19,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
   const [height, setHeight] = useState(580);
   const [expanded, setExpanded] = useState(false);
   const [link, setLink] = useState<string | null>(null);
+  const [artifact, setArtifact] = useState<WorkspaceArtifact | null>(null);
   const handlers = useRef({ onContext, onMessage, locale });
   handlers.current = { onContext, onMessage, locale };
   useEffect(() => { activeBridge.current?.setHostContext({ displayMode: expanded ? "fullscreen" : "inline" }); }, [expanded]);
@@ -50,6 +53,17 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     };
     appBridge.onopenlink = async ({ url }) => {
       requireActive();
+      const local = workspaceArtifactLink(url);
+      if (local) {
+        if (!host.readThread || !host.readThreadWorkspaceBytes || !host.accessThreadWorkspace || !host.listThreadWorkspace) return { isError: true };
+        try {
+          const thread = await host.readThread({ threadId: session.threadId });
+          requireActive();
+          setArtifact({ ...local, path: workspaceArtifactPath(local.path, thread.workspace) });
+          setError("");
+          return {};
+        } catch (reason) { requireActive(); setError(String(reason)); return { isError: true }; }
+      }
       const safe = allowedMcpLink(url);
       if (!safe) return { isError: true };
       setLink(safe); return {};
@@ -79,9 +93,17 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
   return <div className={expanded ? "opl-mcp-app-expanded" : "opl-mcp-app-frame"}>
     {!ready && !error ? <p role="status">{locale === "zh" ? "正在加载工作台…" : "Loading workbench…"}</p> : null}
     {error ? <p role="alert">{error}</p> : null}
+    {artifact && host.readThreadWorkspaceBytes && host.accessThreadWorkspace && host.listThreadWorkspace ? <EcosystemFilePreview
+      threadId={session.threadId} relativePath={artifact.path} locale={locale}
+      startSeconds={artifact.startSeconds} endSeconds={artifact.endSeconds}
+      nativeFileAccess={host.platformCapabilities?.nativeWorkspaceFileAccess === true}
+      readBytes={(request) => host.readThreadWorkspaceBytes!({ ...request, threadId: session.threadId })}
+      listWorkspace={(request) => host.listThreadWorkspace!({ ...request, threadId: session.threadId })}
+      accessWorkspace={(request) => host.accessThreadWorkspace!({ ...request, threadId: session.threadId })}
+      onClose={() => setArtifact(null)} /> : null}
     {link ? <p><a href={link} target="_blank" rel="noopener noreferrer">{locale === "zh" ? "打开外部链接" : "Open external link"}</a></p> : null}
     {expanded ? <button onClick={() => setExpanded(false)}>{locale === "zh" ? "退出展开" : "Exit expanded view"}</button> : null}
-    <iframe ref={frame} title={session.title} sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer" style={{ width: "100%", height: expanded ? "80vh" : height, border: 0, background: "transparent" }}/>
+    <iframe ref={frame} title={session.title} sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer" style={{ display: artifact ? "none" : undefined, width: "100%", height: expanded ? "80vh" : height, border: 0, background: "transparent" }}/>
   </div>;
 }
 
