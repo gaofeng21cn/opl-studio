@@ -158,11 +158,23 @@ test("replay runs the existing vendor and compatibility gates and stops on the f
   assert.ok(commands.indexOf("build:plugins") < commands.indexOf("native-profile-schema"));
   assert.ok(commands.indexOf("native-profile-schema") < commands.indexOf("test:dsh-plugins"));
   assert.ok(commands.includes("test:client-cordis"));
+  assert.ok(commands.includes("test:ui-contributions"));
+  assert.ok(commands.indexOf("test:ui-contributions") < commands.indexOf("build:webui"));
+  assert.ok(commands.indexOf("build:webui") < commands.indexOf("tests/renderer/deep-link-navigation.test.mjs"));
   assert.ok(commands.includes("test:webui-host"));
   assert.equal(commands.at(-1), "validate:candidate");
   const failed = [];
   await assert.rejects(executeReplay(binding, target, { run(step) { failed.push(step.args[1]); if (step.args[1] === "test:dsh-plugins") throw new Error("host lifecycle failure"); }, async checkSchema() { return []; } }), /host lifecycle failure/);
   assert.equal(failed.at(-1), "test:dsh-plugins");
+  const rendererSteps = upgradeVerificationSteps(binding).filter(step => step.command === process.execPath);
+  assert.deepEqual(rendererSteps, [{ command: process.execPath, args: ["--test", "tests/renderer/deep-link-navigation.test.mjs"] }]);
+  const clientFailed = [];
+  await assert.rejects(executeReplay(binding, target, { run(step) {
+    clientFailed.push(step.args[1]);
+    if (step.args[1] === "test:ui-contributions") throw new Error("native settings lifecycle failure");
+  }, async checkSchema() { return []; } }), /native settings lifecycle failure/);
+  assert.equal(clientFailed.at(-1), "test:ui-contributions");
+  assert.ok(!clientFailed.includes("build:webui"));
   assert.throws(() => upgradeVerificationSteps({ ...binding, validation: ["npm run dist:desktop"] }), /Unsupported DSH source validation/);
 });
 

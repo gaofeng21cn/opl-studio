@@ -116,15 +116,18 @@ export async function verifyProfileSchemas(binding) {
 // These are existing source/compatibility gates. No packaging, installation or
 // publication command is accepted through the source manifest.
 export function upgradeVerificationSteps(binding, sourceRoot) {
-  const allowed = new Set(["verify:dsh-gui", "typecheck", "test:webui-host", "test:headless", "validate:candidate"]);
+  const allowed = new Set(["verify:dsh-gui", "test:ui-contributions", "build:webui", "typecheck", "test:webui-host", "test:headless", "validate:candidate"]);
   const declared = binding.validation.map(command => {
     const match = /^npm run ([a-z:-]+)$/.exec(command);
     if (!match || !allowed.has(match[1])) fail(`Unsupported DSH source validation command: ${command}`);
     return match[1];
   });
-  const scripts = [...new Set(["verify:dsh-gui", "build:plugins", "test:dsh-plugins", "test:client-cordis", ...declared])];
+  const scripts = [...new Set(["verify:dsh-gui", "build:plugins", "test:dsh-plugins", "test:client-cordis", "test:ui-contributions", "build:webui", ...declared])];
   for (const script of scripts) if (!binding.packageJson.scripts?.[script]) fail(`Missing DSH verification script: ${script}`);
-  return scripts.map(script => ({ command: "npm", args: ["run", script, ...(script === "verify:dsh-gui" && sourceRoot ? ["--", "--source", sourceRoot] : [])] }));
+  return scripts.flatMap(script => [
+    { command: "npm", args: ["run", script, ...(script === "verify:dsh-gui" && sourceRoot ? ["--", "--source", sourceRoot] : [])] },
+    ...(script === "build:webui" ? [{ command: process.execPath, args: ["--test", "tests/renderer/deep-link-navigation.test.mjs"] }] : [])
+  ]);
 }
 
 export async function executeReplay(binding, target, { replay = false, run = runStep, checkSchema = verifyProfileSchemas } = {}) {

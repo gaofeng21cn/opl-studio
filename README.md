@@ -218,12 +218,13 @@ Replay accepts only the exact pinned source ref and package cohort. It uses the
 existing vendor command, then checks upstream byte parity, builds the OPL plugins,
 generates and validates both Host profile schemas through the official DSH APIs,
 and boots packed plugins through native DSH inventory and lifecycle tests. It
-checks Client Cordis composition and App schema boundaries, then runs the existing
-type, Host, headless and candidate gates. Installed package versions and OPL plugin metadata
-must pass the official DSH compatibility reader before replay starts. Native
-schema transform diagnostics remain visible and are followed by actual Host
-boot tests. A failed step stops execution for a focused repair; this command never installs or
-publishes the App.
+checks Client Cordis composition, native slots and Settings lifecycle through the
+existing UI contribution tests, builds the WebUI, and runs the renderer deep-link
+navigation tests before the existing type, Host, headless and candidate gates.
+Installed package versions and OPL plugin metadata must pass the official DSH
+compatibility reader before replay starts. Native schema transform diagnostics
+remain visible and are followed by actual Host boot tests. A failed step stops
+execution for a focused repair; this command never installs or publishes the App.
 
 To verify a reviewed adapter change without regenerating vendor sources, run
 `node scripts/dsh-upgrade.mjs verify`. Add `--source` to also check the pinned
