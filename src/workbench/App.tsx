@@ -385,7 +385,7 @@ export function App({
   const [threadActionError, setThreadActionError] = useState("");
   const [lifecycleConfirmation, setLifecycleConfirmation] = useState<{ thread: WorkbenchThreadItem; action: ThreadLifecycleAction } | null>(null);
   const [settings, setSettings] = useState<WorkbenchSettings>(() => readSettings());
-  const [settingsNavigation, setSettingsNavigation] = useState<{ destination?: SettingsDestinationId; revision: number }>();
+  const [settingsNavigation, setSettingsNavigation] = useState<{ open: boolean; destination?: SettingsDestinationId; revision: number }>();
   const settingsRef = useRef(settings);
   const voiceInputContextRef = useRef<VoiceInputContext | null>(null);
   const [codexCatalog, setCodexCatalog] = useState<CodexModelCatalogEntry[]>([]);
@@ -1609,12 +1609,12 @@ export function App({
     if (method === "desktop/deep-link") {
       const destination = resolveDeepLinkDestination(params);
       if (destination?.kind === "schedules") {
-        setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 }));
+        setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
         setPrimaryView("schedules");
       } else if (destination?.kind === "settings") {
-        setSettingsNavigation(current => ({ destination: destination.destination, revision: (current?.revision ?? 0) + 1 }));
+        setSettingsNavigation(current => ({ open: true, destination: destination.destination, revision: (current?.revision ?? 0) + 1 }));
       } else if (destination?.kind === "conversation") {
-        setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 }));
+        setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
         setPrimaryView("conversation");
         updateUiMetadata({ threadScope: destination.scope });
         void loadThreadDirectory(false, destination.scope);
@@ -2268,7 +2268,7 @@ export function App({
 
   async function selectStudioAgentPreset(id: string) {
     if (id === "opl-manage-agents") {
-      setSettingsNavigation(current => ({ destination: "agents", revision: (current?.revision ?? 0) + 1 }));
+      setSettingsNavigation(current => ({ open: true, destination: "agents", revision: (current?.revision ?? 0) + 1 }));
       return;
     }
     if (id === "opl-daily-work") {
@@ -2280,7 +2280,7 @@ export function App({
       return settings.locale === "zh" ? "智能体目录已变化，请重新选择。" : "The agent directory changed. Please select again.";
     }
     if (!agent.appEnabled || !agent.readiness.selectable || !agent.homeShortcuts.some(shortcut => shortcut.route)) {
-      setSettingsNavigation(current => ({ destination: "agents", revision: (current?.revision ?? 0) + 1 }));
+      setSettingsNavigation(current => ({ open: true, destination: "agents", revision: (current?.revision ?? 0) + 1 }));
       return agentAvailabilityDetail(agent, settings.locale);
     }
     setSelectedAgent(agentPackageSelectionIntent(agent));
@@ -2681,7 +2681,7 @@ export function App({
     openThread: (id: string) => workbenchOpenThread.current(id),
   }), [bridge]);
 
-  useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
+  useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsPanel
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}

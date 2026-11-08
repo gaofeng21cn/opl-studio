@@ -29,3 +29,16 @@ export function resolveDeepLinkDestination(value: unknown, policy: unknown = glo
   const destination = settingsPresentation[route];
   return destination ? { kind: "settings", destination } : null;
 }
+
+export type SettingsNavigationRequest = { open: boolean; destination?: SettingsDestinationId; revision: number };
+
+/** Share the upstream settings state between shortcuts and admitted deep links. */
+export function applySettingsShellNavigation(
+  request: SettingsNavigationRequest,
+  actions: { open(): void; close(): void; openSection(id: string): void },
+  sectionId?: string,
+): void {
+  if (!request.open) actions.close();
+  else if (sectionId) actions.openSection(sectionId);
+  else actions.open();
+}

@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { resolveDeepLinkDestination } from "../../src/workbench/deepLinkNavigation.ts";
+import { applySettingsShellNavigation, resolveDeepLinkDestination } from "../../src/workbench/deepLinkNavigation.ts";
 import { createDeepLinkPolicy } from "../../desktop/deep-links.mjs";
 import { resolveAppRepoRoot } from "../../scripts/resolve-app-repo-root.mjs";
 import { createSettingsShellStore } from "../../src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
@@ -70,4 +70,16 @@ test("native settings store shares section navigation and dialog dismissal acros
 
   settings.actions.openSection("opl-studio-settings-account");
   assert.deepEqual(settings.getSnapshot(), { open: true, activeId: "opl-studio-settings-account" });
+});
+
+test("shortcut opens settings and non-settings navigation closes the same native store", () => {
+  const settings = createSettingsShellStore().create();
+  applySettingsShellNavigation({ open: true, revision: 1 }, settings.actions);
+  assert.equal(settings.getSnapshot().open, true);
+  applySettingsShellNavigation({ open: true, destination: "preferences", revision: 2 }, settings.actions, "opl-studio-settings-preferences");
+  assert.equal(settings.getSnapshot().activeId, "opl-studio-settings-preferences");
+  applySettingsShellNavigation({ open: false, revision: 3 }, settings.actions);
+  assert.deepEqual(settings.getSnapshot(), { open: false, activeId: undefined });
+  applySettingsShellNavigation({ open: true, revision: 4 }, settings.actions);
+  assert.deepEqual(settings.getSnapshot(), { open: true, activeId: undefined });
 });

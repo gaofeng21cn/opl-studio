@@ -1,3 +1,4 @@
+import { applySettingsShellNavigation } from "../../workbench/deepLinkNavigation";
 import { Activity, Bot, Cable, ChevronDown, CircleHelp, Files, Folder, Gauge, PanelRight, Puzzle, Settings as SettingsIcon, SlidersHorizontal, UserRound, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Menu, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
@@ -199,9 +200,8 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
     : undefined;
   useEffect(() => {
     if (!requestedSettings) return;
-    if (requestedPrimary) actions.openSection(settingsSectionId(requestedPrimary));
-    else actions.open();
-  }, [requestedSettings?.revision, requestedPrimary, actions]);
+    applySettingsShellNavigation(requestedSettings, actions, requestedPrimary ? settingsSectionId(requestedPrimary) : undefined);
+  }, [requestedSettings?.revision, requestedSettings?.open, requestedPrimary, actions]);
   const navigate = (destination: SettingsDestinationId) => {
     setNavigatedDestination(destination);
     const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
