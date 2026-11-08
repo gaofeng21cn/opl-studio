@@ -198,7 +198,7 @@ export function SettingsSlot({ wide, renderSlot }: { wide: boolean; renderSlot: 
     id: settingsSectionId(destination.id),
     order: index * 10,
     label: <span className="opl-settings-nav-label">{(() => {
-      const Icon = ({ overview: Gauge, account: UserRound, resources: Cable, workspace: Folder, agents: Bot, services: Activity, preferences: SlidersHorizontal, about: CircleHelp } as const)[destination.id as "overview"];
+      const Icon = ({ overview: Gauge, account: UserRound, resources: Cable, workspace: Folder, capabilities: Puzzle, agents: Bot, services: Activity, preferences: SlidersHorizontal, about: CircleHelp } as const)[destination.id as "overview"];
       return <Icon aria-hidden="true" size={16} />;
     })()}<span>{destination.label}</span></span>
   }));
