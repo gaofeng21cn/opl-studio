@@ -5,6 +5,7 @@ declare global { var __OPL_DEEP_LINK_POLICY__: unknown; }
 
 export type DeepLinkDestination =
   | { kind: "conversation"; scope: "all" | "archived" }
+  | { kind: "schedules" }
   | { kind: "settings"; destination: SettingsDestinationId };
 
 // This maps App-owned routes into the existing Studio presentation. Admission
@@ -15,7 +16,7 @@ const settingsPresentation: Record<string, SettingsDestinationId> = {
   "/settings/agents": "agents", "/settings/capabilities": "capabilities",
   "/settings/resources": "resources", "/settings/environment": "services",
   "/settings/storage": "storage", "/settings/appearance": "preferences",
-  "/settings/about": "about", "/scheduled": "services"
+  "/settings/about": "about"
 };
 
 export function resolveDeepLinkDestination(value: unknown, policy: unknown = globalThis.__OPL_DEEP_LINK_POLICY__): DeepLinkDestination | null {
@@ -24,6 +25,7 @@ export function resolveDeepLinkDestination(value: unknown, policy: unknown = glo
   const route = result.payload.params.route;
   if (route === "/guid") return { kind: "conversation", scope: "all" };
   if (route === "/archived") return { kind: "conversation", scope: "archived" };
+  if (route === "/scheduled") return { kind: "schedules" };
   const destination = settingsPresentation[route];
   return destination ? { kind: "settings", destination } : null;
 }

@@ -20,7 +20,7 @@ test("every admitted App deep-link route has an existing Studio presentation and
     assert.ok(result, route);
   }
   assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/archived" } }, policy), { kind: "conversation", scope: "archived" });
-  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/scheduled" } }, policy), { kind: "settings", destination: "services" });
+  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/scheduled" } }, policy), { kind: "schedules" });
   assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/access" } }, policy), { kind: "settings", destination: "models" });
   assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/runtime" } }, policy), null);
   assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/access", token: "secret" } }, policy), null);

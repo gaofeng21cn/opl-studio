@@ -1521,7 +1521,10 @@ export function App({
     }
     if (method === "desktop/deep-link") {
       const destination = resolveDeepLinkDestination(params);
-      if (destination?.kind === "settings") {
+      if (destination?.kind === "schedules") {
+        setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 }));
+        setPrimaryView("schedules");
+      } else if (destination?.kind === "settings") {
         setSettingsNavigation(current => ({ destination: destination.destination, revision: (current?.revision ?? 0) + 1 }));
       } else if (destination?.kind === "conversation") {
         setSettingsNavigation(current => ({ revision: (current?.revision ?? 0) + 1 }));
