@@ -143,6 +143,20 @@ DSH 升级需重新评估这个缺口。`opl-codex-native` 继续持有 MCP 连�
 不含 `allow-same-origin` 的 opaque iframe；仅允许声明的 HTTPS 外部 origin，
 不授予宿主同源访问。工具权限仍由 Codex 与领域 owner 检查，UI 不构成审批。
 
+主题来自 App 已解析的当前配色，优先于操作系统偏好；主题和语言变化通过官方
+Host context 更新，保留现有 iframe 与未提交编辑。共享声明式视图与领域专用界面
+消费同一上下文，进度、产物、审阅的业务含义仍由 Framework 和领域 owner 提供。
+专业应用可保留自己的布局和编辑工具，通过 owner 声明的链接进入；Studio 不为
+它们复制任务、数据或执行队列。统一呈现模型见
+[Framework Mini App 规范](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/mcp-apps/SPEC.md)。
+
+Connect 连接使用能力必须由 Framework 在已验证的 installed Package 身份下绑定。
+当前 Codex MCP 目录只给宿主 server/tool 身份，不能把 server 名称、页面参数或
+`consumer_id` 当作 Package 身份。因此现有宿主仍通过绑定 server 的已声明工具调用
+领域 owner；不向 iframe 伪造 `connect.forPackage`，也不在 Studio 建立授权 broker。
+具备可信 Package 绑定的 owner host 可接入 Connect 的公开能力，页面仅收到连接引用、
+授权状态和业务结果，凭据生命周期继续由 provider/carrier 管理。
+
 `ui/update-model-context` 将有大小限制的非可信资料带到同一对话后续用户消息；
 `ui/message` 仅准备输入草稿，由用户发送。外链需用户点击。关闭、切换对话或视图
 释放绑定，晚到结果不能写入新对话。暂不声明 sampling 或 subscription 支持。

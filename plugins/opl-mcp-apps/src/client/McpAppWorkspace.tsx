@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../../../../src/bridge/mcpApps";
-import { allowedMcpLink, modelContextText, sandboxDocument } from "./mcpAppHost";
+import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument } from "./mcpAppHost";
 
 export type McpAppProps = {
   bridge: McpAppsBridge; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
@@ -17,19 +17,21 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
   const [height, setHeight] = useState(580);
   const [expanded, setExpanded] = useState(false);
   const [link, setLink] = useState<string | null>(null);
-  const handlers = useRef({ onContext, onMessage });
-  handlers.current = { onContext, onMessage };
+  const handlers = useRef({ onContext, onMessage, locale });
+  handlers.current = { onContext, onMessage, locale };
   useEffect(() => { activeBridge.current?.setHostContext({ displayMode: expanded ? "fullscreen" : "inline" }); }, [expanded]);
+  useEffect(() => { activeBridge.current?.setHostContext({ locale: locale === "zh" ? "zh-CN" : "en" }); }, [locale]);
   useEffect(() => {
     const iframe = frame.current!;
     let disposed = false;
     const requireActive = () => { if (disposed) throw new Error("MCP App is closed"); };
     const binding = { id: session.id, threadId: session.threadId };
-    const initializationTimeout = setTimeout(() => setError(locale === "zh" ? "应用未完成初始化，可关闭后重新打开或使用模块工作台。" : "App initialization timed out; close and reopen it or use the module workbench."), 20_000);
+    const initializationTimeout = setTimeout(() => setError(handlers.current.locale === "zh" ? "应用未完成初始化，可关闭后重新打开或使用模块工作台。" : "App initialization timed out; close and reopen it or use the module workbench."), 20_000);
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
+    const theme = () => resolvedMcpTheme(getComputedStyle(document.documentElement).colorScheme, dark.matches);
     const appBridge = new AppBridge(null, { name: "OPL App", version: "1.0.0" }, {
       serverTools: {}, serverResources: {}, openLinks: {}, updateModelContext: { text: {} }, message: { text: {} }
-    }, { hostContext: { theme: dark.matches ? "dark" : "light", locale: locale === "zh" ? "zh-CN" : "en", displayMode: "inline", availableDisplayModes: ["inline", "fullscreen"], containerDimensions: { width: iframe.clientWidth, maxHeight: 1400 } } });
+    }, { hostContext: { theme: theme(), locale: handlers.current.locale === "zh" ? "zh-CN" : "en", displayMode: "inline", availableDisplayModes: ["inline", "fullscreen"], containerDimensions: { width: iframe.clientWidth, maxHeight: 1400 } } });
     activeBridge.current = appBridge;
     appBridge.oncalltool = async params => {
       requireActive();
@@ -60,18 +62,20 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
       void appBridge.sendToolInput({ arguments: session.arguments }).catch(() => {});
       void appBridge.sendToolResult(session.result).catch(() => {});
     });
-    const updateTheme = () => appBridge.setHostContext({ theme: dark.matches ? "dark" : "light" });
+    const updateTheme = () => appBridge.setHostContext({ theme: theme() });
     dark.addEventListener("change", updateTheme);
+    const themeObserver = new MutationObserver(updateTheme);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class", "data-ds-theme-source"] });
     const resize = new ResizeObserver(() => appBridge.setHostContext({ containerDimensions: { width: iframe.clientWidth, maxHeight: 1400 } }));
     resize.observe(iframe);
     void appBridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!)).then(() => {
       if (!disposed) iframe.srcdoc = sandboxDocument(session.resource);
     }).catch(reason => { if (!disposed) setError(String(reason)); });
     return () => {
-      disposed = true; activeBridge.current = null; clearTimeout(initializationTimeout); resize.disconnect(); dark.removeEventListener("change", updateTheme);
+      disposed = true; activeBridge.current = null; clearTimeout(initializationTimeout); resize.disconnect(); themeObserver.disconnect(); dark.removeEventListener("change", updateTheme);
       void appBridge.teardownResource({}, { timeout: 1000 }).catch(() => {}).finally(() => appBridge.close());
     };
-  }, [session.id, host, locale]);
+  }, [session.id, host]);
   return <div className={expanded ? "opl-mcp-app-expanded" : "opl-mcp-app-frame"}>
     {!ready && !error ? <p role="status">{locale === "zh" ? "正在加载工作台…" : "Loading workbench…"}</p> : null}
     {error ? <p role="alert">{error}</p> : null}

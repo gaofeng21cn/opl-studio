@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { allowedMcpLink, modelContextText, sandboxDocument } from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
+import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument } from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
+
+test("host-selected theme takes precedence over the operating system preference", () => {
+  expect(resolvedMcpTheme("light", true)).toBe("light");
+  expect(resolvedMcpTheme("dark", false)).toBe("dark");
+  expect(resolvedMcpTheme("normal", true)).toBe("dark");
+  expect(resolvedMcpTheme("light dark", false)).toBe("light");
+});
 
 test("sandbox enforces a restrictive policy before server markup", () => {
   const html = sandboxDocument({ uri: "ui://test", mimeType: "text/html;profile=mcp-app", text: '<script>window.test=true</script>', _meta: { ui: { csp: { resourceDomains: ["https://assets.example", "https://evil.example/;script-src *", "data:", "http://127.0.0.1"], connectDomains: [] } } } });

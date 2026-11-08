@@ -1,5 +1,9 @@
 import type { McpAppSession } from "../../../../src/bridge/mcpApps";
 
+export function resolvedMcpTheme(colorScheme: string, prefersDark: boolean): "light" | "dark" {
+  return colorScheme === "dark" || colorScheme === "light" ? colorScheme : prefersDark ? "dark" : "light";
+}
+
 export function allowedMcpLink(value: string): string | null {
   try {
     const url = new URL(value);
