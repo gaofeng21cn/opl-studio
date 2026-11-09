@@ -1,0 +1,200 @@
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -1,3 +1,7 @@
++// Studio adapter: keep the official local search UI inside its existing owner.
++// The published 1.14 client has no feature-policy or transport extension point.
++(function (fetch) {
++const STUDIO_LOCAL_SEARCH_ONLY = true;
+ /**
+  * dsh-settings-search — browser half.
+  *
+@@ -136,7 +140,7 @@
+       aiOllamaErrTimeout: 'Ollama 响应超时，请检查本机服务及模型加载状态',
+       logTitle: '日志',
+       logCountHint: '磁盘日志文件中的条目数',
+-      logDesc: '记录插件运行、搜索与 AI 请求的关键动作，便于排查问题；日志按天写入 DSH 的日志文件夹，文件名带日期。',
++      logDesc: '记录插件运行与本地搜索的关键动作，便于排查问题；日志按天写入 DSH 的日志文件夹，文件名带日期。',
+       logEmpty: '暂无日志',
+       logExport: '导出日志',
+       logView: '查看日志',
+@@ -149,6 +153,7 @@
+       logCopyFail: '复制失败，请稍后重试。',
+       logClear: '清空日志',
+       logCleared: '已清空',
++      logClearFail: '日志未清空',
+       logConfirmTitle: '清空日志',
+       logConfirm: '确定要清空全部日志吗？磁盘上的日志文件也会一并清空。',
+       logConfirmYes: '确认清空',
+@@ -283,7 +288,7 @@
+       aiOllamaErrTimeout: 'Ollama timed out. Check the local service and model loading status',
+       logTitle: 'Logs',
+       logCountHint: 'Entries in the log file on disk',
+-      logDesc: 'Logs key plugin actions, searches, and AI requests to help troubleshoot; one dated file per day is written to DSH\u2019s log folder.',
++      logDesc: 'Logs key plugin actions and local searches to help troubleshoot; one dated file per day is written to DSH\u2019s log folder.',
+       logEmpty: 'No logs yet',
+       logExport: 'Export logs',
+       logView: 'View logs',
+@@ -296,6 +301,7 @@
+       logCopyFail: 'Copy failed. Please try again.',
+       logClear: 'Clear logs',
+       logCleared: 'Cleared',
++      logClearFail: 'Logs were not cleared',
+       logConfirmTitle: 'Clear logs',
+       logConfirm: 'Clear all logs? The log file on disk is truncated as well.',
+       logConfirmYes: 'Clear logs',
+@@ -668,7 +674,7 @@
+     }
+ 
+     /** Truncate the on-disk log. */
+-    const clearLogFile = async () => { await postLog({ action: 'clear' }) }
++    const clearLogFile = async () => (await postLog({ action: 'clear' })) !== null
+ 
+     /** Current host-log target and last transport outcome, for the panel. */
+     const logTarget = () => ({
+@@ -734,6 +740,7 @@
+     }
+     /** Session-only API key storage avoids durable browser storage exposure. */
+     const readApiKey = () => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return ''
+       const legacy = typeof localStorage !== 'undefined' ? (localStorage.getItem(AI_API_KEY_KEY) ?? '').trim() : ''
+       if (legacy !== '') {
+         if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(AI_API_KEY_KEY, legacy)
+@@ -743,6 +750,7 @@
+       return typeof sessionStorage !== 'undefined' ? (sessionStorage.getItem(AI_API_KEY_KEY) ?? '').trim() : ''
+     }
+     const writeApiKey = (value) => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return
+       const apiKey = String(value ?? '').trim()
+       if (typeof sessionStorage !== 'undefined') {
+         if (apiKey === '') sessionStorage.removeItem(AI_API_KEY_KEY)
+@@ -751,15 +759,18 @@
+       if (typeof localStorage !== 'undefined') localStorage.removeItem(AI_API_KEY_KEY)
+     }
+     const aiSearchEnabled = () => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return false
+       if (typeof localStorage === 'undefined') return false
+       return localStorage.getItem(AI_STORAGE_KEY) === '1'
+     }
+     const setAiSearchEnabled = (enabled) => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return
+       if (typeof localStorage === 'undefined') return
+       localStorage.setItem(AI_STORAGE_KEY, enabled ? '1' : '0')
+       window.dispatchEvent(new CustomEvent(AI_TOGGLE_EVENT, { detail: enabled }))
+     }
+     const aiConfig = () => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return { provider: 'openai', baseUrl: '', model: '', apiKey: '' }
+       const storage = typeof localStorage === 'undefined' ? null : localStorage
+       return normalizeAiConfig({
+         provider: (storage?.getItem(AI_PROVIDER_KEY) ?? 'openai').trim(),
+@@ -769,6 +780,7 @@
+       })
+     }
+     const setAiConfig = (cfg) => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return
+       AI_CACHE.clear()
+       if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return
+       const normalized = normalizeAiConfig(cfg)
+@@ -919,6 +931,7 @@
+         .filter(Boolean))].slice(0, 500)
+     }
+     const fetchAiModels = async (cfg, signal) => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) return { ok: false, code: 'host-model-owner', models: [], detail: '' }
+       cfg = normalizeAiConfig(cfg)
+       const { provider, baseUrl, apiKey } = cfg
+       const url = modelsUrl(provider, baseUrl)
+@@ -1022,6 +1035,7 @@
+       return data?.choices?.[0]?.message?.content
+     }
+     const fetchAiData = async (request, provider, signal) => {
++      if (STUDIO_LOCAL_SEARCH_ONLY) throw new Error('Model requests belong to the Studio Codex owner')
+       const controller = new AbortController()
+       const abort = () => controller.abort()
+       if (signal?.aborted) abort()
+@@ -2162,7 +2176,6 @@
+       const WELCOME_FEATURES = [
+         { icon: '🔍', titleKey: 'wlFeature1Title', descKey: 'wlFeature1Desc' },
+         { icon: '🔤', titleKey: 'wlFeature2Title', descKey: 'wlFeature2Desc' },
+-        { icon: '🤖', titleKey: 'wlFeature3Title', descKey: 'wlFeature3Desc' },
+         { icon: '🧭', titleKey: 'wlFeature4Title', descKey: 'wlFeature4Desc' },
+         { icon: '🧾', titleKey: 'wlFeature5Title', descKey: 'wlFeature5Desc' },
+         { icon: '⚡', titleKey: 'wlFeature6Title', descKey: 'wlFeature6Desc' },
+@@ -3106,14 +3119,20 @@
+ 
+         const requestClear = () => setConfirmClear(true)
+         const cancelClear = () => setConfirmClear(false)
+-        const clearLogs = () => {
++        const clearLogs = async () => {
+           setConfirmClear(false)
++          setLogCleared(false)
++          flushLogs()
++          if (!await clearLogFile()) {
++            setLogFolderMsg(t('logClearFail') + ': ' + logTarget().detail)
++            return
++          }
++          setLogFolderMsg('')
+           LOGS.length = 0
+           // Drop queued lines too: a late flush would resurrect what was cleared.
+           discardPendingLogs()
+           setLogVersion((v) => v + 1)
+           setLogCleared(true)
+-          void clearLogFile()
+         }
+ 
+         /** Read the on-disk tail for the viewer; fall back to this session's ring. */
+@@ -3271,7 +3290,7 @@
+                 }, t('stylePage')),
+               ]),
+             ]),
+-            React.createElement('div', { className: 'sss-vr-field' }, [
++            !STUDIO_LOCAL_SEARCH_ONLY && React.createElement('div', { className: 'sss-vr-field' }, [
+               React.createElement('div', { className: 'sss-vr-field-head' }, [
+                 React.createElement('span', { className: 'sss-vr-label' }, t('aiSearch')),
+                 React.createElement('input', {
+@@ -3317,7 +3336,7 @@
+                 ? React.createElement('p', { className: 'sss-vr-note', style: { color: 'var(--dsw-alias-state-success-primary)' } }, t('indexDone'))
+                 : null,
+             ]),
+-            React.createElement('div', { className: 'sss-vr-field sss-vr-form' }, [
++            !STUDIO_LOCAL_SEARCH_ONLY && React.createElement('div', { className: 'sss-vr-field sss-vr-form' }, [
+               React.createElement('div', { className: 'sss-vr-field-head' }, [
+                 React.createElement('label', { className: 'sss-vr-label' }, t('aiProvider')),
+               ]),
+@@ -3526,7 +3545,37 @@
+     }
+ 
+     exports.apply = apply
+-    exports.inject = ['slots', 'locale', 'connection']
++    exports.inject = ['slots', 'locale']
+     return module.exports
+   },
+ })
++
++})((() => {
++  let pending = Promise.resolve();
++  return (input, init = {}) => {
++    if (input !== 'api/settings-search-log' && input !== 'api/settings-search-log?count=1') {
++      return globalThis.fetch(input, init);
++    }
++    const run = async () => {
++      const method = init.method || 'GET';
++      if (!['GET', 'POST'].includes(method) || (init.body !== undefined && typeof init.body !== 'string')) {
++        throw new Error('Invalid settings search log request');
++      }
++      if (new TextEncoder().encode(init.body || '').byteLength > 256 * 1024) {
++        return new Response(JSON.stringify({ ok: false, reason: 'request-too-large' }), { status: 413 });
++      }
++      if (typeof window.oplStudio?.requestSettingsSearchLog !== 'function') {
++        throw new Error('Settings search log transport unavailable');
++      }
++      const result = await window.oplStudio.requestSettingsSearchLog({
++        method, count: input.endsWith('?count=1'),
++        ...(method === 'POST' ? { body: init.body || '' } : {}),
++      });
++      return new Response(result.body, { status: result.status, headers: { 'content-type': 'application/json' } });
++    };
++    // A clear/read must observe earlier append requests even on a slow Web link.
++    const result = pending.then(run);
++    pending = result.then(() => undefined, () => undefined);
++    return result;
++  };
++})());

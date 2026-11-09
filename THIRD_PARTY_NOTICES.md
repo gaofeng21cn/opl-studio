@@ -152,10 +152,18 @@ integrity and exact payload hashes; the original license and package metadata
 are included. The Host half is not loaded; the public content provider reads
 through Studio's canonical thread workspace bridge. No peer metadata is changed.
 
-`@objectivex666/dsh-settings-search` 1.2.0 is an unmodified, separately loaded
-GPL-3.0 client plugin from https://github.com/objectivex666/dsh-settings-search
-(tag v1.2.0). Its license is included in renderer `plugins/` output. This local
-search version does not introduce an AI provider or credential store.
+`@objectivex666/dsh-settings-search` 1.14.0 is a separately loaded GPL-3.0
+plugin from https://github.com/objectivex666/dsh-settings-search. Its license
+is included in renderer `ecosystem/` output. Studio reuses the official log store
+and route through its existing authenticated WebUI and desktop IPC transports.
+The published client has no transport or feature-policy extension point, so
+`src/integrations/deepseek-harness/patches/settings-search-studio.patch` keeps
+local search, indexing, shortcuts and logs while disabling the separate AI
+provider and credential controls. The adjacent JSON manifest records the exact
+package version plus original, patch and resulting SHA-256 hashes; the build
+fails on drift and leaves the installed npm package unchanged. Both this patch
+and the upstream source are available with Studio source. Model and credential
+authority remains with the existing App/Codex owner.
 Source and installation instructions remain available in that upstream repository.
 The notices and corresponding source availability must accompany distribution;
 these plugins' licenses are not replaced by Studio's MIT license.

@@ -1,3 +1,4 @@
+import { createSettingsSearchLog } from "../../../src/host/settings-search-log.mjs";
 import { McpAppHost } from "../../opl-mcp-apps/src/service.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
@@ -115,6 +116,9 @@ export class OplHostCore extends EventEmitter {
     this.platform = { ...defaultPlatformServices(), ...platform };
     this.nativeUpdater = nativeUpdater;
     this.carrierDiagnostics = carrierDiagnostics ?? defaultCarrierDiagnostics(env);
+    this.settingsSearchLog = options.dshHome
+      ? createSettingsSearchLog({ dshHome: options.dshHome, allowOpen: options.settingsSearchLogOpenAllowed === true })
+      : async () => ({ status: 503, body: JSON.stringify({ ok: false, reason: "dsh-home-unavailable" }) });
     this.closePromise = null;
     this.manualUpdateOperations = new Set();
     this.codex.on("event", (event) => this.emit("event", event));
@@ -233,6 +237,7 @@ export class OplHostCore extends EventEmitter {
     }
 
     switch (method) {
+      case "requestSettingsSearchLog": return this.settingsSearchLog(payload);
       case "beginWindowDrag": return this.platform.beginWindowDrag();
       case "readHostPluginInventory": return this.readHostPluginInventory();
       case "readState": {

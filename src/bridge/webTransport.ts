@@ -172,6 +172,13 @@ export function installWebTransport(): void {
       modelAccessSecretInput: true,
       connectionAccessApproval: true
     },
+    requestSettingsSearchLog: async request => {
+      const response = await fetch(deploymentUrl(`/api/settings-search-log${request.count ? "?count=1" : ""}`), await authenticatedInit({
+        method: request.method,
+        ...(request.method === "POST" ? { body: request.body, headers: { "content-type": "application/json" } } : {}),
+      }));
+      return { status: response.status, body: await response.text() };
+    },
     beginWindowDrag: () => undefined,
     readState: (profile = "fast") => requestJson<OplStateReadback>(`/api/opl/state?profile=${encodeURIComponent(profile)}`),
     readInitialize: () => requestJson("/api/opl/initialize"),

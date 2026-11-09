@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
     modelAccessSecretInput: true,
     connectionAccessApproval: true
   },
+  requestSettingsSearchLog: request => invoke("requestSettingsSearchLog", request),
   beginWindowDrag: () => invoke("beginWindowDrag"),
   retryDesktopHost: () => invoke("retryDesktopHost"),
   readState: (profile = "fast") => invoke("readState", { profile }),

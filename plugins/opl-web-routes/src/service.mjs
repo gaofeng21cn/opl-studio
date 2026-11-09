@@ -45,6 +45,26 @@ async function body(req) {
 async function dispatchApi(req, res, hostCore) {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
 
+  if (url.pathname === "/api/settings-search-log") {
+    if (!["GET", "POST"].includes(req.method)) return json(res, 405, { ok: false, reason: "method-not-allowed" });
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > 256 * 1024) {
+        json(res, 413, { ok: false, reason: "request-too-large" });
+        return;
+      }
+      chunks.push(chunk);
+    }
+    const result = await hostCore.invoke("requestSettingsSearchLog", {
+      method: req.method, count: url.searchParams.get("count") === "1",
+      ...(req.method === "POST" ? { body: Buffer.concat(chunks).toString("utf8") } : {}),
+    });
+    res.writeHead(result.status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(result.body);
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/capabilities") {
     json(res, 200, hostCore.capabilities());
     return;

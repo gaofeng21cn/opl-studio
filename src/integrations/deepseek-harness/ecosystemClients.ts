@@ -143,7 +143,7 @@ class SettingsSearchSlots extends Service {
   }
 }
 
-/** Install the unchanged ecosystem plugin beneath the existing Cordis owner. */
+/** Install the ecosystem implementation beneath the existing Cordis owner. */
 export async function installSettingsSearch(ctx: Context, plugin: ClientPlugin, projection: SettingsSearchProjection): Promise<() => Promise<void>> {
   const sourceScope = ctx[Context.isolate].slots;
   if (!sourceScope || !ctx.get("slots")) throw new Error("Settings search requires the DSH slots service");
@@ -159,6 +159,7 @@ export async function installSettingsSearch(ctx: Context, plugin: ClientPlugin, 
           serviceContext.provide("locale", projection.locale);
         },
       });
+      // The versioned client compatibility patch keeps the local-search scope.
       await services.ctx.plugin(plugin);
     },
   });
