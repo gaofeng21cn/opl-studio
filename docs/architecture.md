@@ -210,6 +210,12 @@ The HTTP adapter publishes two carrier-level probes:
 - `/healthz` reports that the Node HTTP process is accepting requests;
 - `/readyz` reports that the Codex App Server child completed initialization.
 
+The standalone installer stages the built DSH plugins, Host sources and the locked
+production npm dependency graph together. It runs the same packaged Host closure
+smoke before activating the new directory; installed dependencies resolve within
+that directory rather than through the source checkout. Update and rollback retain
+the same atomic current/previous payload boundary.
+
 Readiness does not claim OPL package currentness, domain readiness, release
 readiness, or production readiness. Framework state remains an on-demand
 owner-authoritative `opl app state` read through the existing bridge.

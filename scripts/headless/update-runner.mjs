@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { realpathSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -8,6 +9,7 @@ import { restartLoadedHeadlessService } from "./service-manager.mjs";
 const modulePath = fileURLToPath(import.meta.url);
 const operations = new Set(["status", "check", "apply", "rollback", "restart"]);
 const installRecordName = "installation.json";
+const executeFile = promisify(execFile);
 
 function sameFile(left, right) {
   try {
@@ -84,13 +86,19 @@ function payloadFilter(sourceRoot) {
     const relative = path.relative(sourceRoot, candidate);
     if (!relative) return true;
     const segments = relative.split(path.sep);
-    return !segments.includes("fixtures") && !candidate.endsWith(".test.mjs");
+    return !segments.includes("fixtures") && !segments.includes("node_modules") && !candidate.endsWith(".test.mjs");
   };
 }
 
 async function validatePayload(root) {
   for (const required of [
     "package.json",
+    "package-lock.json",
+    "plugins",
+    path.join("desktop", "official-profile.mjs"),
+    path.join("desktop", "node-host-runtime.mjs"),
+    path.join("desktop", "node-host-policy.json"),
+    path.join("src", "host", "packaged-host-smoke.mjs"),
     path.join("dist", "webui", "index.html"),
     path.join("scripts", "headless", "run.mjs"),
     path.join("scripts", "headless", "service-manager.mjs"),
@@ -121,7 +129,11 @@ export async function installHeadlessPayload({ sourceRoot, installRoot }) {
   const recordStaging = `${recordPath}.staging-${process.pid}`;
   await mkdir(staging, { recursive: true });
   try {
-    await cp(path.join(source, "package.json"), path.join(staging, "package.json"));
+    for (const relative of ["package.json", "package-lock.json", "plugins", "desktop/official-profile.mjs", "desktop/node-host-runtime.mjs", "desktop/node-host-policy.json"]) {
+      const destination = path.join(staging, relative);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await cp(path.join(source, relative), destination, { recursive: true, dereference: true, filter: payloadFilter(source) });
+    }
     await cp(path.join(source, "dist", "webui"), path.join(staging, "dist", "webui"), {
       recursive: true,
       filter: payloadFilter(source)
@@ -136,6 +148,13 @@ export async function installHeadlessPayload({ sourceRoot, installRoot }) {
       filter: payloadFilter(source)
     });
     await validatePayload(staging);
+    // Match the OCI/guest Host closure: install the locked production graph in
+    // its new location, including the built local DSH plugins. Never retain a
+    // dependency link into the developer checkout.
+    const execution = { cwd: staging, env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" }, maxBuffer: 1024 * 1024 };
+    await executeFile("npm", ["ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"], { ...execution, timeout: 180_000 });
+    const smoke = await executeFile(process.execPath, ["src/host/packaged-host-smoke.mjs"], { ...execution, timeout: 60_000 });
+    if (!smoke.stdout.includes("OPL_PACKAGED_HOST_READY")) throw new Error("Installed Headless Host dependency smoke did not complete");
     const record = {
       schema: "opl_headless_installation.v1",
       version,
