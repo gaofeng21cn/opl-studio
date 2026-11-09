@@ -188,13 +188,21 @@ export class DshToolMcp {
       tools: this.tools.schemas().map(mcpToolSchema)
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const result = await this.tools.execute({
-        callId: `mcp:${extra.sessionId ?? "initializing"}:${String(extra.requestId)}`,
-        name: request.params.name,
-        arguments: request.params.arguments ?? {},
+      const callId = `mcp:${extra.sessionId ?? "initializing"}:${String(extra.requestId)}`;
+      const batch = await this.tools.execute({
+        calls: [{
+          type: "tool-call",
+          id: callId,
+          name: request.params.name,
+          arguments: JSON.stringify(request.params.arguments ?? {})
+        }],
         signal: extra.signal
       });
-      return projectToolResult(this.context, result, extra.signal);
+      const settled = batch.results?.[0];
+      if (batch.results?.length !== 1 || settled.callId !== callId) {
+        throw new Error("opl-studio: DSH executor returned no correlated MCP tool result");
+      }
+      return projectToolResult(this.context, settled.result, extra.signal);
     });
     return record;
   }

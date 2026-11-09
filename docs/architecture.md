@@ -19,7 +19,7 @@ itself change the selected Stable carrier, GUI ABI freeze, release composition,
 or installed product.
 
 ```text
-DeepSeek Harness v0.2.1-rc.2 boot/profile/patch loader
+DeepSeek Harness v0.2.2-rc.1 boot/profile/patch loader
   -> Studio Cordis Application Host
        -> DSH native tool registry -> authenticated MCP -> opl-codex-native
        -> opl-framework-bridge -> public OPL App contracts
@@ -89,9 +89,13 @@ adapter and authority decision.
 
 ### DSH Version And Plugin Compatibility
 
-The pinned `0.2.1-rc.2` cohort follows the official upstream `dsh-v0.2.1-rc.2` release
+The pinned `0.2.2-rc.1` cohort follows the official upstream `dsh-v0.2.2-rc.1` release
 candidate. Its source, npm packages, vendored GUI and Host overlays are validated
-together. A plugin declaring a range such as `^0.1.0-rc.8` does not admit this
+together. The official 0.2.2 static frontend plugin is composed through a narrow
+Studio authentication view, and native tool execution uses the official executor
+with correlated singleton batches. The GUI has one digest-bound, replayable
+React 19 compatibility patch; original upstream hashes remain recorded per file.
+A plugin declaring a range such as `^0.1.0-rc.8` does not admit this
 cohort: npm prerelease range matching requires the same patch tuple, so the newer
 prerelease is not an eligible range target even though SemVer orders it later.
 That is a range consequence, not a downgrade.

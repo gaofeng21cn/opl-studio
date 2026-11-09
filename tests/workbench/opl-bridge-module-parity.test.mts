@@ -129,6 +129,8 @@ test("WebUI transport resolves API, upload, download, SSE and login against its 
       installWebTransport();
       const surface = window.oplStudio!;
       await surface.readState("fast");
+      const logResult = await surface.requestSettingsSearchLog({ method: "POST", body: JSON.stringify({ action: "append", lines: ["fixture"] }) });
+      expect(logResult.status).toBe(200);
       await surface.listThreads({});
       await surface.resolveDroppedInputs([new File(["hello"], "note.txt")]);
       const close = surface.subscribeEvents(() => {});
@@ -139,6 +141,7 @@ test("WebUI transport resolves API, upload, download, SSE and login against its 
       expect(urls.some(({ url }) => url.endsWith("api/opl/state?profile=fast"))).toBe(true);
       expect(urls.some(({ url }) => url.includes("api/inputs/input-1/files?path=note.txt"))).toBe(true);
       expect(new Headers(urls.find(({ url }) => url.endsWith("/threads/list"))?.init?.headers).get("x-csrf-token")).toBe("test-csrf");
+      expect(new Headers(urls.find(({ url }) => url.endsWith("/settings-search-log"))?.init?.headers).get("x-csrf-token")).toBe("test-csrf");
       expect(eventUrls.at(-1)).toBe(`https://workspace.example${prefix}api/opl-events`);
     }
     unauthorized = true;

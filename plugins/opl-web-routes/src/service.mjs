@@ -1,8 +1,5 @@
 import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
-import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import { renderIndexInjections } from "@deepseek-ai/dsh-host-webserver";
-import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
 
 function json(res, status, value) {
   res.writeHead(status, {
@@ -48,6 +45,26 @@ async function body(req) {
 async function dispatchApi(req, res, hostCore) {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
 
+  if (url.pathname === "/api/settings-search-log") {
+    if (!["GET", "POST"].includes(req.method)) return json(res, 405, { ok: false, reason: "method-not-allowed" });
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > 256 * 1024) {
+        json(res, 413, { ok: false, reason: "request-too-large" });
+        return;
+      }
+      chunks.push(chunk);
+    }
+    const result = await hostCore.invoke("requestSettingsSearchLog", {
+      method: req.method, count: url.searchParams.get("count") === "1",
+      ...(req.method === "POST" ? { body: Buffer.concat(chunks).toString("utf8") } : {}),
+    });
+    res.writeHead(result.status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(result.body);
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/capabilities") {
     json(res, 200, hostCore.capabilities());
     return;
@@ -337,34 +354,6 @@ export function registerOplHttpRoutes(webServer, hostCore, {
           errorResponse(res, error);
         }
       }
-    }),
-    webServer.registerFallback(async (req, res) => {
-      const auth = webAuth.requireSession(req);
-      if (!auth.ok) {
-        res.writeHead(302, { location: `${webAuth.basePath(req)}login`, "cache-control": "no-store" });
-        res.end();
-        return;
-      }
-      if (req.method !== "GET" && req.method !== "HEAD") {
-        res.writeHead(405);
-        res.end();
-        return;
-      }
-      const rawPath = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
-      await serveStatic(
-        decodeURIComponent(rawPath),
-        res,
-        path.resolve(webRoot),
-        path.resolve(webRoot, "index.html"),
-        () => true,
-        async () => webServer.applyIndexTaps(renderIndexInjections(
-          await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")),
-          [
-            { kind: "html", placement: "head", html: `<base href="${webAuth.basePath(req)}">` },
-            ...webServer.collectIndexInjections()
-          ]
-        ))
-      );
     })
   ];
 

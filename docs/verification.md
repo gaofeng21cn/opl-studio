@@ -38,7 +38,7 @@ is the command owner.
 | `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
 | `npm run validate:client-conformance` | Fresh Framework -> App -> Studio Client compatibility and wire-ref readback |
 | `npm run validate:candidate` | Required source markers and false-ready guards |
-| `npm run verify:dsh-gui` | Byte parity of the pinned DSH GUI source manifest |
+| `npm run verify:dsh-gui` | Exact file inventory, declared compatibility patch replay, and original upstream byte parity |
 | `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
 | `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
 | `npm run test:dsh-upgrade` | Official source/cohort admission, replay and verification orchestration tests |
@@ -146,7 +146,10 @@ The command verifies the actual installed cohort and native DSH plugin metadata,
 replays the existing vendor command, validates Desktop/Web profile schemas using
 official APIs, and runs packed-plugin inventory/lifecycle, Client Cordis, type,
 Host/MCP, headless and candidate gates. `dsh:verify` runs the same checks without
-regenerating vendor sources. Optional `--source` also verifies upstream bytes.
+regenerating vendor sources. The manifest explicitly lists the React 19
+compatibility patch and its digest; verification reverses it in a temporary copy
+and compares every original file digest. Optional `--source` also verifies these
+original bytes against the clean pinned upstream checkout.
 An unsupported or failing step stops execution for repair. Neither command
 installs or publishes the App.
 
@@ -157,7 +160,7 @@ these behavioral seams.
 
 Every direct `@deepseek-ai/dsh-*` runtime dependency must appear in the cohort;
 the binding check rejects omissions as well as package/lock version drift.
-For `0.2.1-rc.2`, the keyed `main` slot uses `conversation` as its fallback
+For `0.2.2-rc.1`, the keyed `main` slot uses `conversation` as its fallback
 entry, while `activePanelId: null` denotes the current conversation. A non-null
 panel id suppresses the workspace tree's current-session selection.
 

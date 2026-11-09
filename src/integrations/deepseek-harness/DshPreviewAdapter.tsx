@@ -3,7 +3,7 @@ import { MarkdownText, type MarkdownLabels } from "../../vendor/deepseek-harness
 import type { EcosystemWorkspaceBridge } from "./ecosystemWorkspaceProvider";
 
 type PreviewProps = EcosystemWorkspaceBridge & { relativePath: string; locale: "zh" | "en"; startSeconds?: number; endSeconds?: number };
-type LoadedFile = { data: Uint8Array; sizeBytes: number };
+type LoadedFile = { data: Uint8Array<ArrayBuffer>; sizeBytes: number };
 
 const textExtensions = new Set([
   "md", "markdown", "html", "htm", "txt", "text", "log", "json", "yaml", "yml", "toml",

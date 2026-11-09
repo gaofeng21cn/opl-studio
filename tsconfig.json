@@ -8,67 +8,66 @@
     ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
     "paths": {
       "@opl-vendor/dsh-app-frame": [
-        "src/vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx"
       ],
       "@opl-vendor/dsh-sidebar-root": [
-        "src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx"
       ],
       "@opl-vendor/dsh-conversation-root": [
-        "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx"
       ],
       "@opl-vendor/dsh-input-bar": [
-        "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx"
       ],
       "@opl-vendor/dsh-queue-dock": [
-        "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/queue/QueueDock.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/queue/QueueDock.tsx"
       ],
       "@opl-vendor/dsh-settings-root": [
-        "src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.tsx"
       ],
       "@opl-vendor/dsh-workspace-browser": [
-        "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx"
       ],
       "@opl-vendor/dsh-session-node": [
-        "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/Rows.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/Rows.tsx"
       ],
       "@opl-vendor/dsh-workspace-store": [
-        "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts"
+        "./src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts"
       ],
       "@opl-vendor/dsh-agent-preset-seat": [
-        "src/vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx"
       ],
       "@opl-vendor/dsh-model-select": [
-        "src/vendor/deepseek-harness/packages/client/ui-model-selection/src/client/ModelSelect.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-model-selection/src/client/ModelSelect.tsx"
       ],
       "@deepseek-ai/dsh-client-ui-primitives": [
-        "src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"
+        "./src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"
       ],
       "@deepseek-ai/dsh-api-remotes/client": [
-        "src/integrations/deepseek-harness/runtimeShim.ts"
+        "./src/integrations/deepseek-harness/runtimeShim.ts"
       ],
       "@deepseek-ai/dsh-client-ui-conversation/client": [
-        "src/integrations/deepseek-harness/emptyModule.ts"
+        "./src/integrations/deepseek-harness/emptyModule.ts"
       ],
       "@deepseek-ai/dsh-client-ui-sidebar/client": [
-        "src/integrations/deepseek-harness/emptyModule.ts"
+        "./src/integrations/deepseek-harness/emptyModule.ts"
       ],
       "@deepseek-ai/dsh-client-runtime/client": [
-        "src/integrations/deepseek-harness/runtimeShim.ts"
+        "./src/integrations/deepseek-harness/runtimeShim.ts"
       ],
       "@opl-vendor/dsh-files-body": [
-        "src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/FilesBody.tsx"
+        "./src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/FilesBody.tsx"
       ],
       "@opl-vendor/dsh-files-store": [
-        "src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/store.ts"
+        "./src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/store.ts"
       ],
       "@opl-vendor/dsh-files-face": [
-        "src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/face.ts"
+        "./src/vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/face.ts"
       ],
       "@deepseek-ai/dsh-util-workspace-path": [
-        "src/vendor/deepseek-harness/packages/util/workspace-path/src/index.ts"
+        "./src/vendor/deepseek-harness/packages/util/workspace-path/src/index.ts"
       ]
     },
     "jsx": "react-jsx",

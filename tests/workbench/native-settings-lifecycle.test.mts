@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readStudioSettingsSearchClient } from "../../scripts/settings-search-client.mjs";
 import { runInNewContext } from "node:vm";
 import * as React from "react";
 import { Context } from "@deepseek-ai/cordis";
@@ -8,8 +8,17 @@ import { createEcosystemLocale, installSettingsSearch } from "../../src/integrat
 
 function settingsSearchPlugin() {
   let plugin: any;
-  runInNewContext(readFileSync(new URL("../../node_modules/@objectivex666/dsh-settings-search/lib/client.js", import.meta.url), "utf8"), {
-    window: { __ModuleLoader__: { load(registration: any) { plugin = registration.factory((name: string) => {
+  runInNewContext(readStudioSettingsSearchClient(), {
+    setTimeout(callback: () => void, delay: number) {
+      const timer = setTimeout(callback, delay);
+      timer.unref();
+      return timer;
+    },
+    clearTimeout,
+    Response, TextEncoder,
+    // The fixture has no Host log route; never send these lifecycle probes to a real server.
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({ reason: "fixture_no_log_host" }) }),
+    window: { oplStudio: { requestSettingsSearchLog: async () => ({ status: 503, body: '{"ok":false,"reason":"fixture_no_log_host"}' }) }, __ModuleLoader__: { load(registration: any) { plugin = registration.factory((name: string) => {
       if (name !== "react") throw new Error(`Unexpected client dependency: ${name}`);
       return React;
     }); } } },
@@ -22,7 +31,10 @@ test("settings search uses native declaration injection and unloads with its Cor
   new SlotRegistry(ctx);
   const slots = ctx.get("slots") as SlotRegistry;
   const locale = createEcosystemLocale(() => "en");
-  const disposeSearch = await installSettingsSearch(ctx, settingsSearchPlugin(), { locale, readSections: () => [{ options: { id: "app", label: "App preferences" } }] });
+  const plugin = settingsSearchPlugin();
+  expect(plugin.inject).not.toContain("connection");
+  expect(ctx.get("connection")).toBeUndefined();
+  const disposeSearch = await installSettingsSearch(ctx, plugin, { locale, readSections: () => [{ options: { id: "app", label: "App preferences" } }] });
   const declareHeader = () => ctx.plugin({
     name: "settings-shell-fixture",
     apply(child: Context) {
@@ -32,6 +44,8 @@ test("settings search uses native declaration injection and unloads with its Cor
   const shell = await declareHeader();
   expect(slots.entries("settings.header")).toHaveLength(1);
   expect(locale.bind("settings-search-v5")("title")).toBe("Settings");
+  expect(ctx.get("connection")).toBeUndefined();
+  expect(plugin.inject).not.toContain("connection");
   await shell.dispose();
   const nextShell = await declareHeader();
   expect(slots.entries("settings.header")).toHaveLength(1);
@@ -68,6 +82,31 @@ test("projected search rows stay scoped while native registrations belong to the
   await searchCtx!.fiber.dispose();
   expect(slots.entries("settings.header")).toHaveLength(0);
   await dispose();
+  await shell.dispose();
+  await ctx.fiber.dispose();
+});
+
+test("local settings search preserves an existing connection without reading model configuration", async () => {
+  const ctx = new Context();
+  new SlotRegistry(ctx);
+  let modelReads = 0;
+  const connection = {
+    get api() {
+      modelReads += 1;
+      throw new Error("Local search must not read model configuration");
+    },
+  };
+  ctx.provide("connection", connection);
+  const shell = await ctx.plugin({ apply(child: Context) {
+    child.get("slots").register({ name: "root", children: { "settings.header": { kind: "single", scope: "root" } } }, () => null);
+  } });
+  const locale = createEcosystemLocale(() => "en");
+  const dispose = await installSettingsSearch(ctx, settingsSearchPlugin(), { locale, readSections: () => [] });
+  expect(ctx.get("slots").entries("settings.header")).toHaveLength(1);
+  expect(ctx.get("connection")).toBe(connection);
+  expect(modelReads).toBe(0);
+  await dispose();
+  expect(ctx.get("connection")).toBe(connection);
   await shell.dispose();
   await ctx.fiber.dispose();
 });

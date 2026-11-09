@@ -1,0 +1,12 @@
+{
+  "package": "@objectivex666/dsh-settings-search",
+  "version": "1.14.0",
+  "upstreamSha256": "0447a4fd733e421507a5b633bcd62291fd89313734efe9cca6fa089e54b6c948",
+  "patchSha256": "01180559615dc492bd2dd5c86eb343679159b0cfd87c7c3970b45e9a86715971",
+  "resultSha256": "024d1c206c1e4b8f5db715b36427d8bea1a2f79cb05fb5b0fe90969e49e73d52",
+  "patch": "settings-search-studio.patch",
+  "scope": [
+    "local-search-only-model-owner",
+    "fixed-log-transport-web-desktop"
+  ]
+}

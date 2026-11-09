@@ -10,10 +10,10 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 | --- | --- | --- |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | 直接使用官方 `createClientModuleSystem` 装载客户端 factory，React 由 Studio 单实例提供 |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
-| DSH `ui-sidebar-documentpreview` | npm `0.1.7-rc.2`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |
-| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.2.0，GPL-3.0 | 使用仅依赖 slots/locale 的本地设置搜索；查询设置页与已渲染选项 |
+| DSH `ui-sidebar-documentpreview` | npm `0.2.2-rc.1`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |
+| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | 保留官方本地设置搜索、索引、快捷键与日志；经 Studio 既有桥接访问日志 |
 
-设置搜索选择 1.2.0 是明确的功能范围选择。核对的 1.9.0 增加独立模型设置、API Key 存储与直连推理；Studio 尚未提供与唯一模型/凭据 owner 一致的适配，因此不装载那些功能。搜索插件本身及许可证随载体保留，未复制改写其实现。
+设置搜索使用 1.14.0，功能范围仍是本地设置检索。该版本没有公开的客户端 transport 或 feature-policy 扩展点，却默认提供独立模型、API Key 和直连推理界面。Studio 在构建时应用明确记录的 `settings-search-studio.patch`：保留官方搜索、索引、快捷键与日志，关闭第二套模型与凭据读写，并将固定日志请求交给既有 WebUI/桌面桥。补丁清单同时核对包版本、原始载荷、补丁及结果的 SHA-256；不修改安装的 npm 包，输入漂移会阻止构建。日志沿用官方 `createLogStore` 和 `createLogRoute`，存储在当前 DSH home 的独立日志目录，WebUI 保留认证与请求上限，打开目录仅允许本机桌面。App/Codex 继续持有模型和凭据。原许可证、上游源码来源与兼容补丁随源码和载体保留。
 
 `EcosystemFilePreview` 将当前 canonical thread 的相对路径交给 OPL workspace 适配器。Markdown、HTML、图片和普通文本由窄适配器呈现；官方 `ui-sidebar-documentpreview` 的 npm 客户端独立随载体提供，但只有完整的 `remote.workspaceFiles`、`resources`、`sidebarRightTabs`、Session 生命周期和 `apply()` 注入链到位后才切换真实调用者。当前 Office/Excel/PDF 等格式明确返回不可用；每次 DSH 升级必须重新评估并优先接入官方完整路径。
 
@@ -34,7 +34,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 未选择线程时为空，切换时销毁旧视图 fiber；不维护第二套 session 数据。
 
 `sidebar.settings` 注册官方 `createSettingsShellStore`，`SettingsRoot` 和 App 导航共用
-其 actions。vendor 保持上游原字节，设置导航无需构建期源码 overlay。社区搜索通过
+其 actions。设置导航直接使用上游实现；GUI 的 React 19 兼容补丁由 source manifest 明确记录。社区搜索通过
 真实 Cordis 插件依赖注入和卸载接入；仅搜索目录和语言绑定映射到 App 当前投影，
 不建立第二份设置持久状态。升级入口及验收见 [验证指南](verification.md#dsh-upstream-upgrade-gate)。
 

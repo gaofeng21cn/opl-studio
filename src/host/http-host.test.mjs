@@ -137,6 +137,8 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   }
   const renderer = await fetch(`${baseUrl}/`).then((response) => response.text());
   assert.match(renderer, /<title>OPL<\/title>/);
+  assert.equal(host.context.get("connection"), undefined, "Studio must retain its existing WebUI authentication owner");
+  assert.equal((await host.webServer.readResource(new Request(`${baseUrl}/`), {})).status, 403);
 
   const eventAbort = new AbortController();
   const eventResponse = await fetch(`${baseUrl}/api/opl-events`, { signal: eventAbort.signal });
@@ -464,6 +466,7 @@ test("loopback HTTP host sends model credentials only through the dedicated stdi
 test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the OPL Studio session ABI", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-cloud-auth-"));
   await writeFile(path.join(directory, "index.html"), "<!doctype html><title>Cloud Studio</title>", "utf8");
+  await writeFile(path.join(directory, "workspace-note.md"), "# Workspace note\n", "utf8");
   const transport = new CodexAppServerTransport({
     command: process.execPath,
     args: [fixture],
@@ -498,6 +501,9 @@ test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the 
   const anonymousRenderer = await fetch(`${host.url}/`, { redirect: "manual" });
   assert.equal(anonymousRenderer.status, 302);
   assert.equal(anonymousRenderer.headers.get("location"), "/login");
+  const anonymousAsset = await fetch(`${host.url}/workspace-note.md`, { redirect: "manual" });
+  assert.equal(anonymousAsset.status, 302);
+  assert.equal(anonymousAsset.headers.get("location"), "/login");
   assert.equal((await fetch(`${host.url}/api/capabilities`)).status, 401);
   assert.equal((await fetch(`${host.url}/api/opl-events`)).status, 401);
   assert.equal((await fetch(`${host.url}/healthz`)).status, 200);
@@ -520,6 +526,21 @@ test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the 
   assert.match(cookie, /^opl-studio-session=/);
   assert.equal((await fetch(`${host.url}/`, { headers: { cookie } })).status, 200);
   assert.equal((await fetch(`${host.url}/api/capabilities`, { headers: { cookie } })).status, 200);
+  const asset = await fetch(`${host.url}/workspace-note.md`, { headers: { cookie } });
+  assert.equal(asset.status, 200);
+  assert.equal(await asset.text(), "# Workspace note\n");
+  assert.equal(asset.headers.get("cache-control"), "no-cache");
+  const etag = asset.headers.get("etag");
+  assert.ok(etag?.startsWith('W/"'));
+  const cached = await fetch(`${host.url}/workspace-note.md`, { headers: { cookie, "if-none-match": etag } });
+  assert.equal(cached.status, 304);
+  const head = await fetch(`${host.url}/workspace-note.md`, { method: "HEAD", headers: { cookie } });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+  const traversal = await fetch(`${host.url}/..%2f..%2fetc/passwd`, { headers: { cookie } });
+  assert.equal(traversal.status, 403);
+  const postAsset = await fetch(`${host.url}/workspace-note.md`, { method: "POST", headers: { cookie } });
+  assert.equal(postAsset.status, 405);
 
   const noCsrf = await fetch(`${host.url}/api/inputs`, {
     method: "POST",
@@ -590,6 +611,8 @@ test("trusted path entry keeps renderer boot, login, session and SSE in the same
   assert.equal(html.match(/<base /g)?.length, 1);
   assert.ok(html.includes(`<base href="${prefix}/">`));
   assert.ok(html.indexOf("<base ") < html.indexOf('src="./renderer.js"'));
+  const encodedIndex = await (await fetch(`${host.url}/%69ndex.html`, { headers: authenticated })).text();
+  assert.ok(encodedIndex.includes(`<base href="${prefix}/">`));
   assert.equal(html.match(/__DSH_BOOT_READY__.*resolve/g)?.length, 1);
   const base = new URL(prefix + "/", host.url);
   assert.equal(new URL("./renderer.js", base).pathname, `${prefix}/renderer.js`);

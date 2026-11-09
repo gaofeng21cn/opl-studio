@@ -23,11 +23,11 @@
   "description": "Standard MCP Apps host using canonical Codex connections and sandboxed client views.",
   "engines": {
     "node": ">=20",
-    "dsh": "0.2.1-rc.2"
+    "dsh": "0.2.2-rc.1"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.5",
-    "react": "18.3.1"
+    "@deepseek-ai/cordis": "4.1.0",
+    "react": "19.3.1"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "2.0.4"

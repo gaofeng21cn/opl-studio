@@ -197,8 +197,8 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.doesNotMatch(recentStyles, /overflow|max-height/);
   assert.match(slotHost, /project\.threads\.map/);
   assert.match(slotHost, /searchSessions=\{async/);
-  assert.match(slotHost, /archiveSession=\{/);
-  assert.match(slotHost, /forkSession=\{/);
+  assert.match(slotHost, /requireSession\(sessionId\)\.archiveThread\(sessionId\)/);
+  assert.match(slotHost, /requireSession\(sessionId\)\.forkThread\(sessionId\)/);
   assert.match(detail, /opl-thread-resume/);
   assert.match(detail, /onRequestArchive/);
   assert.match(detail, /onRequestDelete/);
@@ -718,20 +718,22 @@ test("desktop visual shell uses vendored DeepSeek Harness roots and theme tokens
 });
 
 test("DSH controls resolve to the complete pinned source cohort and OPL-owned slots", () => {
-  const primitiveAlias = ["src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
+  const primitiveAlias = ["./src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
   assert.deepEqual(tsconfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
   assert.deepEqual(typecheckConfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
   assert.match(sourceManifest.upstream.ref, /^[0-9a-f]{40}$/);
   assert.match(sourceManifest.upstream.source_package_version, /^\d+\.\d+\.\d+/);
   assert.equal(sourceManifest.snapshot.file_count, sourceManifest.files.length);
-  assert.equal(sourceManifest.snapshot.byte_identical_to_pinned_ref, true);
+  assert.equal(sourceManifest.snapshot.byte_identical_to_pinned_ref, false);
+  assert.equal(sourceManifest.snapshot.provenance, "pinned_upstream_plus_reviewed_compatibility_patches");
   assert.ok(sourceManifest.snapshot.package_roots.includes("packages/client/ui-primitives/src"));
   assert.ok(sourceManifest.snapshot.package_roots.includes("packages/client/ui-renderer/src"));
   assert.equal(candidateEvidence.reused_oss_module_policy.vendored_file_count, sourceManifest.snapshot.file_count);
-  assert.equal(candidateEvidence.reused_oss_module_policy.byte_identical_to_pinned_ref, true);
+  assert.equal(candidateEvidence.reused_oss_module_policy.byte_identical_to_pinned_ref, false);
+  assert.deepEqual(candidateEvidence.reused_oss_module_policy.compatibility_patches, sourceManifest.compatibility_patches);
   assert.deepEqual(candidateEvidence.reused_oss_module_policy.direct_reuse_modules, [
     ...dshBinding.packageCohort,
-    "use-sync-external-store@1.2.0"
+    "use-sync-external-store@1.7.0"
   ]);
   for (const { name, version } of dshBinding.packageSpecs) {
     assert.equal(packageJson.dependencies[name], version);
@@ -781,7 +783,7 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
     assert.match(dshWebOverlay, new RegExp(`id: ${id}`));
   }
   assert.doesNotMatch(dshWebOverlay, /id: frontend-static/);
-  assert.match(httpRoutes, /serveStatic/);
+  assert.match(read("plugins/opl-web-routes/src/frontend-static.mjs"), /frontend\.plugin\(frontendStatic/);
   assert.match(httpRoutes, /webAuth\.requireSession\(req\)/);
   assert.match(dshToolMcp, /StreamableHTTPServerTransport/);
   assert.match(dshToolMcp, /sendToolListChanged/);
@@ -811,7 +813,7 @@ test("primary surfaces preserve scrolling and settings expose a narrow scrollbar
 });
 
 test("DSH AppFrame keeps its upstream layout contract while Studio's inspector stays off the details track", () => {
-  assert.match(appFrame, /computeColumns\(viewport, sidebarPreference/);
+  assert.match(appFrame, /computeColumns\(\s*viewport, drawer \? 0 : sidebarPreference/);
   assert.match(appFrame, /const narrow = viewport < SIDEBAR_AUTO_COLLAPSE/);
   assert.match(appFrame, /actions\.setSidebar\(sidebarBase\.current \+ dx\)/);
   assert.match(appFrame, /actions\.setRightbar\(rightbarBase\.current - dx\)/);

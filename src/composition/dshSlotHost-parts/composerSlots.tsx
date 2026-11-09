@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { IconChevronDownOutlineMedium, Menu, RiskConfirmation, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
+import { IconChevronDownOutlineMedium, Menu, RiskConfirmation, UserTextRun, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { InputBar } from "@opl-vendor/dsh-input-bar";
 import { QueueDock } from "@opl-vendor/dsh-queue-dock";
 import { AgentPresetSeat } from "@opl-vendor/dsh-agent-preset-seat";
@@ -13,6 +13,7 @@ import {
   useDshSnapshot,
   useStudio,
   useStudioBusyEnter,
+  useStudioComposerAccess,
   useStudioDeveloperTools,
   useStudioStopShortcut
 } from "./studioContext";
@@ -116,7 +117,7 @@ export function HeroActionsSlot() {
     showPicker: boolean;
     options: Array<{ id: string; trust: "system"; name: string; description: string }>;
     current: string;
-    error: string | null;
+    error: string | { preset: { id: string; name?: string }; reason: string } | null;
     busy: boolean;
     introduce: boolean;
   }>({ showPicker: true, options: [], current: "", error: null, busy: false, introduce: false }), []);
@@ -131,8 +132,20 @@ export function HeroActionsSlot() {
     useShowPresetPicker={(selector: any) => selector(true)}
     useSessionRetainInfo={(selector: any) => selector({ retainedBy: { mainView: 1 } })}
     load={async () => undefined}
-    select={(id: string) => studio.selectAgentPreset(id)}
-    introduced={() => undefined}
+    select={async (id: string) => {
+      store.set({ ...store.getSnapshot(), busy: true, error: null });
+      let reason: string | undefined;
+      try { reason = await studio.selectAgentPreset(id); }
+      catch (error) { reason = error instanceof Error ? error.message : String(error); }
+      store.set({ ...store.getSnapshot(), busy: false, error: reason ? {
+        preset: store.getSnapshot().options.find(option => option.id === id) ?? { id }, reason
+      } : null });
+      return reason;
+    }}
+    introduced={() => store.set({ ...store.getSnapshot(), introduce: false })}
+    dismissRefusal={(error: { reason: string }) => {
+      if (store.getSnapshot().error === error) store.set({ ...store.getSnapshot(), error: error.reason });
+    }}
     useAgentPresetSeat={(selector: any) => useDshSnapshot(store, selector)}
     useDeveloperTools={useStudioDeveloperTools}
     t={(key: string) => translate(studio.locale, key)}
@@ -247,7 +260,7 @@ export function InputBarSlot({ renderSlot, ...owner }: Record<string, any>) {
   const inputRenderSlot = (key: string, props: Record<string, unknown>) => key === "conversation.input.permission"
     ? <StudioPermissionSelect value={permissionValue} options={permissionOptions} locked={studio.sending} locale={studio.locale} command={command} />
     : renderSlot(key, props);
-  return <InputBar {...owner} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addAttachments: () => true, removeAttachment: studio.removeComposerImage, pruneAttachments: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} addFiles={studio.addComposerImages} removeAttachment={studio.removeComposerImage} resolveDraftAttachments={(ids: readonly string[]) => ids.flatMap((id) => { const image = studio.composerImages.find((candidate) => candidate.id === id); return image ? [{ kind: "image", ...image }] : []; })} useBusyEnter={useStudioBusyEnter} useStopShortcut={useStudioStopShortcut} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useFileUploads={(selector: any) => selector({})} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
+  return <InputBar {...owner} useAccess={useStudioComposerAccess} sessionId="opl-current" useSession={(selector: any) => selector({ promptError: null, running: studio.sending, subagent: null, removed: false })} useInput={(selector: any) => selector(input)} inputActions={{ setDraft: studio.updatePrompt, addAttachments: () => true, removeAttachment: studio.removeComposerImage, pruneAttachments: () => undefined, submit: studio.submitPrompt }} keyboard={keyboard} addFiles={studio.addComposerImages} removeAttachment={studio.removeComposerImage} resolveDraftAttachments={(ids: readonly string[]) => ids.flatMap((id) => { const image = studio.composerImages.find((candidate) => candidate.id === id); return image ? [{ kind: "image", ...image }] : []; })} useBusyEnter={useStudioBusyEnter} useStopShortcut={useStudioStopShortcut} toggleCommandMenu={studio.openComposerPalette} stop={studio.stopTurn} t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} renderSlot={inputRenderSlot} useFileUploads={(selector: any) => selector({})} useNotices={(selector: any) => selector(null)} useLexicon={(selector: any) => selector(new Map())} useMenuLauncher={(selector: any) => selector(undefined)} useProjection={(_key: string, selector?: (value: undefined) => unknown) => selector ? selector(undefined) : undefined} accessory={studio.composerAccessory} />;
 }
 
 export function QueueDockSlot() {
@@ -269,6 +282,9 @@ export function QueueDockSlot() {
     updateQueue={studio.updateQueue}
     notify={studio.notifyQueue}
     loadImage={loadStudioQueueImage}
+    renderFactorySlot={(name: string, props: { text?: string }) => name === "conversation.user.text"
+      ? <UserTextRun text={props.text ?? ""} />
+      : null}
     t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
   />;
 }

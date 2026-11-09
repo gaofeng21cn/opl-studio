@@ -39,8 +39,8 @@ function findPackagedExecutable() {
 }
 
 function processRows() {
-  const result = spawnSync("/bin/ps", ["-axo", "pid=,ppid=,command="], { encoding: "utf8" });
-  assert.equal(result.status, 0, result.stderr || "unable to read process table");
+  const result = spawnSync("/bin/ps", ["-axo", "pid=,ppid=,command="], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.error?.message || result.stderr || "unable to read process table");
   return result.stdout.trim().split("\n").flatMap((line) => {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
     return match ? [{ pid: Number(match[1]), ppid: Number(match[2]), command: match[3] }] : [];

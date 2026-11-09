@@ -1,3 +1,4 @@
+import { readStudioSettingsSearchClient } from "./settings-search-client.mjs";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { buildDshPlugins } from "./build-dsh-plugins.mjs";
@@ -270,7 +271,9 @@ export function buildRenderer({
     ["@deepseek-ai/dsh-client-ui-sidebar-documentpreview", "dsh-client-ui-sidebar-documentpreview"],
     ["@objectivex666/dsh-settings-search", "dsh-settings-search"]
   ]) {
-    fs.copyFileSync(require.resolve(`${id}/client`), path.join(pluginRoot, `${name}.js`));
+    const target = path.join(pluginRoot, `${name}.js`);
+    if (id === "@objectivex666/dsh-settings-search") fs.writeFileSync(target, readStudioSettingsSearchClient());
+    else fs.copyFileSync(require.resolve(`${id}/client`), target);
     fs.copyFileSync(path.join(root, "node_modules", id, "LICENSE"), path.join(pluginRoot, `${name}.LICENSE`));
   }
   const appProductProfile = readAppProductProfile();

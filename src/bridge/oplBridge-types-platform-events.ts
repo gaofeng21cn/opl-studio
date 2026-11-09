@@ -117,9 +117,12 @@ export type OplBridgeMethodEvent = BaseBridgeEvent & {
 
 export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 
+export type SettingsSearchLogRequest = { method: "GET" | "POST"; count?: boolean; body?: string };
+export type SettingsSearchLogResponse = { status: number; body: string };
+
 export type OplStudioSurface = Pick<
   OplBridge,
-  keyof McpAppsBridge | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  keyof McpAppsBridge | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -129,6 +132,7 @@ export type OplStudioSurface = Pick<
 
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   platformCapabilities: OplPlatformCapabilities;
+  requestSettingsSearchLog(request: SettingsSearchLogRequest): Promise<SettingsSearchLogResponse>;
   beginWindowDrag(): void;
   retryDesktopHost(): Promise<void>;
   readState(profile?: OplStateProfile): Promise<OplStateReadback>;

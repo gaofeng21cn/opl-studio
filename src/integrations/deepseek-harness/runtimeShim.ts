@@ -40,6 +40,7 @@ export type SessionListState = {
   phase: "idle" | "loading" | "ready" | "error";
   subagentsByParent: Readonly<Record<SessionId, unknown>>;
   jobsBySession: Readonly<Record<SessionId, readonly unknown[]>>;
+  projectionsBySession?: Readonly<Record<SessionId, unknown>>;
   currentAddress: undefined;
 };
 

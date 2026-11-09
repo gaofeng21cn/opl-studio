@@ -60,6 +60,7 @@ export function createBrowserBridge(): OplBridge {
       modelAccessSecretInput: candidate?.platformCapabilities?.modelAccessSecretInput === true,
       connectionAccessApproval: candidate?.platformCapabilities?.connectionAccessApproval === true
     },
+    requestSettingsSearchLog: request => candidate?.requestSettingsSearchLog?.(request) ?? Promise.reject(new Error("Settings search logs are unavailable in this host")),
     beginWindowDrag() {
       candidate?.beginWindowDrag?.();
     },
