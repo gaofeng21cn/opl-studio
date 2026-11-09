@@ -4,10 +4,10 @@
 
 OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
 
-- `@deepseek-ai/cordis` `4.0.5-alpha.1`;
-- `@deepseek-ai/cordis-plugin-group` `1.0.5-alpha.1`;
-- `@deepseek-ai/cordis-plugin-include` `1.0.10-alpha.1`;
-- `@deepseek-ai/cordis-plugin-loader` `1.0.6-alpha.1`;
+- `@deepseek-ai/cordis` `4.1.0`;
+- `@deepseek-ai/cordis-plugin-group` `1.1.0`;
+- `@deepseek-ai/cordis-plugin-include` `1.1.0`;
+- `@deepseek-ai/cordis-plugin-loader` `1.1.0`;
 - `@deepseek-ai/dsh-app-boot`, `dsh-brand`, `dsh-client-modules`,
   `dsh-client-ui-primitives`, `dsh-client-ui-slots`, `dsh-client-ui-dockkit`,
   `dsh-client-web`, `dsh-agent-preset-registry`,
@@ -15,13 +15,15 @@ OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
   `dsh-host-plugin-inventory`, `dsh-host-webserver`,
   `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, `dsh-sandbox`, `dsh-sandbox-policy`, and
   `dsh-typert-protocol`, `dsh-client-store`, and
-  `dsh-util-workspace-path`, `dsh-util-values`, all at `0.2.1-rc.2`;
-- `use-sync-external-store` `1.2.0` for the vendored renderer closure;
-- `zustand` `4.4.7` and `immer` `10.2.0` for the DSH client store runtime
+  `dsh-util-workspace-path`, `dsh-util-file-drag`, `dsh-util-values`,
+  `dsh-client-connection` (public Peer type/primitive only), and
+  `dsh-tool-executor-native`, all at `0.2.2-rc.1`;
+- `use-sync-external-store` `1.7.0` for the vendored renderer closure;
+- `zustand` `5.1.0` and `immer` `11.2.9` for the DSH client store runtime
   closure (MIT, pmndrs and Michel Weststrate);
-- Lexical and its history, plain-text, text, and utility modules `0.49.0`
+- Lexical and its history, plain-text, text, and utility modules `0.53.0`
   for the upstream composer (MIT, Meta Platforms, Inc. and affiliates);
-- `simple-icons` `16.31.0` for upstream client icon assets (CC0-1.0,
+- `simple-icons` `16.36.0` for upstream client icon assets (CC0-1.0,
   <https://creativecommons.org/publicdomain/zero/1.0/>).
 
 Exact package integrity values are pinned in `package-lock.json` and the
@@ -30,10 +32,9 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `687f282e8625c6b8d11ff58211a90524be2e4317`
+Inspected source ref: `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`
 
-The complete `src/` trees of eighteen client packages are vendored byte-for-byte
-from that ref under `src/vendor/deepseek-harness/packages/client/`:
+The complete `src/` trees of eighteen client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
 
 - `ui-layout`
 - `ui-sidebar`
@@ -57,11 +58,17 @@ from that ref under `src/vendor/deepseek-harness/packages/client/`:
 The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
-The snapshot contains 559 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.2.1-rc.2`), and
+The snapshot contains 624 files, including the upstream `LICENSE`. Its package
+roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.1`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
-checks local byte parity. OPL changes stay outside the vendor root.
+checks every local digest and reverts the declared React 19 compatibility patch
+in a temporary copy to prove the original upstream bytes. Five upstream primitive
+files carry this bounded patch: ref initialization, nullable DOM refs, the boolean
+`inert` attribute, and Tooltip ref/cleanup forwarding. The patch digest, pinned
+upstream ref, and each changed file's original SHA-256 are recorded explicitly;
+all other files remain byte-identical. The replay applies this patch after copying
+the official source, without introducing another runtime or state owner.
 
 The live One Person Lab composition directly renders upstream `AppFrame`,
 `SidebarRoot`, `WorkspaceBrowser`, `ConversationRoot`/`EmptyHero`, `InputBar`,
@@ -70,9 +77,9 @@ The live One Person Lab composition directly renders upstream `AppFrame`,
 registration, disposal, and entry error isolation. OPL components import `Button`, `Pill`, `Input`, `Tooltip`,
 `StateDot`, `projectUserText`, and icons directly from the vendored upstream
 `@deepseek-ai/dsh-client-ui-primitives` index. User-visible identity uses the
-DSH 0.2.1-rc.2 brand slots with the text `One Person Lab`; no OPL logo, parallel
+DSH 0.2.2-rc.1 brand slots with the text `One Person Lab`; no OPL logo, parallel
 type scale, layout, color system, primitive control, or icon is introduced. The
-DSH 0.2.1-rc.2 attachment slot is occupied by a null adapter and does not enable a
+DSH 0.2.2-rc.1 attachment slot is occupied by a null adapter and does not enable a
 multimodal runtime. Workspace host description remains unavailable until the
 App ABI supplies it; the POSIX home-path compatibility shim therefore does not
 claim a visible `~` abbreviation.

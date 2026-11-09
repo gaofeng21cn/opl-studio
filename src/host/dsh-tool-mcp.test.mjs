@@ -116,6 +116,12 @@ test("DSH profile tools are authenticated, callable, and dynamically announced o
   assert.deepEqual(result.structuredContent, {
     dsh: { value: { echoed: "from-profile" } }
   });
+  const invalid = await client.callTool({ name: "opl_echo", arguments: { text: 17 } });
+  assert.equal(invalid.isError, true);
+  assert.ok(invalid.structuredContent.dsh.error);
+  const unknown = await client.callTool({ name: "not_registered", arguments: {} });
+  assert.equal(unknown.isError, true);
+  assert.ok(unknown.structuredContent.dsh.error);
 
   const imageRef = {
     attachmentId: "image-1",

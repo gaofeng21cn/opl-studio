@@ -17,6 +17,7 @@
       "@deepseek-ai/cordis-plugin-group@1.1.0",
       "@deepseek-ai/cordis-plugin-include@1.1.0",
       "@deepseek-ai/cordis-plugin-loader@1.1.0",
+      "@deepseek-ai/dsh-client-connection@0.2.2-rc.1",
       "@deepseek-ai/dsh-client-store@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-workspace-path@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-file-drag@0.2.2-rc.1",
@@ -43,6 +44,7 @@
       "@deepseek-ai/dsh-session@0.2.2-rc.1",
       "@deepseek-ai/dsh-system-prompt@0.2.2-rc.1",
       "@deepseek-ai/dsh-timeout@0.2.2-rc.1",
+      "@deepseek-ai/dsh-tool-executor-native@0.2.2-rc.1",
       "@deepseek-ai/dsh-tools@0.2.2-rc.1",
       "@deepseek-ai/dsh-typert-protocol@0.2.2-rc.1"
     ],
@@ -73,8 +75,9 @@
   },
   "snapshot": {
     "local_root": "src/vendor/deepseek-harness",
-    "byte_identical": true,
-    "byte_identical_to_pinned_ref": true,
+    "byte_identical": false,
+    "byte_identical_to_pinned_ref": false,
+    "provenance": "pinned_upstream_plus_reviewed_compatibility_patches",
     "package_roots": [
       "packages/client/ui-layout/src",
       "packages/client/ui-sidebar/src",
@@ -98,6 +101,14 @@
     ],
     "file_count": 624
   },
+  "compatibility_patches": [
+    {
+      "path": "src/integrations/deepseek-harness/patches/react19.patch",
+      "sha256": "bef296b2ba74ce21a3d2fd1ad1f16163f674fb5b6bf69b75a12046607add51f9",
+      "upstream_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+      "reason": "React 19 refs, nullable DOM refs, inert and callback-ref cleanup compatibility; no runtime authority changes."
+    }
+  ],
   "opl_delta_roots": [
     "src/composition",
     "src/integrations/deepseek-harness",
@@ -1165,7 +1176,8 @@
     },
     {
       "path": "packages/client/ui-primitives/src/JsonTree.tsx",
-      "sha256": "8eaa0d93659dff1c8b8a738b225cb20c3adc4463f72c929f46b07417af4d8aaa"
+      "sha256": "51ffbd5745b360f5d9a721de405e600d80c39f1c4c20ae2b9f2a2647d5f63373",
+      "upstream_sha256": "8eaa0d93659dff1c8b8a738b225cb20c3adc4463f72c929f46b07417af4d8aaa"
     },
     {
       "path": "packages/client/ui-primitives/src/LinkIcon.tsx",
@@ -1329,7 +1341,8 @@
     },
     {
       "path": "packages/client/ui-primitives/src/TextShimmer.tsx",
-      "sha256": "ffd8cc02a2f76b73c5f1f7a4338fb5df8985a1abe3473eea974a900236b48b50"
+      "sha256": "c04132ec1e2d2bf758d8a7b4ae57c742304deb9870ab3ecf75856906cafffb51",
+      "upstream_sha256": "ffd8cc02a2f76b73c5f1f7a4338fb5df8985a1abe3473eea974a900236b48b50"
     },
     {
       "path": "packages/client/ui-primitives/src/Toast.module.css",
@@ -1345,7 +1358,8 @@
     },
     {
       "path": "packages/client/ui-primitives/src/Tooltip.tsx",
-      "sha256": "c2f931a12e7bf7ae2d5d0adbd6296ace2e4605e5415978a4e503fe8e63e41c7c"
+      "sha256": "4ce42a9fe98899321e85187fde16e8d9459ae727133ec7cc160b6e77956f58a4",
+      "upstream_sha256": "c2f931a12e7bf7ae2d5d0adbd6296ace2e4605e5415978a4e503fe8e63e41c7c"
     },
     {
       "path": "packages/client/ui-primitives/src/UserMessageBubble.module.css",
@@ -1445,7 +1459,8 @@
     },
     {
       "path": "packages/client/ui-primitives/src/image-drag.ts",
-      "sha256": "8a2b868cf67315cdddda2b9c7fcc849d7306992e74a06ceb355c2f494564478c"
+      "sha256": "72a511e68ae8d7cda2c35846639bf6e207b5512531c29e4227bbdf6b40dbb4bb",
+      "upstream_sha256": "8a2b868cf67315cdddda2b9c7fcc849d7306992e74a06ceb355c2f494564478c"
     },
     {
       "path": "packages/client/ui-primitives/src/index.ts",
@@ -1533,7 +1548,8 @@
     },
     {
       "path": "packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts",
-      "sha256": "29fb78ac857415989b70bf0cf73a8eef3b25843df227441838be2e08ba1f8d36"
+      "sha256": "a22c460ccfaa81a05d5fd82d53583987dbc716de9bd8f7a5b9d0f2e701050a23",
+      "upstream_sha256": "29fb78ac857415989b70bf0cf73a8eef3b25843df227441838be2e08ba1f8d36"
     },
     {
       "path": "packages/client/ui-primitives/src/markdown/windows-path-destinations.ts",

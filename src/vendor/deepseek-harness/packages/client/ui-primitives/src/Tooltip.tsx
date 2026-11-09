@@ -74,13 +74,25 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
   const id = useId()
   const [pinned, setPinned] = useState(false)
   const anchor = useRef<HTMLElement | null>(null)
-  // React 18 keeps the element's ref outside props; forward it so wrapping an
-  // anchor in Tooltip never silently severs the owner's ref.
-  const childRef = (children as ReactElement<AnchorProps> & { ref?: Ref<HTMLElement> }).ref
+  // React 19 exposes the element ref through props and permits callback refs to
+  // return cleanup functions. Preserve that cleanup while retaining React 18
+  // callback refs' legacy null notification when no cleanup is returned.
+  const childRef = children.props.ref as Ref<HTMLElement> | undefined
   const mergedRef = useCallback((el: HTMLElement | null) => {
     anchor.current = el
-    if (typeof childRef === 'function') childRef(el)
-    else if (childRef != null) (childRef as MutableRefObject<HTMLElement | null>).current = el
+    let childCleanup: (() => void) | undefined
+    if (typeof childRef === 'function') {
+      const result = childRef(el)
+      if (typeof result === 'function') childCleanup = result
+    } else if (childRef != null) {
+      (childRef as MutableRefObject<HTMLElement | null>).current = el
+    }
+    return () => {
+      childCleanup?.()
+      if (childCleanup === undefined && typeof childRef === 'function') childRef(null)
+      if (childRef != null && typeof childRef !== 'function' && childRef.current === el) childRef.current = null
+      if (anchor.current === el) anchor.current = null
+    }
   }, [childRef])
   const [pos, setPos] = useState<DOMRect | null>(null)
   const bubble = useRef<HTMLSpanElement | null>(null)

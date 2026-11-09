@@ -146,7 +146,10 @@ The command verifies the actual installed cohort and native DSH plugin metadata,
 replays the existing vendor command, validates Desktop/Web profile schemas using
 official APIs, and runs packed-plugin inventory/lifecycle, Client Cordis, type,
 Host/MCP, headless and candidate gates. `dsh:verify` runs the same checks without
-regenerating vendor sources. Optional `--source` also verifies upstream bytes.
+regenerating vendor sources. The manifest explicitly lists the React 19
+compatibility patch and its digest; verification reverses it in a temporary copy
+and compares every original file digest. Optional `--source` also verifies these
+original bytes against the clean pinned upstream checkout.
 An unsupported or failing step stops execution for repair. Neither command
 installs or publishes the App.
 
@@ -157,7 +160,7 @@ these behavioral seams.
 
 Every direct `@deepseek-ai/dsh-*` runtime dependency must appear in the cohort;
 the binding check rejects omissions as well as package/lock version drift.
-For `0.2.1-rc.2`, the keyed `main` slot uses `conversation` as its fallback
+For `0.2.2-rc.1`, the keyed `main` slot uses `conversation` as its fallback
 entry, while `activePanelId: null` denotes the current conversation. A non-null
 panel id suppresses the workspace tree's current-session selection.
 

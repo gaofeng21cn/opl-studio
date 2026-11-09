@@ -1,8 +1,5 @@
 import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
-import path from "node:path";
 import { pipeline } from "node:stream/promises";
-import { renderIndexInjections } from "@deepseek-ai/dsh-host-webserver";
-import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
 
 function json(res, status, value) {
   res.writeHead(status, {
@@ -337,34 +334,6 @@ export function registerOplHttpRoutes(webServer, hostCore, {
           errorResponse(res, error);
         }
       }
-    }),
-    webServer.registerFallback(async (req, res) => {
-      const auth = webAuth.requireSession(req);
-      if (!auth.ok) {
-        res.writeHead(302, { location: `${webAuth.basePath(req)}login`, "cache-control": "no-store" });
-        res.end();
-        return;
-      }
-      if (req.method !== "GET" && req.method !== "HEAD") {
-        res.writeHead(405);
-        res.end();
-        return;
-      }
-      const rawPath = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
-      await serveStatic(
-        decodeURIComponent(rawPath),
-        res,
-        path.resolve(webRoot),
-        path.resolve(webRoot, "index.html"),
-        () => true,
-        async () => webServer.applyIndexTaps(renderIndexInjections(
-          await import("node:fs/promises").then(({ readFile }) => readFile(path.resolve(webRoot, "index.html"), "utf8")),
-          [
-            { kind: "html", placement: "head", html: `<base href="${webAuth.basePath(req)}">` },
-            ...webServer.collectIndexInjections()
-          ]
-        ))
-      );
     })
   ];
 

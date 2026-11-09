@@ -1,0 +1,81 @@
+--- a/packages/client/ui-primitives/src/JsonTree.tsx
++++ b/packages/client/ui-primitives/src/JsonTree.tsx
+@@ -704,8 +704,8 @@
+       ? null
+       : pathId([Array.isArray(data) ? firstExpandableIndex : firstExpandableEntry[0]])
+     : isExpandableValue(data) && rootEntries.length > 0 ? pathId([]) : null
+-  const activeRowRef = useRef<HTMLElement>()
+-  const resetTimer = useRef<ReturnType<typeof setTimeout>>()
++  const activeRowRef = useRef<HTMLElement | undefined>(undefined)
++  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+   const copySequence = useRef(0)
+   const [copyStore] = useState(createCopyStore)
+   const [tabStopId, setTabStopId] = useState<string | null>(initialTabStopId)
+--- a/packages/client/ui-primitives/src/TextShimmer.tsx
++++ b/packages/client/ui-primitives/src/TextShimmer.tsx
+@@ -44,8 +44,8 @@
+         <span className={clsx(css.content, contentClassName)}>{content}</span>
+       </DecorativeCopy.Provider>
+       {active && (
+-        // React 18 forwards inert as an empty string; a boolean is dropped.
+-        <span className={css.decoration} aria-hidden="true" {...{ inert: '' }}>
++        // React 19 forwards the standard boolean inert attribute.
++        <span className={css.decoration} aria-hidden="true" {...{ inert: true }}>
+           <span className={css.sweep}>
+             <DecorativeCopy.Provider value>
+               <span className={clsx(css.content, css.highlight, contentClassName)}>{content}</span>
+--- a/packages/client/ui-primitives/src/Tooltip.tsx
++++ b/packages/client/ui-primitives/src/Tooltip.tsx
+@@ -74,13 +74,25 @@
+   const id = useId()
+   const [pinned, setPinned] = useState(false)
+   const anchor = useRef<HTMLElement | null>(null)
+-  // React 18 keeps the element's ref outside props; forward it so wrapping an
+-  // anchor in Tooltip never silently severs the owner's ref.
+-  const childRef = (children as ReactElement<AnchorProps> & { ref?: Ref<HTMLElement> }).ref
++  // React 19 exposes the element ref through props and permits callback refs to
++  // return cleanup functions. Preserve that cleanup while retaining React 18
++  // callback refs' legacy null notification when no cleanup is returned.
++  const childRef = children.props.ref as Ref<HTMLElement> | undefined
+   const mergedRef = useCallback((el: HTMLElement | null) => {
+     anchor.current = el
+-    if (typeof childRef === 'function') childRef(el)
+-    else if (childRef != null) (childRef as MutableRefObject<HTMLElement | null>).current = el
++    let childCleanup: (() => void) | undefined
++    if (typeof childRef === 'function') {
++      const result = childRef(el)
++      if (typeof result === 'function') childCleanup = result
++    } else if (childRef != null) {
++      (childRef as MutableRefObject<HTMLElement | null>).current = el
++    }
++    return () => {
++      childCleanup?.()
++      if (childCleanup === undefined && typeof childRef === 'function') childRef(null)
++      if (childRef != null && typeof childRef !== 'function' && childRef.current === el) childRef.current = null
++      if (anchor.current === el) anchor.current = null
++    }
+   }, [childRef])
+   const [pos, setPos] = useState<DOMRect | null>(null)
+   const bubble = useRef<HTMLSpanElement | null>(null)
+--- a/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
++++ b/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
+@@ -53,7 +53,7 @@
+  * @returns Whether this component may build highlighted output.
+  */
+ export function useViewportHighlighting(
+-  target: RefObject<Element>,
++  target: RefObject<Element | null>,
+   lang: string | undefined,
+ ): boolean {
+   const supported = supportsHighlighting(lang)
+--- a/packages/client/ui-primitives/src/image-drag.ts
++++ b/packages/client/ui-primitives/src/image-drag.ts
+@@ -22,7 +22,7 @@
+   const source = useMemo<FileDragSource>(() => original === undefined
+     ? { kind: 'url', url: src, name, mediaType: '', resourceAddress }
+     : { kind: 'blob', blob: original, name, mediaType: original.type, resourceAddress }, [src, name, original, resourceAddress])
+-  const state = useRef<Preparation>()
++  const state = useRef<Preparation | undefined>(undefined)
+   const dragged = useRef(false)
+   const release = useCallback((): void => {
+     const previous = state.current
