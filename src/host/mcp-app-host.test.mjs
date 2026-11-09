@@ -177,3 +177,20 @@ test("unknown mutation outcomes are returned without a second dispatch", async (
   const readback = await host.call({ ...view, name: "open", arguments: { item: "p7", request_id: "r7" } });
   assert.equal(readback.structuredContent.revision, 3);
 });
+
+
+test("closing between catalog resolution and the caller continuation prevents dispatch", async () => {
+  for (const method of ["call", "read"]) {
+    const { host, calls } = fixture();
+    const view = await host.open({ threadId: "t1", server: "fixture", tool: "open" });
+    const original = host.currentCatalog.bind(host);
+    host.currentCatalog = async payload => {
+      const result = await original(payload);
+      queueMicrotask(() => host.close(view));
+      return result;
+    };
+    const before = calls.length;
+    await assert.rejects(host[method]({ ...view, name: "save", uri: view.resource.uri }), /closed/);
+    assert.equal(calls.slice(before).some(call => call.method !== "mcpServerStatus/list"), false);
+  }
+});

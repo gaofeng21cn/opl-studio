@@ -256,16 +256,19 @@ export class CodexAppServerTransport extends EventEmitter {
     });
   }
 
-  async request(method, params = {}, timeoutMs = this.requestTimeoutMs, { skipStart = false } = {}) {
-    if (!skipStart) return this.withActivity(() => this.#request(method, params, timeoutMs));
-    return this.#request(method, params, timeoutMs, true);
+  async request(method, params = {}, timeoutMs = this.requestTimeoutMs, { skipStart = false, beforeDispatch } = {}) {
+    if (!skipStart) return this.withActivity(() => this.#request(method, params, timeoutMs, false, beforeDispatch));
+    return this.#request(method, params, timeoutMs, true, beforeDispatch);
   }
 
-  async #request(method, params, timeoutMs, skipStart = false) {
+  async #request(method, params, timeoutMs, skipStart = false, beforeDispatch) {
     if (!skipStart) await this.start();
     if (!this.process?.stdin.writable) {
       throw new AppServerTransportError("app_server_unavailable", "codex app-server stdin is unavailable");
     }
+    // Local host lifecycle guard, never sent over JSON-RPC. Maintenance and
+    // start may have awaited after the caller checked its ephemeral binding.
+    beforeDispatch?.();
     const id = this.nextRequestId++;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {

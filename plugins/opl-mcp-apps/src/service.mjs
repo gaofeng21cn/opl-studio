@@ -112,11 +112,17 @@ export class McpAppHost {
     return { view, catalog };
   }
 
+  dispatch(payload, method, params, timeoutMs) {
+    const beforeDispatch = () => { this.binding(payload); };
+    beforeDispatch();
+    return this.transport.request(method, params, timeoutMs, { beforeDispatch });
+  }
+
   async call(payload) {
     const { view, catalog } = await this.currentCatalog(payload);
     const tool = Object.values(catalog.tools ?? {}).find(item => item.name === payload.name);
     if (!tool || !appVisible(tool)) fail("mcp_app_tool_denied", "The tool is not declared for this MCP App server");
-    return this.transport.request("mcpServer/tool/call", { threadId: view.threadId, server: view.server, tool: payload.name, arguments: object(payload.arguments) }, 120_000);
+    return this.dispatch(payload, "mcpServer/tool/call", { threadId: view.threadId, server: view.server, tool: payload.name, arguments: object(payload.arguments) }, 120_000);
   }
 
   async read(payload) {
@@ -125,7 +131,7 @@ export class McpAppHost {
     const declared = (catalog.resources ?? []).some(item => item.uri === payload.uri)
       || (payload.uri === view.uri && resourceUri(openingTool) === view.uri);
     if (!declared) fail("mcp_app_resource_denied", "The resource is not declared for this MCP App server");
-    return this.transport.request("mcpServer/resource/read", { threadId: view.threadId, server: view.server, uri: payload.uri, ...(view.callId ? { originCallId: view.callId } : {}) });
+    return this.dispatch(payload, "mcpServer/resource/read", { threadId: view.threadId, server: view.server, uri: payload.uri, ...(view.callId ? { originCallId: view.callId } : {}) });
   }
 
   close(payload) { this.binding(payload); this.views.delete(payload.id); return { closed: true }; }

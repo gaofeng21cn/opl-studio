@@ -44,3 +44,27 @@ test("a deferred reload wakes when the last in-flight request times out", async 
   await scheduled;
   assert.equal(reloaded, true, "the deferred reload runs once the transport is idle");
 });
+
+
+test("dispatch guards run after maintenance and startup before any JSON-RPC write", async () => {
+  for (const gate of ["maintenance", "startup"]) {
+    const transport = new CodexAppServerTransport();
+    const writes = [];
+    transport.process = { stdin: { writable: true, write: frame => writes.push(frame) } };
+    let release;
+    const pendingGate = new Promise(resolve => { release = resolve; });
+    transport.start = gate === "startup" ? () => pendingGate : async () => {};
+    if (gate === "maintenance") transport.maintenance = pendingGate;
+    let open = true;
+    const pending = transport.request("mcpServer/tool/call", { tool: "save" }, 1000, {
+      beforeDispatch: () => { if (!open) throw new Error("view closed"); }
+    });
+    open = false;
+    transport.maintenance = null;
+    release();
+    await assert.rejects(pending, /view closed/);
+    assert.deepEqual(writes, []);
+    assert.equal(transport.pending.size, 0);
+    assert.equal(transport.activeOperations, 0);
+  }
+});

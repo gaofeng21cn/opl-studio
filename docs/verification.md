@@ -62,15 +62,25 @@ is the command owner.
 ## Three-Carrier Candidate Evidence
 
 For the standard MCP App host, `npm run test:mcp-apps` checks resource formats,
-canonical completed-call reuse, tool visibility, thread/server isolation, CSP,
-and bounded model context. `npm run test:webui-host` covers the authenticated
+canonical completed-call reuse, live tool/resource visibility, thread/server
+isolation, connection reset and close-during-dispatch races, CSP, and bounded
+model context. `npm run test:webui-host` covers the authenticated
 HTTP bridge and initialize extension negotiation. Both are included in the
-normal source suites. Browser qualification uses the actual `McpAppWorkspace`
-component with the installed OPL Apps server and Relay's synthetic mail profile;
-verify view discovery, read/edit/context roundtrips, confirmation cancellation,
-opaque-origin isolation, and teardown. A synthetic mailbox must not call real
-send/publish actions. These checks do not constitute installed Desktop or
-published-carrier acceptance.
+normal source suites. `node scripts/smoke-mcp-apps.mjs` renders the actual
+`McpAppWorkspace`, Host and official SDK in a browser with a synthetic domain
+transport. It checks save/readback, reopen, stale revision, revocation,
+unknown-without-retry and structured results without UI.
+
+Add `--relay-root /absolute/path/to/opl-relay` to run the same host against Relay's
+real stdio server and SQLite owner with a temporary synthetic mailbox. This mode
+opens the exact draft, saves a UI edit, reads it through the Agent tool, rejects an
+old revision and reopens the same draft. `OPL_MCP_APP_SMOKE_OUTPUT` optionally
+selects a directory for screenshots and machine-readable results. The smoke
+requires the existing Studio dependencies, Bun and Playwright CLI/browser runtime.
+It closes its server, browser, profile and connection after execution. Neither
+mode sends mail or publishes content. These source/browser checks do not constitute
+installed Desktop or published-carrier acceptance; use the actual installed
+carrier and its owner readback for that layer.
 
 `npm run package` reads the `opl-studio` carrier evidence contract from the App
 root selected by `OPL_APP_REPO_ROOT`. It rejects tracked source changes, binds
