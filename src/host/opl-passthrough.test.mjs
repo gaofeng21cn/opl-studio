@@ -1034,6 +1034,37 @@ test("fast state keeps the complete package catalog and bounded runtime control 
   }
 });
 
+test("fast state preserves the bounded application-management projection", () => {
+  const compact = compactFastState({
+    app_state: {
+      application_management: {
+        surface_kind: "opl_application_management_projection.v1",
+        source_refs: Array.from({ length: 20 }, (_, index) => `source:${index}`),
+        shared_resources: Array.from({ length: 105 }, (_, index) => ({
+          resource_id: `connection:${index}`,
+          resource_kind: "connection",
+          label: `Connection ${index}`,
+          status: "unknown",
+          source_refs: [`resource:${index}`],
+          consumer_package_ids: [],
+          owner_settings_route: "connections",
+          relation_kind: "optional",
+          authorization: { status: "unknown", consumer_count: 0, grant_count: 0 }
+        })),
+        authority_boundary: { secrets_included: false, knowledge_bodies_included: false }
+      }
+    }
+  });
+
+  const projection = compact.app_state.application_management;
+  assert.equal(projection.surface_kind, "opl_application_management_projection.v1");
+  assert.equal(projection.source_refs.length, 16);
+  assert.equal(projection.shared_resources.length, 100);
+  assert.deepEqual(projection.shared_resources[0].authorization, { status: "unknown", consumer_count: 0, grant_count: 0 });
+  assert.deepEqual(projection.authority_boundary, { secrets_included: false, knowledge_bodies_included: false });
+  assert.deepEqual(projection.detail_policy, { detail: "startup", full_detail_surface: "opl app state --profile full --json#application_management" });
+});
+
 test("fast state keeps storage reasons, Docker WebUI actions, and safe personalization content", () => {
   const compact = compactFastState({
     app_state: {
