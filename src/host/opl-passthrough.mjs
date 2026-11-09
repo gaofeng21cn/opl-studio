@@ -40,6 +40,29 @@ function firstRecords(value, limit = 8) {
   return value;
 }
 
+function compactFastApplicationManagementProjection(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const sourceRefs = Array.isArray(value.source_refs)
+    ? value.source_refs.filter((entry) => typeof entry === "string").slice(0, 16)
+    : [];
+  const sharedResources = Array.isArray(value.shared_resources)
+    ? value.shared_resources.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)).slice(0, 100)
+    : [];
+  return {
+    surface_kind: "opl_application_management_projection.v1",
+    schema_version: "opl_application_management_projection.v1",
+    source_refs: sourceRefs,
+    shared_resources: sharedResources,
+    authority_boundary: value.authority_boundary && typeof value.authority_boundary === "object" && !Array.isArray(value.authority_boundary)
+      ? value.authority_boundary
+      : {},
+    detail_policy: {
+      detail: "startup",
+      full_detail_surface: "opl app state --profile full --json#application_management"
+    }
+  };
+}
+
 function compactFastState(value) {
   const root = value && typeof value === "object" ? value : {};
   const appState = root.app_state && typeof root.app_state === "object" ? root.app_state : root;
@@ -59,6 +82,7 @@ function compactFastState(value) {
       runtime_source: appState.runtime_source,
       meta: appState.meta,
       managed_update: compactManagedUpdateProjection(appState.managed_update),
+      application_management: compactFastApplicationManagementProjection(appState.application_management),
       core: compactCore(appState.core),
       provider: compactProvider(appState.provider),
       runtime_source_carriers: compactRuntimeSourceCarriers(appState.runtime_source_carriers),
