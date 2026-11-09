@@ -21,6 +21,6 @@
     "manifestVersion": 1
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.5"
+    "@deepseek-ai/cordis": "4.1.0"
   }
 }

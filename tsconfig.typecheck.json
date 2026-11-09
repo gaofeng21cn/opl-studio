@@ -12,6 +12,10 @@
       "@deepseek-ai/dsh-util-code-language": [
         "node_modules/@deepseek-ai/dsh-util-code-language/lib/types/index.d.ts"
       ]
-    }
+    },
+    "types": [
+      "react",
+      "react-dom"
+    ]
   }
 }

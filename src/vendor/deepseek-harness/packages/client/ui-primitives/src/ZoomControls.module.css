@@ -1,13 +1,19 @@
+/* Zero specificity lets an owner className move the toolbar regardless of stylesheet order. */
+:where(.panel) {
+  bottom: 14px;
+}
+
 .panel {
   position: absolute;
   z-index: 2;
   inset-inline-start: 50%;
-  bottom: 14px;
   display: flex;
   align-items: center;
   gap: 2px;
   box-sizing: border-box;
   padding: 4px 6px;
+  /* TODO: replace this border and the literal shadow with `border: 0` and `--dsw-elevation-panel`
+   * (docs/web-styling.md#component-rules), with visual review of the document preview. */
   border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: var(--dsw-radius-lg);
   color: var(--dsw-alias-label-primary);

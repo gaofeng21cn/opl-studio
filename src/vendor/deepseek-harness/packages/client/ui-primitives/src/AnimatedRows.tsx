@@ -1,14 +1,16 @@
-/** React-commit-driven movement and entry/exit fades for the sidebar's keyed rows. */
-import { Component, createRef, type ReactNode } from 'react'
+/** React-commit-driven movement and entry/exit fades for keyed rows. */
+import { Component, createRef, type AriaRole, type ReactNode } from 'react'
 import css from './AnimatedRows.module.css'
 
 const ROW_FADE_MS = 100
 const ROW_GLIDE_MS = 200
 
-interface AnimatedRowsProps {
+/** Keyed row content, list semantics, and animation readiness. */
+export interface AnimatedRowsProps {
   children: ReactNode
   className: string
-  label: string
+  role?: AriaRole
+  label?: string
   /** Unique DOM-order keys matching the rendered data-row-key attributes. */
   rowKeys: readonly string[]
   ready: boolean
@@ -38,7 +40,7 @@ function intersects(row: DOMRect, viewport: DOMRect): boolean {
 }
 
 /**
- * Animates keyed sidebar rows only when their rendered membership or order changes.
+ * Animates keyed rows only when their rendered membership or order changes.
  * Motion starts after the first pointer or keyboard input inside the mounted list.
  * The parent supplies a positioned container for the inert exit overlay.
  */
@@ -65,9 +67,7 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
       const clone = row.element.cloneNode(true) as HTMLElement
       clone.removeAttribute('data-row-key')
       clone.inert = true
-      clone.style.setProperty(
-        '--dsh-workspace-indent', getComputedStyle(row.element).getPropertyValue('--dsh-workspace-indent'),
-      )
+      clone.style.paddingInlineStart = getComputedStyle(row.element).paddingInlineStart
       removed.set(key, { ...row, element: clone })
     }
     return { positions, removed }
@@ -170,7 +170,7 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
       <div
         ref={this.list}
         className={this.props.className}
-        role="tree"
+        role={this.props.role}
         aria-label={this.props.label}
         onPointerDownCapture={() => { this.armed = true }}
         onKeyDownCapture={() => { this.armed = true }}
