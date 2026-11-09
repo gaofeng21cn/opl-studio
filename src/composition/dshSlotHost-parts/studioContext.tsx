@@ -6,7 +6,7 @@ import { zh as modelZh, en as modelEn } from "../../vendor/deepseek-harness/pack
 import { zh as agentZh, en as agentEn } from "../../vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts";
 import { zh as settingsZh, en as settingsEn } from "../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/locales.ts";
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode, type RefObject } from "react";
-import type { SettingsDestinationId } from "../../workbench/SettingsPanel";
+export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";
 import { workspaceEntries } from "../workspaceViewModel";
 
@@ -48,7 +48,6 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 }
 
 const focusableSelector = 'summary, button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-export const SettingsNavigationContext = createContext<{ destination: SettingsDestinationId | null; navigate(destination: SettingsDestinationId): void } | null>(null);
 export const SettingsContributionSlotContext = createContext<((options?: { only?: string }) => ReactNode) | null>(null);
 
 export function focusableElements(root: HTMLElement | null): HTMLElement[] {
@@ -66,6 +65,8 @@ export function useSettingsDialogFocus(rootRef: RefObject<HTMLElement | null>) {
     let restoreTarget: HTMLElement | null = null;
     const trapFocus = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !dialog) return;
+      const activeModal = document.activeElement?.closest<HTMLElement>('[role="dialog"][aria-modal="true"]');
+      if (activeModal && activeModal !== dialog) return;
       const focusable = focusableElements(dialog);
       if (focusable.length === 0) {
         event.preventDefault();

@@ -5,6 +5,7 @@ import { RiskConfirmation } from "@deepseek-ai/dsh-client-ui-primitives";
 import { FeatureStatusPanel } from "./FeatureStatusPanel";
 
 import { AlertCircle, CheckCircle2, LoaderCircle, RefreshCw } from "lucide-react";
+import { useContext, useEffect, useRef, useState } from "react";
 
 import { type SettingsActionRequest } from "./settingsActions";
 
@@ -15,7 +16,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "settings.theme": ThemeKey;
   }
 }
-import { SettingsPanelProps } from "./settings/types";
+import { SettingsNavigationContext, type SettingsDestinationId, type SettingsMobileView, type SettingsPanelProps } from "./settings/types";
 
 import { formatBytes } from "./settings/presentation";
 
@@ -28,8 +29,6 @@ import { StorageSettingsPage } from "./settings/pages/StorageSettingsPage";
 import { AgentsSettingsPage } from "./settings/pages/AgentsSettingsPage";
 import { CapabilitiesSettingsPage } from "./settings/pages/CapabilitiesSettingsPage";
 import { InstructionsSettingsPage } from "./settings/pages/InstructionsSettingsPage";
-import { MemorySettingsPage } from "./settings/pages/MemorySettingsPage";
-import { SchedulesSettingsPage } from "./settings/pages/SchedulesSettingsPage";
 import { ServicesSettingsPage } from "./settings/pages/ServicesSettingsPage";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { DiagnosticsSettingsPage } from "./settings/pages/DiagnosticsSettingsPage";
@@ -46,8 +45,60 @@ export * from "./settings/instructions";
 export * from "./settings/actions";
 export * from "./settings/maintenance";
 export function SettingsPanel(props: SettingsPanelProps) {
-const context = useSettingsPageContext(props);
-const { settings, copy, selectedDestination, zh, stateStatus, actionBusyKey, gatewayAction, onAction, refreshPage, pagePresentation, activeGroup, onNavigate, setSubDestination, localNotice, onRefresh, actionFeedback, feedbackDestinationRef, actionReceipt, model, permissionConfirmation, permissionAcknowledged, setPermissionAcknowledged, setPermissionConfirmation, onSettingChange, pendingConfirmation, confirmationDialogRef, onCancelAction, confirmationCancelRef, onConfirmAction } = context;
+const navigation = useContext(SettingsNavigationContext);
+const [fallbackMobileView, setFallbackMobileView] = useState<SettingsMobileView>("categories");
+const mobileNavigation = props.mobileNavigation ?? (navigation
+  ? { view: navigation.mobileView, setView: navigation.setMobileView }
+  : { view: fallbackMobileView, setView: setFallbackMobileView });
+const mobileView = mobileNavigation.view;
+const setMobileView = mobileNavigation.setView;
+const context = useSettingsPageContext({ ...props, mobileNavigation });
+const { settings, copy, selectedDestination, zh, stateStatus, actionBusyKey, gatewayAction, onAction, refreshPage, pagePresentation, activeGroup, onNavigate, setSubDestination, localNotice, onRefresh, actionFeedback, feedbackDestinationRef, actionReceipt, model, permissionConfirmation, permissionAcknowledged, setPermissionAcknowledged, setPermissionConfirmation, onSettingChange, pendingConfirmation, confirmationDialogRef, onCancelAction, confirmationCancelRef, onConfirmAction, groups } = context;
+const [mobileViewport, setMobileViewport] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches);
+const hasDestinationTabs = Boolean(activeGroup && activeGroup.destinations.length > 1);
+const usesDestinationTabs = hasDestinationTabs && !mobileViewport;
+const destinationLabel = activeGroup?.destinations.find((destination) => destination.id === selectedDestination)?.label ?? copy[selectedDestination];
+const headingId = `settings-heading-${selectedDestination}`;
+const panelRef = useRef<HTMLElement | null>(null);
+const previousDestination = useRef(selectedDestination);
+const selectDestination = (destination: SettingsDestinationId) => onNavigate ? onNavigate(destination) : setSubDestination(destination);
+const selectMobileDestination = (destination: SettingsDestinationId) => {
+  setMobileView("destinations");
+  selectDestination(destination);
+};
+useEffect(() => {
+  const media = window.matchMedia("(max-width: 640px)");
+  const update = () => setMobileViewport(media.matches);
+  media.addEventListener("change", update);
+  return () => media.removeEventListener("change", update);
+}, []);
+useEffect(() => {
+  if (previousDestination.current !== selectedDestination) {
+    previousDestination.current = selectedDestination;
+    if (selectedDestination === "about") setMobileView("about");
+    else if (activeGroup) setMobileView("destinations");
+  }
+}, [activeGroup?.id, selectedDestination, setMobileView]);
+useEffect(() => {
+  if (!mobileViewport) return;
+  const frame = requestAnimationFrame(() => {
+    const panel = panelRef.current;
+    const nav = panel?.querySelector<HTMLElement>(".settings-mobile-nav");
+    let target: HTMLElement | null | undefined;
+    if (mobileView === "categories") {
+      target = nav?.querySelector<HTMLElement>('.settings-mobile-categories [aria-current="true"]')
+        ?? nav?.querySelector<HTMLElement>(".settings-mobile-categories button");
+    } else {
+      target = nav?.querySelector<HTMLElement>('.settings-mobile-destinations [aria-current="page"]')
+        ?? panel?.querySelector<HTMLElement>(".settings-detail-header h1");
+    }
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panel?.contains(active) && active.getClientRects().length > 0
+      && (active === target || active.closest(".settings-content"))) return;
+    target?.focus({ preventScroll: true });
+  });
+  return () => cancelAnimationFrame(frame);
+}, [mobileView, mobileViewport, selectedDestination]);
 function renderContent() { switch (context.selectedDestination) {
 case "overview": return <OverviewSettingsPage {...context} />;
 case "account": return <AccountSettingsPage {...context} />;
@@ -58,8 +109,6 @@ case "storage": return <StorageSettingsPage {...context} />;
 case "agents": return <AgentsSettingsPage {...context} />;
 case "capabilities": return <CapabilitiesSettingsPage {...context} />;
 case "instructions": return <InstructionsSettingsPage {...context} />;
-case "memory": return <MemorySettingsPage {...context} />;
-case "schedules": return <SchedulesSettingsPage {...context} />;
 case "services": return <ServicesSettingsPage {...context} />;
 case "updates": return <UpdatesSettingsPage {...context} />;
 case "diagnostics": return <DiagnosticsSettingsPage {...context} />;
@@ -67,11 +116,25 @@ case "preferences": return <PreferencesSettingsPage {...context} />;
 default: return <AboutSettingsPage {...context} />;
 } }
 return (
-    <section data-testid="opl-settings-panel" className="settings-page" aria-label={settings.locale === "zh" ? "设置" : "Settings"}>
+    <section ref={panelRef} data-testid="opl-settings-panel" className="settings-page" data-mobile-nav={mobileView} aria-label={settings.locale === "zh" ? "设置" : "Settings"}>
       <div className="settings-detail">
+        <nav className="settings-mobile-nav" aria-label={settings.locale === "zh" ? "设置分类" : "Settings categories"}>
+          {mobileView === "about" ? <>
+            <button type="button" className="settings-mobile-back" onClick={() => setMobileView("categories")}>{settings.locale === "zh" ? "返回设置分类" : "Back to settings categories"}</button>
+          </> : mobileView === "destinations" && activeGroup ? <>
+            <button type="button" className="settings-mobile-back" onClick={() => setMobileView("categories")}>{settings.locale === "zh" ? "返回设置分类" : "Back to settings categories"}</button>
+            {hasDestinationTabs ? <strong>{activeGroup.label}</strong> : null}
+            {activeGroup.destinations.length > 1 ? <nav className="settings-mobile-destinations" aria-label={activeGroup.label}>
+              {activeGroup.destinations.map((destination) => <button key={destination.id} type="button" aria-current={destination.id === selectedDestination ? "page" : undefined} onClick={() => selectMobileDestination(destination.id)}>{destination.label}</button>)}
+            </nav> : null}
+          </> : mobileView === "categories" ? <div className="settings-mobile-categories">
+            {groups.map((group) => <button key={group.id} type="button" aria-current={group.id === activeGroup?.id ? "true" : undefined} onClick={() => { setMobileView("destinations"); selectDestination(group.destinations[0]!.id); }}>{group.label}</button>)}
+            <button type="button" className="settings-mobile-about" aria-current={selectedDestination === "about" ? "true" : undefined} onClick={() => { setMobileView("about"); selectDestination("about"); }}>{copy.about}</button>
+          </div> : null}
+        </nav>
         <header className="settings-detail-header">
           <div className="settings-detail-title-row">
-            <h1>{copy[selectedDestination]}</h1>
+            <h1 id={headingId} tabIndex={-1}>{usesDestinationTabs ? activeGroup!.label : destinationLabel}</h1>
             {selectedDestination !== "preferences" && selectedDestination !== "about" ? (
               <button type="button" className="settings-icon-button settings-page-refresh"
                 aria-label={selectedDestination === "account" ? (zh ? "刷新账户与用量" : "Refresh account and usage") : (zh ? "刷新本页" : "Refresh this page")}
@@ -83,18 +146,38 @@ return (
           </div>
           <p className="settings-detail-description">{pagePresentation.description}</p>
           {activeGroup && activeGroup.destinations.length > 1 ? (
-            <nav className="settings-subnav" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} sections`}>
+            <nav className="settings-subnav" role="tablist" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} destinations`}>
               {activeGroup.destinations.map((destination) => (
                 <button key={destination.id} type="button"
+                  role="tab"
+                  tabIndex={destination.id === selectedDestination ? 0 : -1}
                   aria-current={destination.id === selectedDestination ? "page" : undefined}
-                  onClick={() => onNavigate ? onNavigate(destination.id) : setSubDestination(destination.id)}>
+                  aria-selected={destination.id === selectedDestination}
+                  aria-controls="settings-tabpanel"
+                  id={`settings-tab-${destination.id}`}
+                  onKeyDown={(event) => {
+                    const tabs = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+                    const index = tabs.indexOf(event.currentTarget);
+                    const nextIndex = event.key === "ArrowRight" || event.key === "ArrowDown" ? (index + 1) % tabs.length
+                      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (index - 1 + tabs.length) % tabs.length
+                        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+                    if (nextIndex < 0 || tabs.length === 0) return;
+                    event.preventDefault();
+                    const nextTab = tabs[nextIndex]!;
+                    nextTab.focus();
+                    const nextDestination = activeGroup.destinations[nextIndex]!.id;
+                    selectDestination(nextDestination);
+                    if (onNavigate) requestAnimationFrame(() => document.getElementById(`settings-tab-${nextDestination}`)?.focus());
+                  }}
+                  onClick={() => selectDestination(destination.id)}>
                   {destination.label}
                 </button>
               ))}
             </nav>
           ) : null}
         </header>
-        <div className="settings-content" data-section={selectedDestination}>
+        <div className="settings-content" id="settings-tabpanel" role={usesDestinationTabs ? "tabpanel" : "region"} tabIndex={usesDestinationTabs ? 0 : -1}
+          aria-labelledby={usesDestinationTabs ? `settings-tab-${selectedDestination}` : headingId} data-section={selectedDestination}>
           {localNotice ? <p className="settings-inline-note" role="status">{localNotice}</p> : null}
           {stateStatus !== "ready" && selectedDestination !== "preferences" && selectedDestination !== "about" ? (
             <div className="settings-state-notice" role="status" data-testid="opl-settings-state-notice">

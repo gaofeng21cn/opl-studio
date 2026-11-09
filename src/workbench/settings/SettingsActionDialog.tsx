@@ -25,6 +25,7 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
                 onCancelAction();
                 return;
               }
+              event.stopPropagation();
               trapDialogFocus(event, confirmationDialogRef.current);
             }}
           >

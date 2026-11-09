@@ -2,6 +2,11 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
   [data-shortcut-modal="settings"][role="dialog"] > nav + div > div:last-child { padding: 0 0 24px; }
   [data-shortcut-modal="settings"][role="dialog"] > nav button > svg { display: none; }
   [data-shortcut-modal="settings"][role="dialog"] > nav button { min-height: 40px; height: auto; }
+  [data-shortcut-modal="settings"][role="dialog"] > nav > .nav-list,
+  [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child { flex: 1 1 auto; min-height: 0; }
+  [data-shortcut-modal="settings"][role="dialog"] nav [class*="navList"] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  [data-shortcut-modal="settings"][role="dialog"] nav [class*="navList"] > button:has(.opl-settings-nav-label[data-opl-settings-auxiliary="about"]) { margin-top: auto; position: relative; }
+  [data-shortcut-modal="settings"][role="dialog"] nav [class*="navList"] > button:has(.opl-settings-nav-label[data-opl-settings-auxiliary="about"])::before { content: ""; position: absolute; inset-inline: 10px; top: -5px; border-top: 1px solid var(--dsw-alias-border-l2); }
   .settings-state-notice { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 14px 16px; background: var(--opl-hover); border: 1px solid var(--opl-border); border-radius: 10px; color: var(--opl-muted); }
   .settings-state-notice > svg { flex: none; }
   .settings-state-notice > span { flex: 1; }
@@ -12,6 +17,7 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
   .settings-font-size [class*="arrows_"] { opacity: 1; }
   .settings-font-size [class*="stepper_"] { min-width: 88px; padding-right: 20px; }
   .settings-detail-header, .settings-content { padding-left: 24px; padding-right: 24px; }
+  .settings-mobile-nav { display: none; }
   .settings-detail-title-row { flex-wrap: nowrap; align-items: center; }
   .settings-subnav { flex-wrap: wrap; }
   .settings-subnav button { white-space: nowrap; }
@@ -31,7 +37,8 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
     [data-shortcut-modal="settings"][role="dialog"] > nav > div:first-child { position: relative; width: auto; height: auto; overflow: visible; padding: 0 0 8px; }
     [data-shortcut-modal="settings"] .sss-wrap { margin-right: 34px; }
     [data-shortcut-modal="settings"] .sss-title { display: none; }
-    [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
+    [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child { display: none; }
+    [data-shortcut-modal="settings"][role="dialog"] nav [class*="navList"] { flex-direction: row; }
     [data-shortcut-modal="settings"][role="dialog"] > nav button { flex: none; padding: 8px 10px; height: 38px; }
     .opl-settings-nav-label > svg { display: none; }
     .opl-settings-nav-label { white-space: nowrap; }
@@ -40,6 +47,16 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
     .settings-detail-header { padding-top: 12px; padding-bottom: 16px; }
     .settings-detail-header, .settings-content { padding-left: 16px; padding-right: 16px; }
     .settings-detail-title-row { gap: 12px; }
+    .settings-mobile-nav { display: block; padding: 12px 16px 0; }
+    .settings-page[data-mobile-nav="categories"] .settings-detail-header,
+    .settings-page[data-mobile-nav="categories"] .settings-content { display: none; }
+    .settings-mobile-categories, .settings-mobile-destinations { display: grid; gap: 4px; }
+    .settings-mobile-nav button { width: 100%; min-height: 40px; padding: 8px 12px; border: 0; border-radius: var(--dsw-radius-md, 12px); background: transparent; color: var(--dsw-alias-label-primary); font: inherit; text-align: left; }
+    .settings-mobile-nav button:hover, .settings-mobile-nav button[aria-current="true"], .settings-mobile-nav button[aria-current="page"], .settings-mobile-nav button[aria-selected="true"] { background: var(--dsw-alias-interactive-bg-active); }
+    .settings-mobile-back { color: var(--dsw-alias-label-secondary) !important; }
+    .settings-mobile-about { margin-top: 8px; border-top: 1px solid var(--dsw-alias-border-l2) !important; border-radius: 0 !important; }
+    .settings-mobile-nav > strong { display: block; padding: 8px 12px; font-size: 14px; font-weight: 500; }
+    .settings-page .settings-subnav { display: none; }
 
     /* DSH mounts its settings dialog through a portal, outside the local
        settings slot root. Keep the same mobile layout for that shell. */
@@ -63,11 +80,7 @@ export const codexWorkbenchStyleSettingsIntegration = `  /* OPL navigation conte
       overflow: visible;
     }
     [data-shortcut-modal="settings"][role="dialog"] > nav > div:last-child {
-      display: flex;
-      flex-direction: row;
-      overflow-x: auto;
-      gap: 4px;
-      padding-bottom: 0;
+      display: none;
     }
     [data-shortcut-modal="settings"][role="dialog"] > nav button {
       width: auto;

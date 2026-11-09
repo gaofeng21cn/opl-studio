@@ -64,12 +64,26 @@ test("settings navigation exposes primary categories with related destinations g
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("capabilities", "zh").map((destination) => destination.id),
-    ["capabilities", "agents", "instructions", "memory"]
+    ["capabilities", "agents", "instructions"]
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("services", "zh").map((destination) => destination.id),
-    ["services", "schedules", "updates", "diagnostics"]
+    ["services", "updates", "diagnostics"]
   );
+  assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "about"), true);
+  assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "schedules" || destination.id === "memory"), false);
+  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.label, "连接与部署");
+  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.label, "Connections & Deployment");
+  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "资源与连接");
+  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Resources & Connections");
+  assert.match(settingsSource, /role="tablist"/);
+  assert.match(settingsSource, /role=\{usesDestinationTabs \? "tabpanel" : "region"\}/);
+  assert.match(settingsSource, /ArrowRight|ArrowLeft/);
+  assert.match(settingsSource, /settings-memory-context/);
+  assert.match(settingsSource, /settings-mobile-back/);
+  assert.match(settingsSource, /data-mobile-nav/);
+  assert.match(settingsSource, /onOpenSchedules/);
+  assert.match(settingsSource, /groups\.find\(\(group\) => group\.destinations\.some\(\(destination\) => destination\.id === selectedDestination\)\)/);
 });
 
 test("settings pages expose a purpose statement for every destination", () => {
@@ -335,9 +349,12 @@ test("Gateway access presentation keeps none, API Key, and account states mutual
   } as never, "ready"), "none");
 });
 
-test("settings uses the selected destination as the single page heading", () => {
-  assert.match(settingsSource, /<h1>\{copy\[selectedDestination\]\}<\/h1>/);
-  assert.doesNotMatch(settingsSource, /<h1>\{activeGroup\?\.label \?\? copy\[selectedDestination\]\}<\/h1>/);
+test("settings uses one group heading and a named destination panel", () => {
+  assert.match(settingsSource, /<h1[^>]*>\{usesDestinationTabs \? activeGroup!\.label : destinationLabel\}<\/h1>/);
+  assert.match(settingsSource, /aria-controls="settings-tabpanel"/);
+  assert.match(settingsSource, /aria-labelledby=\{usesDestinationTabs \? `settings-tab-\$\{selectedDestination\}` : headingId\}/);
+  assert.match(settingsSource, /event\.key === "Home"/);
+  assert.match(settingsSource, /event\.key === "End"/);
   assert.match(settingsSource, /activeGroup\.destinations\.map/);
   assert.match(settingsSource, /aria-current=\{destination\.id === selectedDestination \? "page" : undefined\}/);
 });

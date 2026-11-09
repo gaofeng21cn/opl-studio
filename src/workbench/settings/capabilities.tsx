@@ -5,7 +5,7 @@ import type { AgentPackageLifecycleRef } from "../workbenchModel";
 
 import type { WorkbenchSettings } from "../settingsModel";
 
-import { SettingsDestinationId } from "./types";
+import { SettingsContextDestinationId } from "./types";
 import { SettingsGroup, SettingRow, StatusValue, OfficialDshCapability } from "./primitives";
 import { localizedPackageDescription, agentPackagePresentationStatus, packageDependencyPresentationStatus, isCapabilityCatalogPackage } from "./packages";
 
@@ -35,10 +35,12 @@ export function CapabilityDirectory({
   locale,
   showTechnicalDetails,
   onRefresh,
-  onNavigate
+  onNavigate,
+  onOpenSchedules
 }: {
   catalog: CodexCapabilityCatalog;
-  onNavigate?: (destination: SettingsDestinationId) => void;
+  onNavigate?: (destination: SettingsContextDestinationId) => void;
+  onOpenSchedules?: () => void;
   packageLifecycle: AgentPackageLifecycleRef[];
   status: "idle" | "loading" | "ready" | "error";
   error: string;
@@ -136,7 +138,8 @@ export function CapabilityDirectory({
   return (
     <section className="settings-capability-directory" data-testid="opl-settings-capability-directory">
       <SettingsGroup title={locale === "zh" ? "按用途配置" : "Configure by purpose"}>
-        {([{ destination: "resources", zh: "连接账户与外部应用", en: "Connect accounts and apps" }, { destination: "agents", zh: "安装专业智能体", en: "Install specialist agents" }, { destination: "instructions", zh: "调整助手行为", en: "Customize assistant behavior" }, { destination: "memory", zh: "查看与纠正记忆", en: "Review and correct memory" }, { destination: "schedules", zh: "安排自动任务", en: "Schedule work" }] as const).map(item => <SettingRow key={item.destination} label={item[locale]}><button className="settings-inline-command" onClick={() => onNavigate?.(item.destination)}>{locale === "zh" ? "打开" : "Open"}</button></SettingRow>)}
+        {([{ destination: "resources", zh: "连接账户与外部应用", en: "Connect accounts and apps" }, { destination: "agents", zh: "安装专业智能体", en: "Install specialist agents" }, { destination: "instructions", zh: "调整助手行为", en: "Customize assistant behavior" }, { destination: "memory", zh: "查看与纠正记忆", en: "Review and correct memory" }] as const).map(item => <SettingRow key={item.destination} label={item[locale]}><button type="button" className="settings-inline-command" onClick={() => onNavigate?.(item.destination)}>{locale === "zh" ? "打开" : "Open"}</button></SettingRow>)}
+        {onOpenSchedules ? <SettingRow label={locale === "zh" ? "安排自动任务" : "Schedule work"}><button className="settings-inline-command" onClick={onOpenSchedules}>{locale === "zh" ? "打开计划任务" : "Open scheduled tasks"}</button></SettingRow> : null}
       </SettingsGroup>
       <div className="settings-capability-toolbar">
         <label className="settings-search-field">

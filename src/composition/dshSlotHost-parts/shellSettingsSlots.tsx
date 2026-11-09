@@ -8,6 +8,7 @@ import type { createSettingsShellStore } from "../../vendor/deepseek-harness/pac
 import { createEcosystemLocale, mountSettingsSearch } from "../../integrations/deepseek-harness/ecosystemClients";
 import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../../integrations/deepseek-harness/ecosystemSettingsSearch";
 import { settingsDestinations, settingsSubDestinations, searchableSettings, type SettingsDestinationId } from "../../workbench/SettingsPanel";
+import type { SettingsMobileView } from "../../workbench/settings/types";
 import { settingsContributionDestination, type OplUiContribution } from "../contributionProjection";
 import {
   SettingsContributionSlotContext,
@@ -134,10 +135,14 @@ export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiC
   const targetFor = (destination: SettingsDestinationId, label: string, rowLabel?: string, keywords?: string) => {
     const page = pages.find(page => settingsSubDestinations(page.id, locale).some(item => item.id === destination))!;
     const subpages = settingsSubDestinations(page.id, locale);
-    return { label, pageLabel: page.label, subpageLabel: subpages.length > 1 ? subpages.find(item => item.id === destination)!.label : undefined, rowLabel, keywords };
+    return { label, pageLabel: page.label, destination, subpageLabel: subpages.length > 1 ? subpages.find(item => item.id === destination)!.label : undefined, rowLabel, keywords };
   };
   const targets = pages.flatMap(page => settingsSubDestinations(page.id, locale).map(item => targetFor(item.id, item.label)));
-  for (const entry of searchableSettings) targets.push(targetFor(entry.destination, entry.labels[locale === "zh" ? 0 : 1], entry.labels[locale === "zh" ? 0 : 1], `${entry.labels.join(" ")} ${entry.keywords ?? ""}`));
+  for (const entry of searchableSettings) {
+    const label = entry.labels[locale === "zh" ? 0 : 1];
+    const destination = entry.destination === "memory" ? "instructions" : entry.destination;
+    targets.push({ ...targetFor(destination, label, entry.destination === "memory" ? (locale === "zh" ? "记忆与纠错" : "Memory and corrections") : label, `${entry.labels.join(" ")} ${entry.keywords ?? ""}`), destination });
+  }
   for (const entry of contributions.filter(entry => entry.slot === "settings.section" && entry.view)) {
     const destination = settingsContributionDestination(entry);
     if (!destination) continue;
@@ -149,8 +154,11 @@ export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiC
 
 export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: boolean; renderSlot: any } & PropsStore<ReturnType<typeof createSettingsShellStore>>) {
   const studio = useStudio();
+  const settingsOpen = useStore((state) => state.open);
   const ctx = useClientContext();
   const [navigatedDestination, setNavigatedDestination] = useState<SettingsDestinationId | null>(null);
+  const [mobileView, setMobileView] = useState<SettingsMobileView>("categories");
+  useEffect(() => { if (!settingsOpen) setMobileView("categories"); }, [settingsOpen]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useSettingsDialogFocus(rootRef);
   const localeRef = useRef(studio.locale);
@@ -160,7 +168,7 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
   const searchLocale = useRef(createEcosystemLocale(() => localeRef.current));
   useEffect(() => { searchLocale.current.refresh(); }, [studio.locale, studio.uiContributions]);
   useEffect(() => rootRef.current
-    ? installSettingsSearchInteraction(document.body, () => settingsSearchTargets(localeRef.current, contributionsRef.current), () => localeRef.current)
+    ? installSettingsSearchInteraction(document.body, () => settingsSearchTargets(localeRef.current, contributionsRef.current), () => localeRef.current, setMobileView)
     : undefined, []);
   useEffect(() => {
     let active = true;
@@ -177,7 +185,7 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
   const studioRows = settingsDestinations(studio.locale).map((destination, index) => ({
     id: settingsSectionId(destination.id),
     order: index * 10,
-    label: <span className="opl-settings-nav-label">{(() => {
+    label: <span className="opl-settings-nav-label" data-opl-settings-auxiliary={destination.id === "about" ? "about" : undefined}>{(() => {
       const Icon = ({ overview: Gauge, account: UserRound, resources: Cable, workspace: Folder, capabilities: Puzzle, agents: Bot, services: Activity, preferences: SlidersHorizontal, about: CircleHelp } as const)[destination.id as "overview"];
       return <Icon aria-hidden="true" size={16} />;
     })()}<span>{destination.label}</span></span>
@@ -200,14 +208,20 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
     : undefined;
   useEffect(() => {
     if (!requestedSettings) return;
+    if (requestedSettings.open && requestedSettings.destination) {
+      setMobileView(requestedSettings.destination === "about" ? "about" : "destinations");
+    } else if (requestedSettings.open) {
+      setMobileView("categories");
+    }
     applySettingsShellNavigation(requestedSettings, actions, requestedPrimary ? settingsSectionId(requestedPrimary) : undefined);
   }, [requestedSettings?.revision, requestedSettings?.open, requestedPrimary, actions]);
   const navigate = (destination: SettingsDestinationId) => {
     setNavigatedDestination(destination);
+    setMobileView(destination === "about" ? "about" : "destinations");
     const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
     if (primary) actions.select(settingsSectionId(primary.id));
   };
-  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
+  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate, mobileView, setMobileView }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
 }
 
 export function SettingsTriggerSlot({ wide }: { wide: boolean }) {
@@ -240,5 +254,5 @@ export function SettingsMainSlot({ destination, close }: { destination: Settings
   // Keep the original DSH render signature available for source-contract checks;
   // navigation context adds cross-group destinations rendered by the same panel.
   // renderSettings(selected, renderContribution ?? undefined, setSelected, close)
-  return <>{studio.renderSettings(selected, renderContribution ?? undefined, navigation?.navigate ?? setSelected, close)}</>;
+  return <>{studio.renderSettings(selected, renderContribution ?? undefined, destination => { setSelected(destination); navigation?.navigate(destination); }, close)}</>;
 }

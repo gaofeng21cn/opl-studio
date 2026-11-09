@@ -4,7 +4,7 @@ import type { ActionReceiptView } from "../actionReceiptView";
 
 import { FontSizeRow } from "../../vendor/deepseek-harness/packages/client/ui-theme/src/client/FontSizeRow";
 
-import { type ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import type { CarrierDiagnosticsReadback, CodexCapabilityCatalog, NativeAppUpdateResult, OplInitializeReadback } from "../../bridge/oplBridge";
 import type { ManagedUpdateProjection, WorkbenchModel } from "../workbenchModel";
 import { type ResolvedCodexModelOption } from "../modelPolicy";
@@ -29,13 +29,22 @@ export type SettingsDestinationId =
   | "agents"
   | "capabilities"
   | "instructions"
-  | "memory"
-  | "schedules"
   | "services"
   | "updates"
   | "diagnostics"
   | "preferences"
   | "about";
+
+export type SettingsContextDestinationId = "resources" | "agents" | "instructions" | "memory";
+
+export type SettingsMobileView = "categories" | "destinations" | "about";
+
+export const SettingsNavigationContext = createContext<{
+  destination: SettingsDestinationId | null;
+  navigate(destination: SettingsDestinationId): void;
+  mobileView: SettingsMobileView;
+  setMobileView(view: SettingsMobileView): void;
+} | null>(null);
 
 export type SettingsGroupId =
   | "overview"
@@ -47,6 +56,10 @@ export type SettingsGroupId =
   | "preferences";
 
 export type SettingsPanelProps = {
+  mobileNavigation?: {
+    view: SettingsMobileView;
+    setView: (view: SettingsMobileView) => void;
+  };
   workbenchServices?: WorkbenchServicesClient;
   onClose?: () => void;
   onOpenSchedules?: () => void;

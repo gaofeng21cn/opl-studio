@@ -1,12 +1,18 @@
 export type SettingsSearchTarget = {
   label: string;
   pageLabel: string;
+  destination?: import("../../workbench/settings/types").SettingsDestinationId;
   subpageLabel?: string;
   rowLabel?: string;
 };
 
 /** Add Studio navigation and keyboard semantics around the unchanged plugin. */
-export function installSettingsSearchInteraction(root: HTMLElement, readTargets: () => SettingsSearchTarget[], readLocale: () => "zh" | "en"): () => void {
+export function installSettingsSearchInteraction(
+  root: HTMLElement,
+  readTargets: () => SettingsSearchTarget[],
+  readLocale: () => "zh" | "en",
+  setMobileView?: (view: import("../../workbench/settings/types").SettingsMobileView) => void,
+): () => void {
   let navigationObserver: MutationObserver | undefined;
   let navigationTimeout: ReturnType<typeof setTimeout> | undefined;
   let activeOption = -1;
@@ -47,13 +53,16 @@ export function installSettingsSearchInteraction(root: HTMLElement, readTargets:
     const dialog = root.querySelector<HTMLElement>('[data-shortcut-modal="settings"][role="dialog"]');
     if (!dialog) return;
     const buttons = () => [...dialog.querySelectorAll<HTMLButtonElement>("button")];
-    const page = buttons().find((button) => button.textContent?.trim() === target.pageLabel && !button.closest(".settings-subnav"));
+    const page = buttons().find((button) => button.textContent?.trim() === target.pageLabel && button.closest("nav") === dialog.querySelector(":scope > nav"));
     if (!page) return;
     input()?.blur();
+    setMobileView?.(target.destination === "about"
+      ? "about"
+      : "destinations");
     page.click();
     const finish = () => {
       if (target.subpageLabel) {
-        const subpage = buttons().find((button) => button.closest(".settings-subnav") && button.textContent?.trim() === target.subpageLabel);
+        const subpage = buttons().find((button) => button.closest(".settings-subnav, .settings-mobile-destinations") && button.textContent?.trim() === target.subpageLabel);
         if (!subpage) return;
         if (subpage.getAttribute("aria-current") !== "page") { subpage.click(); return; }
       }
@@ -67,12 +76,17 @@ export function installSettingsSearchInteraction(root: HTMLElement, readTargets:
         while (ancestor && ancestor !== dialog) { if (ancestor instanceof HTMLDetailsElement) ancestor.open = true; ancestor = ancestor.parentElement; }
         row.scrollIntoView({ block: "nearest" });
         row.animate([{ outline: "2px solid currentColor" }, { outline: "2px solid transparent" }], { duration: 1600 });
-        (row.querySelector<HTMLElement>("button:not([disabled]), input, select") ?? page).focus();
+        const control = row.querySelector<HTMLElement>("summary, button:not([disabled]), input, select, textarea");
+        if (control) control.focus();
+        else { row.tabIndex = -1; row.focus(); }
       } else {
-        const heading = dialog.querySelector<HTMLElement>(".settings-page h1");
-        if (!heading) return;
-        heading.tabIndex = -1;
-        heading.focus();
+        const destination = [
+          dialog.querySelector<HTMLElement>('.settings-mobile-destinations [aria-current="page"]'),
+          dialog.querySelector<HTMLElement>('.settings-subnav [aria-selected="true"]'),
+          dialog.querySelector<HTMLElement>(".settings-page h1"),
+        ].find((element) => element?.getClientRects().length);
+        if (!destination) return;
+        destination.focus();
       }
       clearNavigation();
     };

@@ -15,6 +15,7 @@ import { statusTone, gatewayConnectionPresentation, gatewayModelAccessState } fr
 import { agentPackagePresentationStatus, agentPackageHasHomeShortcutRoute, agentAvailabilityDetail, isAgentCatalogPackage } from "../settings/packages";
 
 export function useSettingsPageContext({
+  mobileNavigation,
   model,
   managedUpdate,
   actionViewModel: projectedActionViewModel,
@@ -74,10 +75,10 @@ export function useSettingsPageContext({
   const locale = settings.locale === "zh" ? "zh-CN" : "en-US";
   const copy = navigationCopy[settings.locale].destinations;
   const [subDestination, setSubDestination] = useState<SettingsDestinationId | null>(null);
-  const activeGroup = groups.find((group) => group.destinations.some((destination) => destination.id === activeDestination));
   const selectedDestination = !onNavigate && subDestination
     ? subDestination
     : activeDestination;
+  const activeGroup = groups.find((group) => group.destinations.some((destination) => destination.id === selectedDestination));
   const pagePresentation = settingsPagePresentationFor(selectedDestination, settings.locale);
   const [refreshRevision, setRefreshRevision] = useState(0);
   const [localNotice, setLocalNotice] = useState("");
@@ -90,7 +91,23 @@ export function useSettingsPageContext({
     if (selectedDestination === "overview") onRefreshInitialization();
   };
   const serviceRevision = `${actionReceipt?.receiptId ?? ""}:${refreshRevision}`;
-  const navigate = (destination: SettingsDestinationId) => onNavigate ? onNavigate(destination) : setSubDestination(destination);
+  const navigate = (destination: SettingsDestinationId | "memory") => {
+    if (destination === "memory") {
+      if (onNavigate) onNavigate("instructions");
+      else setSubDestination("instructions");
+      mobileNavigation?.setView("destinations");
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const memory = document.querySelector<HTMLDetailsElement>("#settings-memory-context");
+        if (!memory) return;
+        memory.open = true;
+        memory.scrollIntoView({ block: "start", behavior: "smooth" });
+        memory.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
+      }));
+      return;
+    }
+    if (onNavigate) onNavigate(destination);
+    else setSubDestination(destination);
+  };
   const runLocal = async (action: () => Promise<unknown>) => { try { await action(); setLocalNotice(""); } catch { setLocalNotice(settings.locale === "zh" ? "操作未完成，请重试。" : "Action failed. Please retry."); } };
   const projection = model.settingsProjection;
   const runtime = model.runtimeOverview;

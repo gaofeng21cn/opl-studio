@@ -5,7 +5,7 @@ import { componentReadinessStatus } from "../../settings/packages";
 import { RuntimeActionButton } from "../../settings/actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ServicesSettingsPage({ runtime, settings, projection, zh, navigate, copy, actionBusyKey, onAction, locale }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "navigate" | "copy" | "actionBusyKey" | "onAction" | "locale">) {
+export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpenSchedules, actionBusyKey, onAction, locale }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "onOpenSchedules" | "actionBusyKey" | "onAction" | "locale">) {
 
       const runtimeActions = runtime?.maintenanceActions ?? [];
       const serviceAction = runtimeActions.find((action) => action.actionId === (runtime?.temporal.serviceReady === false ? "provider_service_start" : "provider_service_status"));
@@ -19,7 +19,7 @@ export function ServicesSettingsPage({ runtime, settings, projection, zh, naviga
             <SettingRow label={settings.locale === "zh" ? "运行环境" : "Runtime environment"}><StatusValue status={projection?.statusSummary.runtimeSourceHealth} locale={settings.locale} /></SettingRow>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "后台任务" : "Background tasks"}>
-            <p className="settings-inline-note">{zh ? "服务状态只负责运行条件；创建与查看任务请打开计划任务。" : "Service status describes runtime requirements. Manage tasks in Scheduled Tasks."} <button className="settings-inline-command" type="button" onClick={() => navigate("schedules")}>{copy.schedules}</button></p>
+            <p className="settings-inline-note">{zh ? "服务状态只负责运行条件；创建与查看任务请在工作台的计划任务中管理。" : "Service status describes runtime requirements. Manage tasks in the workbench."} {onOpenSchedules ? <button className="settings-inline-command" type="button" onClick={onOpenSchedules}>{zh ? "打开计划任务" : "Open scheduled tasks"}</button> : null}</p>
             <SettingRow label={settings.locale === "zh" ? "任务服务" : "Task service"}>
               <span className="runtime-setting-control"><StatusValue status={componentReadinessStatus(runtime?.temporal.serviceReady, runtime?.temporal.serviceStatus)} locale={settings.locale} /><RuntimeActionButton action={serviceAction} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} /></span>
             </SettingRow>

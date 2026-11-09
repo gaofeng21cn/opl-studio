@@ -8,7 +8,7 @@ export const navigationCopy = {
     groups: {
       overview: "概览",
       account_models: "账户与模型",
-      connections_deployment: "连接与访问",
+      connections_deployment: "连接与部署",
       workspace: "工作区",
       agents_capabilities: "扩展与应用",
       runtime_maintenance: "运行与维护",
@@ -24,8 +24,6 @@ export const navigationCopy = {
       agents: "智能体",
       capabilities: "扩展与应用",
       instructions: "指令",
-      memory: "记忆",
-      schedules: "后台任务",
       services: "服务状态",
       updates: "更新与修复",
       diagnostics: "日志与诊断",
@@ -37,7 +35,7 @@ export const navigationCopy = {
     groups: {
       overview: "Overview",
       account_models: "Account & Models",
-      connections_deployment: "Connections & Access",
+      connections_deployment: "Connections & Deployment",
       workspace: "Workspace",
       agents_capabilities: "Extensions & Apps",
       runtime_maintenance: "Runtime & Maintenance",
@@ -53,8 +51,6 @@ export const navigationCopy = {
       agents: "Agents",
       capabilities: "Extensions & Apps",
       instructions: "Instructions",
-      memory: "Memory",
-      schedules: "Background tasks",
       services: "Service Status",
       updates: "Updates & Repair",
       diagnostics: "Logs & Diagnostics",
@@ -95,8 +91,7 @@ export function navigationGroups(locale: WorkbenchSettings["locale"]): Navigatio
       destinations: [
         { id: "capabilities", label: locale === "zh" ? "全部扩展" : "All extensions" },
         { id: "agents", label: copy.destinations.agents },
-        { id: "instructions", label: copy.destinations.instructions },
-        { id: "memory", label: copy.destinations.memory }
+        { id: "instructions", label: locale === "zh" ? "指令与上下文" : "Instructions & Context" }
       ]
     },
     {
@@ -104,7 +99,6 @@ export function navigationGroups(locale: WorkbenchSettings["locale"]): Navigatio
       label: copy.groups.runtime_maintenance,
       destinations: [
         { id: "services", label: copy.destinations.services },
-        { id: "schedules", label: copy.destinations.schedules },
         { id: "updates", label: copy.destinations.updates },
         { id: "diagnostics", label: copy.destinations.diagnostics }
       ]
@@ -136,7 +130,7 @@ export function settingsSubDestinations(
     ?.destinations ?? [{ id: "about", label: navigationCopy[locale].destinations.about }];
 }
 
-export const searchableSettings: Array<{ destination: SettingsDestinationId; labels: [string, string]; keywords?: string }> = [
+export const searchableSettings: Array<{ destination: SettingsDestinationId | "memory"; labels: [string, string]; keywords?: string }> = [
   { destination: "preferences", labels: ["语言", "Language"] },
   { destination: "preferences", labels: ["外观", "Appearance"], keywords: "theme dark light 主题 深色 浅色" },
   { destination: "preferences", labels: ["字号大小", "Font size"], keywords: "字体 字号" },
@@ -150,6 +144,7 @@ export const searchableSettings: Array<{ destination: SettingsDestinationId; lab
   { destination: "account", labels: ["今日用量", "Usage today"], keywords: "令牌 tokens 费用 cost" },
   { destination: "account", labels: ["累计用量", "Total usage"] },
   { destination: "models", labels: ["模型", "Model"], keywords: "推理 reasoning 自动 auto" },
+  { destination: "instructions", labels: ["记忆与纠错", "Memory and corrections"], keywords: "记忆 memory context 上下文" },
   { destination: "workspace", labels: ["当前项目", "Current project"], keywords: "文件夹 folder" },
   { destination: "diagnostics", labels: ["应用日志", "Application logs"] },
   { destination: "diagnostics", labels: ["反馈摘要", "Feedback summary"], keywords: "诊断 diagnostics" },
@@ -196,14 +191,6 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
   instructions: {
     zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "设置工作习惯与补充说明，管理新会话使用的上下文。" },
     en: { eyebrow: "Agents & capabilities · instructions & context", description: "Set working preferences and additional instructions for new conversations." }
-  },
-  memory: {
-    zh: { eyebrow: "记忆", description: "查看已保存的记忆，提交需要更正的内容。" },
-    en: { eyebrow: "Memory", description: "Review saved memory and submit corrections." }
-  },
-  schedules: {
-    zh: { eyebrow: "计划任务", description: "检查计划任务的运行条件，在工作台管理任务和查看结果。" },
-    en: { eyebrow: "Scheduled tasks", description: "Schedule tasks and review their next runs and results." }
   },
   services: {
     zh: { eyebrow: "运行与维护", description: "检查后台服务是否就绪，处理影响任务执行的问题。" },

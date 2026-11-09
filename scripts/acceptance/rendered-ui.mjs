@@ -142,12 +142,12 @@ try {
     return {
       open: Boolean(dialog),
       activeLabel: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim(),
-      sections: dialog ? Array.from(dialog.querySelectorAll('nav button')).map((item) => item.textContent?.trim()) : []
+      sections: dialog ? Array.from(dialog.querySelectorAll('button:has(.opl-settings-nav-label)')).map((item) => item.textContent?.trim()) : []
     };
   }`, cliRoot);
   assert.equal(settingsOpen.open, true);
   assert.equal(settingsOpen.activeLabel, "概览");
-  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "连接与访问", "工作区", "智能体与能力", "运行与维护", "偏好", "关于"]);
+  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "连接与部署", "工作区", "扩展与应用", "运行与维护", "偏好", "关于"]);
 
   const focusBounds = await evaluate(`() => {
     const dialog = document.querySelector('[role="dialog"]');
