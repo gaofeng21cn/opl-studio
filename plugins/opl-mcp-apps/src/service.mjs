@@ -25,7 +25,20 @@ function appResource(resource, catalog, uri) {
 // Only ephemeral view bindings live here. Codex owns connections, credentials,
 // tool approvals and thread state; the MCP server owns all domain operations.
 export class McpAppHost {
-  constructor(transport) { this.transport = transport; this.views = new Map(); }
+  constructor(transport) {
+    this.transport = transport;
+    this.views = new Map();
+    this.generation = 0;
+    this.disposed = false;
+    this.onAvailability = availability => {
+      if (availability.available === false) { this.generation++; this.views.clear(); }
+    };
+    transport.on?.("availability", this.onAvailability);
+  }
+
+  requireGeneration(generation) {
+    if (this.disposed || generation !== this.generation) fail("mcp_app_closed", "The MCP App connection changed; reopen the view");
+  }
 
   async catalog(threadId, serverName) {
     const servers = [];
@@ -54,8 +67,11 @@ export class McpAppHost {
 
   async open({ threadId, server, tool, arguments: args = {}, callId }) {
     required(threadId, "threadId"); required(server, "server"); required(tool, "tool");
+    const generation = this.generation;
+    this.requireGeneration(generation);
     if (this.views.size >= 16) fail("mcp_app_limit", "Close an existing MCP App first");
     const catalog = (await this.catalog(threadId, server)).find(entry => entry.name === server);
+    this.requireGeneration(generation);
     const declared = Object.values(catalog?.tools ?? {}).find(entry => entry.name === tool);
     const uri = resourceUri(declared);
     if (!declared || typeof uri !== "string" || !uri.startsWith("ui://")) fail("mcp_app_unavailable", "This tool has no available MCP App");
@@ -70,11 +86,13 @@ export class McpAppHost {
       if (declared.annotations?.readOnlyHint !== true) fail("mcp_app_open_requires_read", "Opening a view must not repeat a mutating tool");
       result = await this.transport.request("mcpServer/tool/call", { threadId, server, tool, arguments: object(args) }, 120_000);
     }
+    this.requireGeneration(generation);
     if (result.isError) fail("mcp_app_open_failed", result.content?.find(item => item.type === "text")?.text ?? "The MCP App could not open");
     const resource = await this.transport.request("mcpServer/resource/read", { threadId, server, uri, ...(callId ? { originCallId: callId } : {}) });
+    this.requireGeneration(generation);
     const content = appResource(resource, catalog, uri);
     const id = randomUUID();
-    this.views.set(id, { threadId, server, callId, tools: new Map(Object.values(catalog.tools).filter(appVisible).map(item => [item.name, item])), resources: new Set([uri, ...(catalog.resources ?? []).map(item => item.uri)]) });
+    this.views.set(id, { threadId, server, tool, uri, callId });
     return { id, threadId, server, tool, title: declared.title || tool, arguments: object(args), result, resource: content, resources: catalog.resources ?? [] };
   }
 
@@ -84,18 +102,32 @@ export class McpAppHost {
     return view;
   }
 
-  async call(payload) {
+  async currentCatalog(payload) {
     const view = this.binding(payload);
-    if (!view.tools.has(payload.name)) fail("mcp_app_tool_denied", "The tool is not declared for this MCP App server");
+    const catalog = (await this.catalog(view.threadId, view.server)).find(entry => entry.name === view.server);
+    // Closing the iframe or resetting the connection during discovery revokes
+    // this dispatch, too. Never authorize against the catalog captured at open.
+    this.binding(payload);
+    if (!catalog) fail("mcp_app_unavailable", "This MCP App server is no longer available");
+    return { view, catalog };
+  }
+
+  async call(payload) {
+    const { view, catalog } = await this.currentCatalog(payload);
+    const tool = Object.values(catalog.tools ?? {}).find(item => item.name === payload.name);
+    if (!tool || !appVisible(tool)) fail("mcp_app_tool_denied", "The tool is not declared for this MCP App server");
     return this.transport.request("mcpServer/tool/call", { threadId: view.threadId, server: view.server, tool: payload.name, arguments: object(payload.arguments) }, 120_000);
   }
 
   async read(payload) {
-    const view = this.binding(payload);
-    if (!view.resources.has(payload.uri)) fail("mcp_app_resource_denied", "The resource is not declared for this MCP App server");
+    const { view, catalog } = await this.currentCatalog(payload);
+    const openingTool = Object.values(catalog.tools ?? {}).find(item => item.name === view.tool);
+    const declared = (catalog.resources ?? []).some(item => item.uri === payload.uri)
+      || (payload.uri === view.uri && resourceUri(openingTool) === view.uri);
+    if (!declared) fail("mcp_app_resource_denied", "The resource is not declared for this MCP App server");
     return this.transport.request("mcpServer/resource/read", { threadId: view.threadId, server: view.server, uri: payload.uri, ...(view.callId ? { originCallId: view.callId } : {}) });
   }
 
   close(payload) { this.binding(payload); this.views.delete(payload.id); return { closed: true }; }
-  dispose() { this.views.clear(); }
+  dispose() { this.disposed = true; this.generation++; this.views.clear(); this.transport.off?.("availability", this.onAvailability); }
 }

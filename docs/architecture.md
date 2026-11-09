@@ -397,7 +397,11 @@ loopback default. Authentication and route ownership stay in the existing Studio
 `opl-mcp-apps` provides the Host service and the client components through Cordis.
 It injects the canonical Codex transport and owns ephemeral view bindings; Studio
 core only delegates. The client consumes the official ext-apps AppBridge, an
-opaque iframe and the existing authenticated bridges on every carrier.
+opaque iframe and the existing authenticated bridges on every carrier. UI tool
+and resource requests recheck the live server catalog before dispatch. Closing a
+view during discovery prevents that dispatch; a Codex connection reset invalidates
+all old view bindings, without changing durable domain tasks. Owner results and
+unknown outcomes pass through intact, and no tool call is retried by this host.
 
 Runtime task and research routes use the same Framework MCP App resource as
 Codex. Studio keeps cross-Agent summaries, while stage timelines, research paths,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { EventEmitter } from "node:events";
 import { McpAppHost } from "../../plugins/opl-mcp-apps/src/service.mjs";
 import { MCP_APP_MIME, MCP_APP_EXTENSION } from "./mcp-app-protocol.mjs";
 
@@ -11,13 +12,13 @@ function fixture() {
     modelOnly: { name: "modelOnly", _meta: { ui: { visibility: ["model"] } } },
     mutate: { name: "mutate", _meta: { ui: { resourceUri: "ui://fixture/review" } } }
   };
-  const transport = { request: async (method, params) => {
+  const transport = Object.assign(new EventEmitter(), { request: async (method, params) => {
     calls.push({ method, params });
     if (method === "mcpServerStatus/list") return { data: [{ name: "fixture", tools, resources: [] }] };
     if (method === "mcpServer/tool/call") return { content: [], structuredContent: { revision: 3 } };
     if (method === "mcpServer/resource/read") return { contents: [{ uri: params.uri, mimeType: MCP_APP_MIME, text: "<h1>Review</h1>" }] };
     throw new Error(method);
-  } };
+  } });
   return { host: new McpAppHost(transport), calls, tools, transport };
 }
 
@@ -57,7 +58,10 @@ test("does not execute a mutation to open a view or accept mismatched resources"
 test("keeps owner tool errors intact and disposes all ephemeral bindings", async () => {
   const { host, transport } = fixture();
   const view = await host.open({ threadId: "t1", server: "fixture", tool: "open" });
-  transport.request = async () => ({ isError: true, content: [{ type: "text", text: "revision conflict" }] });
+  const original = transport.request;
+  transport.request = async (method, params) => method === "mcpServer/tool/call"
+    ? { isError: true, content: [{ type: "text", text: "revision conflict" }] }
+    : original(method, params);
   assert.equal((await host.call({ ...view, name: "save" })).isError, true);
   host.dispose();
   assert.equal(host.views.size, 0);
@@ -102,4 +106,74 @@ test("decodes bounded HTML blobs and preserves resource-list CSP metadata", asyn
   assert.equal(view.resource._meta.ui.prefersBorder, true);
   blob = "invalid!";
   await assert.rejects(host.open({ threadId: "t1", server: "fixture", tool: "open" }), /supported MCP App/);
+});
+
+
+test("rechecks App visibility and resource declarations after a view has opened", async () => {
+  const { host, tools, calls } = fixture();
+  const view = await host.open({ threadId: "t1", server: "fixture", tool: "open" });
+  const before = calls.length;
+  tools.save._meta.ui.visibility = ["model"];
+  await assert.rejects(host.call({ ...view, name: "save", arguments: { revision: 3 } }), /not declared/);
+  delete tools.open;
+  await assert.rejects(host.read({ ...view, uri: view.resource.uri }), /not declared/);
+  assert.equal(calls.slice(before).some(call => call.method !== "mcpServerStatus/list"), false);
+});
+
+test("closing during live discovery prevents a pending operation from dispatching", async () => {
+  const { host, transport, calls } = fixture();
+  const view = await host.open({ threadId: "t1", server: "fixture", tool: "open" });
+  const original = transport.request;
+  let resume;
+  transport.request = async (method, params) => {
+    if (method === "mcpServerStatus/list") await new Promise(resolve => { resume = resolve; });
+    return original(method, params);
+  };
+  const before = calls.length;
+  const pending = host.call({ ...view, name: "save" });
+  host.close(view);
+  resume();
+  await assert.rejects(pending, /closed/);
+  assert.equal(calls.slice(before).some(call => call.method === "mcpServer/tool/call"), false);
+});
+
+test("connection reset revokes old bindings and a reopened view uses owner readback", async () => {
+  const { host, transport, calls } = fixture();
+  const view = await host.open({ threadId: "t1", server: "fixture", tool: "open", arguments: { item: "p7" } });
+  transport.emit("availability", { available: false });
+  transport.emit("availability", { available: true });
+  await assert.rejects(host.call({ ...view, name: "save" }), /closed/);
+  const reopened = await host.open({ threadId: "t1", server: "fixture", tool: "open", arguments: view.arguments });
+  assert.notEqual(reopened.id, view.id);
+  assert.deepEqual(reopened.arguments, { item: "p7" });
+  assert.deepEqual(calls.filter(call => call.method === "mcpServer/tool/call").map(call => call.params.tool), ["open", "open"]);
+  host.dispose();
+  assert.equal(transport.listenerCount("availability"), 0);
+});
+
+test("an open in flight cannot recreate a binding after connection reset", async () => {
+  const { host, transport } = fixture();
+  const original = transport.request;
+  transport.request = async (method, params) => {
+    const result = await original(method, params);
+    if (method === "mcpServer/resource/read") transport.emit("availability", { available: false });
+    return result;
+  };
+  await assert.rejects(host.open({ threadId: "t1", server: "fixture", tool: "open" }), /connection changed/);
+  assert.equal(host.views.size, 0);
+});
+
+test("unknown mutation outcomes are returned without a second dispatch", async () => {
+  const { host, transport, calls } = fixture();
+  const view = await host.open({ threadId: "t1", server: "fixture", tool: "open" });
+  const original = transport.request;
+  transport.request = async (method, params) => {
+    const result = await original(method, params);
+    if (method === "mcpServer/tool/call" && params.tool === "save") throw new Error("outcome_unknown; inspect the owner receipt");
+    return result;
+  };
+  await assert.rejects(host.call({ ...view, name: "save", arguments: { revision: 3, request_id: "r7" } }), /outcome_unknown/);
+  assert.equal(calls.filter(call => call.method === "mcpServer/tool/call" && call.params.tool === "save").length, 1);
+  const readback = await host.call({ ...view, name: "open", arguments: { item: "p7", request_id: "r7" } });
+  assert.equal(readback.structuredContent.revision, 3);
 });
