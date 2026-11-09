@@ -1,5 +1,6 @@
 import { Context } from "@deepseek-ai/cordis";
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { Window } from "happy-dom";
 import { readFileSync } from "node:fs";
 import {
   OPL_UI_CONTRIBUTION_SLOTS,
@@ -73,7 +74,31 @@ test("startup does not retry unrelated validation failures", async () => {
   expect(attempts).toBe(1);
 });
 const contexts: Context[] = [];
-afterEach(async () => { for (const ctx of contexts.splice(0)) await ctx.fiber.dispose(); });
+const browserGlobals = ["window", "document", "DOMParser", "Element", "HTMLElement", "Node"] as const;
+let browser: Window;
+let originalGlobals: Map<string, PropertyDescriptor | undefined>;
+beforeEach(() => {
+  // The native menu and icon plugins own real document nodes/listeners even
+  // when these composition tests do not mount React. Use an actual DOM so
+  // their installation and disposal are exercised alongside SlotRegistry.
+  browser = new Window({ url: "http://localhost/" });
+  originalGlobals = new Map(browserGlobals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const key of browserGlobals) {
+    const value = key === "window" ? browser : browser[key];
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+  }
+});
+afterEach(async () => {
+  try { for (const ctx of contexts.splice(0)) await ctx.fiber.dispose(); }
+  finally {
+    browser.close();
+    for (const key of browserGlobals) {
+      const previous = originalGlobals.get(key);
+      if (previous) Object.defineProperty(globalThis, key, previous);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
 function createHost() {
   const ctx = new Context();
   contexts.push(ctx);
@@ -88,6 +113,9 @@ test("native slot stores and factories follow the client plugin lifetime", async
   const fiber = await ctx.plugin({ name: "studio-slot-lifetime", apply(child: Context) {
     host = new OplStudioDshSlotHost(child, {} as never);
   } });
+  expect(document.querySelectorAll("[data-dsh-icon-sprite]")).toHaveLength(1);
+  expect(document.querySelectorAll("[data-dsh-icon-sprite] symbol").length).toBeGreaterThan(0);
+  expect(host.core.snapshot("shell.overlay")[0]?.occupants.some(entry => entry.id === "context-menu")).toBe(true);
   const rendererHost = (host.renderRoot() as any).props.value;
   expect(rendererHost.scope("session").current.getSnapshot().key).toBeUndefined();
   host.threadScope.select("codex-thread-one");
@@ -120,6 +148,8 @@ test("native slot stores and factories follow the client plugin lifetime", async
   await child.dispose();
   expect(rendererHost.factoryOf("test.settings")).toBeUndefined();
   await fiber.dispose();
+  expect(document.querySelectorAll("[data-dsh-icon-sprite]")).toHaveLength(0);
+  expect(host.core.entries("shell.overlay")).toHaveLength(0);
   expect(host.core.entries("root")).toHaveLength(0);
   expect(() => rendererHost.storeOf(settings)).toThrow("store handle is not registered");
 });
@@ -407,8 +437,10 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(host.core.entries("root")[0]?.children?.["runtime.detail"]).toEqual({ kind: "list", scope: "root" });
     expect(host.core.entries("rightbar")[0]?.children?.["runtime.detail"]).toBeUndefined();
     expect(host.core.entries("main").find(entry => entry.registrant === "dsh-ui-conversation")?.children?.["conversation.hero.options"]).toEqual({ kind: "list", scope: "root" });
-    expect(host.core.entries("shell.overlay")).toHaveLength(1);
-    expect(host.core.snapshot("shell.overlay")[0]?.occupants[0]?.id).toBe("opl-studio-overlay");
+    expect(host.core.entries("shell.overlay")).toHaveLength(3);
+    expect(host.core.snapshot("shell.overlay")[0]?.occupants.map(entry => entry.id).sort()).toEqual([
+      "context-menu", "opl-studio-overlay", "opl-studio-session-rename"
+    ]);
     expect(host.core.entries("conversation.input.dock")).toHaveLength(1);
     expect(host.core.snapshot("conversation.input.dock")[0]?.occupants[0]).toMatchObject({
       id: "queue",

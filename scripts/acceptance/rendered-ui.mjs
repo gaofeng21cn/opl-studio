@@ -81,7 +81,19 @@ try {
   host = await createWebUiHost({ transport, opl, dshHome: path.join(tempRoot, "dsh-home"), webRoot: path.join(repositoryRoot, "dist", "webui") });
   const baseUrl = host.url;
 
-  await cli(["open", baseUrl], cliRoot);
+  await cli(["open", "about:blank"], cliRoot);
+  await cli(["run-code", `async page => {
+    await page.addInitScript(() => {
+      window.__oplAcceptanceErrors = [];
+      window.addEventListener('error', event => {
+        if (event instanceof ErrorEvent) window.__oplAcceptanceErrors.push({ kind: 'error', message: event.message, stack: event.error?.stack });
+      });
+      window.addEventListener('unhandledrejection', event => {
+        window.__oplAcceptanceErrors.push({ kind: 'unhandledrejection', message: String(event.reason), stack: event.reason?.stack });
+      });
+    });
+  }`], cliRoot);
+  await cli(["goto", baseUrl], cliRoot);
   await cli(["resize", "1440", "900"], cliRoot);
   const wide = await evaluate(`() => ({
     title: document.title,
@@ -389,6 +401,17 @@ try {
   assert.equal(archivedRowRemoved, true);
   const sessionMenuActions = { target: "thread-recent", renamed: true, forked: true, archived: archivedRecent.thread.archived, removedFromActiveList: archivedRowRemoved };
 
+  const unhandledErrors = await evaluate(`() => window.__oplAcceptanceErrors`, cliRoot);
+  const consoleResponse = await cli(["console", "error"], cliRoot);
+  const consoleErrorLog = JSON.parse(consoleResponse.stdout.trim()).result;
+  const consoleErrors = consoleErrorLog.split(/\n(?=\[ERROR\])/).filter(message => message.startsWith("[ERROR]"));
+  const nonBlockingWarnings = consoleErrors.filter(message => message.includes('Each child in a list should have a unique "key" prop'));
+  const staticRequestErrors = consoleErrors.filter(message => message.includes("/favicon.ico") && message.includes("404 (Not Found)"));
+  const unexpectedErrors = consoleErrors.filter(message => !nonBlockingWarnings.includes(message) && !staticRequestErrors.includes(message));
+  const consoleReadback = { unhandledErrors, unexpectedErrors, nonBlockingWarnings, staticRequestErrors };
+  assert.deepEqual(unhandledErrors, [], "the full interaction must produce no uncaught errors or unhandled rejections");
+  assert.deepEqual(unexpectedErrors, [], "application console errors and failed settings log requests must be resolved");
+
   await mkdir(outputRoot, { recursive: true });
   const wideOutput = path.join(outputRoot, "webui-1440x900.png");
   const narrowOutput = path.join(outputRoot, "webui-400x800.png");
@@ -410,7 +433,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { wide, iconSprite, contextMenu, sidebarRecent, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
+    assertions: { consoleReadback, wide, iconSprite, contextMenu, sidebarRecent, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }
