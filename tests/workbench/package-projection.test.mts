@@ -87,6 +87,8 @@ test("current Package directory entries replace retired private lifecycle fields
                 reason: "live_verification_deferred",
                 detail_surface: "opl packages status --package-id future.agent --json"
               },
+              package_currentness: { status: "update_available" },
+              required_by_package_ids: ["future.workflow"],
               home_shortcuts: [
                 {
                   shortcut_id: "research",
@@ -228,6 +230,8 @@ test("current Package directory entries replace retired private lifecycle fields
   assert.equal(item.details.find((detail) => detail.label === "Physical surface")?.value, "available");
   assert.equal(item.sourceMode, "package_channel");
   assert.equal(item.automaticUpdate, true);
+  assert.equal(item.currentness, "update_available");
+  assert.deepEqual(item.requiredByPackageIds, ["future.workflow"]);
   assert.deepEqual(item.homeShortcuts, [
     {
       shortcutId: "research",
