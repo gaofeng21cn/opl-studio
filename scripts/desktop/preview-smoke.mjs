@@ -240,9 +240,44 @@ export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
   };
 }
 
+export async function navigateSettingsSection({ section, labels, timeoutMs }) {
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+  const attempts = [];
+  let observation;
+  while (true) {
+    // The native settings dialog is portaled to body, outside the slot root.
+    const dialog = document.querySelector('[data-shortcut-modal="settings"][role="dialog"]');
+    const content = dialog?.querySelector('[data-testid="opl-settings-panel"] [data-section]');
+    const matchingLabels = [...(dialog?.querySelectorAll('.opl-settings-nav-label') ?? [])]
+      .filter((node) => labels.includes(node.textContent.trim()));
+    const button = matchingLabels[0]?.closest('button');
+    const targetPagePresent = content?.getAttribute('data-section') === section
+      && (section !== 'about' || !!content.querySelector('[data-testid="settings-page-about"]'));
+    observation = {
+      targetSection: section,
+      dialogPresent: !!dialog,
+      matchingButtons: matchingLabels.filter((node) => node.closest('button')).length,
+      currentSection: content?.getAttribute('data-section') ?? null,
+      targetPagePresent: !!targetPagePresent,
+      attempts
+    };
+    if (attempts.length > 0 && targetPagePresent) return { ...observation, reached: true };
+    const now = Date.now();
+    if (now >= deadline) return { ...observation, reached: false };
+    // Re-resolve after asynchronous slot remounts; one retry shares the original deadline.
+    if (button && !button.disabled && (attempts.length === 0 || (attempts.length === 1 && now >= startedAt + timeoutMs / 2))) {
+      attempts.push({ label: matchingLabels[0].textContent.trim(), current: button.getAttribute('aria-current') });
+      button.click();
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.min(100, deadline - now)));
+  }
+}
+
 async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   const uiTimeoutMs = Math.min(timeoutMs, 10_000);
   const result = await evaluate(`(async()=>{
+    const navigateSettings=${navigateSettingsSection.toString()};
     const click=(selector)=>{const node=document.querySelector(selector); if(!node) return false; node.click(); return true;};
     const clickButton=(label)=>{const node=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()===label || button.getAttribute("aria-label")===label); if(!node) return false; node.click(); return true;};
     const waitFor=(selector,ms=${uiTimeoutMs})=>new Promise((resolve)=>{const deadline=Date.now()+ms; const tick=()=>{if(document.querySelector(selector)) return resolve(true); if(Date.now()>=deadline) return resolve(false); setTimeout(tick,100);}; tick();});
@@ -265,12 +300,12 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     result.settings.opened=clickButton("设置")||clickButton("Settings");
     if(result.settings.opened){
       result.settings.panel=await waitFor('[data-testid="opl-settings-panel"]');
-      const accountClicked=clickButton("账户与模型")||clickButton("Account & Models");
-      result.settings.account=accountClicked && await waitFor('[data-testid="opl-settings-panel"] [data-section="account"]');
-      const preferencesClicked=clickButton("偏好")||clickButton("Preferences");
-      if(preferencesClicked) await waitFor('[data-testid="opl-settings-panel"] [data-section="preferences"]');
-      const aboutClicked=clickButton("关于")||clickButton("About");
-      result.settings.about=aboutClicked && await waitFor('[data-testid="settings-page-about"]');
+      const account=await navigateSettings({section:"account",labels:["账户与模型","Account & Models"],timeoutMs:${uiTimeoutMs}});
+      result.settings.account=account.reached;
+      const preferences=await navigateSettings({section:"preferences",labels:["偏好","Preferences"],timeoutMs:${uiTimeoutMs}});
+      const about=await navigateSettings({section:"about",labels:["关于","About"],timeoutMs:${uiTimeoutMs}});
+      result.settings.about=about.reached;
+      result.settings.navigation={account,preferences,about};
     }
     const closeSettings=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()==="关闭"||button.innerText.trim()==="Close"||button.getAttribute("aria-label")==="关闭"||button.getAttribute("aria-label")==="Close");
     closeSettings?.click();
@@ -303,8 +338,8 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="设置"||node.innerText.trim()==="Settings"); button?.click(); return !!button;})()`);
     await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
     await capture("settings");
-    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关于"||node.innerText.trim()==="About"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="settings-page-about"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    const aboutCapture = await evaluate(`(${navigateSettingsSection.toString()})({section:"about",labels:["关于","About"],timeoutMs:${uiTimeoutMs}})`);
+    result.settings.captureNavigation = aboutCapture;
     await capture("about");
     await evaluate(`(()=>{const close=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="关闭"||node.innerText.trim()==="Close"||node.getAttribute("aria-label")==="关闭"||node.getAttribute("aria-label")==="Close"); close?.click(); return !!close;})()`);
     await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.getAttribute("aria-label")==="运行状态"||node.getAttribute("aria-label")==="Run status"||node.innerText.trim()==="运行状态"||node.innerText.trim()==="Run status"); button?.click(); return !!button;})()`);

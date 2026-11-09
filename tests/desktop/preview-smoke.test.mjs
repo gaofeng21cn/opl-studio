@@ -4,6 +4,7 @@ import {
   PREVIEW_PRODUCT,
   parsePreviewSmokeArgs,
   parseRuntimeProfiles,
+  navigateSettingsSection,
   projectGatewayState,
   redactSecrets,
   runGatewayHook,
@@ -15,6 +16,93 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { runInNewContext } from "node:vm";
+
+function settingsNavigationDom({ renderTarget = true, showNavigation = true } = {}) {
+  let now = 0;
+  let currentSection = "preferences";
+  let targetAt = Infinity;
+  let remountUntil = 0;
+  const clickedButtons = [];
+  const content = {
+    getAttribute: (name) => name === "data-section" ? currentSection : null,
+    querySelector: (selector) => selector === '[data-testid="settings-page-about"]' && now >= targetAt ? {} : null
+  };
+  const buttons = [0, 1].map((generation) => ({
+    disabled: false,
+    getAttribute: (name) => name === "aria-current" ? String(currentSection === "about") : null,
+    click() {
+      clickedButtons.push(generation);
+      if (generation === 0) remountUntil = now + 100;
+      else {
+        currentSection = "about";
+        if (renderTarget) targetAt = now + 200;
+      }
+    }
+  }));
+  const labels = buttons.map((button) => ({ textContent: "About", closest: (selector) => selector === "button" ? button : null }));
+  const dialog = {
+    querySelector(selector) {
+      assert.equal(selector, '[data-testid="opl-settings-panel"] [data-section]');
+      return content;
+    },
+    querySelectorAll(selector) {
+      assert.equal(selector, ".opl-settings-nav-label");
+      return showNavigation && now >= 100 ? [labels[clickedButtons.length > 0 ? 1 : 0]] : [];
+    }
+  };
+  const outsideAbout = { innerText: "About", click: () => assert.fail("Clicked an unrelated global About button") };
+  return {
+    clickedButtons,
+    elapsed: () => now,
+    context: {
+      document: {
+        querySelector(selector) {
+          assert.equal(selector, '[data-shortcut-modal="settings"][role="dialog"]');
+          return now >= remountUntil ? dialog : null;
+        },
+        querySelectorAll: () => [outsideAbout]
+      },
+      Date: { now: () => now },
+      setTimeout(callback, delay) { now += delay; queueMicrotask(callback); }
+    }
+  };
+}
+
+test("Settings navigation waits for native labels and retries an asynchronous portal remount within one deadline", async () => {
+  const dom = settingsNavigationDom();
+  const result = await runInNewContext(`(${navigateSettingsSection.toString()})({section:"about",labels:["关于","About"],timeoutMs:1000})`, dom.context);
+  assert.equal(result.reached, true);
+  assert.deepEqual(dom.clickedButtons, [0, 1]);
+  assert.equal(result.currentSection, "about");
+  assert.equal(result.targetPagePresent, true);
+  assert.equal(result.attempts.length, 2);
+  assert.equal(result.attempts[0].label, "About");
+  assert.equal(dom.elapsed(), 700);
+});
+
+test("Settings navigation keeps About failure and bounded diagnostics when the target page never renders", async () => {
+  const dom = settingsNavigationDom({ renderTarget: false });
+  const result = await runInNewContext(`(${navigateSettingsSection.toString()})({section:"about",labels:["关于","About"],timeoutMs:1000})`, dom.context);
+  assert.equal(result.reached, false);
+  assert.equal(result.targetSection, "about");
+  assert.equal(result.currentSection, "about");
+  assert.equal(result.targetPagePresent, false);
+  assert.equal(result.dialogPresent, true);
+  assert.equal(result.matchingButtons, 1);
+  assert.equal(result.attempts.length, 2);
+  assert.equal(dom.elapsed(), 1000);
+});
+
+test("Settings navigation reports an absent native target without clicking a global namesake", async () => {
+  const dom = settingsNavigationDom({ showNavigation: false });
+  const result = await runInNewContext(`(${navigateSettingsSection.toString()})({section:"about",labels:["About"],timeoutMs:1000})`, dom.context);
+  assert.equal(result.reached, false);
+  assert.equal(result.matchingButtons, 0);
+  assert.equal(result.currentSection, "preferences");
+  assert.equal(result.attempts.length, 0);
+  assert.equal(dom.elapsed(), 1000);
+});
 
 test("Guest public metadata transport reads exact Framework sources and rejects other API calls", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-metadata-test-"));
