@@ -21,11 +21,10 @@ test("every admitted App deep-link route has an existing Studio presentation and
   }
   assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/archived" } }, policy), { kind: "conversation", scope: "archived" });
   assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/scheduled" } }, policy), { kind: "schedules" });
-  const applicationPolicy = { ...policy, routes: [...policy.routes, "/apps"], sectionRoutes: ["/apps?section=applications", "/apps?section=updates", "/apps?section=resources", "/settings/environment?section=updates"] };
-  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps" } }, applicationPolicy), { kind: "application_management" });
-  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps?section=resources" } }, applicationPolicy), { kind: "application_management", section: "resources" });
-  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/environment?section=updates" } }, applicationPolicy), { kind: "application_management", section: "updates" });
-  assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps?section=invalid" } }, applicationPolicy), null);
+  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps" } }, policy), { kind: "application_management" });
+  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps?section=resources" } }, policy), { kind: "application_management", section: "resources" });
+  assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/environment?section=updates" } }, policy), { kind: "application_management", section: "updates" });
+  assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/apps?section=invalid" } }, policy), null);
   assert.deepEqual(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/access" } }, policy), { kind: "settings", destination: "models" });
   assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/runtime" } }, policy), null);
   assert.equal(resolveDeepLinkDestination({ action: "navigate", params: { route: "/settings/access", token: "secret" } }, policy), null);

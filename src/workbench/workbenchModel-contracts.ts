@@ -67,6 +67,23 @@ export type ApplicationManagementResource = {
   ownerSettingsRoute?: string;
   relationKind: "required" | "optional" | "configured";
   detailRef?: string;
+  authorization?: {
+    status: "authorized" | "attention" | "unknown";
+    consumerCount?: number;
+    grantCount?: number;
+  };
+  revision?: {
+    status: "current" | "stale" | "unknown";
+    securityRevision?: string;
+  };
+  freshness?: {
+    status: "fresh" | "stale" | "unknown";
+    observedAt?: string;
+  };
+  readiness?: {
+    status: "ready" | "attention" | "unknown";
+    reason?: string;
+  };
 };
 
 export type ApplicationManagementProjection = {
