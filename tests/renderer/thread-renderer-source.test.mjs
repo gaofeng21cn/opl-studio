@@ -197,8 +197,8 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.doesNotMatch(recentStyles, /overflow|max-height/);
   assert.match(slotHost, /project\.threads\.map/);
   assert.match(slotHost, /searchSessions=\{async/);
-  assert.match(slotHost, /archiveSession=\{/);
-  assert.match(slotHost, /forkSession=\{/);
+  assert.match(slotHost, /requireSession\(sessionId\)\.archiveThread\(sessionId\)/);
+  assert.match(slotHost, /requireSession\(sessionId\)\.forkThread\(sessionId\)/);
   assert.match(detail, /opl-thread-resume/);
   assert.match(detail, /onRequestArchive/);
   assert.match(detail, /onRequestDelete/);

@@ -55,6 +55,7 @@ async function latestScreenshot(cliRoot) {
 }
 
 const opl = {
+  readInitialize: async () => ({ system_initialize: { setup_flow: { is_first_run: false, ready_to_launch: true } }, readback: { exitCode: 0 } }),
   readState: async (profile) => ({ profile, app_state: { meta: { profile } }, readback: { exitCode: 0 } }),
   readFullDrilldown: async () => ({ detail: "full", drilldown: {}, readback: { exitCode: 0 } }),
   readContribution: async (request) => ({ packageId: request.packageId, ref: request.ref, result: {} }),
@@ -95,6 +96,14 @@ try {
   assert.equal(wide.brand, true);
   assert.equal(wide.root, true);
   assert.equal(wide.horizontalOverflow, false);
+  const iconSprite = await evaluate(`() => {
+    const symbols = document.querySelectorAll('[data-dsh-icon-sprite] symbol');
+    const references = Array.from(document.querySelectorAll('svg use')).map(use => use.getAttribute('href')).filter(href => href?.startsWith('#dsw-icon-'));
+    return { count: document.querySelectorAll('[data-dsh-icon-sprite]').length, symbols: symbols.length, references: references.length, missing: references.filter(href => !document.querySelector(href)) };
+  }`, cliRoot);
+  assert.equal(iconSprite.count, 1);
+  assert.ok(iconSprite.symbols > 0 && iconSprite.references > 0);
+  assert.deepEqual(iconSprite.missing, []);
   await evaluate(`() => { document.querySelector('[data-testid="opl-context-inspector-trigger"]').click(); return true; }`, cliRoot);
   const contextMenu = await evaluate(`() => Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent.trim())`, cliRoot);
   assert.deepEqual(contextMenu, ["项目进度", "文件与结果", "智能体与能力"]);
@@ -133,6 +142,37 @@ try {
     scrollOwnerCount: 1,
     scrollOwnerClass: "opl-workspace-browser-seat"
   });
+
+  const recentMenu = await evaluate(`async () => {
+    const row = document.querySelector('.opl-recent-session-list [data-row-key="session:thread-recent"]');
+    row.focus();
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+    const deadline = Date.now() + 3000;
+    while (!document.querySelector('[role="menuitem"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    return Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent.trim());
+  }`, cliRoot);
+  assert.deepEqual(recentMenu, ["重命名", "分叉会话", "归档会话"]);
+  await evaluate(`() => { Array.from(document.querySelectorAll('[role="menuitem"]')).find(item => item.textContent.trim() === '重命名').click(); return true; }`, cliRoot);
+  const renameDialog = await evaluate(`async () => {
+    const deadline = Date.now() + 3000;
+    while (!document.querySelector('input[aria-label="会话名称"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    const input = document.querySelector('input[aria-label="会话名称"]');
+    input.focus();
+    return { value: input.value, dialog: Boolean(input.closest('[role="dialog"]')) };
+  }`, cliRoot);
+  assert.deepEqual(renameDialog, { value: "Thread thread-recent", dialog: true });
+  await cli(["press", process.platform === "darwin" ? "Meta+a" : "Control+a"], cliRoot);
+  await cli(["type", "Renamed recent task"], cliRoot);
+  await cli(["press", "Enter"], cliRoot);
+  const renamedRecent = await evaluate(`async () => {
+    const deadline = Date.now() + 5000;
+    const row = () => document.querySelector('.opl-recent-session-list [data-row-key="session:thread-recent"]');
+    while (!row()?.textContent.includes('Renamed recent task') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    return { renamed: row()?.textContent.includes('Renamed recent task'), dialogClosed: !document.querySelector('input[aria-label="会话名称"]') };
+  }`, cliRoot);
+  assert.deepEqual(renamedRecent, { renamed: true, dialogClosed: true });
+  const renameMessages = (await readFile(appServerLog, "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  assert.ok(renameMessages.some(message => message.method === "thread/name/set" && message.params.threadId === "thread-recent" && message.params.name === "Renamed recent task"));
 
   const settingsOpen = await evaluate(`async () => {
     const trigger = document.querySelector('button[aria-haspopup="dialog"]');
@@ -237,14 +277,15 @@ try {
     }
     const trigger = row?.querySelector('button[aria-label]');
     trigger?.click();
-    await new Promise(requestAnimationFrame);
+    const menuDeadline = Date.now() + 3000;
+    while (!document.querySelector('[role="menuitem"]') && Date.now() < menuDeadline) await new Promise(resolve => setTimeout(resolve, 25));
     return {
       rowFound: Boolean(row),
       triggerFound: Boolean(trigger),
       items: Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent?.trim())
     };
   }`, cliRoot);
-  assert.deepEqual(sessionMenu, { rowFound: true, triggerFound: true, items: ["分叉会话", "归档会话"] });
+  assert.deepEqual(sessionMenu, { rowFound: true, triggerFound: true, items: ["重命名", "分叉会话", "归档会话"] });
   await cli(["press", "Escape"], cliRoot);
   const selection = [];
   for (const threadId of ["thread-idle", "thread-source", "thread-running"]) {
@@ -302,6 +343,52 @@ try {
   assert.equal(steered.params.expectedTurnId, "turn-running");
   const busySubmission = { busyLabel, queued, steer: { threadId: steered.params.threadId, turnId: steered.params.expectedTurnId } };
 
+  for (const label of ["分叉会话", "归档会话"]) {
+    await evaluate(`async () => {
+      const row = document.querySelector('.opl-recent-session-list [data-row-key="session:thread-recent"]');
+      if (!row) throw new Error('Recent session must remain available before the captured menu action');
+      row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 130, clientY: 250 }));
+      const deadline = Date.now() + 3000;
+      let item;
+      while (!item && Date.now() < deadline) {
+        item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(entry => entry.textContent.trim() === ${JSON.stringify(label)});
+        if (!item) await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      if (!item) throw new Error('Menu action did not appear');
+      item.click();
+      return true;
+    }`, cliRoot);
+    if (label === "归档会话") {
+      const archiveConfirmation = await evaluate(`async () => {
+        const deadline = Date.now() + 3000;
+        while (!document.querySelector('[data-testid="opl-thread-lifecycle-confirmation"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+        const dialog = document.querySelector('[data-testid="opl-thread-lifecycle-confirmation"]');
+        const target = dialog?.querySelector('code')?.textContent;
+        if (target === 'thread-recent') dialog.querySelector('footer button').click();
+        return target;
+      }`, cliRoot);
+      assert.equal(archiveConfirmation, "thread-recent");
+    }
+    const method = label === "分叉会话" ? "thread/fork" : "thread/archive";
+    const deadline = Date.now() + 5000;
+    let seen = false;
+    while (!seen && Date.now() < deadline) {
+      const messages = (await readFile(appServerLog, "utf8")).trim().split("\n").map(line => JSON.parse(line));
+      seen = messages.some(message => message.method === method && message.params.threadId === "thread-recent");
+      if (!seen) await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    assert.equal(seen, true, `${method} must act on the captured recent thread`);
+  }
+  const archivedRecent = await transport.readThread("thread-recent");
+  assert.equal(archivedRecent.thread.archived, true);
+  const archivedRowRemoved = await evaluate(`async () => {
+    const deadline = Date.now() + 5000;
+    while (document.querySelector('[data-row-key="session:thread-recent"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    return !document.querySelector('[data-row-key="session:thread-recent"]');
+  }`, cliRoot);
+  assert.equal(archivedRowRemoved, true);
+  const sessionMenuActions = { target: "thread-recent", renamed: true, forked: true, archived: archivedRecent.thread.archived, removedFromActiveList: archivedRowRemoved };
+
   await mkdir(outputRoot, { recursive: true });
   const wideOutput = path.join(outputRoot, "webui-1440x900.png");
   const narrowOutput = path.join(outputRoot, "webui-400x800.png");
@@ -323,7 +410,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { wide, contextMenu, sidebarRecent, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
+    assertions: { wide, iconSprite, contextMenu, sidebarRecent, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }
@@ -334,6 +421,12 @@ try {
   };
   await writeFile(path.join(outputRoot, "rendered-ui-acceptance.json"), `${JSON.stringify(receipt, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+} catch (error) {
+  if (host) {
+    const diagnostics = await cli(["console", "error"], cliRoot).catch(() => null);
+    if (diagnostics) process.stderr.write(`Browser errors at the failed acceptance boundary:\n${diagnostics.stdout}\n`);
+  }
+  throw error;
 } finally {
   await cli(["close"], cliRoot).catch(() => undefined);
   if (host) await host.close().catch(() => undefined);

@@ -1,6 +1,5 @@
-import { Activity, Archive, CalendarClock, GitFork, RefreshCw } from "lucide-react";
+import { Activity, CalendarClock, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { MenuItemButton } from "@deepseek-ai/dsh-client-ui-primitives";
 import { AppFrame } from "@opl-vendor/dsh-app-frame";
 import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
 import { ConversationRoot } from "@opl-vendor/dsh-conversation-root";
@@ -9,15 +8,19 @@ import { WorkspaceBrowser } from "@opl-vendor/dsh-workspace-browser";
 import { SessionNodeItem, type DshSessionNode } from "@opl-vendor/dsh-session-node";
 import { createWorkspaceViewStore } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts";
 import { createSnapshotStore, type SessionListState, type WorkspaceListState } from "../../integrations/deepseek-harness/runtimeShim";
+import { useStudioMenus } from "./studioMenus";
 import type { OplStudioSurface } from "../oplStudioSurface";
 import {
   StudioContext,
   useConversationPanelInfo,
   useDshSnapshot,
+  useStudioFoldedLandscape,
   useStudio,
   useStudioPanels,
+  useStudioRemoteAccess,
+  useStudioSessionAccess,
+  useStudioWorkspaceAccess,
   useStudioShortcuts,
-  useStudioWorkspaceShortcuts,
   translate
 } from "./studioContext";
 
@@ -90,9 +93,10 @@ export function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface
     <StudioContext.Provider value={value}>
       <main ref={frameRootRef} data-testid="opl-studio-root" data-inspector-open={inspectorOpen || undefined} className="opl-studio-dsh-root codex-sidebar-chat with-rail without-inspector">
         <AppFrame
-          useStore={(selector: (state: { layoutInfo: typeof panels }) => unknown) => selector({ layoutInfo: panels })}
-          useSessions={(selector: (state: typeof sessions) => unknown) => selector(sessions)}
+          useStore={(selector) => selector({ layoutInfo: panels })}
+          useSessions={(selector) => selector(sessions)}
           usePanelInfo={useConversationPanelInfo}
+          useFoldedLandscape={useStudioFoldedLandscape}
           actions={actions}
           renderSlot={renderSlot}
           t={(key: string, params?: Record<string, unknown>) => translate(surface.locale, key, params)}
@@ -102,13 +106,20 @@ export function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface
   );
 }
 
-export function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boolean; width: number; renderSlot: any }) {
+export function SidebarSlot({ collapsed, width, drawer, renderSlot }: { collapsed: boolean; width: number; drawer: boolean; renderSlot: any }) {
   const studio = useStudio();
+  const [unpinned, setUnpinned] = useState<readonly string[]>([]);
   return (
     <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined} data-narrow-expanded={studio.narrow && !collapsed || undefined}>
       <SidebarRoot
         collapsed={collapsed}
         width={width}
+        drawer={drawer}
+        useRemoteAccess={useStudioRemoteAccess}
+        useEntryPins={(selector: (ids: readonly string[]) => unknown) => selector(unpinned)}
+        useEntryActions={(selector: (registered: boolean) => unknown) => selector(false)}
+        setPinned={(id: string, pinned: boolean) => setUnpinned(ids => pinned ? ids.filter(value => value !== id) : [...new Set([...ids, id])])}
+        trackEntryClick={() => undefined}
         startSession={studio.startSession}
         toggleSidebar={studio.toggleSidebar}
         selectPanel={(id: string) => { if (id === "workspace") studio.openPrimaryView("workspace"); }}
@@ -124,6 +135,7 @@ export function SidebarSlot({ collapsed, width, renderSlot }: { collapsed: boole
 
 export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandSidebar(): void }) {
   const studio = useStudio();
+  const menus = useStudioMenus();
   const workspaceStore = useMemo(() => createWorkspaceViewStore().create(), []);
   const list: SessionListState = useMemo(() => {
     const projects = studio.threadProjects.filter(project => !project.projectless);
@@ -194,6 +206,18 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; 
     wide={wide}
     usePanelInfo={useConversationPanelInfo}
     expandSidebar={expandSidebar}
+    useRemoteAccess={useStudioRemoteAccess}
+    useSessionAccess={useStudioSessionAccess}
+    useWorkspaceAccess={useStudioWorkspaceAccess}
+    useContextMenu={menus.useContextMenu}
+    useContextMenuTarget={menus.useContextMenuTarget}
+    openSessionMenu={menus.openSessionMenu}
+    openWorkspaceMenu={menus.openWorkspaceMenu}
+    useWorkspaceActionRequest={menus.useWorkspaceActionRequest}
+    settleWorkspaceAction={menus.settleWorkspaceAction}
+    requestSessionRename={menus.requestSessionRename}
+    notifyArchivedNotOpenable={menus.notifyArchivedNotOpenable}
+    unarchiveSession={menus.unarchiveSession}
     useSessions={(selector: any) => selector(list)}
     useSessionStatus={(selector: any) => selector(new Map(Object.values(list.byId).filter((session) => session.pendingInteraction).map((session) => [session.id, { pendingInteraction: session.pendingInteraction }])))}
     useWorkspaces={(selector: any) => selector(workspaces)}
@@ -201,40 +225,34 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; 
     actions={actions}
     startSession={(projectId?: string) => studio.startSessionInProject(projectId)}
     open={(threadId: string) => studio.openThread(threadId)}
-    renameSession={(threadId: string, title: string) => studio.renameSession(threadId, title)}
-    forkSession={(threadId: string) => studio.forkThread(threadId)}
     renameWorkspace={(workspaceId: string, title: string) => studio.renameWorkspace(workspaceId, title)}
     deleteWorkspace={(workspaceId: string) => studio.deleteWorkspace(workspaceId)}
     insertWorkspaceBefore={(workspaceId: string, beforeWorkspaceId?: string) => studio.insertWorkspaceBefore(workspaceId, beforeWorkspaceId)}
-    archiveSession={(threadId: string) => studio.archiveThread(threadId)}
-    insertSessionBefore={(workspaceId: string, threadId: string, beforeThreadId?: string) => studio.insertSessionBefore(workspaceId, threadId, beforeThreadId)}
     createWorkspace={async ({ path }: { path: string }) => studio.createWorkspace(path).then(() => ({ workspaceId: path, path, title: path, sessionIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }) as never)}
     searchSessions={async (query: string) => ({ items: await studio.searchThreads(query), hasMore: false })}
     searchResultLimit={100}
     useDirectoryFlow={() => false}
     useHostInfo={(selector: any) => selector({ home: undefined })}
     useShortcuts={useStudioShortcuts}
-    useWorkspaceShortcuts={useStudioWorkspaceShortcuts}
-    requestSearch={() => undefined}
-    requestAddWorkspace={() => undefined}
-    closeAddWorkspace={() => undefined}
-    setDirectoryBusy={() => undefined}
-    dismissForkError={() => undefined}
-    renderSlot={(key: string, owner: { sessionId: string }, options?: { hookContext?: [boolean, (open: boolean) => void] }) => renderSessionMenu(key, owner, options, dshLocale, studio.forkThread, studio.archiveThread)}
+    useWorkspaceShortcuts={menus.useWorkspaceShortcuts}
+    requestSearch={menus.requestSearch}
+    requestAddWorkspace={menus.requestAddWorkspace}
+    closeAddWorkspace={menus.closeAddWorkspace}
+    setDirectoryBusy={menus.setDirectoryBusy}
+    renderSlot={() => null}
     t={dshLocale}
   />
-  {wide ? <RecentSessionsSection list={recentList} current={studio.currentThreadId} locale={studio.locale} open={studio.openThread} fork={studio.forkThread} archive={studio.archiveThread} /> : null}
+  {wide ? <RecentSessionsSection list={recentList} current={studio.currentThreadId} locale={studio.locale} open={studio.openThread} menus={menus} /> : null}
   </div>
   </>;
 }
 
-function RecentSessionsSection({ list, current, locale, open, fork, archive }: {
+function RecentSessionsSection({ list, current, locale, open, menus }: {
   list: SessionListState;
   current?: string;
   locale: "zh" | "en";
   open(threadId: string): void;
-  fork(threadId: string): void;
-  archive(threadId: string): Promise<void>;
+  menus: ReturnType<typeof useStudioMenus>;
 }) {
   const recent = useMemo(() => Object.values(list.byId)
     .filter(session => !session.blank)
@@ -261,29 +279,16 @@ function RecentSessionsSection({ list, current, locale, open, fork, archive }: {
         currentId={current}
         now={now}
         onOpen={open}
-        onRenameRequest={() => undefined}
-        renderSlot={(key: string, owner: { sessionId: string }, options?: { hookContext?: [boolean, (open: boolean) => void] }) => renderSessionMenu(key, owner, options, t, fork, archive)}
-        flat
+        onRenameRequest={menus.requestSessionRename}
+        useSessionAccess={useStudioSessionAccess}
+        useContextMenu={menus.useContextMenu}
+        useContextMenuTarget={menus.useContextMenuTarget}
+        openSessionMenu={menus.openSessionMenu}
+        renderSlot={() => null}
         t={t}
       />)}
     </div>
   </section>;
-}
-
-function renderSessionMenu(
-  key: string,
-  owner: { sessionId: string },
-  options: { hookContext?: [boolean, (open: boolean) => void] } | undefined,
-  t: (key: string) => string,
-  fork: (threadId: string) => void,
-  archive: (threadId: string) => Promise<void>
-): ReactNode {
-  if (key !== "sidebar.workspaces.session.menu.item") return null;
-  const close = () => options?.hookContext?.[1](false);
-  return <>
-    <MenuItemButton icon={<GitFork size={14} />} onSelect={() => { close(); fork(owner.sessionId); }}>{t("menu.fork")}</MenuItemButton>
-    <MenuItemButton icon={<Archive size={14} />} onSelect={() => { close(); void archive(owner.sessionId); }}>{t("menu.archiveSession")}</MenuItemButton>
-  </>;
 }
 
 function RuntimeNavigation({ wide }: { wide: boolean }) {

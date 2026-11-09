@@ -79,3 +79,68 @@
    const dragged = useRef(false)
    const release = useCallback((): void => {
      const previous = state.current
+--- a/packages/client/ui-layout/src/client/AppFrame.tsx
++++ b/packages/client/ui-layout/src/client/AppFrame.tsx
+@@ -41,3 +41,3 @@
+ function CenterColumn(props: { children?: ReactNode; inert: boolean }) {
+-  return <div className={css.centerCol} {...{ inert: props.inert ? '' : undefined }}>{props.children}</div>
++  return <div className={css.centerCol} {...{ inert: props.inert }}>{props.children}</div>
+ }
+@@ -58,3 +58,3 @@
+ function RightbarColumn(props: { children?: ReactNode; inert: boolean }) {
+-  return <div className={css.rightbarCol} data-rightbar-col {...{ inert: props.inert ? '' : undefined }}>{props.children}</div>
++  return <div className={css.rightbarCol} data-rightbar-col {...{ inert: props.inert }}>{props.children}</div>
+ }
+@@ -315,3 +315,3 @@
+         style={drawer ? { width: sidebarWidth } : undefined}
+-        {...{ inert: drawer && sidebarCollapsed ? '' : undefined }}>
++        {...{ inert: drawer && sidebarCollapsed }}>
+         {sidebar}
+@@ -324,3 +324,3 @@
+       </>
+-      <div className={css.bottomRow} data-shell-bottom {...{ inert: drawerOpen ? '' : undefined }}>
++      <div className={css.bottomRow} data-shell-bottom {...{ inert: drawerOpen }}>
+         {renderSlot('shell.bottom', {})}
+@@ -331,3 +331,3 @@
+       {leadingMounted && (
+-        <div className={css.leadingSeat} data-shell-leading {...{ inert: drawerOpen ? '' : undefined }}>
++        <div className={css.leadingSeat} data-shell-leading {...{ inert: drawerOpen }}>
+           {leading}
+--- a/packages/client/ui-sidebar-documentpreview/src/client/pdf/pdf.tsx
++++ b/packages/client/ui-sidebar-documentpreview/src/client/pdf/pdf.tsx
+@@ -118,9 +118,9 @@
+   const [width, setWidth] = useState<number>()
+   const [requested, setRequested] = useState(initiallyRequested)
+   const [visible, setVisible] = useState(initiallyRequested)
+-  const renderedZoom = useRef<number>()
++  const renderedZoom = useRef<number | undefined>(undefined)
+   const pendingRender = useRef(Promise.resolve())
+-  const textTask = useRef<ReturnType<ReturnType<typeof pdfTextRenderer>>>()
++  const textTask = useRef<ReturnType<ReturnType<typeof pdfTextRenderer>> | undefined>(undefined)
+   const [state, setState] = useState<'loading' | 'ready'>('loading')
+   const [failure, setFailure] = useState<{ readonly error: unknown }>()
+   const [attempt, setAttempt] = useState(0)
+--- a/packages/client/ui-sidebar-documentpreview/src/client/zoom/ZoomViewport.tsx
++++ b/packages/client/ui-sidebar-documentpreview/src/client/zoom/ZoomViewport.tsx
+@@ -62,8 +62,8 @@
+   const frame = useRef<HTMLElement | null>(null)
+   const scrollport = useRef<HTMLDivElement | null>(null)
+   const controls = useRef<ZoomControlsHandle>(null)
+-  const pinchTimer = useRef<ReturnType<typeof setTimeout>>()
+-  const controlsHideTimer = useRef<ReturnType<typeof setTimeout>>()
++  const pinchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
++  const controlsHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+   const pointerInRevealZone = useRef(false)
+   const controlsActive = useRef(false)
+   const clearControlsHide = useCallback((): void => {
+--- a/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
++++ b/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
+@@ -138,7 +138,7 @@
+   readonly scrollportRef: ImageBodyProps['scrollportRef']
+   readonly t: ImageBodyProps['t']
+ }): ReactNode {
+-  const releasePan = useRef<() => void>()
++  const releasePan = useRef<(() => void) | undefined>(undefined)
+   const attachImage = useCallback((image: HTMLImageElement | null): void => {
+     releasePan.current?.()
+     releasePan.current = image === null ? undefined : bindImagePan(image)

@@ -5,14 +5,14 @@ import { zh as conversationZh, en as conversationEn } from "../../vendor/deepsee
 import { zh as modelZh, en as modelEn } from "../../vendor/deepseek-harness/packages/client/ui-model-selection/src/client/locales.ts";
 import { zh as agentZh, en as agentEn } from "../../vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts";
 import { zh as settingsZh, en as settingsEn } from "../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/locales.ts";
-import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";
 import { workspaceEntries } from "../workspaceViewModel";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
-    sidebar: { kind: "single"; scope: "root"; owner: { collapsed: boolean; width: number } };
+    sidebar: { kind: "single"; scope: "root"; owner: { collapsed: boolean; width: number; drawer: boolean } };
     main: { kind: "keyed"; scope: "root"; owner: object };
     rightbar: { kind: "single"; scope: "root"; owner: { width: number; viewportWidth: number; canShow: boolean } };
     "shell.overlay": { kind: "list"; scope: "root"; owner: object };
@@ -40,6 +40,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "settings.action": { kind: "list"; scope: "root"; owner: object };
     "settings.close": { kind: "single"; scope: "root"; owner: object };
     "settings.section": { kind: "list"; scope: "root"; owner: object };
+    "settings.section.icon": { kind: "list"; scope: "root"; inline: true; owner: { size: number; active: boolean } };
     "settings.general.item": { kind: "list"; scope: "root"; owner: object };
     "settings.onboarding": { kind: "list"; scope: "root"; owner: object };
     "composer.palette": { kind: "list"; scope: "root"; owner: object };
@@ -187,10 +188,26 @@ export function useStudioPanels<T>(selector: (panels: readonly { id: string; ord
     id: "workspace", order: 10, label: studio.locale === "zh" ? "能力工作台" : "Capability workspace"
   }] : []);
 }
+// Match the official layout injector's browser posture observable. This hook
+// reads browser geometry only; it does not introduce a runtime or state owner.
+export function useStudioFoldedLandscape<T>(selector: (folded: boolean) => T): T {
+  const query = useMemo(() => typeof matchMedia === "function"
+    ? matchMedia("(device-posture: folded) and (orientation: landscape)") : undefined, []);
+  const folded = useSyncExternalStore(
+    listener => {
+      query?.addEventListener("change", listener);
+      return () => query?.removeEventListener("change", listener);
+    },
+    () => query?.matches ?? false,
+    () => false
+  );
+  return selector(folded);
+}
+
 // Plain Enter queues while the agent is busy; the accelerated chord steers.
 const studioBusyEnter = "queue" as const;
 export const useStudioBusyEnter = (selector: (behavior: typeof studioBusyEnter) => unknown) => selector(studioBusyEnter);
-// DSH 0.2.1-alpha.1 UI packages receive these hook faces through DSH's runtime injector. The
+// DSH UI packages receive these hook faces through DSH's runtime injector. The
 // Studio host renders the reference components directly, so bind the same
 // contracts to the App-owned local projections here.
 const studioShortcuts: readonly { id: string; keys: readonly string[]; aria: string }[] = [];
@@ -203,3 +220,31 @@ const studioWorkspaceShortcutState = { searchRequest: 0, addRequested: false, di
 export const useStudioWorkspaceShortcuts = (selector: (state: typeof studioWorkspaceShortcutState) => unknown) => selector(studioWorkspaceShortcutState);
 // Studio queue rows carry text only, so the queue thumbnail loader is inert.
 export const loadStudioQueueImage = async (): Promise<string> => "";
+
+// These hooks expose operations supported by the App-owned Codex bridge to
+// DSH presentation components. The bridge retains authentication and mutation
+// authority; no DSH remote/session ACL or lifecycle is created here.
+export function useStudioRemoteAccess(permission: string): boolean {
+  const studio = useStudio();
+  return permission === "session/create" && studio.threadDirectoryStatus === "ready";
+}
+export function useStudioSessionAccess(sessionId: string, permission: string): boolean {
+  const studio = useStudio();
+  const present = studio.threadProjects.some(project => project.threads.some(thread => thread.id === sessionId));
+  return present && studio.threadDirectoryStatus === "ready"
+    && ["session/rename", "session/fork", "session/archive", "workspace/insertSessionBefore"].includes(permission);
+}
+export function useStudioWorkspaceAccess(workspaceId: string, permission: string): boolean {
+  const studio = useStudio();
+  return studio.threadDirectoryStatus === "ready"
+    && studio.threadProjects.some(project => project.id === workspaceId && !project.projectless)
+    && ["session/create", "workspace/rename", "workspace/delete", "workspace/insertBefore"].includes(permission);
+}
+export function useStudioComposerAccess(permission: string): boolean {
+  const studio = useStudio();
+  if (permission === "session/prompt") return typeof studio.submitPrompt === "function";
+  if (permission === "session/cancel") return typeof studio.stopTurn === "function";
+  // The bridge accepts inline image drafts and rejects unsupported file kinds.
+  if (permission === "fileUploads/upload") return typeof studio.addComposerImages === "function";
+  return false;
+}

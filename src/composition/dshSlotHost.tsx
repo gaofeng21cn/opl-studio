@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Context } from "@deepseek-ai/cordis";
+import { installIconSprite } from "../integrations/deepseek-harness/iconSprite.mjs";
 import { SlotRegistry } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { createSettingsShellStore } from "../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
 import { CodexThreadScope } from "./codexThreadScope";
@@ -24,6 +25,7 @@ import {
   ShellOverlaySlot,
   settingsSectionId,
 } from "./dshSlotHost-parts/shellSettingsSlots";
+import { installStudioMenus } from "./dshSlotHost-parts/studioMenus";
 import { FirstRunOnboardingSlot } from "./dshSlotHost-parts/firstRunOnboarding";
 import {
   ConversationBodySlot,
@@ -106,6 +108,9 @@ export class OplStudioDshSlotHost {
     this.core.install(createSlotRenderer());
     ctx.effect(() => this.core.onEntryError((key, entry, error) => console.error("OPL Studio UI slot failed", { slot: key, registrant: entry.registrant, error })));
     this.registerStaticSlots();
+    installIconSprite(ctx, undefined);
+    try { installStudioMenus(ctx); }
+    catch (error) { console.error("OPL Studio context menu installation failed", error); throw error; }
     ctx.effect(() => () => this.clearProjection());
   }
 
@@ -116,7 +121,7 @@ export class OplStudioDshSlotHost {
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
     register({ name: "sidebar.workspaces", registrant: "opl-studio" }, SidebarWorkspacesSlot);
-    register({ name: "sidebar.settings", registrant: "dsh-ui-settings", store: createSettingsShellStore, children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
+    register({ name: "sidebar.settings", registrant: "dsh-ui-settings", store: createSettingsShellStore, children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.section.icon": { kind: "list", scope: "root", inline: true }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
     register({ name: "settings.trigger", registrant: "opl-studio" }, SettingsTriggerSlot);
     register({ name: "settings.header", registrant: "opl-studio" }, SettingsHeaderSlot);
     register({ name: "settings.close", registrant: "opl-studio" }, SettingsCloseSlot);

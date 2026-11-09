@@ -776,7 +776,7 @@
       "reference_product": "DeepSeek Harness",
       "reference_version": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
       "reference_date": "2026-10-09",
-      "scope": "eleven_pinned_gui_package_source_trees_with_opl_slot_adapters",
+      "scope": "pinned_gui_package_source_trees_with_opl_slot_adapters",
       "token_source": "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
       "palette": {
         "canvas": "#fff",
@@ -825,7 +825,7 @@
     "adopted_patterns": [
       "Official SlotRegistry typed slots, stores, factories and Cordis disposer lifecycle",
       "createSlotRenderer React composition and entry error isolation",
-      "byte-identical AppFrame SidebarRoot WorkspaceBrowser ConversationRoot EmptyHero InputBar AgentPresetSeat and SettingsRoot GUI source plus the DSH Menu primitive",
+      "pinned AppFrame SidebarRoot WorkspaceBrowser ConversationRoot EmptyHero InputBar AgentPresetSeat and SettingsRoot GUI source plus the DSH Menu primitive",
       "DSH-owned typography spacing layout color state and interaction without an OPL parallel visual system",
       "project-first persistent left sidebar",
       "single centered conversation canvas",
@@ -879,7 +879,7 @@
     ],
     "vendored_source_root": "src/vendor/deepseek-harness",
     "source_manifest": "src/composition/deepseekHarnessSourceManifest.json",
-    "vendored_file_count": 624,
+    "vendored_file_count": 633,
     "byte_identical": false,
     "byte_identical_to_pinned_ref": false,
     "vendored_package_roots": [
@@ -893,6 +893,7 @@
       "packages/client/ui-settings-general/src",
       "packages/client/ui-theme/src",
       "packages/client/ui-primitives/src",
+      "packages/client/ui-context-menu/src",
       "packages/client/ui-renderer/src",
       "packages/client/ui-sidebar-files/src",
       "packages/client/ui-sidebar-documentpreview/src",
@@ -940,7 +941,7 @@
     "compatibility_patches": [
       {
         "path": "src/integrations/deepseek-harness/patches/react19.patch",
-        "sha256": "bef296b2ba74ce21a3d2fd1ad1f16163f674fb5b6bf69b75a12046607add51f9",
+        "sha256": "c4c4457232b90c91003a0b30a1fe59bf1b2380fdfb40b3bd8026e479f2700005",
         "upstream_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
         "reason": "React 19 refs, nullable DOM refs, inert and callback-ref cleanup compatibility; no runtime authority changes."
       }
@@ -989,8 +990,8 @@
     "external_cohort": {
       "framework_commit": "269c19606767f5f9fff1eaf23998bc451b848d99",
       "framework_tree": "4861e0d07cafbf761eeadf773d42aba078c15fb5",
-      "app_commit": "709dd4e60a87e7602c9b842dd31bc9341d429e53",
-      "app_tree": "d3f6864f1efd84f74b5127a05e747543a07ad78f"
+      "app_commit": "eba2b9d335e1be6372911ca98379540bf51a49fa",
+      "app_tree": "2cc60e30cd299fa5ca395a89bc5d777064f8c1c4"
     },
     "framework_producer": "src/read-models/operator/app-state-ui-contributions.ts#buildAppUiContributionsProjection",
     "host_app_studio_e2e": true,

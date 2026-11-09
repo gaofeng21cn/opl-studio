@@ -464,7 +464,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(evidence.default_home_layout?.details_default_open === false, "task details must be closed by default");
   assert(evidence.webui_parity?.desktop_and_webui_default_home === "chat_first_default_collapsed", "desktop and WebUI must share the chat-first default-collapsed home");
   assert(visualStyle?.reference_version === alignment.reference_version, "visual tokens must bind to the same DeepSeek Harness source ref");
-  assert(visualStyle?.scope === "eleven_pinned_gui_package_source_trees_with_opl_slot_adapters", "visual source scope must cover all eleven pinned DSH GUI package trees");
+  assert(visualStyle?.scope === "pinned_gui_package_source_trees_with_opl_slot_adapters", "visual source scope must cover the manifest-owned pinned DSH GUI package trees");
   assert(visualStyle?.token_source === "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css", "DeepSeek Harness token source must be exact");
   for (const marker of ["--dsw-static-deepseek-450", "--dsw-alias-button-primary-fill", "--dsw-alias-tooltip-bg"]) {
     assert(themeSource.includes(marker), `missing vendored DeepSeek Harness design token ${marker}`);

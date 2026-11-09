@@ -89,6 +89,7 @@
       "packages/client/ui-settings-general/src",
       "packages/client/ui-theme/src",
       "packages/client/ui-primitives/src",
+      "packages/client/ui-context-menu/src",
       "packages/client/ui-renderer/src",
       "packages/client/ui-sidebar-files/src",
       "packages/client/ui-sidebar-documentpreview/src",
@@ -99,12 +100,12 @@
       "packages/client/resources/src",
       "packages/util/workspace-path/src"
     ],
-    "file_count": 624
+    "file_count": 633
   },
   "compatibility_patches": [
     {
       "path": "src/integrations/deepseek-harness/patches/react19.patch",
-      "sha256": "bef296b2ba74ce21a3d2fd1ad1f16163f674fb5b6bf69b75a12046607add51f9",
+      "sha256": "c4c4457232b90c91003a0b30a1fe59bf1b2380fdfb40b3bd8026e479f2700005",
       "upstream_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
       "reason": "React 19 refs, nullable DOM refs, inert and callback-ref cleanup compatibility; no runtime authority changes."
     }
@@ -217,6 +218,42 @@
     {
       "path": "packages/client/ui-agent-preset/src/index.ts",
       "sha256": "aaebafa4968de2822986a600a280cb775a51918ab44804a44c3f75158b951472"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/View.tsx",
+      "sha256": "42534bf9b7561c5ee9a21e9eede9d8e26afb74825ddd165cb6f26c50ae0b77b9"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/index.ts",
+      "sha256": "8cb705a1727aa556ea6df1acfbc41528ef89383d98349a3a6bef7d64e27c7c01"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/locales.ts",
+      "sha256": "decc3322776417b45b697ef01f9eccbb11145c63a28184aa06a65976cb8343e3"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/registry.ts",
+      "sha256": "97cc53b7668447cef0dacf0f066b351aaebfa9693d6ee3010d569a7df9385c32"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/store.ts",
+      "sha256": "df739186fdc009636bb782c2f1fd08f7fc1dc308e4a5515423c09332260c893f"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/target-key.ts",
+      "sha256": "bf2dc85bdc41d68d30310484e66e830648685fffe1b645959df0abc0d195b517"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/trigger.ts",
+      "sha256": "13979f3e830ca0120fcf656502bcb5ccb42267003892e5c26a560e5691ef64b4"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/client/types.ts",
+      "sha256": "eab0467514fd8c791ac028a4dd735aa3287718eb83a4198835b4eb6ac967c0c3"
+    },
+    {
+      "path": "packages/client/ui-context-menu/src/index.ts",
+      "sha256": "245348310e2a223bf3f545f8538b29a3b0b8de4b7c21002cc54535038613a595"
     },
     {
       "path": "packages/client/ui-conversation/src/client/apply.ts",
@@ -864,7 +901,8 @@
     },
     {
       "path": "packages/client/ui-layout/src/client/AppFrame.tsx",
-      "sha256": "e36de99599c4072f58366621eb508747d0b57156a5569870257b9215c13c12a1"
+      "sha256": "71ae4bc9d027303c55e5a4132cef54a1242b56802b31185dadc44b570f2e7ee1",
+      "upstream_sha256": "e36de99599c4072f58366621eb508747d0b57156a5569870257b9215c13c12a1"
     },
     {
       "path": "packages/client/ui-layout/src/client/DocumentTitle.tsx",
@@ -1949,7 +1987,8 @@
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx",
-      "sha256": "b4bc8b5303e8ef5486e208c57ffcfde5b88e6d7f05d64f43f306ab17c17ee992"
+      "sha256": "cba3ce3b04d1fff288a6c6844d2824e23a07369ca62d3d6a4a775a9baa741b52",
+      "upstream_sha256": "b4bc8b5303e8ef5486e208c57ffcfde5b88e6d7f05d64f43f306ab17c17ee992"
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/image/index.ts",
@@ -2077,7 +2116,8 @@
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/pdf/pdf.tsx",
-      "sha256": "62398432150c88965ad970a2bfab21aa1ac3f6908ebbd1c57ab53beb145c4b97"
+      "sha256": "1d00723e76a3f269701d3c175b6e7b2d5813d043e9b678d453743d420b5097b2",
+      "upstream_sha256": "62398432150c88965ad970a2bfab21aa1ac3f6908ebbd1c57ab53beb145c4b97"
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/pdf/runtime.ts",
@@ -2117,7 +2157,8 @@
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/zoom/ZoomViewport.tsx",
-      "sha256": "795bb3064cb1a6884561d89339d42fb563d1f50e290bf61015deae7af85c3193"
+      "sha256": "00e97c6629f219534bfe470062f988704c166fbaf537d4c72d613e61a10a7303",
+      "upstream_sha256": "795bb3064cb1a6884561d89339d42fb563d1f50e290bf61015deae7af85c3193"
     },
     {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/zoom/locales.ts",

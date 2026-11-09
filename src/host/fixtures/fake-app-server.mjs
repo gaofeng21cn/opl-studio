@@ -148,7 +148,7 @@ async function handle(frame) {
     const page = params.cursor === "page-2"
       ? [threads.get("thread-running"), threads.get("thread-subagent")]
       : [threads.get("thread-source"), threads.get("thread-idle"), threads.get("thread-unloaded"), ...(includeProjectlessThread ? [threads.get("thread-recent")] : [])];
-    return send({ id, result: { data: page.filter(Boolean), nextCursor: params.cursor ? null : "page-2", backwardsCursor: null } });
+    return send({ id, result: { data: page.filter(item => item && (params.archived === undefined || item.archived === params.archived)), nextCursor: params.cursor ? null : "page-2", backwardsCursor: null } });
   }
   if (method === "thread/read") {
     const target = threads.get(params.threadId);
@@ -178,6 +178,12 @@ async function handle(frame) {
     const forked = { ...source, id: threadId, sessionId: `session-${threadId}`, forkedFromId: source.id, status: { type: "idle" } };
     threads.set(threadId, forked);
     return send({ id, result: { thread: forked, model: "gpt-test", modelProvider: "openai", cwd: workspace } });
+  }
+  if (method === "thread/name/set") {
+    const target = threads.get(params.threadId);
+    if (!target) return send({ id, error: { code: -32004, message: "thread not found" } });
+    target.name = params.name;
+    return send({ id, result: {} });
   }
   if (method === "thread/archive") {
     threads.get(params.threadId).archived = true;

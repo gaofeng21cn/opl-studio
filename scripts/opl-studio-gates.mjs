@@ -16,6 +16,7 @@ export const requiredDeliverySurfaceKeys = [
 export const slotHostSourcePaths = [
   "src/composition/dshSlotHost.tsx",
   "src/composition/dshSlotHost-parts/studioContext.tsx",
+  "src/composition/dshSlotHost-parts/studioMenus.tsx",
   "src/composition/dshSlotHost-parts/navigationSlots.tsx",
   "src/composition/dshSlotHost-parts/composerSlots.tsx",
   "src/composition/dshSlotHost-parts/shellSettingsSlots.tsx",

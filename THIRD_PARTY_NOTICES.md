@@ -34,7 +34,7 @@ Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
 Inspected source ref: `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`
 
-The complete `src/` trees of eighteen client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
+The complete `src/` trees of nineteen client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
 
 - `ui-layout`
 - `ui-sidebar`
@@ -46,6 +46,7 @@ The complete `src/` trees of eighteen client packages are vendored from that ref
 - `ui-settings-general`
 - `ui-theme`
 - `ui-primitives`
+- `ui-context-menu`
 - `ui-renderer`
 - `ui-sidebar-files`
 - `ui-sidebar-documentpreview`
@@ -58,12 +59,12 @@ The complete `src/` trees of eighteen client packages are vendored from that ref
 The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
-The snapshot contains 624 files, including the upstream `LICENSE`. Its package
+The snapshot contains 633 files, including the upstream `LICENSE`. Its package
 roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.1`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks every local digest and reverts the declared React 19 compatibility patch
-in a temporary copy to prove the original upstream bytes. Five upstream primitive
+in a temporary copy to prove the original upstream bytes. Nine upstream GUI
 files carry this bounded patch: ref initialization, nullable DOM refs, the boolean
 `inert` attribute, and Tooltip ref/cleanup forwarding. The patch digest, pinned
 upstream ref, and each changed file's original SHA-256 are recorded explicitly;
