@@ -718,7 +718,7 @@ test("desktop visual shell uses vendored DeepSeek Harness roots and theme tokens
 });
 
 test("DSH controls resolve to the complete pinned source cohort and OPL-owned slots", () => {
-  const primitiveAlias = ["src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
+  const primitiveAlias = ["./src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
   assert.deepEqual(tsconfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
   assert.deepEqual(typecheckConfig.compilerOptions.paths["@deepseek-ai/dsh-client-ui-primitives"], primitiveAlias);
   assert.match(sourceManifest.upstream.ref, /^[0-9a-f]{40}$/);
@@ -731,7 +731,7 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   assert.equal(candidateEvidence.reused_oss_module_policy.byte_identical_to_pinned_ref, true);
   assert.deepEqual(candidateEvidence.reused_oss_module_policy.direct_reuse_modules, [
     ...dshBinding.packageCohort,
-    "use-sync-external-store@1.2.0"
+    "use-sync-external-store@1.7.0"
   ]);
   for (const { name, version } of dshBinding.packageSpecs) {
     assert.equal(packageJson.dependencies[name], version);
