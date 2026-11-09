@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { IconChevronDownOutlineMedium, Menu, RiskConfirmation, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
+import { IconChevronDownOutlineMedium, Menu, RiskConfirmation, UserTextRun, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { InputBar } from "@opl-vendor/dsh-input-bar";
 import { QueueDock } from "@opl-vendor/dsh-queue-dock";
 import { AgentPresetSeat } from "@opl-vendor/dsh-agent-preset-seat";
@@ -269,6 +269,9 @@ export function QueueDockSlot() {
     updateQueue={studio.updateQueue}
     notify={studio.notifyQueue}
     loadImage={loadStudioQueueImage}
+    renderFactorySlot={(name: string, props: { text?: string }) => name === "conversation.user.text"
+      ? <UserTextRun text={props.text ?? ""} />
+      : null}
     t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
   />;
 }
