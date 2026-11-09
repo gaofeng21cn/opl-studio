@@ -380,10 +380,12 @@ new namespace. Task execution requires an explicit `:read-only` or `:workspace`
 permission profile and a validated workspace. Definitions carry revisions;
 changes run through one active Temporal management workflow per task and recheck revisions. Stale or concurrent edits fail visibly; Schedule conflict tokens alone are not assumed to provide exclusion.
 
-Memory reads use the active Codex home. Canonical Markdown is read-only;
-corrections are notes for the existing memory owner, not a claim that its memory
-has already changed. Cleanup uses owner-declared inactive log files and an
-expiring exact-file preview. Protected App/Framework/Codex inventory reports
+Executor memory reads use the active `CODEX_HOME/memories`. Canonical Markdown is
+read-only; corrections are notes in `extensions/ad_hoc/notes` for the Codex memory
+owner, not a claim that its memory has already changed. This service neither
+maintains the user's business knowledge nor grants access to it. Cleanup uses
+owner-declared inactive log files and an expiring exact-file preview.
+Protected App/Framework/Codex inventory reports
 partial or failed reads explicitly. Resource contents and raw action payloads
 are excluded from diagnostic receipt summaries.
 
@@ -392,11 +394,36 @@ canonical observation. Projection presence and App Server connection alone are
 insufficient. Empty directories are legitimate states, and missing memory refs
 are not evidence that a memory facility is absent.
 
-
 The official DSH Web server requires a concrete local bind address. Studio resolves a legacy
 wildcard request to the single external interface of a container; hosts with multiple matching
 interfaces must supply the intended concrete address. Desktop and tool-only startup retain their
 loopback default. Authentication and route ownership stay in the existing Studio Web adapter.
+
+## Business knowledge ownership
+
+The [Framework knowledge policy](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)
+and [knowledge sources contract](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/knowledge-sources.md)
+define the shared source and consumption model. Product, user/team, topic and
+project ownership are independent of content type and physical directory. An
+existing Obsidian vault or other personal library keeps the single editable
+business source; a business workspace can hold it when no personal library
+exists. Workspaces may also hold original project work and must not be treated
+as disposable runtime caches.
+
+Framework owns source registration and bindings, accepted versions, scope and
+access checks, immutable task snapshots and mechanical writeback evidence. The
+user or domain owner accepts the meaning of a change. Current domain state stays
+with its business owner, and runtime evidence records its actual use; neither a
+Studio cache nor a dated projection silently becomes editable long-term truth.
+
+`MemoryRefsPanel` only presents the task's declared memory references. The
+separate Codex memory service above reads executor memory. Knowledge review
+surfaces use the existing dynamic Package contribution when the source owner
+exposes one. Studio does not add a personal store, source registry or Vault RPC.
+Selecting a thread workspace does not grant knowledge access; source reads and
+writeback retain their owner checks, accepted revision and separate permissions.
+Missing required knowledge or a changed source is reported by the owner instead
+of being filled from an unverified client cache.
 
 ## Standard MCP Apps plugin
 
