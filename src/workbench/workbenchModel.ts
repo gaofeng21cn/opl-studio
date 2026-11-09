@@ -1,5 +1,7 @@
 import {
   initialWorkbenchModel,
+  type ApplicationManagementProjection,
+  type ApplicationManagementResource,
   type ActiveProjectLine,
   type ConfirmationCard,
   type DeliveryPackage,
@@ -63,6 +65,33 @@ export * from "./workbenchModel-threads";
 export * from "./workbenchModel-managed-updates";
 export { agentPackageSelectionIntent } from "./workbenchModel-package-lifecycle";
 export { deriveThreadDirectory, deriveThreadMessages } from "./workbenchModel-threads";
+
+function readApplicationManagementProjection(value: unknown): ApplicationManagementProjection | undefined {
+  const projection = asRecord(value);
+  if (projection?.surface_kind !== "opl_application_management_projection.v1") return undefined;
+  const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  const optionalString = (value: unknown): string | undefined => asString(value) ?? undefined;
+  const kinds: ApplicationManagementResource["resourceKind"][] = ["knowledge_source", "connection", "model", "base_capability"];
+  return { sharedResources: asRecordArray(projection.shared_resources).flatMap((resource) => {
+    const resourceId = asString(resource.resource_id);
+    const resourceKind = asString(resource.resource_kind) as ApplicationManagementResource["resourceKind"];
+    const label = asString(resource.label);
+    if (!resourceId || !label || !kinds.includes(resourceKind)) return [];
+    const labels = asRecord(resource.label_i18n);
+    return [{
+      resourceId,
+      resourceKind,
+      label,
+      ...(labels ? { labelI18n: { zh: optionalString(labels.zh), en: optionalString(labels.en) } } : {}),
+      status: resource.status === "ready" || resource.status === "attention" ? resource.status : "unknown",
+      sourceRefs: strings(resource.source_refs),
+      consumerPackageIds: strings(resource.consumer_package_ids),
+      ownerSettingsRoute: optionalString(resource.owner_settings_route),
+      relationKind: resource.relation_kind === "required" || resource.relation_kind === "configured" ? resource.relation_kind : "optional",
+      detailRef: optionalString(resource.detail_ref)
+    } satisfies ApplicationManagementResource];
+  }) };
+}
 
 export function deriveWorkbenchModelFromState(state: unknown, fallback: WorkbenchModel = initialWorkbenchModel): WorkbenchModel {
   const appState = pickAppState(state);
@@ -278,6 +307,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     contextTrace: contextTrace.length ? contextTrace : fallback.contextTrace,
     gatewayAccount,
     settingsProjection,
+    applicationManagement: readApplicationManagementProjection(appState.application_management),
     runtimeOverview,
     serviceRecovery: deriveServiceRecoveryModel({ temporal, actions, stateFresh: true }),
     workItemRuntime,

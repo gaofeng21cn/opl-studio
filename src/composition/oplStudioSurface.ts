@@ -14,7 +14,7 @@ export type OplSetupOperationResult = {
 
 export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
 
-export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace";
+export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace" | "applications";
 export type RenderSettingsContribution = (options?: { only?: string }) => ReactNode;
 
 export type OplStudioSurface = {
@@ -55,6 +55,7 @@ export type OplStudioSurface = {
   selectedAgentPresetId: string;
   conversationBody: ReactNode;
   primaryView: OplStudioPrimaryView;
+  applicationManagement: ReactNode;
   runtimeOverview: ReactNode;
   scheduledTasks: ReactNode;
   openPrimaryView(view: OplStudioPrimaryView): void;

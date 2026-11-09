@@ -47,12 +47,30 @@ export type WorkbenchModel = {
   contextTrace: WorkbenchTraceRef[];
   gatewayAccount?: WorkbenchGatewayAccount;
   settingsProjection?: WorkbenchSettingsProjection;
+  applicationManagement?: ApplicationManagementProjection;
   runtimeOverview?: RuntimeOverviewRef;
   serviceRecovery?: ServiceRecoveryModel;
   workItemRuntime?: WorkItemRuntimeProjection;
   managedCompanions: ManagedCompanionViewModel[];
   uiContributions: OplUiContributionsProjection;
   stateGeneratedAt?: string;
+};
+
+export type ApplicationManagementResource = {
+  resourceId: string;
+  resourceKind: "knowledge_source" | "connection" | "model" | "base_capability";
+  label: string;
+  labelI18n?: { zh?: string; en?: string };
+  status: "ready" | "attention" | "unknown";
+  sourceRefs: string[];
+  consumerPackageIds: string[];
+  ownerSettingsRoute?: string;
+  relationKind: "required" | "optional" | "configured";
+  detailRef?: string;
+};
+
+export type ApplicationManagementProjection = {
+  sharedResources: ApplicationManagementResource[];
 };
 
 export const workbenchBridgeUnavailableDiagnostic = {

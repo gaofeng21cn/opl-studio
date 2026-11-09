@@ -21,6 +21,7 @@ const passthrough = read("src/host/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
 const model = read("src/workbench/workbenchModel.ts");
 const runtimePage = read("src/workbench/RuntimeOverviewPage.tsx");
+const applicationManagementPage = read("src/workbench/ApplicationManagementPage.tsx");
 const runtimeCache = read("src/workbench/runtimeOverviewCache.ts");
 const settingsPanel = read("src/workbench/SettingsPanel.tsx") + fs.readdirSync(path.join(root, 'src/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'src/workbench/settings', file), 'utf8')).join('\n');
 const styleSources = [
@@ -38,7 +39,8 @@ const styleSources = [
   "src/workbench/codexWorkbenchStyleDsh.ts",
   "src/workbench/codexWorkbenchStyleRuntimeOverview.ts",
   "src/workbench/codexWorkbenchStyleResponsive.ts",
-  "src/workbench/codexWorkbenchStyleSettingsIntegration.ts"
+  "src/workbench/codexWorkbenchStyleSettingsIntegration.ts",
+  "src/workbench/codexWorkbenchStyleApplicationManagement.ts"
 ];
 const styles = styleSources.map(read).join("\n");
 const adapterStyles = read("src/integrations/deepseek-harness/oplAdapter.css");
@@ -160,6 +162,23 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
   assert.match(runtimeCache, /cached_snapshot_requires_fresh_state/);
   assert.match(runtimeCache, /maintenanceActions: \[\]/);
   assert.match(runtimePage, /causalRoot\.detail\[locale\]/);
+});
+
+test("Studio exposes one App-owned application management surface", () => {
+  assert.match(slotHost, /studio\.primaryView === "applications"/);
+  assert.match(slotHost, /studio\.applicationManagement/);
+  assert.match(app, /<ApplicationManagementPage/);
+  assert.match(app, /applicationManagement:/);
+  assert.match(read("src/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
+  assert.match(applicationManagementPage, /data-testid="opl-app-management"/);
+  assert.match(applicationManagementPage, /data-testid="opl-app-management-tabs"/);
+  assert.match(applicationManagementPage, /PackageCatalog kind="all"/);
+  assert.match(applicationManagementPage, /UpdatesSettingsPage/);
+  assert.match(applicationManagementPage, /model\.applicationManagement\?\.sharedResources/);
+  assert.match(applicationManagementPage, /ArrowRight|ArrowLeft/);
+  assert.match(applicationManagementPage, /opl-app-management-receipt/);
+  assert.match(model, /application_management/);
+  assert.match(styles, /\.opl-app-management/);
 });
 
 test("new task and runtime entries share the light primary navigation treatment", () => {

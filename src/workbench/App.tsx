@@ -84,6 +84,7 @@ import {
 } from "./settingsModel";
 import { codexWorkbenchStyles } from "./codexWorkbenchStyles";
 import { RuntimeOverviewPage } from "./RuntimeOverviewPage";
+import { ApplicationManagementPage, type ApplicationManagementTab } from "./ApplicationManagementPage";
 import {
   readRuntimeOverviewCache,
   runtimeOverviewModelFromCache,
@@ -418,6 +419,7 @@ export function App({
   const [mcpTaskTarget, setMcpTaskTarget] = useState<{ itemId: string; viewId?: string; threadId?: string } | undefined>();
   const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
+  const [applicationManagementTab, setApplicationManagementTab] = useState<ApplicationManagementTab>("applications");
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [desktopSetupStage, setDesktopSetupStage] = useState<string | null>(null);
   const [desktopSetupElapsedSeconds, setDesktopSetupElapsedSeconds] = useState<number | null>(null);
@@ -1612,6 +1614,10 @@ export function App({
       if (destination?.kind === "schedules") {
         setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
         setPrimaryView("schedules");
+      } else if (destination?.kind === "application_management") {
+        setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
+        setApplicationManagementTab(destination.section ?? "applications");
+        setPrimaryView("applications");
       } else if (destination?.kind === "settings") {
         setSettingsNavigation(current => ({ open: true, destination: destination.destination, revision: (current?.revision ?? 0) + 1 }));
       } else if (destination?.kind === "conversation") {
@@ -2569,6 +2575,14 @@ export function App({
   }), [bridge]);
 
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
+  const renderPackageContributions = (packageId: string, renderContribution?: (options?: { only?: string }) => ReactNode) => {
+    const entries = model.uiContributions.entries.filter((entry) => (
+      entry.slot === "settings.section" && entry.packageId === packageId && settingsContributionDestination(entry) !== null
+    ));
+    return entries.length ? <div className="opl-contribution-slot" data-package-id={packageId}>
+      {entries.map((entry) => <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>)}
+    </div> : null;
+  };
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsPanel
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
@@ -2633,14 +2647,7 @@ export function App({
       pendingConfirmation={null}
       onConfirmAction={() => void confirmSettingsAction()}
       onCancelAction={() => setSettingsActionConfirmation(null)}
-      renderPackageContributions={(packageId) => {
-        const entries = model.uiContributions.entries.filter((entry) => (
-          entry.slot === "settings.section" && entry.packageId === packageId && settingsContributionDestination(entry) !== null
-        ));
-        return entries.length ? <div className="opl-contribution-slot" data-package-id={packageId}>
-          {entries.map((entry) => <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>)}
-        </div> : null;
-      }}
+      renderPackageContributions={(packageId) => renderPackageContributions(packageId, renderContribution)}
     />
   );
 
@@ -2717,6 +2724,24 @@ export function App({
     selectedAgentPresetId: selectedAgent?.packageId ?? "opl-daily-work",
     conversationBody: studioConversationBody,
     primaryView,
+    applicationManagement: <ApplicationManagementPage
+      model={model}
+      settings={settings}
+      managedUpdate={managedUpdate}
+      actionViewModel={settingsActionViewModel}
+      nativeAppUpdate={nativeAppUpdate}
+      actionBusyKey={settingsActionBusyKey}
+      onAction={(request) => void runSettingsAction(request)}
+      onHostAction={(intent) => void runSettingsHostAction(intent)}
+      onRefresh={() => void loadState(settings.runtimeProfile)}
+      manifestInstallAction={projectedManifestInstallAction}
+      renderPackageContributions={(packageId) => renderPackageContributions(packageId, options => renderContributionSlot?.("settings.section", contributionOwner, options))}
+      onOpenSettings={(destination) => setSettingsNavigation(current => ({ open: true, destination, revision: (current?.revision ?? 0) + 1 }))}
+      initialTab={applicationManagementTab}
+      onTabChange={setApplicationManagementTab}
+      actionFeedback={settingsActionFeedback}
+      actionReceipt={settingsActionReceipt}
+    />,
     scheduledTasks: <section className="settings-page opl-schedules-page" aria-label={settings.locale === "zh" ? "计划任务" : "Scheduled tasks"}>
       <header className="settings-detail-header"><h1>{settings.locale === "zh" ? "计划任务" : "Scheduled tasks"}</h1><p>{settings.locale === "zh" ? "安排重复工作，查看执行结果。" : "Schedule recurring work and review results."}</p></header>
       <ScheduledTasksPanel client={workbenchServices} locale={settings.locale} onAction={request => void runSettingsAction(request)} busy={settingsActionBusyKey !== null} revision={settingsActionReceipt?.receiptId} cwd={selectedProject?.workspace ?? currentProject} onOpened={() => setPrimaryView("conversation")} />
