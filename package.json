@@ -114,7 +114,7 @@
     "@types/use-sync-external-store": "1.5.0",
     "electron": "44.9.1",
     "electron-builder": "26.15.3",
-    "typescript": "5.8.3",
+    "typescript": "7.0.2",
     "yaml": "2.9.1"
   },
   "overrides": {
