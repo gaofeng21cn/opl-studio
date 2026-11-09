@@ -28,7 +28,9 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         cwd: path.join(root, source.slice(5)), encoding: "utf8"
       });
       assert.equal(packed.status, 0, packed.stderr);
-      const receipt = JSON.parse(packed.stdout)[0];
+      const packedResult = JSON.parse(packed.stdout);
+      const receipt = Array.isArray(packedResult) ? packedResult[0] : Object.values(packedResult)[0];
+      assert.ok(receipt, name);
       assert.ok(receipt.files.some((file) => file.path === "LICENSE"), name);
       assert.ok(!receipt.files.some((file) => file.path.startsWith("src/")), name);
       await fs.mkdir(destination, { recursive: true });
