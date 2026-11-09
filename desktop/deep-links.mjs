@@ -6,6 +6,13 @@ const MAX_PENDING_DEEP_LINKS = 16;
 const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const rejected = reason => ({ valid: false, reason });
 const exactPath = value => typeof value === "string" && /^\/[a-z0-9]+(?:[/-][a-z0-9]+)*$/.test(value);
+const explicitSectionRoute = value => {
+  if (typeof value !== "string" || value.includes("#")) return false;
+  let url;
+  try { url = new URL(value, "https://opl.invalid"); } catch { return false; }
+  const entries = [...url.searchParams];
+  return exactPath(url.pathname) && entries.length === 1 && entries[0][0] === "section" && /^[a-z0-9_-]+$/.test(entries[0][1]);
+};
 
 export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
   const source = guiContract?.branded_deep_link_policy;
@@ -13,7 +20,7 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
     || JSON.stringify(source.accepted_schemes) !== '["opl"]'
     || JSON.stringify(source.allowed_actions) !== '["navigate"]'
     || !["url_hostname_only_with_empty_path", "url_hostname_only_with_empty_or_root_path"].includes(source.action_authority)
-    || source.route_registry?.match_policy !== "exact_path_only_no_query_hash_or_dynamic_segments") {
+    || !["exact_path_only_no_query_hash_or_dynamic_segments", "exact_path_or_explicit_section_route_allowlist"].includes(source.route_registry?.match_policy)) {
     throw new Error("Invalid App branded deep-link policy");
   }
   const groups = [source.route_registry.static_exact_routes,
@@ -21,6 +28,10 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
     settingsControlPlane?.secondary_pages?.map(route => route.path)];
   if (groups.some(group => !Array.isArray(group) || group.some(route => !exactPath(route)))) {
     throw new Error("Invalid App branded deep-link route registry");
+  }
+  const sectionRoutes = source.route_registry.allowed_section_routes ?? [];
+  if (!Array.isArray(sectionRoutes) || sectionRoutes.some(route => !explicitSectionRoute(route))) {
+    throw new Error("Invalid App branded deep-link section route registry");
   }
   if (!Array.isArray(source.forbidden_parameter_names) || !Array.isArray(source.secret_like_value_prefixes)) {
     throw new Error("Invalid App branded deep-link secret policy");
@@ -30,6 +41,7 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
     source: "contracts/app-gui-product-contract.json#branded_deep_link_policy",
     settingsRouteSource: "contracts/app-settings-control-plane.json#ordinary_routes+secondary_pages",
     routes: Object.freeze([...new Set(groups.flat())]),
+    sectionRoutes: Object.freeze([...new Set(sectionRoutes)]),
     forbiddenParameters: Object.freeze([...source.forbidden_parameter_names]),
     secretPrefixes: Object.freeze([...source.secret_like_value_prefixes])
   });
@@ -37,7 +49,8 @@ export function createDeepLinkPolicy(guiContract, settingsControlPlane) {
 
 export function isAllowedDeepLinkRoute(route, policy) {
   return policy?.schema === "opl_studio_deep_link_policy.v1"
-    && exactPath(route) && Array.isArray(policy.routes) && policy.routes.includes(route);
+    && ((exactPath(route) && Array.isArray(policy.routes) && policy.routes.includes(route))
+      || (explicitSectionRoute(route) && Array.isArray(policy.sectionRoutes) && policy.sectionRoutes.includes(route)));
 }
 
 function sensitive(value, policy) {

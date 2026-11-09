@@ -29,6 +29,13 @@ test("deep links consume every exact App route without a second route registry",
   }
 });
 
+test("deep links accept only explicit section routes alongside exact routes", () => {
+  const sectionPolicy = { ...policy, sectionRoutes: ["/apps?section=updates", "/settings/environment?section=updates"] };
+  assert.deepEqual(parseDeepLinkUrl("opl://navigate?route=%2Fapps%3Fsection%3Dupdates", sectionPolicy), { valid: true, payload: payload("/apps?section=updates") });
+  assert.equal(validateDeepLinkPayload(payload("/apps?section=unknown"), sectionPolicy).valid, false);
+  assert.equal(parseDeepLinkUrl("opl://navigate?route=%2Fapps%3Fsection%3Dupdates%26token%3Dsecret", sectionPolicy).valid, false);
+});
+
 test("deep links reject secret actions, payloads, authority, duplicates and route aliases without retaining input", () => {
   const invalid = [
     "aionui://navigate?route=/guid", "https://navigate?route=/guid", "opl://provider/add?token=secret",

@@ -6,6 +6,7 @@ declare global { var __OPL_DEEP_LINK_POLICY__: unknown; }
 export type DeepLinkDestination =
   | { kind: "conversation"; scope: "all" | "archived" }
   | { kind: "schedules" }
+  | { kind: "application_management"; section?: "applications" | "updates" | "resources" }
   | { kind: "settings"; destination: SettingsDestinationId };
 
 // This maps App-owned routes into the existing Studio presentation. Admission
@@ -23,10 +24,30 @@ export function resolveDeepLinkDestination(value: unknown, policy: unknown = glo
   const result = validateDeepLinkPayload(value, policy);
   if (!result.valid) return null;
   const route = result.payload.params.route;
-  if (route === "/guid") return { kind: "conversation", scope: "all" };
-  if (route === "/archived") return { kind: "conversation", scope: "archived" };
-  if (route === "/scheduled") return { kind: "schedules" };
-  const destination = settingsPresentation[route];
+  let baseRoute = route;
+  let section: string | undefined;
+  try {
+    const parsed = new URL(route, "https://opl.invalid");
+    const entries = [...parsed.searchParams];
+    if (entries.length > 1 || (entries.length === 1 && entries[0][0] !== "section")) return null;
+    baseRoute = parsed.pathname;
+    section = entries[0]?.[1];
+  } catch {
+    return null;
+  }
+  if (baseRoute === "/guid") return { kind: "conversation", scope: "all" };
+  if (baseRoute === "/archived") return { kind: "conversation", scope: "archived" };
+  if (baseRoute === "/scheduled") return { kind: "schedules" };
+  if (baseRoute === "/apps") {
+    return section && ["applications", "updates", "resources"].includes(section)
+      ? { kind: "application_management", section: section as "applications" | "updates" | "resources" }
+      : section ? null : { kind: "application_management" };
+  }
+  if (baseRoute === "/settings/agents" || baseRoute === "/settings/capabilities") return { kind: "application_management", section: "applications" };
+  if (baseRoute === "/settings/resources") return { kind: "application_management", section: "resources" };
+  if (baseRoute === "/settings/environment" && section === "updates") return { kind: "application_management", section: "updates" };
+  if (section) return null;
+  const destination = settingsPresentation[baseRoute];
   return destination ? { kind: "settings", destination } : null;
 }
 

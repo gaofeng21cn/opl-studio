@@ -1,4 +1,4 @@
-import { Activity, CalendarClock, RefreshCw } from "lucide-react";
+import { Activity, Boxes, CalendarClock, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppFrame } from "@opl-vendor/dsh-app-frame";
 import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
@@ -295,6 +295,7 @@ function RuntimeNavigation({ wide }: { wide: boolean }) {
   const studio = useStudio();
   const label = studio.locale === "zh" ? "运行状态" : "Run status";
   return <nav className="opl-primary-nav" data-wide={wide} aria-label={studio.locale === "zh" ? "主导航" : "Primary navigation"}>
+    <button type="button" title={studio.locale === "zh" ? "应用管理" : "Application management"} aria-label={studio.locale === "zh" ? "应用管理" : "Application management"} aria-current={studio.primaryView === "applications" ? "page" : undefined} onClick={() => studio.openPrimaryView("applications")}><Boxes aria-hidden="true" size={wide ? 14 : 18} />{wide ? <span>{studio.locale === "zh" ? "应用管理" : "Application management"}</span> : null}</button>
     <button
       type="button"
       title={label}
@@ -310,6 +311,7 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const studio = useStudio();
   if (studio.primaryView === "schedules") return <>{studio.scheduledTasks}</>;
   if (studio.primaryView === "runtime") return <>{studio.runtimeOverview}</>;
+  if (studio.primaryView === "applications") return <>{studio.applicationManagement}</>;
   const sessionId = "opl-current";
   const session = { openState: "open", blank: studio.conversationBlank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
   const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { id: sessionId, blank: studio.conversationBlank, cwd: studio.workspacePath, retainedBy: { mainView: 1 } } } };

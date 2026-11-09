@@ -13,6 +13,7 @@ import { codexWorkbenchStyleDsh } from "./codexWorkbenchStyleDsh";
 import { codexWorkbenchStyleRuntimeOverview } from "./codexWorkbenchStyleRuntimeOverview";
 import { codexWorkbenchStyleResponsive } from "./codexWorkbenchStyleResponsive";
 import { codexWorkbenchStyleSettingsIntegration } from "./codexWorkbenchStyleSettingsIntegration";
+import { codexWorkbenchStyleApplicationManagement } from "./codexWorkbenchStyleApplicationManagement";
 
 export const codexWorkbenchStyles =
   codexWorkbenchStyleFoundation +
@@ -29,4 +30,5 @@ export const codexWorkbenchStyles =
   codexWorkbenchStyleDsh +
   codexWorkbenchStyleRuntimeOverview +
   codexWorkbenchStyleResponsive +
-  codexWorkbenchStyleSettingsIntegration;
+  codexWorkbenchStyleSettingsIntegration +
+  codexWorkbenchStyleApplicationManagement;
