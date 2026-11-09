@@ -71,6 +71,7 @@ function readApplicationManagementProjection(value: unknown): ApplicationManagem
   if (projection?.surface_kind !== "opl_application_management_projection.v1") return undefined;
   const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   const optionalString = (value: unknown): string | undefined => asString(value) ?? undefined;
+  const optionalCount = (value: unknown): number | undefined => typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined;
   const kinds: ApplicationManagementResource["resourceKind"][] = ["knowledge_source", "connection", "model", "base_capability"];
   return { sharedResources: asRecordArray(projection.shared_resources).flatMap((resource) => {
     const resourceId = asString(resource.resource_id);
@@ -78,6 +79,10 @@ function readApplicationManagementProjection(value: unknown): ApplicationManagem
     const label = asString(resource.label);
     if (!resourceId || !label || !kinds.includes(resourceKind)) return [];
     const labels = asRecord(resource.label_i18n);
+    const authorization = asRecord(resource.authorization);
+    const revision = asRecord(resource.revision);
+    const freshness = asRecord(resource.freshness);
+    const readiness = asRecord(resource.readiness);
     return [{
       resourceId,
       resourceKind,
@@ -88,7 +93,24 @@ function readApplicationManagementProjection(value: unknown): ApplicationManagem
       consumerPackageIds: strings(resource.consumer_package_ids),
       ownerSettingsRoute: optionalString(resource.owner_settings_route),
       relationKind: resource.relation_kind === "required" || resource.relation_kind === "configured" ? resource.relation_kind : "optional",
-      detailRef: optionalString(resource.detail_ref)
+      detailRef: optionalString(resource.detail_ref),
+      ...(authorization ? { authorization: {
+        status: authorization.status === "authorized" || authorization.status === "attention" ? authorization.status : "unknown",
+        consumerCount: optionalCount(authorization.consumer_count),
+        grantCount: optionalCount(authorization.grant_count)
+      } } : {}),
+      ...(revision ? { revision: {
+        status: revision.status === "current" || revision.status === "stale" ? revision.status : "unknown",
+        securityRevision: optionalString(revision.security_revision)
+      } } : {}),
+      ...(freshness ? { freshness: {
+        status: freshness.status === "fresh" || freshness.status === "stale" ? freshness.status : "unknown",
+        observedAt: optionalString(freshness.observed_at)
+      } } : {}),
+      ...(readiness ? { readiness: {
+        status: readiness.status === "ready" || readiness.status === "attention" ? readiness.status : "unknown",
+        reason: optionalString(readiness.reason)
+      } } : {})
     } satisfies ApplicationManagementResource];
   }) };
 }

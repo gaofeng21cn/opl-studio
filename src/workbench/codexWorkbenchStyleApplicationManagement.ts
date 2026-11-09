@@ -210,6 +210,47 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     flex-wrap: wrap;
   }
 
+  .opl-app-management-resource-details {
+    flex-basis: 100%;
+    min-width: 220px;
+    margin-top: 2px;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    text-align: left;
+  }
+
+  .opl-app-management-resource-details summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--opl-muted);
+  }
+
+  .opl-app-management-resource-details summary:hover {
+    color: var(--opl-text);
+  }
+
+  .opl-app-management-resource-details dl {
+    display: grid;
+    gap: 4px;
+    margin: 8px 0 0;
+  }
+
+  .opl-app-management-resource-details dl > div {
+    display: grid;
+    grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.3fr);
+    gap: 10px;
+  }
+
+  .opl-app-management-resource-details dt {
+    color: var(--opl-faint);
+  }
+
+  .opl-app-management-resource-details dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--opl-muted);
+  }
+
   @media (max-width: 680px) {
     .opl-app-management {
       padding-right: 16px;

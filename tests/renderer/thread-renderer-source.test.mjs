@@ -175,9 +175,13 @@ test("Studio exposes one App-owned application management surface", () => {
   assert.match(applicationManagementPage, /PackageCatalog kind="all"/);
   assert.match(applicationManagementPage, /UpdatesSettingsPage/);
   assert.match(applicationManagementPage, /model\.applicationManagement\?\.sharedResources/);
+  assert.match(applicationManagementPage, /resourceKindLabel/);
+  assert.match(applicationManagementPage, /opl-app-management-knowledge-empty/);
+  assert.doesNotMatch(applicationManagementPage, /Open owner|查看 Owner|第二套依赖注册表/);
   assert.match(applicationManagementPage, /ArrowRight|ArrowLeft/);
   assert.match(applicationManagementPage, /opl-app-management-receipt/);
   assert.match(model, /application_management/);
+  for (const field of ["authorization", "consumer_count", "grant_count", "security_revision", "observed_at", "readiness"]) assert.match(model, new RegExp(field));
   assert.match(styles, /\.opl-app-management/);
 });
 

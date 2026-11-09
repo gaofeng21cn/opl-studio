@@ -69,24 +69,82 @@ function resourceOwnerDestination(route: string | undefined): SettingsDestinatio
   }
 }
 
+function resourceKindLabel(kind: ApplicationManagementResource["resourceKind"], zh: boolean): string {
+  return ({
+    knowledge_source: zh ? "知识来源" : "Knowledge source",
+    connection: zh ? "连接" : "Connection",
+    model: zh ? "模型" : "Model",
+    base_capability: zh ? "基础能力" : "Base capability"
+  })[kind];
+}
+
+function relationLabel(relation: ApplicationManagementResource["relationKind"], zh: boolean): string {
+  return ({
+    required: zh ? "必需" : "Required",
+    optional: zh ? "可选" : "Optional",
+    configured: zh ? "已配置" : "Configured"
+  })[relation];
+}
+
+function resourceStateLabel(value: string | undefined, zh: boolean): string {
+  return ({
+    authorized: zh ? "已授权" : "Authorized",
+    attention: zh ? "需要处理" : "Needs attention",
+    current: zh ? "当前" : "Current",
+    stale: zh ? "已过期" : "Stale",
+    fresh: zh ? "最新" : "Fresh",
+    ready: zh ? "就绪" : "Ready",
+    unknown: zh ? "未提供" : "Unknown"
+  })[value ?? "unknown"] ?? (zh ? "未提供" : "Unknown");
+}
+
+function observedAtLabel(value: string | undefined, locale: WorkbenchSettings["locale"]): string | undefined {
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
+}
+
+function ResourceMetadata({ resource, locale }: { resource: ApplicationManagementResource; locale: WorkbenchSettings["locale"] }) {
+  const zh = locale === "zh";
+  const authorization = resource.authorization;
+  const revision = resource.revision;
+  const freshness = resource.freshness;
+  const readiness = resource.readiness;
+  const authorizationCounts = [
+    authorization?.consumerCount !== undefined ? `${authorization.consumerCount} ${zh ? "个应用" : "consumer(s)"}` : undefined,
+    authorization?.grantCount !== undefined ? `${authorization.grantCount} ${zh ? "项授权" : "grant(s)"}` : undefined
+  ].filter(Boolean).join(zh ? "，" : ", ");
+  const revisionValue = [resourceStateLabel(revision?.status, zh), revision?.securityRevision ? `${zh ? "安全修订" : "security revision"} ${revision.securityRevision}` : undefined].filter(Boolean).join(zh ? "，" : ", ");
+  const freshnessValue = [resourceStateLabel(freshness?.status, zh), observedAtLabel(freshness?.observedAt, locale)].filter(Boolean).join(zh ? "，" : ", ");
+  const readinessValue = [resourceStateLabel(readiness?.status, zh), readiness?.reason].filter(Boolean).join(zh ? "，" : ", ");
+  return <details className="opl-app-management-resource-details">
+    <summary>{zh ? "查看详情" : "View details"}</summary>
+    <dl>
+      <div><dt>{zh ? "授权" : "Authorization"}</dt><dd>{resourceStateLabel(authorization?.status, zh)}{authorizationCounts ? `，${authorizationCounts}` : ""}</dd></div>
+      <div><dt>{zh ? "版本与安全修订" : "Version & security revision"}</dt><dd>{revisionValue}</dd></div>
+      <div><dt>{zh ? "数据时效" : "Freshness"}</dt><dd>{freshnessValue}</dd></div>
+      <div><dt>{zh ? "就绪状态" : "Readiness"}</dt><dd>{readinessValue}</dd></div>
+    </dl>
+  </details>;
+}
+
 function SharedResources({ model, settings, onOpenSettings }: Pick<ApplicationManagementPageProps, "model" | "settings" | "onOpenSettings">) {
-  const projection = model.settingsProjection;
-  const authorization = projection?.connectionAuthorization;
   const packageDependencies = model.packageLifecycle.filter((item) => item.dependencies.length > 0);
   const projected = model.applicationManagement?.sharedResources ?? [];
   const resources = useMemo(() => projected.filter((item) => item.resourceId || item.label), [projected]);
   const zh = settings.locale === "zh";
+  const hasKnowledgeSource = resources.some((resource) => resource.resourceKind === "knowledge_source");
 
   return <div className="opl-app-management-resources" data-testid="opl-app-management-resources">
     <SettingsGroup title={zh ? "共享资源" : "Shared resources"}>
-      <p className="settings-inline-note">{zh ? "应用只引用已授权的连接和知识来源；正文与凭证仍由所属 Owner 管理。" : "Apps reference authorized connections and knowledge sources; source bodies and credentials remain with their owners."}</p>
-      {resources.length ? resources.map((resource, index) => <SettingRow key={resource.resourceId ?? `${resource.label}-${index}`} label={localizedResourceLabel(resource, settings.locale)} detail={[resource.resourceKind, resource.relationKind, resource.consumerPackageIds.length ? `${resource.consumerPackageIds.length} ${zh ? "个应用使用" : "apps"}` : undefined].filter(Boolean).join(" · ")}>
-        <span className="runtime-setting-control"><StatusValue status={resourceStatus(resource)} locale={settings.locale} />{resourceOwnerDestination(resource.ownerSettingsRoute) && onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => { const destination = resourceOwnerDestination(resource.ownerSettingsRoute); if (destination) onOpenSettings(destination); }}>{zh ? "打开管理" : "Open owner"}</button> : null}</span>
-      </SettingRow>) : <SettingRow label={zh ? "知识与记忆来源" : "Knowledge and memory sources"} detail={zh ? "共享资源投影尚未返回知识来源" : "Knowledge source rows were not returned by the shared-resource projection"}><span className="runtime-setting-control"><StatusValue status="unknown" locale={settings.locale} />{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("resources")}>{zh ? "查看 Owner" : "Open owner"}</button> : null}</span></SettingRow>}
-      {authorization?.connections.map((connection) => <SettingRow key={connection.id} label={connection.displayName} detail={[connection.accountLabel, connection.providerType, connection.capabilities.map((capability) => capability.label).join(zh ? "、" : ", ")].filter(Boolean).join(" · ")}><StatusValue status={connection.status ?? "unknown"} locale={settings.locale} /></SettingRow>)}
+      <p className="settings-inline-note">{zh ? "应用只引用已授权的连接和知识来源；正文与凭证继续由对应设置管理。" : "Apps reference authorized connections and knowledge sources; source bodies and credentials stay in their settings."}</p>
+      {resources.length ? <>{resources.map((resource, index) => <SettingRow key={resource.resourceId ?? `${resource.label}-${index}`} label={localizedResourceLabel(resource, settings.locale)} detail={[resourceKindLabel(resource.resourceKind, zh), relationLabel(resource.relationKind, zh), resource.consumerPackageIds.length ? `${resource.consumerPackageIds.length} ${zh ? "个应用使用" : "consumer(s)"}` : undefined].filter(Boolean).join(" · ")}>
+        <span className="runtime-setting-control"><StatusValue status={resourceStatus(resource)} locale={settings.locale} />{resourceOwnerDestination(resource.ownerSettingsRoute) && onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => { const destination = resourceOwnerDestination(resource.ownerSettingsRoute); if (destination) onOpenSettings(destination); }}>{zh ? "打开设置" : "Open settings"}</button> : null}<ResourceMetadata resource={resource} locale={settings.locale} /></span>
+      </SettingRow>)}{!hasKnowledgeSource ? <p className="settings-inline-note" data-testid="opl-app-management-knowledge-empty">{zh ? "知识来源尚未返回；当前仅显示已返回的共享资源。" : "Knowledge sources were not returned; only available shared resources are shown."}</p> : null}</> : <p className="settings-inline-note" data-testid="opl-app-management-resources-empty">{zh ? "共享资源尚未返回；知识来源也未提供可显示的授权关系。" : "Shared resources were not returned; no authorized knowledge relation is available to show."}</p>}
     </SettingsGroup>
     <SettingsGroup title={zh ? "应用依赖" : "Application dependencies"}>
-      <p className="settings-inline-note">{zh ? "卸载或停用前先查看真实依赖关系；此页不创建第二套依赖注册表。" : "Review the owner-projected dependency graph before disabling or removing anything."}</p>
+      <p className="settings-inline-note">{zh ? "卸载或停用前先查看应用依赖关系。" : "Review application dependencies before disabling or removing anything."}</p>
       {packageDependencies.length ? packageDependencies.map((item) => <SettingRow key={item.packageId} label={item.label} detail={item.dependencies.map((dependency) => dependency.packageId).join(zh ? "、" : ", ")}><span className="runtime-setting-control"><StatusValue status={item.readiness.operationalReady === false ? "unavailable" : "available"} locale={settings.locale} />{item.requiredByPackageIds?.length ? <span className="settings-muted">{zh ? `被 ${item.requiredByPackageIds.length} 个应用依赖` : `Required by ${item.requiredByPackageIds.length} app(s)`}</span> : null}</span></SettingRow>) : <p className="settings-inline-note">{zh ? "当前没有返回共享依赖关系。" : "No shared dependency relationships were returned."}</p>}
     </SettingsGroup>
   </div>;
