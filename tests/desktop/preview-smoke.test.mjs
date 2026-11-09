@@ -4,6 +4,7 @@ import {
   PREVIEW_PRODUCT,
   parsePreviewSmokeArgs,
   parseRuntimeProfiles,
+  openSettingsDialog,
   navigateSettingsSection,
   projectGatewayState,
   redactSecrets,
@@ -17,6 +18,134 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { runInNewContext } from "node:vm";
+
+function settingsOpeningDom({ neverOpen = false, lateFirstRun = true, openingStaysPending = false } = {}) {
+  let now = 0;
+  let firstRunVisible = false;
+  let expanded = false;
+  let dialogAt = Infinity;
+  let panelAt = Infinity;
+  let onboardingAt = Infinity;
+  let dismissedAt = Infinity;
+  let clickCount = 0;
+  const root = { get inert() { return firstRunVisible || now >= dialogAt; }, hasAttribute: () => false };
+  const trigger = {
+    disabled: false,
+    getClientRects: () => [1],
+    closest: () => null,
+    getAttribute(name) {
+      if (name === "aria-label") return "设置";
+      if (name === "aria-haspopup") return "dialog";
+      if (name === "aria-expanded") return String(expanded);
+      return null;
+    },
+    click() {
+      clickCount += 1;
+      if (!neverOpen) {
+        expanded = true;
+        if (openingStaysPending) return;
+        dialogAt = now + 100;
+        panelAt = now + 200;
+        if (lateFirstRun && clickCount === 1) onboardingAt = now + 100;
+      }
+    }
+  };
+  const dismiss = {
+    disabled: false,
+    getClientRects: () => [1],
+    closest: () => null,
+    textContent: "稍后处理",
+    click() { dismissedAt = now + 100; }
+  };
+  const panel = {
+    getClientRects: () => now >= panelAt ? [1] : [],
+    closest: () => null,
+    querySelector: (selector) => selector === "[data-section]" ? { getAttribute: () => "overview" } : null
+  };
+  const dialog = {
+    getClientRects: () => now >= dialogAt ? [1] : [],
+    closest: () => null,
+    querySelector: (selector) => selector === '[data-testid="opl-settings-panel"]' && now >= panelAt ? panel : null,
+    getAttribute: (name) => name === 'data-shortcut-modal' ? 'settings' : null
+  };
+  const firstRun = {
+    getClientRects: () => firstRunVisible ? [1] : [],
+    closest: () => null,
+    getAttribute: () => null,
+    querySelectorAll: (selector) => selector === "button" ? [dismiss] : []
+  };
+  const context = {
+    document: {
+      getElementById: () => root,
+      querySelector(selector) {
+        if (selector === ".opl-first-run") return firstRunVisible ? firstRun : null;
+        if (selector === '[data-shortcut-modal="settings"][role="dialog"]') return now >= dialogAt ? dialog : null;
+        return null;
+      },
+      querySelectorAll(selector) {
+        if (selector === '.opl-settings-slot-root button[aria-haspopup="dialog"]') return now >= 100 ? [trigger] : [];
+        if (selector === '[role="dialog"][aria-modal="true"]') return firstRunVisible ? [firstRun] : now >= dialogAt ? [dialog] : [];
+        if (selector === 'button') return [{ innerText: '设置', click() { assert.fail('Clicked a global Settings namesake'); } }];
+        return [];
+      }
+    },
+    Date: { now: () => now },
+    setTimeout(callback, delay) {
+      now += delay;
+      if (now >= onboardingAt) {
+        firstRunVisible = true;
+        expanded = false;
+        dialogAt = panelAt = onboardingAt = Infinity;
+      }
+      if (now >= dismissedAt) {
+        firstRunVisible = false;
+        dismissedAt = Infinity;
+      }
+      queueMicrotask(callback);
+    }
+  };
+  return { context, elapsed: () => now, clicks: () => clickCount };
+}
+
+test("Settings opening dismisses late first-run and retries the native trigger without reopening a live dialog", async () => {
+  const dom = settingsOpeningDom();
+  const result = await runInNewContext(`(${openSettingsDialog.toString()})({timeoutMs:1000})`, dom.context);
+  assert.equal(result.opened, true);
+  assert.equal(result.panel, true);
+  assert.equal(result.firstRunSeen, true);
+  assert.equal(dom.clicks(), 2);
+  assert.equal(result.attempts.length, 2);
+  assert.equal(result.dismissals.length, 1);
+  assert.equal(result.trigger.expanded, 'true');
+  assert.equal(result.firstRunVisible, false);
+  assert.equal(dom.elapsed(), 600);
+});
+
+test("Settings opening reports a real trigger and modal diagnostic when the panel never appears", async () => {
+  const dom = settingsOpeningDom({ neverOpen: true, lateFirstRun: false });
+  const result = await runInNewContext(`(${openSettingsDialog.toString()})({timeoutMs:1000})`, dom.context);
+  assert.equal(result.opened, false);
+  assert.equal(result.panel, false);
+  assert.equal(result.trigger.label, "设置");
+  assert.equal(result.trigger.hasPopup, "dialog");
+  assert.equal(result.trigger.expanded, "false");
+  assert.equal(result.rootInert, false);
+  assert.equal(result.firstRunSeen, false);
+  assert.equal(result.attempts.length, 2);
+  assert.equal(dom.clicks(), 2);
+  assert.equal(dom.elapsed(), 1000);
+});
+
+test("Settings opening waits for an expanded native trigger without toggling it again", async () => {
+  const dom = settingsOpeningDom({ lateFirstRun: false, openingStaysPending: true });
+  const result = await runInNewContext(`(${openSettingsDialog.toString()})({timeoutMs:1000})`, dom.context);
+  assert.equal(result.opened, false);
+  assert.equal(result.panel, false);
+  assert.equal(result.trigger.expanded, 'true');
+  assert.equal(result.dialogVisible, false);
+  assert.equal(dom.clicks(), 1);
+  assert.equal(dom.elapsed(), 1000);
+});
 
 function settingsNavigationDom({ renderTarget = true, showNavigation = true } = {}) {
   let now = 0;

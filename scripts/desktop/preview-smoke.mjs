@@ -240,6 +240,63 @@ export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
   };
 }
 
+export async function openSettingsDialog({ timeoutMs }) {
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+  const attempts = [];
+  const dismissals = [];
+  const visible = (node) => !!node && node.getClientRects().length > 0 && !node.closest('[hidden], [aria-hidden="true"]');
+  let firstRunSeen = false;
+  let readySince = null;
+  while (true) {
+    const now = Date.now();
+    const dialog = document.querySelector('[data-shortcut-modal="settings"][role="dialog"]');
+    const panel = dialog?.querySelector('[data-testid="opl-settings-panel"]');
+    const firstRun = document.querySelector('.opl-first-run');
+    const firstRunVisible = visible(firstRun);
+    firstRunSeen ||= firstRunVisible;
+    const triggers = [...document.querySelectorAll('.opl-settings-slot-root button[aria-haspopup="dialog"]')]
+      .filter((node) => ["设置", "Settings"].includes(node.getAttribute('aria-label')));
+    const trigger = triggers.find(visible);
+    const root = document.getElementById('root');
+    const rootInert = !!root && (root.inert || root.hasAttribute('inert'));
+    const modals = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter(visible);
+    const observation = {
+      trigger: trigger ? { label: trigger.getAttribute('aria-label'), hasPopup: trigger.getAttribute('aria-haspopup'), expanded: trigger.getAttribute('aria-expanded'), disabled: trigger.disabled } : null,
+      matchingTriggers: triggers.length,
+      rootInert,
+      firstRunSeen,
+      firstRunVisible,
+      dialogVisible: visible(dialog),
+      panelVisible: visible(panel),
+      currentSection: panel?.querySelector('[data-section]')?.getAttribute('data-section') ?? null,
+      visibleModals: modals.slice(0, 4).map((node) => ({ shortcut: node.getAttribute('data-shortcut-modal'), testId: node.getAttribute('data-testid'), firstRun: node === firstRun })),
+      attempts,
+      dismissals
+    };
+    if (!firstRunVisible && observation.dialogVisible && observation.panelVisible) {
+      readySince ??= now;
+      // Observe the mounted page again after effects can close it for late onboarding.
+      if (now - readySince >= 100) return { ...observation, opened: true, panel: true };
+    } else readySince = null;
+    if (now >= deadline) return { ...observation, opened: false, panel: false };
+    if (firstRunVisible && dismissals.length === 0) {
+      const dismiss = [...firstRun.querySelectorAll('button')]
+        .find((node) => ["稍后处理", "Do this later"].includes(node.textContent.trim()) && !node.disabled && visible(node));
+      if (dismiss) {
+        dismissals.push({ label: dismiss.textContent.trim(), elapsedMs: now - startedAt });
+        dismiss.click();
+      }
+    } else if (!firstRunVisible && !observation.dialogVisible && modals.length === 0 && !rootInert
+      && trigger && !trigger.disabled && trigger.getAttribute('aria-expanded') !== 'true'
+      && (attempts.length === 0 || (attempts.length === 1 && (dismissals.length > 0 || now >= startedAt + timeoutMs / 2)))) {
+      attempts.push({ ...observation.trigger, elapsedMs: now - startedAt });
+      trigger.click();
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.min(100, deadline - now)));
+  }
+}
+
 export async function navigateSettingsSection({ section, labels, timeoutMs }) {
   const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
@@ -277,6 +334,7 @@ export async function navigateSettingsSection({ section, labels, timeoutMs }) {
 async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   const uiTimeoutMs = Math.min(timeoutMs, 10_000);
   const result = await evaluate(`(async()=>{
+    const openSettings=${openSettingsDialog.toString()};
     const navigateSettings=${navigateSettingsSection.toString()};
     const click=(selector)=>{const node=document.querySelector(selector); if(!node) return false; node.click(); return true;};
     const clickButton=(label)=>{const node=[...document.querySelectorAll("button")].find((button)=>button.innerText.trim()===label || button.getAttribute("aria-label")===label); if(!node) return false; node.click(); return true;};
@@ -293,13 +351,13 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       runtime:{opened:false,panel:false},
       inspector:{opened:false,menuItemSelected:false,tabs:false,closed:false},
     };
-    if(result.onboarding.visible){
-      const dismissed=clickButton("稍后处理")||clickButton("Do this later");
-      result.onboarding.dismissed=dismissed && await waitForGone('.opl-first-run',Math.min(${uiTimeoutMs},5000));
-    } else result.onboarding.dismissed=true;
-    result.settings.opened=clickButton("设置")||clickButton("Settings");
+    const opening=await openSettings({timeoutMs:${uiTimeoutMs}});
+    result.settings.opening=opening;
+    result.settings.opened=opening.opened;
+    result.settings.panel=opening.panel;
+    result.onboarding.visible=opening.firstRunSeen;
+    result.onboarding.dismissed=!opening.firstRunVisible;
     if(result.settings.opened){
-      result.settings.panel=await waitFor('[data-testid="opl-settings-panel"]');
       const account=await navigateSettings({section:"account",labels:["账户与模型","Account & Models"],timeoutMs:${uiTimeoutMs}});
       result.settings.account=account.reached;
       const preferences=await navigateSettings({section:"preferences",labels:["偏好","Preferences"],timeoutMs:${uiTimeoutMs}});
@@ -335,8 +393,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
   })()`);
   if (typeof capture === "function") {
     await capture("conversation");
-    await evaluate(`(()=>{const button=[...document.querySelectorAll("button")].find((node)=>node.innerText.trim()==="设置"||node.innerText.trim()==="Settings"); button?.click(); return !!button;})()`);
-    await evaluate(`(async()=>{const deadline=Date.now()+${uiTimeoutMs}; while(Date.now()<deadline){if(document.querySelector('[data-testid="opl-settings-panel"]')) return true; await new Promise((resolve)=>setTimeout(resolve,100));} return false;})()`);
+    result.settings.captureOpening = await evaluate(`(${openSettingsDialog.toString()})({timeoutMs:${uiTimeoutMs}})`);
     await capture("settings");
     const aboutCapture = await evaluate(`(${navigateSettingsSection.toString()})({section:"about",labels:["关于","About"],timeoutMs:${uiTimeoutMs}})`);
     result.settings.captureNavigation = aboutCapture;
