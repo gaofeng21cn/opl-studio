@@ -21,10 +21,37 @@ updates:
       time: "03:00"
       timezone: Asia/Shanghai
     groups:
-      npm:
+      # The official DSH source/cohort requires its own compatibility review.
+      dsh-runtime-cohort:
+        applies-to: version-updates
+        patterns:
+          - "@deepseek-ai/*"
+      react-runtime:
+        applies-to: version-updates
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      npm-minor-patch:
+        applies-to: version-updates
         patterns:
           - "*"
-    open-pull-requests-limit: 2
+        exclude-patterns:
+          - "@deepseek-ai/*"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "typescript"
+          - "@types/node"
+          - "electron"
+          - "zod"
+        update-types:
+          - minor
+          - patch
+    # Security updates and ungrouped compiler/runtime majors remain independent.
+    open-pull-requests-limit: 10
 
   - package-ecosystem: docker
     directory: /
