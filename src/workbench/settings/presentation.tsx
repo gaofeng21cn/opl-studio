@@ -101,6 +101,10 @@ export type NavigationGroup = {
 export function statusTone(status: string | undefined): "ready" | "attention" | "neutral" {
   if (!status) return "neutral";
   const normalized = status.toLowerCase();
+  // Currentness is a separate axis from callability. Handle compound states
+  // before the broad "current"/"available" matches below.
+  if (["currentness_not_checked", "unknown", "not_checked", "staged", "pending"].includes(normalized)) return "neutral";
+  if (["update_available", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(normalized)) return "attention";
   const healthRatio = normalized.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (healthRatio) {
     const available = Number(healthRatio[1]);
@@ -153,6 +157,13 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     available: ["可用", "Available"],
     healthy: ["可用", "Available"],
     current: ["已是最新", "Up to date"],
+    update_available: ["有可用更新", "Update available"],
+    currentness_not_checked: ["尚未检查更新", "Update not checked"],
+    updating: ["更新中", "Updating"],
+    applying: ["正在更新", "Applying update"],
+    queued: ["等待处理", "Queued"],
+    staged: ["已准备更新", "Update staged"],
+    needs_reload: ["需要重新加载", "Reload required"],
     installed: ["已安装", "Installed"],
     enabled: ["已开启", "Enabled"],
     planned: ["待接入", "Planned"],
@@ -167,6 +178,9 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     "not-available": ["不可用", "Unavailable"],
     unsupported: ["当前不支持", "Not supported"],
     restart_needed: ["需要重新启动", "Restart required"],
+    needs_restart: ["需要重新启动", "Restart required"],
+    failed_with_repair: ["更新失败，可修复", "Update failed; repair available"],
+    skipped_manual_required: ["需要手动处理", "Manual action required"],
     error: ["出现问题", "Needs attention"],
     attention_needed: ["需要处理", "Needs attention"],
     action_available: ["可配置", "Action available"],

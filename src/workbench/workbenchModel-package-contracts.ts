@@ -104,6 +104,8 @@ export type AgentPackageLifecycleRef = {
   requiredSkillIds: string[];
   optionalSkillRefs: string[];
   dependencies: AgentPackageDependencyRef[];
+  /** Owner-projected reverse dependency refs used before disabling or removing a package. */
+  requiredByPackageIds?: string[];
   installed: boolean | null;
   activated: boolean | null;
   appEnabled: boolean;

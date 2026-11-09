@@ -133,11 +133,14 @@ export function ManagedUpdateGroup({
         : nativeUpdate?.reasonCode
           ? (locale === "zh" ? "当前载体没有可用更新源" : "No update source is available for this carrier")
           : undefined;
+  const explicitPackageUpdate = component?.packageStates?.some((packageState) =>
+    ["update_available", "staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(packageState.state.toLowerCase())
+  ) ?? false;
   const renderableActions = actions.filter((intent) => {
     const isManagedApply = intent.transport !== "app_action" && "operation" in intent && intent.operation === "apply";
     return nativeUpdate?.supported !== false && intent.availability === "ready"
       && (intent.transport === "app_action" || Boolean(onHostAction))
-      && !(isDefaultSilentManagedComponent(component) && isManagedApply && component?.state !== "failed_with_repair");
+      && !(isDefaultSilentManagedComponent(component) && isManagedApply && component?.state !== "failed_with_repair" && !explicitPackageUpdate);
   });
   return (
     <SettingsGroup title={fallbackLabel}>

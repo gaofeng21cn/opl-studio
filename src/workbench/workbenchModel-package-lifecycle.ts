@@ -518,6 +518,7 @@ function packageLifecycleItem(
   const readiness = packageReadiness(record, installed);
   const capabilityMetadata = packageCapabilityMetadata(record);
   const dependencies = packageDependencies(record);
+  const requiredByPackageIds = asStringArray(record.required_by_package_ids ?? record.requiredByPackageIds);
   const packageCurrentness = asRecord(record.package_currentness);
   const sourceRef = source === "canonical_agent_packages"
     ? "opl app state --profile fast --json#app_state.agent_packages.directory + app_state.agent_packages.status_index"
@@ -549,6 +550,7 @@ function packageLifecycleItem(
     sessionRoutingSummaryI18n: asLocalizedText(record.session_routing_summary_i18n),
     ...capabilityMetadata,
     dependencies,
+    ...(requiredByPackageIds.length ? { requiredByPackageIds } : {}),
     installed,
     activated: asOptionalBoolean(record.activated),
     appEnabled: record.app_enabled !== false,

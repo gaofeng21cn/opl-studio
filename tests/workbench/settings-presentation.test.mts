@@ -247,6 +247,17 @@ test("standard Agent summary is derived from the same installed, enabled, callab
   assert.equal(presentation.agentPackagePresentationStatus(agent({ packageRole: "workflow_profile", homeShortcuts: [] })), "ready");
 });
 
+test("package update state remains separate from installed and callable state", () => {
+  assert.equal(presentation.agentPackageUpdateStatus({ currentness: "update_available", installed: true }), "update_available");
+  assert.equal(presentation.agentPackageUpdateStatus({ currentness: "currentness_not_checked", installed: true }), "currentness_not_checked");
+  assert.equal(presentation.agentPackageUpdateStatus({ currentness: "unknown", installed: true }), "currentness_not_checked");
+  assert.equal(presentation.agentPackageUpdateStatus({ currentness: "unknown", installed: false }), "not_installed");
+  assert.equal(presentation.statusTone("currentness_not_checked"), "neutral");
+  assert.equal(presentation.statusTone("update_available"), "attention");
+  assert.equal(presentation.formatStatus("update_available", "zh"), "有可用更新");
+  assert.equal(presentation.formatStatus("currentness_not_checked", "zh"), "尚未检查更新");
+});
+
 test("agent catalog keeps agent and workflow packages together while excluding capability packages", () => {
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "standard_agent" }), true);
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "workflow_profile" }), true);

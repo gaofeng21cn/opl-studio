@@ -70,6 +70,36 @@ export function agentPackagePresentationStatus(item: AgentPackageLifecycleRef): 
   return "checking";
 }
 
+const packageUpdateAttentionStatuses = new Set([
+  "update_available",
+  "staged",
+  "needs_restart",
+  "needs_reload",
+  "failed_with_repair",
+  "skipped_manual_required"
+]);
+
+/**
+ * Return the owner-projected update axis without deriving it from an action.
+ * An available `update` action is an affordance; it is not proof that a new
+ * version was found. This distinction keeps the catalog truthful when the
+ * carrier has not performed a currentness check.
+ */
+export function agentPackageUpdateStatus(item: Pick<AgentPackageLifecycleRef, "currentness" | "installed">): string {
+  const currentness = item.currentness.trim().toLowerCase();
+  if (currentness && currentness !== "unknown") return currentness;
+  if (item.installed === false) return "not_installed";
+  return "currentness_not_checked";
+}
+
+export function agentPackageNeedsAttention(item: Pick<AgentPackageLifecycleRef, "currentness" | "installed" | "readiness">): boolean {
+  const updateStatus = agentPackageUpdateStatus(item);
+  return packageUpdateAttentionStatuses.has(updateStatus)
+    || item.readiness.operationalReady === false
+    || item.readiness.callable === false
+    || item.readiness.launchAllowed === false;
+}
+
 export function agentPackageHasHomeShortcutRoute(item: Pick<AgentPackageLifecycleRef, "homeShortcuts">): boolean {
   return item.homeShortcuts.some((shortcut) => Boolean(shortcut.route));
 }
@@ -169,13 +199,16 @@ export function PackageCatalog({
     && manifestInstallAction.payloadFields.includes("trust_tier")
   );
   const statusOptions = [...new Set(["not_installed", ...scoped.map(agentPackagePresentationStatus)])].sort();
+  const updateStatusOptions = [...new Set(scoped.map(agentPackageUpdateStatus).filter((status) => status !== "not_installed"))].sort();
   const homeShortcutOrder = model.packageLifecycle.flatMap((item) => item.homeShortcuts.map((shortcut) => ({
     packageId: item.packageId,
     ...shortcut
   }))).sort((left, right) => left.sortOrder - right.sortOrder || left.shortcutId.localeCompare(right.shortcutId));
   const normalizedQuery = query.trim().toLowerCase();
   const visible = scoped.filter((item) => {
-    if (statusFilter === "app_hidden" ? item.appEnabled : statusFilter !== "all" && agentPackagePresentationStatus(item) !== statusFilter) return false;
+    if (statusFilter === "app_hidden" ? item.appEnabled : statusFilter.startsWith("update:")
+      ? agentPackageUpdateStatus(item) !== statusFilter.slice("update:".length)
+      : statusFilter !== "all" && agentPackagePresentationStatus(item) !== statusFilter) return false;
     return !normalizedQuery || item.searchMetadata.query.includes(normalizedQuery);
   });
   const installedCount = packages.filter((item) => item.installed === true).length;
@@ -217,6 +250,7 @@ export function PackageCatalog({
           <option value="all">{locale === "zh" ? "全部状态" : "All statuses"}</option>
           <option value="app_hidden">{locale === "zh" ? "在 OPL App 中已关闭" : "Off in OPL App"}</option>
           {statusOptions.map((status) => <option key={status} value={status}>{formatStatus(status === "ready" ? "installed" : status, locale)}</option>)}
+          {updateStatusOptions.map((status) => <option key={`update:${status}`} value={`update:${status}`}>{locale === "zh" ? `更新：${formatStatus(status, locale)}` : `Update: ${formatStatus(status, locale)}`}</option>)}
         </select>
         <span>{locale === "zh" ? `${visible.length} 个结果 · 已安装 ${installedCount} 个` : `${visible.length} results · ${installedCount} installed`}</span>
       </div>
@@ -231,7 +265,9 @@ export function PackageCatalog({
               const presentationStatus = agentPackagePresentationStatus(item);
               const primaryAction = executableActions.find((action) => action.actionId === item.recommendedActionId)
                 ?? (item.installed === false ? executableActions.find((action) => action.kind === "install") : undefined)
+                ?? (agentPackageUpdateStatus(item) === "update_available" ? executableActions.find((action) => action.kind === "update") : undefined)
                 ?? (agentPackagePresentationStatus(item) === "unavailable" ? executableActions.find((action) => action.kind === "repair") : undefined);
+              const updateStatus = agentPackageUpdateStatus(item);
               return (
                 <details key={item.id} className="agent-package-row" data-testid="opl-settings-agent-row" data-package-id={item.packageId}
                   onToggle={(event) => { const open = event.currentTarget.open; setExpandedPackages(previous => { const next = new Set(previous); if (open) next.add(item.packageId); else next.delete(item.packageId); return next; }); }}>
@@ -243,6 +279,7 @@ export function PackageCatalog({
                         {item.version ? <span>{locale === "zh" ? `${item.versionKind === "installed" ? "已安装版本" : "可安装版本"} ${item.version}` : `${item.versionKind === "installed" ? "Installed version" : "Available version"} ${item.version}`}</span> : null}
                         <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
                         {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
+                        <span data-testid="opl-package-update-status">{locale === "zh" ? `更新：${formatStatus(updateStatus, locale)}` : `Update: ${formatStatus(updateStatus, locale)}`}</span>
                       </span>
                     </span>
                     <span className="agent-package-summary-actions">
@@ -285,7 +322,13 @@ export function PackageCatalog({
                       <div><dt>{locale === "zh" ? "来源" : "Source"}</dt><dd>{packageSourceLabel(item.sourceMode, locale)}</dd></div>
                       <div><dt>{locale === "zh" ? "安装" : "Installed"}</dt><dd>{booleanStateLabel(item.installed, locale)}</dd></div>
                       <div><dt>{locale === "zh" ? "执行平台启用" : "Enabled on platform"}</dt><dd>{booleanStateLabel(item.activated, locale)}</dd></div>
+                      <div><dt>{locale === "zh" ? "更新检查" : "Update check"}</dt><dd><StatusValue status={updateStatus} locale={locale} /></dd></div>
                     </dl>
+                    {item.requiredByPackageIds?.length ? <p className="settings-inline-note" data-testid="opl-package-dependent-guard">
+                      {locale === "zh"
+                        ? `此能力仍被 ${item.requiredByPackageIds.join("、")} 使用；卸载或停用前请先处理这些依赖。`
+                        : `This capability is still required by ${item.requiredByPackageIds.join(", ")}; resolve those dependents before uninstalling or disabling it.`}
+                    </p> : null}
                     {item.appEnabled && item.homeShortcuts.length ? (
                       <div className="home-shortcut-preferences">
                         {item.homeShortcuts.map((shortcut) => {
