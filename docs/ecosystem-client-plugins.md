@@ -83,8 +83,8 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 | --- | --- |
 | 用户计划任务 | 主导航 → 计划任务：创建、编辑、暂停、恢复、删除、立即运行 |
 | 计划执行 | 每次运行新建 canonical thread，显式只读或工作区写权限；结果打开成功后进入对应会话，失败保留任务页面 |
-| Memory | Settings → 智能体与能力 → 记忆：查看现有 Markdown，新增、修改、删除用户纠错建议 |
-| 领域记忆引用 | 同页按需读取；没有 refs 不等于没有记忆能力 |
+| Codex 执行器记忆 | Settings → 智能体与能力 → 记忆：查看当前 Codex home 中的 Markdown，新增、修改、删除交给该 owner 的纠错建议 |
+| 任务知识引用 | 同页按需读取领域 owner 提供的 refs；不读取业务正文，没有 refs 不等于没有记忆能力 |
 | 数据管理 | Settings → 工作区 → 数据与存储：只读用量与可预览清理 |
 
 官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/schedule/schedule)
@@ -103,6 +103,22 @@ owner action，不维护业务状态表；其执行器要求显式受限权限�
 提示，普通聊天不被阻塞。源码接入不代表已发布载体自动具备新导出：测试入口和
 证据层级见 [Verification](verification.md)，安装包仍须绑定相应 Framework 版本
 再验收。
+
+知识归属遵循 Framework 的[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)
+和[知识来源接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/knowledge-sources.md)。
+用户已有 Obsidian 等资料库时，原库继续持有唯一可编辑的业务正文；没有资料库时，
+业务工作目录可以承担同样职责。产品、用户或团队、主题、项目是归属范围，机制、
+约束、时点状态、决策是内容性质，两者都不由文件夹名称推断。
+
+Framework 管理来源登记、绑定、接受版本、权限核验、任务快照与机械写回证据；
+用户或领域 owner 接受正文含义。业务现状仍以领域 owner 的观察日期和版本为准，
+运行证据只记录实际消费，Codex 纠错建议只交给执行器记忆 owner。这些内容各有
+负责人，Studio 缓存不成为新的事实源，也不另建个人知识库或 Vault 副本。
+
+后续知识来源、审核与写回视图复用下述动态能力工作台，由 owner 声明真实可用能力；
+本说明不表示新增了内置知识编辑器。选中工作目录不授予资料库访问权，通用文件预览
+也不承担来源绑定或知识写回。业务工作区中的原始成果按其 owner 的保留规则管理，
+不能作为临时运行缓存清理。
 
 ## 实现位置与设置组织
 
