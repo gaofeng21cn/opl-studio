@@ -215,12 +215,17 @@ function compactPackageRecord(value) {
     "status", "operational_ready", "launch_allowed", "verification_deferred", "reason", "detail_surface", "status_read_error"
   ]);
   const packageCurrentness = selectedFields(value?.package_currentness, ["status", "reasons"]);
+  const packageAccess = selectedFields(value?.package_access, [
+    "visibility", "status", "provider_id", "source_id", "source_ref", "access_policy_ref", "verified_at",
+    "security_revision", "reason", "discover_allowed", "download_allowed"
+  ]);
+  const installability = selectedFields(value?.installability, ["installable", "reason"]);
   const availableActions = Array.isArray(value?.available_actions)
     ? value.available_actions.map((action) => {
       const payload = compactPackageActionPayload(action?.payload);
       return {
         ...(selectedFields(action, [
-        "action_id", "action_ref", "required_payload_fields", "confirmation_required", "semantic", "surface"
+        "action_id", "action_ref", "required_payload_fields", "confirmation_required", "semantic", "surface", "status", "reason"
         ]) ?? {}),
         ...(payload && Object.keys(payload).length ? { payload } : {})
       };
@@ -247,6 +252,9 @@ function compactPackageRecord(value) {
     ...(actions ? { actions } : {}),
     ...(readiness ? { readiness } : {}),
     ...(packageCurrentness ? { package_currentness: packageCurrentness } : {}),
+    ...(packageAccess ? { package_access: packageAccess } : {}),
+    ...(installability ? { installability } : {}),
+    ...(Array.isArray(value?.required_by_package_ids) ? { required_by_package_ids: compactStringArray(value.required_by_package_ids) } : {}),
     ...(availableActions ? { available_actions: availableActions } : {}),
     ...(files ? { files } : {}),
   };
@@ -258,6 +266,40 @@ function compactPackageRows(value, limit = 64) {
     return Object.fromEntries(Object.entries(value).slice(0, limit).map(([key, row]) => [key, compactPackageRecord(row)]));
   }
   return value;
+}
+
+function compactSoftwareSourceAction(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled"]);
+  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled"]);
+  return {
+    ...selectedFields(value, [
+      "action_id", "label", "delegated_surface", "payload_fields", "mutates", "dry_run_supported",
+      "confirmation_required", "danger_level", "impact", "follow_up_action_ids", "verify_action_id", "status", "reason"
+    ]),
+    ...(defaultPayload && Object.keys(defaultPayload).length ? { default_payload: defaultPayload } : {}),
+    ...(payload && Object.keys(payload).length ? { payload } : {})
+  };
+}
+
+function compactSoftwareSources(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const entries = Array.isArray(value.entries) ? value.entries.slice(0, 32).flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const compact = selectedFields(entry, [
+      "source_id", "display_name", "source_kind", "source_ref", "visibility", "provider_id", "status",
+      "enabled", "credential_handle_present", "verified_at", "entry_count"
+    ]) ?? {};
+    compact.available_actions = Array.isArray(entry.available_actions)
+      ? entry.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean)
+      : [];
+    return [compact];
+  }) : [];
+  return {
+    ...selectedFields(value, ["surface_kind", "status"]),
+    entries,
+    authority_boundary: selectedFields(value.authority_boundary, ["owner", "credential_values_exposed", "installation_mutation_owner"]) ?? {}
+  };
 }
 
 function compactAction(value) {
@@ -274,6 +316,7 @@ export {
   compactHomeShortcutPreferences,
   compactManagedUpdateProjection,
   compactPackageRows,
+  compactSoftwareSources,
   compactUiContributions,
   compactLocalizedText,
   compactStringArray,

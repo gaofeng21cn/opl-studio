@@ -363,40 +363,5 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     color: var(--opl-canvas);
   }
 
-  .opl-primary-nav {
-    display: grid;
-    align-self: stretch;
-    width: auto;
-    margin: 0 2px 8px;
-  }
-
-  .opl-primary-nav button {
-    width: 100%;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 9px;
-    padding: 0 8px;
-    box-sizing: border-box;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--opl-text);
-    font-size: var(--opl-text-md);
-    font-weight: var(--opl-weight-regular);
-    line-height: 20px;
-    cursor: pointer;
-    overflow: hidden;
-  }
-
-  .opl-primary-nav button:hover {
-    background: var(--opl-hover);
-    color: var(--opl-text);
-  }
-
-  .opl-primary-nav button[aria-current="page"] {
-    background: var(--opl-selected);
-  }
 
 `;

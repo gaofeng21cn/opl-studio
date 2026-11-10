@@ -16,6 +16,24 @@ test("App state timeout keeps the interactive default and admits a bounded cold-
   assert.throws(() => createOplPassthrough({ readStateTimeoutMs: 120_001 }), /100 through 120000/);
 });
 
+test("fast state preserves software source access metadata and opaque default references", () => {
+  const compact = compactFastState({ app_state: { agent_packages: {
+    surface_kind: "opl_app_agent_packages_projection.v1",
+    sources: {
+      surface_kind: "opl_software_sources_projection.v1",
+      status: "attention_required",
+      authority_boundary: { owner: "opl_framework", credential_values_exposed: false, private_value: "omit" },
+      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false,
+        available_actions: [{ action_id: "source_configure", label: "Configure", payload_fields: ["source_id", "provider_id", "credential_handle", "enabled"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli", token: "must-omit" }, status: "available" }] }]
+    }
+  } } });
+  const sources = compact.app_state.agent_packages.sources;
+  assert.equal(sources.entries[0].source_id, "github-packages");
+  assert.equal(sources.entries[0].available_actions[0].default_payload.credential_handle, "provider:github_packages:gh-cli");
+  assert.equal("token" in sources.entries[0].available_actions[0].default_payload, false);
+  assert.equal(sources.authority_boundary.private_value, undefined);
+});
+
 test("Desktop startup maintenance invokes the Framework runtime scope and respects read-only mode", async context => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-startup-passthrough-test-"));
   context.after(() => rm(directory, { recursive: true, force: true }));

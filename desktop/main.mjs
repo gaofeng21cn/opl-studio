@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, shell, Tray } from "electron";
 import updaterPackage from "electron-updater";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -107,6 +107,10 @@ function trustedRendererUrl(url) {
   }
 }
 
+function chromeFallbackFill() {
+  return nativeTheme.shouldUseDarkColors ? "#1b1b1c" : "#f9fafb";
+}
+
 function createWindow() {
   deepLinks.deactivate();
   const window = new BrowserWindow({
@@ -116,7 +120,13 @@ function createWindow() {
     minHeight: 640,
     show: false,
     title: "One Person Lab",
-    ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" } : {}),
+    ...(process.platform === "darwin" ? {
+      titleBarStyle: "hiddenInset",
+      trafficLightPosition: { x: 16, y: 18 },
+      vibrancy: "sidebar",
+      visualEffectState: "active",
+      backgroundColor: "#00000000"
+    } : {}),
     webPreferences: {
       preload: path.join(desktopRoot, "preload.cjs"),
       contextIsolation: true,
@@ -170,6 +180,30 @@ function createWindow() {
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
+  const sendFullscreen = () => {
+    if (!window.isDestroyed()) window.webContents.send("opl:window-fullscreen", window.isFullScreen());
+  };
+  window.on("enter-full-screen", sendFullscreen);
+  window.on("leave-full-screen", sendFullscreen);
+  window.webContents.on("did-finish-load", sendFullscreen);
+  if (process.platform === "darwin") {
+    // Reattach native material after hide/minimize so restoration never
+    // exposes the desktop through a temporarily missing vibrancy backing.
+    const applyBackdrop = () => {
+      if (window.isDestroyed()) return;
+      if (window.isMinimized() || !window.isVisible()) {
+        window.setVibrancy(null);
+        window.setBackgroundColor(chromeFallbackFill());
+      } else {
+        window.setVibrancy("sidebar");
+        window.setBackgroundColor("#00000000");
+      }
+    };
+    window.on("minimize", applyBackdrop);
+    window.on("hide", applyBackdrop);
+    window.on("restore", applyBackdrop);
+    window.on("show", applyBackdrop);
+  }
   window.webContents.once("did-finish-load", () => {
     // GPU initialization can suppress ready-to-show even after the renderer loaded.
     void showMainWindow();
@@ -526,6 +560,13 @@ app.whenReady().then(async () => {
   }
   const appLogDirectory = createAppLogDirectoryController({ electronApp: app });
   await appLogDirectory.restore();
+  // Native material follows only the trusted main document's theme preference.
+  ipcMain.on("opl:native-theme-source", (event, source) => {
+    const owner = mainWindow;
+    if (owner === null || owner === undefined || event.sender !== owner.webContents
+      || event.senderFrame !== owner.webContents.mainFrame || !trustedRendererUrl(event.senderFrame.url)) return;
+    if (source === "light" || source === "dark" || source === "system") nativeTheme.themeSource = source;
+  });
   createWindow();
   ipcMain.handle("opl:invoke", async (event, request) => {
     if (quittingApplication) throw new Error("Application is closing");

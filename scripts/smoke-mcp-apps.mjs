@@ -82,7 +82,7 @@ function bundle(name, source) {
   const outputDirectory = path.join(temporaryRoot, `${name}-bundle`);
   const output = path.join(outputDirectory, `${name}.js`);
   return writeFile(input, source).then(async () => {
-    const built = spawnSync('bun', [path.join(root, 'scripts/bun-build-renderer-entry.ts'), input, outputDirectory, 'esm'], { cwd: root, encoding: 'utf8' });
+    const built = spawnSync(process.execPath, [path.join(root, 'scripts/vite-build-renderer-entry.mjs'), input, outputDirectory, 'esm'], { cwd: root, encoding: 'utf8' });
     assert.equal(built.status, 0, built.stderr || built.stdout);
     return readFile(output, 'utf8');
   });

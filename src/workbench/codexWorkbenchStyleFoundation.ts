@@ -1,13 +1,13 @@
 export const codexWorkbenchStyleFoundation = `
-  /* ChatGPT Codex macOS 26.707.61608 visual token baseline.
-     OPL Studio additionally uses pinned DeepSeek Harness GUI source reuse. */
+  /* OPL-only content tokens consume the pinned DSH theme; shell geometry,
+     glyphs and palette remain owned by the imported upstream styles. */
   :root {
     color-scheme: light;
     --opl-native-titlebar-inset: 0px;
     --opl-sidebar-width: 236px;
     --opl-font-sans: var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-    --opl-font-mono: var(--ds-font-family-code, ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
-    /* OPL uses one compact desktop scale across DSH surfaces and host-owned
+    --opl-font-mono: var(--dsh-font-family-code, ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+    /* OPL uses one compact desktop scale for host-owned
        pages. Components may opt into a larger title, but should not invent a
        new base size or weight. */
     --opl-text-xs: 11px;
@@ -35,38 +35,6 @@ export const codexWorkbenchStyleFoundation = `
     --opl-control-md: 34px;
     --opl-radius-control: 7px;
     --opl-radius-surface: 10px;
-
-    /* Selected from DeepSeek Harness ui-theme/design-platform.css at
-       a66e4702047846cdaa10c66c9d3df3951f5ea70d for the reused primitives. */
-    --dsw-static-deepseek-450: rgb(86, 134, 254);
-    --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
-    --dsw-static-neutral-bluish-100: rgb(235, 238, 242);
-    --dsw-static-neutral-bluish-500: rgb(151, 157, 166);
-    --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
-    --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
-    --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
-    --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
-    --dsw-static-green-500: rgb(34, 197, 94);
-    --dsw-static-amber-500: rgb(245, 158, 11);
-    --dsw-static-red-600: rgb(236, 19, 19);
-    --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-00);
-    --dsw-alias-border-l2: rgba(0, 0, 0, 0.1);
-    --dsw-alias-button-ghost-active-border: var(--dsw-static-neutral-bluish-500);
-    --dsw-alias-button-ghost-active-fill: var(--dsw-static-neutral-bluish-100);
-    --dsw-alias-button-primary-fill: var(--dsw-static-neutral-bluish-1000);
-    --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-750);
-    --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
-    --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
-    --dsw-alias-interactive-bg-active: rgba(38, 49, 72, 0.1);
-    --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
-    --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-1000);
-    --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-00);
-    --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-700);
-    --dsw-alias-state-success-primary: var(--dsw-static-green-500);
-    --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
-    --dsw-alias-state-error-primary: var(--dsw-static-red-600);
-    --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-850);
-    --ds-ease-in-out: ease-in-out;
   }
 
   :root[data-opl-host="native"] {

@@ -1,0 +1,215 @@
+--- a/packages/client/ui-schedule/src/client/TaskDetail.tsx
++++ b/packages/client/ui-schedule/src/client/TaskDetail.tsx
+@@ -43,3 +43,3 @@
+    */
+-  readonly edit: (request: ScheduleEditRequest) => Promise<'saved' | { readonly failed: HostEditFailure }>
++  readonly edit: (request: ScheduleEditRequest, ownerValues?: Readonly<Record<string, unknown>>) => Promise<'saved' | { readonly failed: HostEditFailure }>
+   /**
+@@ -57,4 +57,20 @@
+ 
++/** Optional owner extension while the upstream task view assumes the Schedule service. */
++export interface TaskOwnerView {
++  readonly values: (task: ScheduleCatalogEntry | undefined) => Readonly<Record<string, unknown>>
++  readonly validate: (values: Readonly<Record<string, unknown>>) => boolean
++  readonly renderFields: (props: { readonly values: Readonly<Record<string, unknown>>; readonly onChange: (values: Readonly<Record<string, unknown>>) => void; readonly disabled: boolean }) => ReactNode
++  readonly renderHistory: (task: ScheduleCatalogEntry) => ReactNode
++  readonly timing: (draft: TaskEditorDraft) => ScheduleCreateRequest['timing']
++  readonly targets: readonly TaskEditorDraft['target'][]
++  readonly frequencies: readonly string[]
++  readonly titleMaxLength?: number
++  readonly promptMaxLength?: number
++  readonly cwdInput?: boolean
++  readonly minutePrecisionRecurrence?: boolean
++}
++
+ /** Deletion, Host edit and run, saved-history, and linked-Session actions one task's detail calls. */
+ export interface TaskDetailInjected extends DeliveryHistoryInjected {
++  readonly ownerView?: TaskOwnerView
+   /** Host-owned edit, run, and new-Session interval actions. */
+@@ -124,3 +140,3 @@
+   readonly authoritative?: never
+-  readonly onCreateTask: (request: ScheduleCreateRequest) => Promise<TaskCreateOutcome>
++  readonly onCreateTask: (request: ScheduleCreateRequest, ownerValues?: Readonly<Record<string, unknown>>) => Promise<TaskCreateOutcome>
+   readonly onCreated: (task: ScheduleCatalogEntry) => void
+@@ -205,3 +221,5 @@
+     [stored?.draft, stored?.base])
+-  const storedDirty = changes !== undefined && Object.keys(changes).length > 0
++  const ownerDirty = stored !== undefined && props.ownerView !== undefined
++    && JSON.stringify(stored.draft.ownerValues) !== JSON.stringify(props.ownerView.values(stored.base))
++  const storedDirty = changes !== undefined && Object.keys(changes).length > 0 || ownerDirty
+   const cached = stored?.base !== undefined && !storedDirty && !stored.pending && stored.failure === undefined
+@@ -212,7 +230,8 @@
+   // Until a directory is chosen, a new form follows the Workspace list as it arrives.
+-  const draft = task === undefined && input.cwd === '' ? { ...input, cwd: projects.defaultCwd } : input
++  const projectDraft = task === undefined && input.cwd === '' ? { ...input, cwd: projects.defaultCwd } : input
++  const draft = props.ownerView === undefined ? projectDraft : { ...projectDraft, target: 'new' as const, ownerValues: projectDraft.ownerValues ?? props.ownerView.values(base) }
+   const dirty = base === undefined
+     ? JSON.stringify(draft) !== JSON.stringify({ ...initial, cwd: initial.cwd || projects.defaultCwd }) : storedDirty
+-  const issue = dirty ? taskDraftIssue(draft, changes) : undefined
+-  const valid = issue === undefined
++  const issue = dirty ? taskDraftIssue(draft, changes, props.ownerView?.titleMaxLength) : undefined
++  const valid = issue === undefined && (props.ownerView?.validate(draft.ownerValues ?? {}) ?? true)
+   const [actionPending, setPending] = useState(false)
+@@ -273,5 +292,5 @@
+       ? await props.onCreateTask({ title: draft.title.trim(), prompt: draft.prompt.trim(),
+-        timing: timingFromDraft(draft, true), target: draftTarget(draft) })
+-      : await hostActions.edit({ id: task.id, action: 'update', patch: taskDraftPatch(draft, existingBase, true),
+-        expectedUpdatedAt: existingBase.updatedAt ?? null })
++        timing: props.ownerView?.timing(draft) ?? timingFromDraft(draft, true), target: draftTarget(draft) }, draft.ownerValues)
++      : await hostActions.edit({ id: task.id, action: 'update', patch: { ...taskDraftPatch(draft, existingBase, true), ...(changes?.timing === undefined ? {} : { timing: props.ownerView?.timing(draft) ?? timingFromDraft(draft, true) }) },
++        expectedUpdatedAt: existingBase.updatedAt ?? null }, draft.ownerValues)
+     if (outcome === 'saved' || 'created' in outcome) {
+@@ -383,4 +402,6 @@
+             disabled={pending || executionActive || deletingTask}
+-            projects={projects} original={base} t={t} />
+-          {draft.target === 'new'
++            projects={projects} original={base} t={t} policy={props.ownerView} />
++          {props.ownerView?.renderFields({ values: draft.ownerValues ?? {}, disabled: pending || executionActive || deletingTask,
++            onChange: ownerValues => setDraft({ ...draft, ownerValues }) })}
++          {draft.target === 'new' && props.ownerView === undefined
+             && <NewSessionLimit load={hostActions.loadNewSessionInterval} t={t} />}
+@@ -389,6 +410,6 @@
+         </>}
+-        {tab === 'records' && task !== undefined && <DeliveryHistory id={task.id} latestMessageId={task.lastDelivery?.messageId}
++        {tab === 'records' && task !== undefined && (props.ownerView !== undefined ? props.ownerView.renderHistory(task) : <DeliveryHistory id={task.id} latestMessageId={task.lastDelivery?.messageId}
+           timeZone={recordTimeZone(task)} loadHistory={loadHistory} onOpenSession={onOpenSession}
+           sessionTitles={Object.fromEntries(choices.map(choice => [choice.value, choice.label]))}
+-          availableSessionIds={sessions.ids.filter(value => sessionLinkState(value, sessions, workspaces) === 'available')} t={t} />}
++          availableSessionIds={sessions.ids.filter(value => sessionLinkState(value, sessions, workspaces) === 'available')} t={t} />)}
+       </div>
+--- a/packages/client/ui-schedule/src/client/TaskEditorFields.tsx
++++ b/packages/client/ui-schedule/src/client/TaskEditorFields.tsx
+@@ -30,2 +30,4 @@
+   readonly cwd: string
++  /** Optional view-owned values; never interpreted by the Schedule service. */
++  readonly ownerValues?: Readonly<Record<string, unknown>>
+ }
+@@ -67,5 +69,5 @@
+  */
+-export function taskDraftIssue(draft: TaskEditorDraft, changes?: SchedulePatch): TaskManagerKey | 'incomplete' | undefined {
++export function taskDraftIssue(draft: TaskEditorDraft, changes?: SchedulePatch, titleMaxLength = 120): TaskManagerKey | 'incomplete' | undefined {
+   if (draft.title.trim() === '' || draft.prompt.trim() === '' || draft.target === 'session' && draft.sessionId === '') return 'incomplete'
+-  if (draft.title.trim().length > 120) return 'rule.invalidTitle'
++  if (draft.title.trim().length > titleMaxLength) return 'rule.invalidTitle'
+   if (draft.frequency !== 'once' && draft.frequency !== 'advanced'
+@@ -109,2 +111,3 @@
+     ...(changes.target === undefined ? { target: latestTarget, sessionId: latestSessionId, cwd: latestCwd } : { target, sessionId, cwd }),
++    ...(draft.ownerValues === undefined ? {} : { ownerValues: draft.ownerValues }),
+   }
+@@ -124,3 +127,3 @@
+ /** Render manual creation and inline edits with the existing task rule controls. */
+-export function TaskEditorFields({ draft, onChange, projects, disabled, original, t }: {
++export function TaskEditorFields({ draft, onChange, projects, disabled, original, t, policy }: {
+   readonly draft: TaskEditorDraft
+@@ -131,2 +134,10 @@
+   readonly t: PropsLocale<'schedule.manager'>['t']
++  readonly policy?: {
++    readonly targets?: readonly TaskEditorDraft['target'][]
++    readonly frequencies?: readonly string[]
++    readonly titleMaxLength?: number
++    readonly promptMaxLength?: number
++    readonly cwdInput?: boolean
++    readonly minutePrecisionRecurrence?: boolean
++  }
+ }): ReactNode {
+@@ -152,4 +163,4 @@
+     { id: 'once', label: t('rule.once') }, { id: 'advanced', label: t('host.frequency.advanced') },
+-  ]
+-  const frequencyValue = weekdays ? 'weekdays' : draft.frequency
++  ].filter(item => policy?.frequencies === undefined || policy.frequencies.includes(item.id))
++  const frequencyValue = weekdays && frequencyItems.some(item => item.id === 'weekdays') ? 'weekdays' : draft.frequency
+   // The directory line tells which folder a Workspace title such as Default workspace stands for.
+@@ -165,6 +176,6 @@
+   }}>
+-    <label className={css.editorField}>{t('detail.name')}<Input value={draft.title} maxLength={120} aria-required placeholder={t('detail.namePlaceholder')}
++    <label className={css.editorField}>{t('detail.name')}<Input value={draft.title} maxLength={policy?.titleMaxLength ?? 120} aria-required placeholder={t('detail.namePlaceholder')}
+       onChange={(event) => { change({ title: event.target.value }) }} /></label>
+     <label className={css.editorField}>{t('detail.instruction')}<textarea className={css.instruction} aria-required placeholder={t('detail.instructionPlaceholder')}
+-      value={draft.prompt} onChange={(event) => { change({ prompt: event.target.value }) }} /></label>
++      maxLength={policy?.promptMaxLength} value={draft.prompt} onChange={(event) => { change({ prompt: event.target.value }) }} /></label>
+     <div className={css.ruleRows}>
+@@ -177,3 +188,3 @@
+           })),
+-        ]}
++        ].filter(item => policy?.targets === undefined || policy.targets.includes(item.id as TaskEditorDraft['target']))}
+         onChange={(value) => { change({ target: value as TaskEditorDraft['target'],
+@@ -181,6 +192,8 @@
+           cwd: value === 'session' ? '' : draft.target === 'session' ? projects.defaultCwd : draft.cwd }) }} />
+-      {draft.target !== 'session' && <RuleSelectRow label={t('host.project')} value={draft.cwd} disabled={disabled}
++      {draft.target !== 'session' && (policy?.cwdInput === true ? <label className={css.editorField}>{t('host.project')}
++        <Input aria-required value={draft.cwd} disabled={disabled} onChange={event => { change({ cwd: event.target.value }) }} />
++      </label> : <RuleSelectRow label={t('host.project')} value={draft.cwd} disabled={disabled}
+         current={projects.items.find(choice => choice.value === draft.cwd)?.label ?? (draft.cwd || t('host.ungrouped'))}
+         listClassName={css.workspaceMenu} items={workspaceItems.length === 0 ? [{ id: '', label: t('host.ungrouped'), disabled: true }]
+-          : workspaceItems} onChange={(cwd) => { change({ cwd }) }} />}
++          : workspaceItems} onChange={(cwd) => { change({ cwd }) }} />)}
+     </div>
+@@ -188,8 +201,9 @@
+       <RuleSelectRow label={t('rule.repeat')} value={frequencyValue} disabled={disabled} items={frequencyItems}
+-        current={(frequencyItems.find(item => item.id === frequencyValue) as { label: string }).label} onChange={(value) => {
++        current={frequencyItems.find(item => item.id === frequencyValue)?.label ?? frequencyValue} onChange={(value) => {
+           const frequency = value === 'weekdays' ? 'weekly' : value as FrequencyPreset
+           change({ frequency, ...(value === 'weekdays' ? { weekdays: [1, 2, 3, 4, 5] } : {}),
++            ...(policy?.minutePrecisionRecurrence === true && frequency === 'weekly' ? { start: `${draft.start.slice(0, 16)}:00` } : {}),
+             ...(frequency === 'advanced' ? { rrule: rruleFromDraft(draft, original === undefined) } : {}) })
+         }} />
+-      {draft.frequency !== 'once' && draft.frequency !== 'advanced' && <div className={css.ruleRow}>
++      {draft.frequency !== 'once' && draft.frequency !== 'advanced' && (policy?.frequencies === undefined || draft.frequency === 'minutely' || draft.frequency === 'hourly') && <div className={css.ruleRow}>
+         <label className={css.ruleLabel} htmlFor={rowId('interval')}>{t('host.interval')}</label>
+@@ -226,3 +240,4 @@
+         </button>
+-        <ClockPicker open={clockOpen && !disabled} anchorRef={clockAnchor} anchorName={clockAnchorName} value={clock} seconds={draft.frequency !== 'daily'}
++        <ClockPicker open={clockOpen && !disabled} anchorRef={clockAnchor} anchorName={clockAnchorName} value={clock}
++          seconds={draft.frequency !== 'daily' && (policy?.minutePrecisionRecurrence !== true || draft.frequency === 'once')}
+           onPick={(time) => { change(draft.frequency === 'daily' ? { dailyTime: time.slice(0, 5) }
+--- a/packages/client/ui-schedule/src/client/TaskManagerPage.tsx
++++ b/packages/client/ui-schedule/src/client/TaskManagerPage.tsx
+@@ -9,2 +9,3 @@
+ import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
++import type { ReactNode } from 'react'
+ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+@@ -25,2 +26,8 @@
+ export interface TaskManagerInjected extends TaskDetailInjected {
++  /** Owner may expose manual creation only when a session has no schedule tool. */
++  readonly manualCreateOnly?: boolean
++  /** Bulk deletion requires an owner-authoritative batch operation. */
++  readonly allowClearEnded?: boolean
++  /** Owner-specific execution history that does not claim Schedule deliveries. */
++  readonly catalogFooter?: ReactNode
+   /** Host task catalog with its query and deletion state. */
+@@ -41,5 +48,5 @@
+    */
+-  readonly onClearEnded: () => Promise<void>
++  readonly onClearEnded?: () => Promise<void>
+   /** Create a task directly through the Host, without a model request. */
+-  readonly onCreateTask: (request: ScheduleCreateRequest) => Promise<TaskCreateOutcome>
++  readonly onCreateTask: (request: ScheduleCreateRequest, ownerValues?: Readonly<Record<string, unknown>>) => Promise<TaskCreateOutcome>
+ }
+@@ -169,3 +176,3 @@
+     // second press has to be ignored here instead of by `disabled`.
+-    if (clearing) return
++    if (clearing || onClearEnded === undefined) return
+     setClearing(true)
+@@ -203,5 +210,5 @@
+                 <span className={css.createGroup} role="group" aria-label={t('host.create')}>
+-                  <Button variant="primary" size="sm" className={clsx(css.headerAction, css.createPrimary)} icon={<IconPlusOutlineRegular size={13} />}
+-                    onClick={onNewTask}>{t('new.action')}</Button>
+-                  <Menu open={createMenuOpen} onClose={() => { setCreateMenuOpen(false) }} align="end" portal autoFocus
++                  <Button variant="primary" size="sm" className={clsx(css.headerAction, !props.manualCreateOnly && css.createPrimary)} icon={<IconPlusOutlineRegular size={13} />}
++                    onClick={(event) => { if (props.manualCreateOnly) createManually(event.currentTarget); else onNewTask() }}>{t('new.action')}</Button>
++                  {!props.manualCreateOnly && <Menu open={createMenuOpen} onClose={() => { setCreateMenuOpen(false) }} align="end" portal autoFocus
+                     listClassName={css.createMenu}
+@@ -217,3 +224,3 @@
+                     </MenuItemButton>
+-                  </Menu>
++                  </Menu>}
+                 </span>
+@@ -250,3 +257,3 @@
+               </div>
+-              {statusFilter !== 'active' && endedCount > 0 && <Menu
++              {onClearEnded !== undefined && props.allowClearEnded !== false && statusFilter !== 'active' && endedCount > 0 && <Menu
+                 open={clearMenu}
+@@ -333,2 +340,3 @@
+             </div>
++            {props.catalogFooter}
+           </div>

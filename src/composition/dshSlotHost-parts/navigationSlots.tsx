@@ -1,11 +1,14 @@
-import { Activity, Boxes, CalendarClock, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { HeaderLeadingControls } from "../../integrations/deepseek-harness/sidebarComponents.mjs";
 import { AppFrame } from "@opl-vendor/dsh-app-frame";
+import { createPanelPins } from "../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/panel-pins.ts";
 import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
 import { ConversationRoot } from "@opl-vendor/dsh-conversation-root";
 import { ConversationContent } from "../../integrations/deepseek-harness/conversationContent.mjs";
 import { WorkspaceBrowser } from "@opl-vendor/dsh-workspace-browser";
 import { SessionNodeItem, type DshSessionNode } from "@opl-vendor/dsh-session-node";
+import { Button, IconPinOutlineRegular, MenuItemButton } from "../../vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts";
 import { createWorkspaceViewStore } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts";
 import { createSnapshotStore, type SessionListState, type WorkspaceListState } from "../../integrations/deepseek-harness/runtimeShim";
 import { useStudioMenus } from "./studioMenus";
@@ -106,9 +109,10 @@ export function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface
   );
 }
 
-export function SidebarSlot({ collapsed, width, drawer, renderSlot }: { collapsed: boolean; width: number; drawer: boolean; renderSlot: any }) {
+export function SidebarSlot({ collapsed, width, drawer, renderSlot, renderFactorySlot }: { collapsed: boolean; width: number; drawer: boolean; renderSlot: any; renderFactorySlot: any }) {
   const studio = useStudio();
-  const [unpinned, setUnpinned] = useState<readonly string[]>([]);
+  const pins = useMemo(() => createPanelPins(), []);
+  const pinnedPanelIds = useStudioPanels(panels => panels.map(panel => panel.id));
   return (
     <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined} data-narrow-expanded={studio.narrow && !collapsed || undefined}>
       <SidebarRoot
@@ -116,24 +120,52 @@ export function SidebarSlot({ collapsed, width, drawer, renderSlot }: { collapse
         width={width}
         drawer={drawer}
         useRemoteAccess={useStudioRemoteAccess}
-        useEntryPins={(selector: (ids: readonly string[]) => unknown) => selector(unpinned)}
-        useEntryActions={(selector: (registered: boolean) => unknown) => selector(false)}
-        setPinned={(id: string, pinned: boolean) => setUnpinned(ids => pinned ? ids.filter(value => value !== id) : [...new Set([...ids, id])])}
+        useEntryPins={(selector: (ids: readonly string[]) => unknown) => useDshSnapshot(pins.unpinned, selector)}
+        setPinned={pins.setPinned}
         trackEntryClick={() => undefined}
         startSession={studio.startSession}
         toggleSidebar={studio.toggleSidebar}
-        selectPanel={(id: string) => { if (id === "workspace") studio.openPrimaryView("workspace"); }}
+        selectPanel={(id: string) => {
+          if (["applications", "runtime", "schedules", "workspace"].includes(id)) {
+            studio.openPrimaryView(id as "applications" | "runtime" | "schedules" | "workspace");
+          }
+        }}
         usePanels={useStudioPanels}
+        useEntryActions={(selector: (registered: boolean) => unknown) => selector(pinnedPanelIds.length > 0)}
         useShortcuts={useStudioShortcuts}
         usePanelInfo={useConversationPanelInfo}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
         renderSlot={renderSlot}
+        renderFactorySlot={renderFactorySlot}
       />
     </div>
   );
 }
 
-export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; expandSidebar(): void }) {
+export function SidebarLeadingSlot() {
+  const studio = useStudio();
+  return <HeaderLeadingControls toggleSidebar={studio.toggleSidebar} startSession={studio.startSession}
+    trackEntryClick={() => undefined} useRemoteAccess={useStudioRemoteAccess} useShortcuts={useStudioShortcuts}
+    t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)} />;
+}
+
+/** Reuses DSH's menu row primitive for the sidebar More menu. */
+export function SidebarPanelActionsSlot({ entries, onOpen, onPinnedChange, onDismiss, renderFactorySlot }: {
+  entries: readonly { id: string; label: string; pinned: boolean; active?: boolean }[];
+  onOpen(id: string): void;
+  onPinnedChange(id: string, pinned: boolean): void;
+  onDismiss(): void;
+  renderFactorySlot: any;
+}) {
+  const studio = useStudio();
+  const zh = studio.locale === "zh";
+  return <>{entries.filter(entry => !entry.pinned).map(entry => <div key={entry.id} className="opl-sidebar-more-entry">
+    <MenuItemButton current={entry.active === true} icon={renderFactorySlot("sidebar.panel.icon", { id: entry.id, size: 16, active: entry.active === true })} onSelect={() => { onDismiss(); onOpen(entry.id); }}>{entry.label}</MenuItemButton>
+    <Button size="sm" role="menuitem" aria-label={zh ? `固定${entry.label}` : `Pin ${entry.label}`} onClick={() => { onDismiss(); onPinnedChange(entry.id, true); }}><IconPinOutlineRegular size={14} /></Button>
+  </div>)}<MenuItemButton onSelect={() => { onDismiss(); studio.openPrimaryView("applications"); }}>{zh ? "管理应用与扩展" : "Manage apps and extensions"}</MenuItemButton></>;
+}
+
+export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller, renderFactorySlot }: { wide: boolean; expandSidebar(): void; useSectionScroller: any; renderFactorySlot: any }) {
   const studio = useStudio();
   const menus = useStudioMenus();
   const workspaceStore = useMemo(() => createWorkspaceViewStore().create(), []);
@@ -191,19 +223,20 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; 
   const actions = workspaceStore.actions as Record<string, (...args: any[]) => void>;
   const dshLocale = (key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params);
   if (studio.threadDirectoryStatus === "loading") {
-    return <><RuntimeNavigation wide={wide} /><div className="opl-thread-directory-status" role="status">{studio.locale === "zh" ? "正在读取 Codex 会话..." : "Loading Codex conversations..."}</div></>;
+    return <div className="opl-thread-directory-status" role="status">{studio.locale === "zh" ? "正在读取 Codex 会话..." : "Loading Codex conversations..."}</div>;
   }
   if (studio.threadDirectoryStatus === "error") {
-    return <><RuntimeNavigation wide={wide} /><div className="opl-thread-directory-error" role="alert">
+    return <div className="opl-thread-directory-error" role="alert">
       <strong>{studio.locale === "zh" ? "无法连接 Codex App Server" : "Codex App Server is unavailable"}</strong>
       <span>{studio.threadDirectoryError}</span>
       <button type="button" onClick={() => studio.reloadThreadDirectory()}><RefreshCw aria-hidden="true" size={14} />{studio.locale === "zh" ? "重试" : "Retry"}</button>
-    </div></>;
+    </div>;
   }
-  return <><RuntimeNavigation wide={wide} />
-  <div className="opl-workspace-browser-seat">
+  return <div className="opl-workspace-browser-seat">
   <WorkspaceBrowser
     wide={wide}
+    renderFactorySlot={renderFactorySlot}
+    useSectionScroller={useSectionScroller}
     usePanelInfo={useConversationPanelInfo}
     expandSidebar={expandSidebar}
     useRemoteAccess={useStudioRemoteAccess}
@@ -242,17 +275,17 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar }: { wide: boolean; 
     renderSlot={() => null}
     t={dshLocale}
   />
-  {wide ? <RecentSessionsSection list={recentList} current={studio.currentThreadId} locale={studio.locale} open={studio.openThread} menus={menus} /> : null}
-  </div>
-  </>;
+  {wide ? <RecentSessionsSection list={recentList} current={studio.currentThreadId} locale={studio.locale} open={studio.openThread} menus={menus} renderFactorySlot={renderFactorySlot} /> : null}
+  </div>;
 }
 
-function RecentSessionsSection({ list, current, locale, open, menus }: {
+function RecentSessionsSection({ list, current, locale, open, menus, renderFactorySlot }: {
   list: SessionListState;
   current?: string;
   locale: "zh" | "en";
   open(threadId: string): void;
   menus: ReturnType<typeof useStudioMenus>;
+  renderFactorySlot: any;
 }) {
   const recent = useMemo(() => Object.values(list.byId)
     .filter(session => !session.blank)
@@ -285,33 +318,15 @@ function RecentSessionsSection({ list, current, locale, open, menus }: {
         useContextMenuTarget={menus.useContextMenuTarget}
         openSessionMenu={menus.openSessionMenu}
         renderSlot={() => null}
+        renderFactorySlot={renderFactorySlot}
         t={t}
       />)}
     </div>
   </section>;
 }
 
-function RuntimeNavigation({ wide }: { wide: boolean }) {
-  const studio = useStudio();
-  const label = studio.locale === "zh" ? "运行状态" : "Run status";
-  return <nav className="opl-primary-nav" data-wide={wide} aria-label={studio.locale === "zh" ? "主导航" : "Primary navigation"}>
-    <button type="button" title={studio.locale === "zh" ? "应用管理" : "Application management"} aria-label={studio.locale === "zh" ? "应用管理" : "Application management"} aria-current={studio.primaryView === "applications" ? "page" : undefined} onClick={() => studio.openPrimaryView("applications")}><Boxes aria-hidden="true" size={wide ? 14 : 18} />{wide ? <span>{studio.locale === "zh" ? "应用管理" : "Application management"}</span> : null}</button>
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-current={studio.primaryView === "runtime" ? "page" : undefined}
-      onClick={() => studio.openPrimaryView("runtime")}
-    ><Activity aria-hidden="true" size={wide ? 14 : 18} />{wide ? <span>{label}</span> : null}</button>
-    <button type="button" title={studio.locale === "zh" ? "计划任务" : "Scheduled tasks"} aria-label={studio.locale === "zh" ? "计划任务" : "Scheduled tasks"} aria-current={studio.primaryView === "schedules" ? "page" : undefined} onClick={() => studio.openPrimaryView("schedules")}><CalendarClock aria-hidden="true" size={wide ? 14 : 18} />{wide ? <span>{studio.locale === "zh" ? "计划任务" : "Scheduled tasks"}</span> : null}</button>
-  </nav>;
-}
-
 export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const studio = useStudio();
-  if (studio.primaryView === "schedules") return <>{studio.scheduledTasks}</>;
-  if (studio.primaryView === "runtime") return <>{studio.runtimeOverview}</>;
-  if (studio.primaryView === "applications") return <>{studio.applicationManagement}</>;
   const sessionId = "opl-current";
   const session = { openState: "open", blank: studio.conversationBlank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
   const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { id: sessionId, blank: studio.conversationBlank, cwd: studio.workspacePath, retainedBy: { mainView: 1 } } } };
@@ -350,6 +365,10 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
     />
   </div>;
 }
+
+export function ApplicationMainSlot() { return <>{useStudio().applicationManagement}</>; }
+export function RuntimeMainSlot() { return <>{useStudio().runtimeOverview}</>; }
+export function SchedulesMainSlot() { return <>{useStudio().scheduledTasks}</>; }
 
 export function ConversationHeaderSlot() {
   const studio = useStudio();

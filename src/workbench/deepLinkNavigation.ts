@@ -6,7 +6,7 @@ declare global { var __OPL_DEEP_LINK_POLICY__: unknown; }
 export type DeepLinkDestination =
   | { kind: "conversation"; scope: "all" | "archived" }
   | { kind: "schedules" }
-  | { kind: "application_management"; section?: "applications" | "updates" | "resources" }
+  | { kind: "application_management"; section?: "applications" | "updates" | "resources" | "sources" }
   | { kind: "settings"; destination: SettingsDestinationId };
 
 // This maps App-owned routes into the existing Studio presentation. Admission
@@ -39,8 +39,8 @@ export function resolveDeepLinkDestination(value: unknown, policy: unknown = glo
   if (baseRoute === "/archived") return { kind: "conversation", scope: "archived" };
   if (baseRoute === "/scheduled") return { kind: "schedules" };
   if (baseRoute === "/apps") {
-    return section && ["applications", "updates", "resources"].includes(section)
-      ? { kind: "application_management", section: section as "applications" | "updates" | "resources" }
+    return section && ["applications", "updates", "resources", "sources"].includes(section)
+      ? { kind: "application_management", section: section as "applications" | "updates" | "resources" | "sources" }
       : section ? null : { kind: "application_management" };
   }
   if (baseRoute === "/settings/agents" || baseRoute === "/settings/capabilities") return { kind: "application_management", section: "applications" };

@@ -89,6 +89,61 @@ export type AgentPackageDependencyRef = {
   reasons: string[];
 };
 
+export type AgentPackageAccessRef = {
+  visibility: "public" | "authorized_only" | "unknown";
+  status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "unknown";
+  providerId?: string;
+  sourceRef?: string;
+  accessPolicyRef?: string;
+  verifiedAt?: string;
+  securityRevision?: string;
+  reason?: string;
+  discoverAllowed: boolean | null;
+  downloadAllowed: boolean | null;
+};
+
+/** Framework-owned software source refs. Values are display metadata only; credential values never cross this boundary. */
+export type SoftwareSourceActionRef = {
+  actionId: "source_list" | "source_check" | "source_configure" | "source_disconnect" | string;
+  label: string;
+  delegatedSurface?: string;
+  payload: Record<string, unknown>;
+  payloadFields: string[];
+  status: "available" | "unavailable";
+  mutates?: string;
+  dryRunSupported: boolean;
+  confirmationRequired: boolean;
+  dangerLevel?: string;
+  impact?: string;
+  followUpActionIds: string[];
+  verifyActionId?: string;
+  reason?: string;
+};
+
+export type SoftwareSourceRef = {
+  sourceId: string;
+  displayName: string;
+  sourceKind: "registry" | "tap" | string;
+  sourceRef: string;
+  visibility: "public" | "authorized_only" | "unknown";
+  providerId?: string;
+  status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "unknown";
+  enabled: boolean | null;
+  credentialHandlePresent: boolean;
+  verifiedAt?: string;
+  entryCount?: number;
+  availableActions: SoftwareSourceActionRef[];
+};
+
+export type SoftwareSourcesProjection = {
+  status: "available" | "attention_required" | "unknown";
+  entries: SoftwareSourceRef[];
+  authorityBoundary?: {
+    owner?: string;
+    credentialValuesExposed?: boolean;
+  };
+};
+
 export type AgentPackageLifecycleRef = {
   id: string;
   packageId: string;
@@ -112,8 +167,13 @@ export type AgentPackageLifecycleRef = {
   readiness: AgentPackageReadinessRef;
   version?: string;
   versionKind?: "installed" | "available";
+  installedVersion?: string;
+  availableVersion?: string;
   currentness: string;
   sourceMode: string;
+  /** Registry access is independent of local install and business runtime grants. */
+  access?: AgentPackageAccessRef;
+  installable?: boolean | null;
   automaticUpdate: boolean | null;
   homeShortcuts: AgentPackageShortcutRef[];
   recommendedActionId?: string;

@@ -77,7 +77,8 @@ const requiredFiles = [
   "scripts/validate-client-conformance.mjs",
   "scripts/build-desktop.mjs",
   "scripts/package-candidate-carriers.mjs",
-  "scripts/bun-build-renderer-entry.ts",
+  "scripts/vite-build-renderer-entry.mjs",
+  "scripts/vite-node-module-stub.mjs",
   "scripts/deepseek-harness-gui-vendor.mjs",
   "scripts/dsh-upstream.mjs",
   "scripts/dsh-upgrade.mjs",
@@ -449,7 +450,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const composerPalette = read("src/workbench/ComposerCapabilityPalette.tsx");
   const contributionComponents = read("src/composition/contributionComponents.tsx");
   const runtimeShim = read("src/integrations/deepseek-harness/runtimeShim.ts");
-  const bunBuild = read("scripts/bun-build-renderer-entry.ts");
+  const rendererBuild = read("scripts/vite-build-renderer-entry.mjs");
   const notices = read("THIRD_PARTY_NOTICES.md");
   assert(alignment, "missing DeepSeek Harness GUI source-reuse evidence");
   assert(alignment.reference_product === "DeepSeek Harness", "DeepSeek Harness must be the primary GUI reference");
@@ -515,7 +516,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(slotHost.includes("function EmptyAttachmentSlot() { return null; }"), "attachment slot must remain an empty adapter");
   assert(slotHost.includes("useHostInfo={(selector: any) => selector({ home: undefined })}"), "workspace home must remain unavailable without a new App ABI field");
   assert(runtimeShim.includes("export function abbreviateHomePath") && runtimeShim.includes("isWindowsStylePath"), "runtime shim must provide POSIX home abbreviation with Windows fail-open");
-  assert(bunBuild.includes('"process.env.DSH_CLIENT_COMMIT_HASH": JSON.stringify("")'), "browser build must not read Node process for the DSH commit hash");
+  assert(rendererBuild.includes('"process.env.DSH_CLIENT_COMMIT_HASH": JSON.stringify("")'), "browser build must not read Node process for the DSH commit hash");
   assert(
     /bridge\.steerTurn\(\{\s*threadId: active\.threadId,\s*expectedTurnId: active\.turnId,/s.test(appSource),
     "queued follow-ups must steer the exact active Codex thread and turn"

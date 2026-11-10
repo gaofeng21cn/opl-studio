@@ -66,6 +66,7 @@ const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-rendered-acceptance-"
 const cliRoot = path.join(tempRoot, "playwright");
 const appServerLog = path.join(tempRoot, "app-server.jsonl");
 await mkdir(cliRoot, { recursive: true });
+await mkdir(outputRoot, { recursive: true });
 let host;
 
 try {
@@ -139,8 +140,9 @@ try {
       recentRowCount: recentRows.length,
       workspaceCollapsible: Boolean(workspaceGroup),
       recentAfterWorkspaceBrowser: Boolean(seat?.firstElementChild && recent && (seat.firstElementChild.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING)),
-      scrollOwnerCount: scrollOwners.length,
-      scrollOwnerClass: scrollOwners[0]?.className ?? null
+      customSeatScrolls: scrollOwners.includes(seat),
+      officialViewport: Boolean(seat?.closest('[data-sidebar-scrollport]')),
+      officialListArea: Boolean(seat?.querySelector('[data-sidebar-list-area]'))
     };
   }`, cliRoot);
   assert.deepEqual(sidebarRecent, {
@@ -151,9 +153,47 @@ try {
     recentRowCount: 1,
     workspaceCollapsible: true,
     recentAfterWorkspaceBrowser: true,
-    scrollOwnerCount: 1,
-    scrollOwnerClass: "opl-workspace-browser-seat"
+    customSeatScrolls: false,
+    officialViewport: true,
+    officialListArea: true
   });
+
+  const sidebarPanels = await evaluate(`async () => {
+    const nav = document.querySelector('nav[aria-label="主页面"]');
+    const labels = ['应用管理', '运行状态', '计划任务'];
+    const icons = labels.map(label => Boolean(nav?.querySelector('button[aria-label="' + label + '"] svg use')));
+    nav.querySelector('button[aria-label="更多"]').click();
+    await new Promise(requestAnimationFrame);
+    const initialMenu = Array.from(document.querySelectorAll('[role="menuitem"]')).map(item => item.textContent.trim());
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    nav.querySelector('button[aria-label="从侧边栏取消固定计划任务"]').click();
+    await new Promise(requestAnimationFrame);
+    const unpinned = !nav.querySelector('button[aria-label="计划任务"]');
+    nav.querySelector('button[aria-label="更多"]').click();
+    await new Promise(requestAnimationFrame);
+    const menuIcon = Boolean(document.querySelector('.opl-sidebar-more-entry [role="menuitem"] svg use'));
+    document.querySelector('button[aria-label="固定计划任务"]').click();
+    await new Promise(requestAnimationFrame);
+    return { icons, initialMenu, unpinned, menuIcon, repinned: Boolean(nav.querySelector('button[aria-label="计划任务"]')) };
+  }`, cliRoot);
+  assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: ['管理应用与扩展'], unpinned: true, menuIcon: true, repinned: true });
+
+  const primaryPanels = [];
+  for (const [label, testid] of [['应用管理', 'opl-app-management'], ['计划任务', 'opl-scheduled-tasks']]) {
+    const result = await evaluate(`async () => {
+      document.querySelector('nav[aria-label="主页面"] button[aria-label=${JSON.stringify(label)}]').click();
+      await new Promise(requestAnimationFrame);
+      return { label: ${JSON.stringify(label)}, mounted: Boolean(document.querySelector('[data-testid=${JSON.stringify(testid)}]')), selected: Boolean(document.querySelector('nav[aria-label="主页面"] button[aria-label=${JSON.stringify(label)}][aria-current="page"]')) };
+    }`, cliRoot);
+    assert.equal(result.mounted, true);
+    assert.equal(result.selected, true);
+    primaryPanels.push(result);
+  }
+  await evaluate(`async () => {
+    document.querySelector('button[aria-label="新建任务"]').click();
+    await new Promise(requestAnimationFrame);
+    return true;
+  }`, cliRoot);
 
   const recentMenu = await evaluate(`async () => {
     const row = document.querySelector('.opl-recent-session-list [data-row-key="session:thread-recent"]');
@@ -241,6 +281,20 @@ try {
   assert.equal(narrow.horizontalOverflow, false);
   assert.equal(narrow.promptVisible, true);
   assert.equal(narrow.selectedModelLabel, "自动（推荐）");
+  const narrowNavigation = await evaluate(`async () => {
+    const opener = document.querySelector('[data-sidebar-opener]');
+    opener.click();
+    await new Promise(requestAnimationFrame);
+    const dialog = document.querySelector('[data-shortcut-modal="sidebar"]');
+    const more = dialog?.querySelector('button[aria-label="更多"]');
+    more.click();
+    await new Promise(requestAnimationFrame);
+    return { drawer: dialog?.getAttribute('aria-modal') === 'true', moreOpen: more.getAttribute('aria-expanded') === 'true', menu: Array.from(document.querySelectorAll('[role="menuitem"]')).map(row => row.textContent.trim()) };
+  }`, cliRoot);
+  assert.deepEqual(narrowNavigation, { drawer: true, moreOpen: true, menu: ['管理应用与扩展'] });
+  await cli(["press", "Escape"], cliRoot);
+  await cli(["press", "Escape"], cliRoot);
+  await evaluate(`() => { document.activeElement?.blur(); return true; }`, cliRoot);
   await cli(["screenshot"], cliRoot);
   const narrowScreenshot = await latestScreenshot(cliRoot);
 
@@ -401,6 +455,30 @@ try {
   assert.equal(archivedRowRemoved, true);
   const sessionMenuActions = { target: "thread-recent", renamed: true, forked: true, archived: archivedRecent.thread.archived, removedFromActiveList: archivedRowRemoved };
 
+  const themeVariants = [];
+  for (const theme of ['light', 'dark']) {
+    await evaluate(`() => {
+      const key = 'opl.studio.settings.v1';
+      localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key) || '{}'), locale: 'en', theme: ${JSON.stringify(theme)} }));
+      return true;
+    }`, cliRoot);
+    await cli(["reload"], cliRoot);
+    await cli(["resize", "1440", "900"], cliRoot);
+    const variant = await evaluate(`async () => {
+      const deadline = Date.now() + 5000;
+      while (!document.querySelector('button[aria-label="More"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+      const more = document.querySelector('button[aria-label="More"]');
+      const newTask = document.querySelector('button[aria-label="New task"]');
+      more.click(); await new Promise(requestAnimationFrame);
+      return { theme: document.documentElement.getAttribute('data-ds-theme-source'), dark: document.body.hasAttribute('data-ds-dark-theme'), newTask: Boolean(newTask), menu: Array.from(document.querySelectorAll('[role="menuitem"]')).map(row => row.textContent.trim()), overflow: document.documentElement.scrollWidth > innerWidth };
+    }`, cliRoot);
+    assert.deepEqual(variant, { theme, dark: theme === 'dark', newTask: true, menu: ['Manage apps and extensions'], overflow: false });
+    themeVariants.push(variant);
+    await cli(["screenshot"], cliRoot);
+    await copyFile(await latestScreenshot(cliRoot), path.join(outputRoot, `webui-en-${theme}.png`));
+    await cli(["press", "Escape"], cliRoot);
+  }
+
   const unhandledErrors = await evaluate(`() => window.__oplAcceptanceErrors`, cliRoot);
   const consoleResponse = await cli(["console", "error"], cliRoot);
   const consoleErrorLog = JSON.parse(consoleResponse.stdout.trim()).result;
@@ -433,7 +511,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { consoleReadback, wide, iconSprite, contextMenu, sidebarRecent, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, composerText, undone, redone, submitted, selection, busySubmission },
+    assertions: { consoleReadback, wide, iconSprite, contextMenu, sidebarRecent, sidebarPanels, primaryPanels, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, narrowNavigation, themeVariants, composerText, undone, redone, submitted, selection, busySubmission },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }

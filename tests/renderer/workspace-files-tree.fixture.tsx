@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { WorkspaceFilesTree, createWorkspaceTreeListing } from "../../src/integrations/deepseek-harness/WorkspaceFilesTree";
 import type { ThreadWorkspaceListing } from "../../src/bridge/oplBridge";
 
-// Build with scripts/bun-build-renderer-entry.ts, serve #root plus the generated
+// Build with scripts/vite-build-renderer-entry.mjs, serve #root plus the generated
 // CSS/module, and pass workspace-files-tree.mount-check.js to Playwright run-code.
 const calls: string[] = [];
 const opened: string[] = [];

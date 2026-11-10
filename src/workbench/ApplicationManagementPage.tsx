@@ -1,4 +1,4 @@
-import { Box, Cable, CircleAlert, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { Box, Cable, CircleAlert, Globe2, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { NativeAppUpdateResult } from "../bridge/oplBridge";
@@ -8,11 +8,12 @@ import type { WorkbenchSettings } from "./settingsModel";
 import type { SettingsDestinationId } from "./settings/types";
 import type { SettingsActionFeedback } from "./settings/types";
 import type { SettingsActionRequest, SettingsActionViewModel, SettingsHostActionIntent } from "./settingsActions";
-import { agentPackageNeedsAttention, PackageCatalog } from "./settings/packages";
+import { agentPackageNeedsAttention, packageAccessNeedsAttention, packageInstallAllowed, PackageCatalog } from "./settings/packages";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { SettingRow, SettingsGroup, StatusValue } from "./settings/primitives";
+import { SoftwareSourcesPage } from "./SoftwareSourcesPage";
 
-export type ApplicationManagementTab = "applications" | "updates" | "resources";
+export type ApplicationManagementTab = "applications" | "updates" | "resources" | "sources";
 
 type UpdatesPageProps = Parameters<typeof UpdatesSettingsPage>[0];
 
@@ -98,6 +99,12 @@ function resourceStateLabel(value: string | undefined, zh: boolean): string {
   })[value ?? "unknown"] ?? (zh ? "未提供" : "Unknown");
 }
 
+function dependencyStatus(item: { readiness: { operationalReady: boolean | null } }): string {
+  if (item.readiness.operationalReady === true) return "available";
+  if (item.readiness.operationalReady === false) return "unavailable";
+  return "unknown";
+}
+
 function observedAtLabel(value: string | undefined, locale: WorkbenchSettings["locale"]): string | undefined {
   if (!value) return undefined;
   const timestamp = Date.parse(value);
@@ -129,7 +136,7 @@ function ResourceMetadata({ resource, locale }: { resource: ApplicationManagemen
   </details>;
 }
 
-function SharedResources({ model, settings, onOpenSettings }: Pick<ApplicationManagementPageProps, "model" | "settings" | "onOpenSettings">) {
+function SharedResources({ model, settings, onOpenSettings, onOpenApplicationTab }: Pick<ApplicationManagementPageProps, "model" | "settings" | "onOpenSettings"> & { onOpenApplicationTab?: (tab: ApplicationManagementTab) => void }) {
   const packageDependencies = model.packageLifecycle.filter((item) => item.dependencies.length > 0);
   const projected = model.applicationManagement?.sharedResources ?? [];
   const resources = useMemo(() => projected.filter((item) => item.resourceId || item.label), [projected]);
@@ -137,15 +144,20 @@ function SharedResources({ model, settings, onOpenSettings }: Pick<ApplicationMa
   const hasKnowledgeSource = resources.some((resource) => resource.resourceKind === "knowledge_source");
 
   return <div className="opl-app-management-resources" data-testid="opl-app-management-resources">
+    <SettingsGroup title={zh ? "管理共享基座" : "Manage shared foundation"}>
+      <SettingRow label={zh ? "账号与授权" : "Accounts & access"} detail={zh ? "管理共享连接、邮箱和应用访问权限。" : "Manage shared connections, mailboxes, and app access."}>{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("resources")}>{zh ? "打开" : "Open"}</button> : null}</SettingRow>
+      <SettingRow label={zh ? "模型与访问" : "Models & access"} detail={zh ? "管理默认模型来源与模型访问设置。" : "Manage the default model source and model access."}>{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("models")}>{zh ? "打开" : "Open"}</button> : null}</SettingRow>
+      <SettingRow label={zh ? "软件源权限" : "Software source access"} detail={zh ? "管理公开目录和授权软件的下载连接。" : "Manage connections for public catalogs and authorized downloads."}>{onOpenApplicationTab ? <button type="button" className="settings-inline-command" onClick={() => onOpenApplicationTab("sources")}>{zh ? "打开" : "Open"}</button> : null}</SettingRow>
+    </SettingsGroup>
     <SettingsGroup title={zh ? "共享资源" : "Shared resources"}>
       <p className="settings-inline-note">{zh ? "应用只引用已授权的连接和知识来源；正文与凭证继续由对应设置管理。" : "Apps reference authorized connections and knowledge sources; source bodies and credentials stay in their settings."}</p>
       {resources.length ? <>{resources.map((resource, index) => <SettingRow key={resource.resourceId ?? `${resource.label}-${index}`} label={localizedResourceLabel(resource, settings.locale)} detail={[resourceKindLabel(resource.resourceKind, zh), relationLabel(resource.relationKind, zh), resource.consumerPackageIds.length ? `${resource.consumerPackageIds.length} ${zh ? "个应用使用" : "consumer(s)"}` : undefined].filter(Boolean).join(" · ")}>
         <span className="runtime-setting-control"><StatusValue status={resourceStatus(resource)} locale={settings.locale} />{resourceOwnerDestination(resource.ownerSettingsRoute) && onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => { const destination = resourceOwnerDestination(resource.ownerSettingsRoute); if (destination) onOpenSettings(destination); }}>{zh ? "打开设置" : "Open settings"}</button> : null}<ResourceMetadata resource={resource} locale={settings.locale} /></span>
-      </SettingRow>)}{!hasKnowledgeSource ? <p className="settings-inline-note" data-testid="opl-app-management-knowledge-empty">{zh ? "知识来源尚未返回；当前仅显示已返回的共享资源。" : "Knowledge sources were not returned; only available shared resources are shown."}</p> : null}</> : <p className="settings-inline-note" data-testid="opl-app-management-resources-empty">{zh ? "共享资源尚未返回；知识来源也未提供可显示的授权关系。" : "Shared resources were not returned; no authorized knowledge relation is available to show."}</p>}
+      </SettingRow>)}{!hasKnowledgeSource ? <div className="settings-inline-note" data-testid="opl-app-management-knowledge-empty"><p>{zh ? "Obsidian 知识来源配置尚未接入此界面；这里仅显示 Framework 已返回的授权关系。" : "Obsidian knowledge-source configuration is not exposed in this view; only Framework-projected authorization relations are shown."}</p><span className="runtime-setting-control">{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("resources")}>{zh ? "打开账号与授权" : "Open accounts & access"}</button> : null}{onOpenApplicationTab ? <button type="button" className="settings-inline-command" onClick={() => onOpenApplicationTab("sources")}>{zh ? "打开软件源权限" : "Open source access"}</button> : null}</span></div> : null}</> : <div className="settings-inline-note" data-testid="opl-app-management-resources-empty"><p>{zh ? "共享资源尚未返回；Obsidian 知识来源配置也尚未接入此界面。" : "Shared resources were not returned; Obsidian knowledge-source configuration is not exposed in this view."}</p><span className="runtime-setting-control">{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("resources")}>{zh ? "打开账号与授权" : "Open accounts & access"}</button> : null}{onOpenApplicationTab ? <button type="button" className="settings-inline-command" onClick={() => onOpenApplicationTab("sources")}>{zh ? "打开软件源权限" : "Open source access"}</button> : null}</span></div>}
     </SettingsGroup>
     <SettingsGroup title={zh ? "应用依赖" : "Application dependencies"}>
       <p className="settings-inline-note">{zh ? "卸载或停用前先查看应用依赖关系。" : "Review application dependencies before disabling or removing anything."}</p>
-      {packageDependencies.length ? packageDependencies.map((item) => <SettingRow key={item.packageId} label={item.label} detail={item.dependencies.map((dependency) => dependency.packageId).join(zh ? "、" : ", ")}><span className="runtime-setting-control"><StatusValue status={item.readiness.operationalReady === false ? "unavailable" : "available"} locale={settings.locale} />{item.requiredByPackageIds?.length ? <span className="settings-muted">{zh ? `被 ${item.requiredByPackageIds.length} 个应用依赖` : `Required by ${item.requiredByPackageIds.length} app(s)`}</span> : null}</span></SettingRow>) : <p className="settings-inline-note">{zh ? "当前没有返回共享依赖关系。" : "No shared dependency relationships were returned."}</p>}
+      {packageDependencies.length ? packageDependencies.map((item) => <SettingRow key={item.packageId} label={item.label} detail={item.dependencies.map((dependency) => dependency.packageId).join(zh ? "、" : ", ")}><span className="runtime-setting-control"><StatusValue status={dependencyStatus(item)} locale={settings.locale} />{item.requiredByPackageIds?.length ? <span className="settings-muted">{zh ? `被 ${item.requiredByPackageIds.length} 个应用依赖` : `Required by ${item.requiredByPackageIds.length} app(s)`}</span> : null}</span></SettingRow>) : <p className="settings-inline-note">{zh ? "当前没有返回共享依赖关系。" : "No shared dependency relationships were returned."}</p>}
     </SettingsGroup>
   </div>;
 }
@@ -155,12 +167,17 @@ export function ApplicationManagementPage({ model, settings, managedUpdate, acti
   const tabRefs = useRef<Partial<Record<ApplicationManagementTab, HTMLButtonElement | null>>>({});
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
-  const installed = model.packageLifecycle.filter((item) => item.installed === true).length;
-  const attention = model.packageLifecycle.filter((item) => agentPackageNeedsAttention(item)).length;
+  const catalogPackages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId));
+  const installed = catalogPackages.filter((item) => item.installed === true).length;
+  const installable = catalogPackages.filter((item) => packageInstallAllowed(item)).length;
+  const updatesAvailable = catalogPackages.filter((item) => item.currentness.trim().toLowerCase() === "update_available").length;
+  const attention = catalogPackages.filter((item) => agentPackageNeedsAttention(item) || packageAccessNeedsAttention(item)).length;
+  const sourceAttention = model.softwareSources?.entries.filter((source) => source.enabled !== false && source.credentialHandlePresent && ["forbidden", "expired", "revoked", "unknown"].includes(source.status)).length ?? 0;
   const tabs: Array<{ id: ApplicationManagementTab; label: string; icon: typeof Box }> = [
     { id: "applications", label: zh ? "我的应用" : "My apps", icon: Box },
     { id: "updates", label: zh ? "更新" : "Updates", icon: RefreshCw },
-    { id: "resources", label: zh ? "共享资源" : "Shared resources", icon: Cable }
+    { id: "resources", label: zh ? "共享资源" : "Shared resources", icon: Cable },
+    { id: "sources", label: zh ? "软件源" : "Software sources", icon: Globe2 }
   ];
   const updatesProps: UpdatesPageProps = {
     actionViewModel,
@@ -193,7 +210,7 @@ export function ApplicationManagementPage({ model, settings, managedUpdate, acti
       </div>
       <div className="opl-app-management-environment" data-testid="opl-app-management-environment"><span>{zh ? "当前环境" : "Current environment"}</span><strong>{zh ? "本机 OPL" : "Local OPL"}</strong><button type="button" className="settings-icon-button" aria-label={zh ? "刷新应用管理状态" : "Refresh application management"} title={zh ? "刷新" : "Refresh"} onClick={onRefresh} disabled={actionBusyKey !== null}><RefreshCw aria-hidden="true" size={15} /></button></div>
     </header>
-    <div className="opl-app-management-summary" role="status"><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span><span><strong>{model.packageLifecycle.length}</strong> {zh ? "个可发现" : "discoverable"}</span>{attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个需处理" : "need attention"}</span> : <span><ShieldCheck aria-hidden="true" size={14} />{zh ? "当前没有已知问题" : "No known issues"}</span>}</div>
+    <div className="opl-app-management-summary" role="status"><span><strong>{catalogPackages.length}</strong> {zh ? "个目录条目" : "catalog entries"}</span><span><strong>{installable}</strong> {zh ? "个可安装" : "installable"}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span>{updatesAvailable ? <span className="attention"><RefreshCw aria-hidden="true" size={14} /><strong>{updatesAvailable}</strong> {zh ? "个有更新" : "updates available"}</span> : null}{attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个应用需处理" : "apps need attention"}</span> : null}{sourceAttention || model.softwareSources?.status === "attention_required" ? <span className="attention"><CircleAlert aria-hidden="true" size={14} />{sourceAttention ? (zh ? `${sourceAttention} 个软件源需处理` : `${sourceAttention} sources need attention`) : (zh ? "软件源需要处理" : "Software sources need attention")}</span> : null}{!attention && !sourceAttention && model.softwareSources?.status !== "attention_required" ? <span><ShieldCheck aria-hidden="true" size={14} />{zh ? "当前没有已知问题" : "No known issues"}</span> : null}</div>
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}
     <nav className="opl-app-management-tabs" data-testid="opl-app-management-tabs" role="tablist" aria-label={zh ? "应用管理分区" : "Application management sections"}>
@@ -202,7 +219,8 @@ export function ApplicationManagementPage({ model, settings, managedUpdate, acti
     <div className="opl-app-management-content">
       {tab === "applications" ? <section id="opl-app-management-panel-applications" role="tabpanel" aria-label={tabs[0]!.label}><PackageCatalog kind="all" model={model} settings={settings} actionBusyKey={actionBusyKey} onAction={onAction} manifestInstallAction={manifestInstallAction} renderPackageContributions={renderPackageContributions} /></section> : null}
       {tab === "updates" ? <section id="opl-app-management-panel-updates" role="tabpanel" aria-label={tabs[1]!.label}><UpdatesSettingsPage {...updatesProps} /></section> : null}
-      {tab === "resources" ? <section id="opl-app-management-panel-resources" role="tabpanel" aria-label={tabs[2]!.label}><SharedResources model={model} settings={settings} onOpenSettings={onOpenSettings} /></section> : null}
+      {tab === "resources" ? <section id="opl-app-management-panel-resources" role="tabpanel" aria-label={tabs[2]!.label}><SharedResources model={model} settings={settings} onOpenSettings={onOpenSettings} onOpenApplicationTab={(nextTab) => { setTab(nextTab); onTabChange?.(nextTab); }} /></section> : null}
+      {tab === "sources" ? <section id="opl-app-management-panel-sources" role="tabpanel" aria-label={tabs[3]!.label}><SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={actionBusyKey} onAction={onAction} onRefresh={onRefresh} /></section> : null}
     </div>
   </section>;
 }

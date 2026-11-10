@@ -16,6 +16,7 @@ const controllers = new WeakMap<Context, ReturnType<typeof createStudioMenus>>()
 function createStudioMenus(ctx: Context) {
   let surface: OplStudioSurface | undefined;
   let disposed = false;
+  let renderedLocale = "en";
   const surfaceRevision = createSnapshotStore(0);
   const workspaceAction = createSnapshotStore<WorkspaceActionRequest | null>(null);
   const renameRequest = createSnapshotStore<SessionRenameTarget | null>(null);
@@ -31,6 +32,7 @@ function createStudioMenus(ctx: Context) {
   // active flag is published only after this synchronous installer returns.
   const menus = menuScope.get("contextMenus", false) as ContextMenus;
   const slots = menuScope.get("slots", false) as SlotRegistry;
+  slots.installLocale(locale);
   const bindings = createContextMenuBindings((target, point) => menus.open(target, point), () => !disposed);
   const t = (key: string, params?: Record<string, unknown>) => translate(surface?.locale ?? "en", key, params);
   const currentSession = (id: string) => surface?.threadDirectoryStatus === "ready"
@@ -90,7 +92,13 @@ function createStudioMenus(ctx: Context) {
   };
   return {
     updateSurface(next: OplStudioSurface) { surface = next; },
-    refresh() { surfaceRevision.set(surfaceRevision.getSnapshot() + 1); locale.refresh(); },
+    refresh() {
+      surfaceRevision.set(surfaceRevision.getSnapshot() + 1);
+      if (surface && renderedLocale !== surface.locale) {
+        renderedLocale = surface.locale;
+        locale.refresh();
+      }
+    },
     useContextMenu: () => bindings,
     useContextMenuTarget: <T,>(selector: (target: ContextMenuTarget | null) => T): T => useDshSnapshot(menus.active, selector),
     useWorkspaceActionRequest: <T,>(selector: (request: WorkspaceActionRequest | null) => T): T => useDshSnapshot(workspaceAction, selector),
@@ -130,6 +138,6 @@ export function useStudioMenus() {
   const controller = controllers.get(ctx);
   if (!controller) throw new Error("Studio context menus were not installed by the DSH slot host");
   controller.updateSurface(studio);
-  useEffect(() => { controller.refresh(); }, [controller, studio]);
+  useEffect(() => { controller.refresh(); }, [controller, studio.locale, studio.threadProjects, studio.threadDirectoryStatus]);
   return controller;
 }

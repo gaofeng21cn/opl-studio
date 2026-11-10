@@ -74,57 +74,20 @@
 .settings-page .storage-center-heading h3 { display: none; }
 .settings-page .storage-intent-stat { border-top: 0; padding-block: 6px; }
 
-/* Layout reference: official DSH DSH 0.2.1-alpha.1 (477b4f420553e8a52c2fbccc464d7561b239c443)
-   packages/client/ui-schedule/src/client/TaskManagerPage.module.css.
-   Uses the existing vendored DSH atoms; no DSH scheduler/session authority. */
-.settings-page .scheduled-tasks { display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 22px; }
-.settings-page .scheduled-tasks p, .settings-page .scheduled-tasks h3 { margin: 0; }
-.schedule-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-.schedule-toolbar > p { flex: 1 1 220px; }
-.schedule-toolbar > button { flex-shrink: 0; }
-.schedule-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.schedule-filters > button[aria-pressed="true"] { background: var(--dsw-alias-interactive-bg-hover); }
-.schedule-filters > span { margin-left: auto; flex: 1 1 180px; max-width: 280px; }
-.schedule-list { display: flex; flex-direction: column; min-width: 0; }
-.schedule-task { border-bottom: .5px solid var(--dsw-alias-border-l2); }
-.schedule-task-summary { display: flex; align-items: center; gap: 12px; padding: 14px 8px; cursor: pointer; border-radius: 8px; list-style: none; }
-.schedule-task-summary::-webkit-details-marker { display: none; }
-.schedule-task-summary::after { content: '›'; color: var(--dsw-alias-label-tertiary); }
-.schedule-task[open] > .schedule-task-summary::after { transform: rotate(90deg); }
-.schedule-task-summary:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.schedule-task-summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
-.schedule-task-name { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.schedule-task-name strong, .schedule-run strong { font-weight: 500; overflow-wrap: anywhere; }
-.schedule-task-name small, .schedule-task-status, .schedule-next-run, .schedule-run small { color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
-.schedule-task-status { flex-shrink: 0; }
-.schedule-task-detail { display: flex; flex-direction: column; gap: 12px; padding: 0 8px 16px 30px; }
-.schedule-prompt { white-space: pre-wrap; overflow-wrap: anywhere; }
-.schedule-task-detail dl { margin: 0; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; font-size: 12px; line-height: 18px; }
-.schedule-task-detail dt { color: var(--dsw-alias-label-secondary); }
-.schedule-task-detail dd { margin: 0; overflow-wrap: anywhere; color: var(--dsw-alias-label-tertiary); }
-.schedule-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.settings-page .scheduled-tasks .schedule-editor { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 0; padding: 16px 0; }
-.schedule-editor h3, .schedule-field-wide, .schedule-editor fieldset { grid-column: 1 / -1; }
-.schedule-editor label { margin: 0; gap: 6px; font-size: 13px; }
-.schedule-editor label > span { width: 100%; box-sizing: border-box; }
-.schedule-editor textarea, .schedule-editor select, .schedule-editor label > input { box-sizing: border-box; padding: 8px 10px; border: .5px solid var(--dsw-alias-border-l2); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-width: 0; }
-.schedule-history > summary { cursor: pointer; font-weight: 500; padding-block: 8px; }
-.schedule-history > summary span { color: var(--dsw-alias-label-tertiary); font-size: 12px; margin-left: 8px; }
-.settings-page .scheduled-tasks .schedule-run { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
-.schedule-run > div { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.schedule-run > button { flex-shrink: 0; }
-@media(max-width: 680px) {
-  .schedule-filters > span { flex-basis: 100%; max-width: none; }
-  .settings-page .scheduled-tasks .schedule-editor { grid-template-columns: minmax(0,1fr); }
-  .schedule-task-summary { gap: 8px; }
-  .schedule-task-detail { padding-left: 8px; }
-}
-
-/* Match DSH TaskManagerPage's centered 960px column and responsive insets. */
-.opl-schedules-page { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; overflow: auto; padding: 28px clamp(24px, 4vw, 48px) 48px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
-.opl-schedules-page > header, .opl-schedules-page > .scheduled-tasks, .opl-schedules-page > p { max-width: 864px; margin-inline: auto; }
-.settings-page.opl-schedules-page > .settings-detail-header { padding: 0; margin-bottom: 24px; }
-.opl-schedules-page > header h1 { margin: 0 0 8px; font-size: 20px; line-height: 28px; font-weight: 500; }
-.opl-schedules-page > header p { color: var(--dsw-alias-label-secondary); margin: 0; }
-.schedule-toolbar-actions { display: flex; align-items: center; gap: 8px; }
-@media (max-width: 640px) { .opl-schedules-page { padding: 24px 16px; } }
+.opl-dsh-schedule-page { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
+.opl-dsh-schedule-page > [data-testid="task-manager-page"] { flex: 1; min-width: 0; }
+.opl-dsh-schedule-owner-fields { display: grid; gap: 12px; padding-top: 16px; }
+.opl-dsh-schedule-owner-fields label { display: grid; gap: 6px; min-width: 0; }
+.opl-dsh-schedule-owner-fields input, .opl-dsh-schedule-owner-fields select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; border: .5px solid var(--dsw-alias-border-l2); border-radius: 8px; padding: 8px 10px; background: var(--dsw-alias-background-primary, transparent); color: var(--dsw-alias-label-primary); font: inherit; }
+.opl-dsh-schedule-owner-fields input:focus-visible, .opl-dsh-schedule-owner-fields select:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+.opl-dsh-schedule-owner-fields p { color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.opl-dsh-schedule-global-history { margin-top: 24px; border-top: .5px solid var(--dsw-alias-border-l2); }
+.opl-dsh-schedule-global-history > summary { padding-block: 14px; cursor: pointer; color: var(--dsw-alias-label-secondary); }
+.opl-dsh-schedule-history { display: grid; gap: 8px; padding-bottom: 16px; }
+.opl-dsh-schedule-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.opl-dsh-schedule-history-heading h3 { margin: 0; font-size: 14px; font-weight: 500; }
+.opl-dsh-schedule-history article { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: .5px solid var(--dsw-alias-border-l2); }
+.opl-dsh-schedule-history article > div { display: grid; gap: 4px; min-width: 0; }
+.opl-dsh-schedule-history article strong { overflow-wrap: anywhere; font-weight: 500; }
+.opl-dsh-schedule-history article small, .opl-dsh-schedule-history article p { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.opl-dsh-schedule-history article p { margin: 0; }

@@ -290,9 +290,9 @@ export function buildRenderer({
   const cssName = jsName.replace(/\.[^.]+$/, ".css");
   const cssPath = path.join(outDir, cssName);
   const build = spawnSync(
-    "bun",
+    process.execPath,
     [
-      path.join(root, "scripts", "bun-build-renderer-entry.ts"),
+      path.join(root, "scripts", "vite-build-renderer-entry.mjs"),
       path.join(root, "src", "main.tsx"),
       outDir,
       format

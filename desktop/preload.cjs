@@ -3,6 +3,52 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const invoke = (method, payload = {}) => ipcRenderer.invoke("opl:invoke", { method, payload });
 const subscriptions = new Map();
 let pendingDeepLinksRequested = false;
+const NATIVE_THEME_SOURCE_ATTRIBUTE = "data-ds-theme-source";
+const NATIVE_THEME_SOURCE_CHANNEL = "opl:native-theme-source";
+
+function markDocumentPlatform() {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const mark = () => {
+    if (document.documentElement) document.documentElement.dataset.platform = process.platform;
+  };
+  if (document.documentElement) mark();
+  else window.addEventListener("DOMContentLoaded", mark, { once: true });
+}
+
+markDocumentPlatform();
+function syncNativeThemeSource() {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+  const root = document.documentElement;
+  if (!root) return;
+  let sent;
+  const send = () => {
+    const source = root.getAttribute(NATIVE_THEME_SOURCE_ATTRIBUTE);
+    if ((source !== "light" && source !== "dark" && source !== "system") || source === sent) return;
+    sent = source;
+    ipcRenderer.send(NATIVE_THEME_SOURCE_CHANNEL, source);
+  };
+  new MutationObserver(send).observe(root, {
+    attributes: true,
+    attributeFilter: [NATIVE_THEME_SOURCE_ATTRIBUTE]
+  });
+  send();
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", syncNativeThemeSource, { once: true });
+  else syncNativeThemeSource();
+}
+
+if (typeof document !== "undefined") ipcRenderer.on("opl:window-fullscreen", (_event, fullscreen) => {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const mark = () => {
+    if (!document.documentElement) return;
+    if (fullscreen) document.documentElement.dataset.fullscreen = "true";
+    else delete document.documentElement.dataset.fullscreen;
+  };
+  if (document.documentElement) mark();
+  else window.addEventListener("DOMContentLoaded", mark, { once: true });
+});
 
 function subscribeEvents(listener) {
   const wrapped = (_event, payload) => listener(payload);

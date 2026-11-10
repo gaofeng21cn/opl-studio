@@ -36,6 +36,17 @@ test("desktop readiness reports the exact running package version", () => {
   assert.match(main, /type: "opl-desktop-ready",\s+version: app\.getVersion\(\)/);
 });
 
+test("macOS desktop exposes the official DSH platform and sidebar material", () => {
+  assert.match(main, /titleBarStyle: "hiddenInset"[\s\S]+trafficLightPosition: \{ x: 16, y: 18 \}[\s\S]+vibrancy: "sidebar"[\s\S]+visualEffectState: "active"[\s\S]+backgroundColor: "#00000000"/);
+  assert.match(main, /window\.setVibrancy\(null\)[\s\S]+window\.setBackgroundColor\(chromeFallbackFill\(\)\)[\s\S]+window\.on\("show", applyBackdrop\)/);
+  assert.match(main, /ipcMain\.on\("opl:native-theme-source"[\s\S]+event\.senderFrame !== owner\.webContents\.mainFrame[\s\S]+!trustedRendererUrl\(event\.senderFrame\.url\)[\s\S]+source === "system"\) nativeTheme\.themeSource = source/);
+  assert.match(preload, /document\.documentElement\.dataset\.platform = process\.platform/);
+  assert.match(preload, /"opl:native-theme-source"[\s\S]+ipcRenderer\.send\(NATIVE_THEME_SOURCE_CHANNEL, source\)[\s\S]+new MutationObserver\(send\)\.observe\(root/);
+  assert.match(main, /window\.webContents\.on\("did-finish-load", sendFullscreen\)/);
+  assert.match(preload, /opl:window-fullscreen/);
+  assert.match(fs.readFileSync(path.join(root, "src", "workbench", "App.tsx"), "utf8"), /data-ds-theme-source", settings\.theme/);
+});
+
 test("native accessibility support is enabled only by the qualification lane", () => {
   assert.match(main, /process\.env\.OPL_DESKTOP_NATIVE_ACCESSIBILITY_QUALIFICATION === "1"/);
   assert.match(main, /nativeAccessibilityQualificationEnabled[\s\S]+app\.commandLine\.appendSwitch\("force-renderer-accessibility"\)[\s\S]+app\.whenReady\(\)/);

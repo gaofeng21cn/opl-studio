@@ -1,84 +1,3 @@
---- a/packages/client/ui-primitives/src/JsonTree.tsx
-+++ b/packages/client/ui-primitives/src/JsonTree.tsx
-@@ -704,8 +704,8 @@
-       ? null
-       : pathId([Array.isArray(data) ? firstExpandableIndex : firstExpandableEntry[0]])
-     : isExpandableValue(data) && rootEntries.length > 0 ? pathId([]) : null
--  const activeRowRef = useRef<HTMLElement>()
--  const resetTimer = useRef<ReturnType<typeof setTimeout>>()
-+  const activeRowRef = useRef<HTMLElement | undefined>(undefined)
-+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-   const copySequence = useRef(0)
-   const [copyStore] = useState(createCopyStore)
-   const [tabStopId, setTabStopId] = useState<string | null>(initialTabStopId)
---- a/packages/client/ui-primitives/src/TextShimmer.tsx
-+++ b/packages/client/ui-primitives/src/TextShimmer.tsx
-@@ -44,8 +44,8 @@
-         <span className={clsx(css.content, contentClassName)}>{content}</span>
-       </DecorativeCopy.Provider>
-       {active && (
--        // React 18 forwards inert as an empty string; a boolean is dropped.
--        <span className={css.decoration} aria-hidden="true" {...{ inert: '' }}>
-+        // React 19 forwards the standard boolean inert attribute.
-+        <span className={css.decoration} aria-hidden="true" {...{ inert: true }}>
-           <span className={css.sweep}>
-             <DecorativeCopy.Provider value>
-               <span className={clsx(css.content, css.highlight, contentClassName)}>{content}</span>
---- a/packages/client/ui-primitives/src/Tooltip.tsx
-+++ b/packages/client/ui-primitives/src/Tooltip.tsx
-@@ -74,13 +74,25 @@
-   const id = useId()
-   const [pinned, setPinned] = useState(false)
-   const anchor = useRef<HTMLElement | null>(null)
--  // React 18 keeps the element's ref outside props; forward it so wrapping an
--  // anchor in Tooltip never silently severs the owner's ref.
--  const childRef = (children as ReactElement<AnchorProps> & { ref?: Ref<HTMLElement> }).ref
-+  // React 19 exposes the element ref through props and permits callback refs to
-+  // return cleanup functions. Preserve that cleanup while retaining React 18
-+  // callback refs' legacy null notification when no cleanup is returned.
-+  const childRef = children.props.ref as Ref<HTMLElement> | undefined
-   const mergedRef = useCallback((el: HTMLElement | null) => {
-     anchor.current = el
--    if (typeof childRef === 'function') childRef(el)
--    else if (childRef != null) (childRef as MutableRefObject<HTMLElement | null>).current = el
-+    let childCleanup: (() => void) | undefined
-+    if (typeof childRef === 'function') {
-+      const result = childRef(el)
-+      if (typeof result === 'function') childCleanup = result
-+    } else if (childRef != null) {
-+      (childRef as MutableRefObject<HTMLElement | null>).current = el
-+    }
-+    return () => {
-+      childCleanup?.()
-+      if (childCleanup === undefined && typeof childRef === 'function') childRef(null)
-+      if (childRef != null && typeof childRef !== 'function' && childRef.current === el) childRef.current = null
-+      if (anchor.current === el) anchor.current = null
-+    }
-   }, [childRef])
-   const [pos, setPos] = useState<DOMRect | null>(null)
-   const bubble = useRef<HTMLSpanElement | null>(null)
---- a/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
-+++ b/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
-@@ -53,7 +53,7 @@
-  * @returns Whether this component may build highlighted output.
-  */
- export function useViewportHighlighting(
--  target: RefObject<Element>,
-+  target: RefObject<Element | null>,
-   lang: string | undefined,
- ): boolean {
-   const supported = supportsHighlighting(lang)
---- a/packages/client/ui-primitives/src/image-drag.ts
-+++ b/packages/client/ui-primitives/src/image-drag.ts
-@@ -22,7 +22,7 @@
-   const source = useMemo<FileDragSource>(() => original === undefined
-     ? { kind: 'url', url: src, name, mediaType: '', resourceAddress }
-     : { kind: 'blob', blob: original, name, mediaType: original.type, resourceAddress }, [src, name, original, resourceAddress])
--  const state = useRef<Preparation>()
-+  const state = useRef<Preparation | undefined>(undefined)
-   const dragged = useRef(false)
-   const release = useCallback((): void => {
-     const previous = state.current
 --- a/packages/client/ui-layout/src/client/AppFrame.tsx
 +++ b/packages/client/ui-layout/src/client/AppFrame.tsx
 @@ -41,3 +41,3 @@
@@ -106,11 +25,101 @@
 -        <div className={css.leadingSeat} data-shell-leading {...{ inert: drawerOpen ? '' : undefined }}>
 +        <div className={css.leadingSeat} data-shell-leading {...{ inert: drawerOpen }}>
            {leading}
+--- a/packages/client/ui-primitives/src/JsonTree.tsx
++++ b/packages/client/ui-primitives/src/JsonTree.tsx
+@@ -706,4 +706,4 @@
+     : isExpandableValue(data) && rootEntries.length > 0 ? pathId([]) : null
+-  const activeRowRef = useRef<HTMLElement>()
+-  const resetTimer = useRef<ReturnType<typeof setTimeout>>()
++  const activeRowRef = useRef<HTMLElement | undefined>(undefined)
++  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+   const copySequence = useRef(0)
+--- a/packages/client/ui-primitives/src/Menu.tsx
++++ b/packages/client/ui-primitives/src/Menu.tsx
+@@ -273,3 +273,3 @@
+     if (!open || !portal || anchorRef === undefined) {
+-      setExternalAnchor(null)
++      if (externalAnchor !== null) setExternalAnchor(null)
+       return
+@@ -277,3 +277,3 @@
+     const element = anchorRef.current
+-    setExternalAnchor(element)
++    if (externalAnchor !== element) setExternalAnchor(element)
+     if (element === null) return
+--- a/packages/client/ui-primitives/src/TextShimmer.tsx
++++ b/packages/client/ui-primitives/src/TextShimmer.tsx
+@@ -46,4 +46,4 @@
+       {active && (
+-        // React 18 forwards inert as an empty string; a boolean is dropped.
+-        <span className={css.decoration} aria-hidden="true" {...{ inert: '' }}>
++        // React 19 forwards the standard boolean inert attribute.
++        <span className={css.decoration} aria-hidden="true" {...{ inert: true }}>
+           <span className={css.sweep}>
+--- a/packages/client/ui-primitives/src/Tooltip.tsx
++++ b/packages/client/ui-primitives/src/Tooltip.tsx
+@@ -76,9 +76,21 @@
+   const anchor = useRef<HTMLElement | null>(null)
+-  // React 18 keeps the element's ref outside props; forward it so wrapping an
+-  // anchor in Tooltip never silently severs the owner's ref.
+-  const childRef = (children as ReactElement<AnchorProps> & { ref?: Ref<HTMLElement> }).ref
++  // React 19 exposes the element ref through props and permits callback refs to
++  // return cleanup functions. Preserve that cleanup while retaining React 18
++  // callback refs' legacy null notification when no cleanup is returned.
++  const childRef = children.props.ref as Ref<HTMLElement> | undefined
+   const mergedRef = useCallback((el: HTMLElement | null) => {
+     anchor.current = el
+-    if (typeof childRef === 'function') childRef(el)
+-    else if (childRef != null) (childRef as MutableRefObject<HTMLElement | null>).current = el
++    let childCleanup: (() => void) | undefined
++    if (typeof childRef === 'function') {
++      const result = childRef(el)
++      if (typeof result === 'function') childCleanup = result
++    } else if (childRef != null) {
++      (childRef as MutableRefObject<HTMLElement | null>).current = el
++    }
++    return () => {
++      childCleanup?.()
++      if (childCleanup === undefined && typeof childRef === 'function') childRef(null)
++      if (childRef != null && typeof childRef !== 'function' && childRef.current === el) childRef.current = null
++      if (anchor.current === el) anchor.current = null
++    }
+   }, [childRef])
+--- a/packages/client/ui-primitives/src/image-drag.ts
++++ b/packages/client/ui-primitives/src/image-drag.ts
+@@ -24,3 +24,3 @@
+     : { kind: 'blob', blob: original, name, mediaType: original.type, resourceAddress }, [src, name, original, resourceAddress])
+-  const state = useRef<Preparation>()
++  const state = useRef<Preparation | undefined>(undefined)
+   const dragged = useRef(false)
+--- a/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
++++ b/packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts
+@@ -55,3 +55,3 @@
+ export function useViewportHighlighting(
+-  target: RefObject<Element>,
++  target: RefObject<Element | null>,
+   lang: string | undefined,
+--- a/packages/client/ui-primitives/src/useMenuSubmenu.ts
++++ b/packages/client/ui-primitives/src/useMenuSubmenu.ts
+@@ -17,3 +17,3 @@
+   entry: (MenuItem & { submenu: readonly MenuEntry[] }) | undefined
+-  panelRef: RefObject<HTMLDivElement>
++  panelRef: RefObject<HTMLDivElement | null>
+   /** CSS anchor name of the root card's anchor box; the child card is placed against it. */
+@@ -43,3 +43,3 @@
+   footer: readonly MenuEntry[] | undefined
+-  listRef: RefObject<HTMLDivElement>
++  listRef: RefObject<HTMLDivElement | null>
+   refocusAnchor: () => void
+--- a/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
++++ b/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
+@@ -140,3 +140,3 @@
+ }): ReactNode {
+-  const releasePan = useRef<() => void>()
++  const releasePan = useRef<(() => void) | undefined>(undefined)
+   const attachImage = useCallback((image: HTMLImageElement | null): void => {
 --- a/packages/client/ui-sidebar-documentpreview/src/client/pdf/pdf.tsx
 +++ b/packages/client/ui-sidebar-documentpreview/src/client/pdf/pdf.tsx
-@@ -118,9 +118,9 @@
-   const [width, setWidth] = useState<number>()
-   const [requested, setRequested] = useState(initiallyRequested)
+@@ -120,5 +120,5 @@
    const [visible, setVisible] = useState(initiallyRequested)
 -  const renderedZoom = useRef<number>()
 +  const renderedZoom = useRef<number | undefined>(undefined)
@@ -118,29 +127,12 @@
 -  const textTask = useRef<ReturnType<ReturnType<typeof pdfTextRenderer>>>()
 +  const textTask = useRef<ReturnType<ReturnType<typeof pdfTextRenderer>> | undefined>(undefined)
    const [state, setState] = useState<'loading' | 'ready'>('loading')
-   const [failure, setFailure] = useState<{ readonly error: unknown }>()
-   const [attempt, setAttempt] = useState(0)
 --- a/packages/client/ui-sidebar-documentpreview/src/client/zoom/ZoomViewport.tsx
 +++ b/packages/client/ui-sidebar-documentpreview/src/client/zoom/ZoomViewport.tsx
-@@ -62,8 +62,8 @@
-   const frame = useRef<HTMLElement | null>(null)
-   const scrollport = useRef<HTMLDivElement | null>(null)
+@@ -64,4 +64,4 @@
    const controls = useRef<ZoomControlsHandle>(null)
 -  const pinchTimer = useRef<ReturnType<typeof setTimeout>>()
 -  const controlsHideTimer = useRef<ReturnType<typeof setTimeout>>()
 +  const pinchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 +  const controlsHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
    const pointerInRevealZone = useRef(false)
-   const controlsActive = useRef(false)
-   const clearControlsHide = useCallback((): void => {
---- a/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
-+++ b/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
-@@ -138,7 +138,7 @@
-   readonly scrollportRef: ImageBodyProps['scrollportRef']
-   readonly t: ImageBodyProps['t']
- }): ReactNode {
--  const releasePan = useRef<() => void>()
-+  const releasePan = useRef<(() => void) | undefined>(undefined)
-   const attachImage = useCallback((image: HTMLImageElement | null): void => {
-     releasePan.current?.()
-     releasePan.current = image === null ? undefined : bindImagePan(image)

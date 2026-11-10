@@ -28,7 +28,7 @@
     "role": "deepseek_harness_cordis_application_host",
     "implementation_status": "source_implemented_release_admission_separate",
     "upstream_version": "0.2.2-rc.1",
-    "upstream_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+    "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
     "profile": "opl-studio",
     "profile_source": "src/host/dsh/cordis.yml",
     "web_overlay": "src/host/dsh/web.patch.yml",
@@ -734,7 +734,7 @@
     },
     "primary_visual_reference": {
       "reference_product": "DeepSeek Harness",
-      "reference_version": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+      "reference_version": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
       "reference_date": "2026-10-09",
       "source_usage": "direct_gui_source_reuse_with_application_host_cohort",
       "left_side": "persistent project and conversation rail with search and Settings only",
@@ -774,7 +774,7 @@
     },
     "visual_style_reference": {
       "reference_product": "DeepSeek Harness",
-      "reference_version": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+      "reference_version": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
       "reference_date": "2026-10-09",
       "scope": "pinned_gui_package_source_trees_with_opl_slot_adapters",
       "token_source": "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
@@ -816,7 +816,7 @@
   },
   "reuse_policy": {
     "deepseek_harness_source_usage": "pinned_application_host_runtime_and_gui_source_reuse",
-    "deepseek_harness_source_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+    "deepseek_harness_source_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
     "deepseek_harness_package_version": "0.2.2-rc.1",
     "deepseek_harness_selected_source_reused": true,
     "other_external_gui_source_copied": false,
@@ -879,7 +879,7 @@
     ],
     "vendored_source_root": "src/vendor/deepseek-harness",
     "source_manifest": "src/composition/deepseekHarnessSourceManifest.json",
-    "vendored_file_count": 633,
+    "vendored_file_count": 701,
     "byte_identical": false,
     "byte_identical_to_pinned_ref": false,
     "vendored_package_roots": [
@@ -898,6 +898,8 @@
       "packages/client/ui-sidebar-files/src",
       "packages/client/ui-sidebar-documentpreview/src",
       "packages/client/ui-sidebar-right/src",
+      "packages/client/ui-slots/src",
+      "packages/client/ui-schedule/src",
       "packages/client/ui-deliverables/src",
       "packages/client/ui-open-in-app/src",
       "packages/client/ui-dockkit/src",
@@ -927,7 +929,9 @@
       "packages/client/ui-conversation/src/client/skeleton/InputBar.tsx#InputBar",
       "packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx#AgentPresetSeat",
       "packages/client/ui-settings-general/src/client/SettingsRoot.tsx#SettingsRoot",
-      "packages/client/ui-renderer/src/client/scoped-slots.tsx#createSlotRenderer"
+      "packages/client/ui-renderer/src/client/scoped-slots.tsx#createSlotRenderer",
+      "packages/client/ui-schedule/src/client/TaskManagerPage.tsx#TaskManagerPage",
+      "packages/client/ui-schedule/src/client/TaskDetail.tsx#TaskDetail"
     ],
     "other_gui_source_reuse": [],
     "deepseek_harness_selected_source_reused": true,
@@ -936,14 +940,20 @@
     "dsh_product_runtime_authority_adopted": false,
     "user_visible_protocol_copy": false,
     "required_boundary": "run the pinned DeepSeek Harness Cordis application skeleton and GUI source with OPL-owned plugins; expose DSH ctx.tools to the persistent Codex App Server through authenticated loopback MCP; derive the browser Client Cordis graph from Framework Host projection plus App profile and slot policy; do not load dsh-base or adopt DSH session, LLM-provider, agent-loop, credential, domain, Package-currentness, product, or release authority",
-    "deepseek_harness_source_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+    "deepseek_harness_source_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
     "deepseek_harness_package_version": "0.2.2-rc.1",
     "compatibility_patches": [
       {
         "path": "src/integrations/deepseek-harness/patches/react19.patch",
-        "sha256": "c4c4457232b90c91003a0b30a1fe59bf1b2380fdfb40b3bd8026e479f2700005",
-        "upstream_ref": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
-        "reason": "React 19 refs, nullable DOM refs, inert and callback-ref cleanup compatibility; no runtime authority changes."
+        "sha256": "9e1cd2fe27a178443856b0a3178e8a171ee93990325a1ad45d3e631d1b4896ba",
+        "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
+        "reason": "React 19 refs, nullable DOM refs, inert, callback-ref cleanup and convergent menu anchor effects; no runtime authority changes."
+      },
+      {
+        "path": "src/integrations/deepseek-harness/patches/schedule-owner.patch",
+        "sha256": "ba7bef4d150a193349be43ac55c083dc1e7b12db326dc7e29dcd4b605a3e1d51",
+        "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
+        "reason": "Optional owner view fields, timing limits, manual creation and execution-history slots for Framework/Temporal and canonical Codex tasks; default DSH Schedule behavior retained."
       }
     ],
     "provenance": "pinned_upstream_plus_reviewed_compatibility_patches"
