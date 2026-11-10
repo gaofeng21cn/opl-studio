@@ -139,8 +139,8 @@ test("package descriptions prefer the active locale and allow an English fallbac
   assert.equal(presentation.localizedPackageDescription(rawEnglishOnly, "zh"), rawEnglishOnly.description);
 
   const roleOnly = { description: "", descriptionI18n: {}, packageRole: "standard_agent" };
-  assert.notEqual(presentation.localizedPackageDescription(roleOnly, "zh"), "");
-  assert.notEqual(presentation.localizedPackageDescription(roleOnly, "en"), "");
+  assert.equal(presentation.localizedPackageDescription(roleOnly, "zh"), "尚未提供软件说明。");
+  assert.equal(presentation.localizedPackageDescription(roleOnly, "en"), "No software description provided.");
 });
 
 test("internal status and package role identifiers are projected as user-facing values", () => {
