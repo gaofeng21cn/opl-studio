@@ -8,7 +8,7 @@ import type { WorkbenchSettings } from "./settingsModel";
 import type { SettingsDestinationId } from "./settings/types";
 import type { SettingsActionFeedback } from "./settings/types";
 import type { SettingsActionRequest, SettingsActionViewModel, SettingsHostActionIntent } from "./settingsActions";
-import { agentPackageNeedsAttention, packageAccessNeedsAttention, packageInstallAllowed } from "./settings/packages";
+import { agentPackageNeedsAttention, packageAccessNeedsAttention, packageInstallAllowed, packagePresentLocally, packageInstalledLocally, packageDevelopmentLinked } from "./settings/packages";
 import { DshPluginManagerOwner } from "../composition/dshPluginManagerOwner";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { SharedResourcesPage } from "./SharedResourcesPage";
@@ -51,12 +51,13 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
-  const catalogPackages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId));
+  const catalogPackages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && item.catalogScope === "software");
   const catalogAvailable = model.packageLifecycle.some(item => item.packageId === "agent_packages_directory" || item.statusAxes.some(axis => axis.source === "canonical_agent_packages"));
   const effectiveBusyKey = actionBusyKey ?? (stateStatus !== "ready" ? "application-management:state" : null);
   const nativeInventory = nativeSoftwareInventory(model.softwareSources);
-  const installed = nativeInventory.installed + catalogPackages.filter((item) => item.installed === true).length;
-  const installable = nativeInventory.installable + catalogPackages.filter((item) => packageInstallAllowed(item)).length;
+  const installed = nativeInventory.installed + catalogPackages.filter(packageInstalledLocally).length;
+  const developmentLinked = catalogPackages.filter(packageDevelopmentLinked).length;
+  const installable = nativeInventory.installable + catalogPackages.filter((item) => !packagePresentLocally(item) && packageInstallAllowed(item)).length;
   const updatesAvailable = nativeInventory.updatesAvailable + catalogPackages.filter((item) => item.currentness.trim().toLowerCase() === "update_available").length;
   const attention = catalogPackages.filter((item) => agentPackageNeedsAttention(item) || packageAccessNeedsAttention(item)).length;
   const sourceAttention = model.softwareSources?.entries.filter((source) => source.enabled !== false && source.credentialHandlePresent && ["forbidden", "expired", "revoked", "unknown"].includes(source.status)).length ?? 0;
@@ -89,7 +90,8 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
   ];
   const headerStatus = <div className="opl-app-management-status"><div className="opl-app-management-overview"><div className="opl-app-management-environment" data-testid="opl-app-management-environment"><span>{zh ? "当前环境" : "Current environment"}</span><strong>{zh ? "本机 OPL" : "Local OPL"}</strong></div>
     <div className="opl-app-management-summary" role="status">
-      {catalogAvailable ? <><span><strong>{catalogPackages.length + nativeInventory.total}</strong> {zh ? (nativeInventory.complete ? "个目录条目" : "个已读取条目") : (nativeInventory.complete ? "catalog entries" : "entries read")}</span><span><strong>{installable}</strong> {zh ? "个可安装" : "installable"}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span></> : <span>{zh ? "尚未读取应用目录" : "App catalog has not been read"}</span>}
+      {catalogAvailable ? <><span><strong>{catalogPackages.length + nativeInventory.total}</strong> {zh ? (nativeInventory.complete ? "个软件" : "个已读取软件") : (nativeInventory.complete ? "software items" : "software items read")}</span><span><strong>{installable}</strong> {zh ? "个可安装" : "installable"}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span></> : <span>{zh ? "尚未读取应用目录" : "App catalog has not been read"}</span>}
+      {developmentLinked ? <span><strong>{developmentLinked}</strong> {zh ? "个开发接入" : "development checkouts"}</span> : null}
       {updatesAvailable ? <span className="attention"><RefreshCw aria-hidden="true" size={14} /><strong>{updatesAvailable}</strong> {zh ? "个有更新" : "updates available"}</span> : null}
       {attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个应用需处理" : "apps need attention"}</span> : null}
       {resourceAttention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{resourceAttention}</strong> {zh ? "项共享资源需处理" : "shared resources need attention"}</span> : null}

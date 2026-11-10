@@ -42,6 +42,7 @@ console.log(JSON.stringify({app_state:{agent_packages:{
     { sources: [source, source], profile: "fast", check: true, visible: true },
     { sources: [source], profile: "fast", check: true, visible: false, checkFails: true },
     { sources: [{ ...source, access_refresh_required: false }], profile: "fast", check: false },
+    { sources: [{ ...source, source_kind: "tap", access_refresh_required: false, inventory_refresh_required: true }], profile: "fast", check: true, visible: true },
     { sources: [], profile: "fast", check: false },
     { sources: [{ ...source, available_actions: [{ action_id: "source_check", status: "unavailable" }] }], profile: "fast", check: false },
     { sources: [source], profile: "full", check: false }

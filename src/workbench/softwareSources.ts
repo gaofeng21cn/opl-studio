@@ -17,9 +17,18 @@ function safeActionPayload(value: unknown): Record<string, unknown> {
 function readNativeItem(item: Record<string, unknown>, sourceId: string): NativeSoftwareItemRef | null {
   const itemId = asString(item.item_id);
   const name = asString(item.name);
-  if (!itemId || !name || !["formula", "cask"].includes(String(item.kind))) return null;
+  if (!itemId || !name || !["formula", "cask", "managed_runtime"].includes(String(item.kind))) return null;
   return {
-    itemId, name, displayName: asString(item.display_name) ?? name,
+    itemId, name,
+    productId: asString(item.product_id) ?? undefined,
+    productDisplayName: asString(item.product_display_name) ?? undefined,
+    homebrewInstalled: item.homebrew_installed === undefined ? undefined : asOptionalBoolean(item.homebrew_installed),
+    homebrewInstalledVersion: asString(item.homebrew_installed_version) ?? undefined,
+    installationOwner: asString(item.installation_owner) ?? undefined,
+    installationKind: asString(item.installation_kind) ?? undefined,
+    installationEvidence: asString(item.installation_evidence) ?? undefined,
+    ownerSettingsRoute: asString(item.owner_settings_route) ?? undefined,
+    displayName: asString(item.display_name) ?? name,
     description: asString(item.description) ?? undefined,
     displayNameI18n: asLocalizedText(item.display_name_i18n),
     descriptionI18n: asLocalizedText(item.description_i18n),
@@ -64,6 +73,10 @@ export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesPr
   const authority = asRecord(projection.authority_boundary);
   return {
     status: projection.status === "available" || projection.status === "attention_required" ? projection.status : "unknown",
+    installedProducts: asRecordArray(projection.installed_products).flatMap(item => {
+      const projected = readNativeItem(item, "");
+      return projected ? [{ ...projected, availableActions: [] }] : [];
+    }),
     entries: asRecordArray(projection.entries).flatMap((entry) => {
       const sourceId = asString(entry.source_id);
       const displayName = asString(entry.display_name);
@@ -144,29 +157,77 @@ export function nativeSoftwareEntries(projection?: SoftwareSourcesProjection) {
   return projection?.entries.filter(source => source.sourceKind === "tap" && source.inventoryStatus === "available").flatMap(source => (source.nativeItems ?? []).map(item => ({ source, item }))) ?? [];
 }
 
+export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
+  type Channels = ReturnType<typeof nativeSoftwareEntries>;
+  const groups = new Map<string, { channels: Channels; installed?: NativeSoftwareItemRef }>();
+  for (const entry of nativeSoftwareEntries(projection)) {
+    const key = entry.item.productId ?? `${entry.source.sourceId}:${entry.item.itemId}`;
+    const group = groups.get(key) ?? { channels: [] };
+    group.channels.push(entry);
+    groups.set(key, group);
+  }
+  for (const item of projection?.installedProducts ?? []) {
+    const key = item.productId ?? item.itemId;
+    groups.set(key, { ...(groups.get(key) ?? { channels: [] }), installed: item });
+  }
+  return [...groups].map(([productId, { channels, installed }]) => {
+    const ordered = [...channels].sort((a, b) => a.item.name.length - b.item.name.length);
+    const primary = channels.find(({ item }) => item.homebrewInstalled === true)
+      ?? ordered.find(({ item }) => item.installed === true) ?? ordered[0];
+    const item = installed ? {
+      ...primary?.item, ...installed,
+      itemId: primary?.item.itemId ?? installed.itemId,
+      name: primary?.item.name ?? installed.name,
+      availableVersion: primary?.item.availableVersion ?? installed.availableVersion,
+      availableActions: primary?.item.availableActions ?? [],
+      revision: primary?.item.revision,
+      homebrewInstalled: primary?.item.homebrewInstalled,
+      homebrewInstalledVersion: primary?.item.homebrewInstalledVersion,
+    } : primary!.item;
+    return { source: primary?.source, item, productId, channels };
+  });
+}
+
 export function nativeSoftwareInventory(projection?: SoftwareSourcesProjection) {
-  const entries = nativeSoftwareEntries(projection);
+  const entries = nativeSoftwareProducts(projection);
   const sources = projection?.entries.filter(source => source.sourceKind === "tap") ?? [];
   return {
     total: entries.length,
     installed: entries.filter(({ item }) => item.installed === true).length,
-    installable: entries.filter(({ item }) => item.installed === false && item.availableActions.some(action => action.actionId === "source_install" && action.status === "available")).length,
-    updatesAvailable: entries.filter(({ item }) => item.updateStatus === "available").length,
+    installable: entries.filter(({ channels }) => channels.some(({ item }) => item.installed === false && item.availableActions.some(action => action.actionId === "source_install" && action.status === "available"))).length,
+    updatesAvailable: entries.filter(({ channels }) => channels.some(({ item }) => item.updateStatus === "available")).length,
     complete: sources.length > 0 && sources.every(source => source.inventoryStatus === "available")
   };
 }
 
-export function nativeSoftwareMatches(item: NativeSoftwareItemRef, source: SoftwareSourceRef, query: string, statusFilter: string): boolean {
+export function nativeSoftwareMatches(item: NativeSoftwareItemRef, source: SoftwareSourceRef | undefined, query: string, statusFilter: string): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery && ![item.itemId, item.name, item.displayName, item.description,
     ...Object.values(item.displayNameI18n ?? {}), ...Object.values(item.descriptionI18n ?? {}),
-    source.displayName, source.sourceRef].join(" ").toLowerCase().includes(normalizedQuery)) return false;
+    source?.displayName, source?.sourceRef].join(" ").toLowerCase().includes(normalizedQuery)) return false;
   if (statusFilter === "all") return true;
-  if (statusFilter === "ready" || statusFilter === "installed") return item.installed === true;
+  if (statusFilter === "development") return item.installationKind === "source_link";
+  if (statusFilter === "ready" || statusFilter === "installed") return item.installed === true && item.installationKind !== "source_link";
   if (statusFilter === "not_installed") return item.installed === false;
   if (statusFilter === "unknown") return item.installed === null;
   if (statusFilter === "update:update_available" || statusFilter === "update:available") return item.updateStatus === "available";
   if (statusFilter === "update:current") return item.updateStatus === "current";
   if (statusFilter === "update:unknown") return item.updateStatus === "unknown";
   return false;
+}
+
+export function nativeInstallationLabel(item: NativeSoftwareItemRef, locale: "zh" | "en"): string {
+  const labels: Record<string, [string, string]> = {
+    homebrew_formula: ["Homebrew 命令行安装", "Homebrew formula"],
+    homebrew_cask: ["Homebrew 应用安装", "Homebrew cask"],
+    managed_runtime: ["OPL 受管运行时", "OPL managed runtime"],
+    app_bundle: ["本机应用安装", "Local application bundle"],
+    source_link: ["源码开发连接", "Source development link"],
+  };
+  return labels[item.installationKind ?? ""]?.[locale === "zh" ? 0 : 1] ?? (locale === "zh" ? "安装方式待确认" : "Installation method not confirmed");
+}
+
+/** Carrier actions are bound to the carrier receipt, not product presence. */
+export function nativeCarrierInstalled(item: NativeSoftwareItemRef): boolean | null {
+  return item.homebrewInstalled === undefined ? item.installed : item.homebrewInstalled;
 }

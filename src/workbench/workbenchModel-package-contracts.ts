@@ -143,12 +143,20 @@ export type SoftwareSourceRef = {
 
 export type NativeSoftwareItemRef = {
   itemId: string;
+  productId?: string;
+  productDisplayName?: string;
+  homebrewInstalled?: boolean | null;
+  homebrewInstalledVersion?: string;
+  installationOwner?: string;
+  installationKind?: string;
+  installationEvidence?: string;
+  ownerSettingsRoute?: string;
   name: string;
   displayName: string;
   description?: string;
   displayNameI18n?: AgentPackageLocalizedText;
   descriptionI18n?: AgentPackageLocalizedText;
-  kind: "formula" | "cask";
+  kind: "formula" | "cask" | "managed_runtime";
   installed: boolean | null;
   installedVersion?: string;
   availableVersion?: string;
@@ -158,12 +166,25 @@ export type NativeSoftwareItemRef = {
 };
 
 export type SoftwareSourcesProjection = {
+  installedProducts?: NativeSoftwareItemRef[];
   status: "available" | "attention_required" | "unknown";
   entries: SoftwareSourceRef[];
   authorityBoundary?: {
     owner?: string;
     credentialValuesExposed?: boolean;
   };
+};
+
+export type PackageLocalInstallation = {
+  installationId: string;
+  kind: "owner_managed" | "uv_tool";
+  version: string;
+  mode: "installed" | "development";
+  manager: "package_owner" | "uv";
+  managementScope: "owner_only";
+  locationRef: string;
+  evidenceRef: string;
+  sourceRevision?: string;
 };
 
 export type AgentPackageLifecycleRef = {
@@ -173,8 +194,12 @@ export type AgentPackageLifecycleRef = {
   description: string;
   publisher: string;
   packageRole: string;
-  /** Publication channel reported by the catalog owner, independent of installation. */
-  releaseChannel?: "preview" | "stable";
+  /** Catalog admission and distribution are independent of product maturity. */
+  softwareType?: "application" | "agent" | "capability" | "unknown";
+  catalogScope?: "software" | "host_component" | "unknown";
+  localInstallations?: PackageLocalInstallation[];
+  distributionChannel?: "release" | "source" | "unknown";
+  releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";
   official: boolean;
   displayNameI18n: AgentPackageLocalizedText;

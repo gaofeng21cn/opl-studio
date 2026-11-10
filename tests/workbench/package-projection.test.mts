@@ -525,3 +525,48 @@ test("package version prefers installed identity over the available release", ()
   assert.equal(model.packageLifecycle[1]?.installedVersion, undefined);
   assert.equal(model.packageLifecycle[1]?.availableVersion, "2.1");
 });
+
+
+test("native product counts collapse distribution channels and retain actual installation authority", async () => {
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts, nativeCarrierInstalled } = await import("../../src/workbench/softwareSources.ts");
+  const { compactSoftwareSources, compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({ surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [
+    ...["app", "app-full", "app-nightly"].map(name => ({ item_id: `cask:${name}`, name, display_name: "OPL App", kind: "cask", product_id: "github:owner/app", installed: true, installed_version: "26.11.1091", homebrew_installed: false, homebrew_installed_version: null, installation_kind: "app_bundle", installation_owner: "application", available_version: "26.11.890", update_status: "unknown" })),
+    { item_id: "formula:opl", name: "opl", display_name: "OPL Framework", kind: "formula", product_id: "github:owner/framework", installed: true, installed_version: "0.3.12", homebrew_installed: false, installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", available_version: "0.3.10", update_status: "unknown" }
+  ] }] }))!;
+  assert.deepEqual(nativeSoftwareInventory(projection), { total: 2, installed: 2, installable: 0, updatesAvailable: 0, complete: true });
+  const products = nativeSoftwareProducts(projection);
+  assert.equal(products[0].channels.length, 3);
+  assert.equal(products[0].item.installedVersion, "26.11.1091");
+  assert.equal(nativeCarrierInstalled(products[0].item), false);
+  assert.equal(products[1].item.installationKind, "managed_runtime");
+  assert.equal(products[1].item.ownerSettingsRoute, "updates");
+  const rows = compactPackageRows([{ package_id: "device", catalog_scope: "software", distribution_channel: "source" }, { package_id: "browser", catalog_scope: "host_component" }]);
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: rows } } } });
+  assert.equal(model.packageLifecycle[0].catalogScope, "software");
+  assert.equal(model.packageLifecycle[0].distributionChannel, "source");
+  assert.equal(model.packageLifecycle[1].catalogScope, "host_component");
+});
+
+
+test("owner-managed Framework remains visible without Homebrew and merges with its optional distribution channel", async () => {
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts } = await import("../../src/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const product = { product_id: "github:owner/framework", product_display_name: "OPL Framework", item_id: "managed:framework", name: "opl-framework", display_name: "OPL Framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12", installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", token: "must-not-cross" };
+  const raw = { surface_kind: "opl_software_sources_projection.v1", installed_products: [product], entries: [] };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  const products = nativeSoftwareProducts(projection);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].source, undefined);
+  assert.equal(products[0].item.installedVersion, "0.3.12");
+  assert.equal(products[0].channels.length, 0);
+  assert.equal(nativeSoftwareInventory(projection).installed, 1);
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  const withTap = readSoftwareSourcesProjection(compactSoftwareSources({ ...raw, entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [{ ...product, item_id: "formula:opl", name: "opl", kind: "formula", installed: false, installed_version: null, homebrew_installed: false, available_version: "0.3.11" }] }] }))!;
+  const merged = nativeSoftwareProducts(withTap);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].item.installed, true);
+  assert.equal(merged[0].item.installedVersion, "0.3.12");
+  assert.equal(merged[0].item.availableVersion, "0.3.11");
+  assert.equal(merged[0].channels.length, 1);
+});

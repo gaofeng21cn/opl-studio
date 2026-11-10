@@ -574,8 +574,23 @@ function packageLifecycleItem(
     description: firstStringField(record, ["description"]) ?? "",
     publisher,
     packageRole,
+    softwareType: ["application", "agent", "capability"].includes(String(record.software_type)) ? record.software_type as "application" | "agent" | "capability" : "unknown",
+    catalogScope: record.catalog_scope === "software" || record.catalog_scope === "host_component" ? record.catalog_scope : "unknown",
+    ...(["release", "source", "unknown"].includes(String(record.distribution_channel)) ? { distributionChannel: record.distribution_channel as "release" | "source" | "unknown" } : {}),
     ...(record.release_channel === "preview" || record.release_channel === "stable"
       ? { releaseChannel: record.release_channel } : {}),
+    localInstallations: asRecordArray(record.local_installations).flatMap(installation => {
+      const id = asString(installation.installation_id), version = asString(installation.version);
+      const locationRef = asString(installation.location_ref), evidenceRef = asString(installation.evidence_ref);
+      if (!id || !version || !locationRef || !evidenceRef || installation.entrypoint_verified !== true
+        || !["owner_managed", "uv_tool"].includes(String(installation.kind))
+        || !["installed", "development"].includes(String(installation.mode))
+        || !["package_owner", "uv"].includes(String(installation.manager)) || installation.management_scope !== "owner_only") return [];
+      return [{ installationId: id, version, kind: installation.kind as "owner_managed" | "uv_tool",
+        mode: installation.mode as "installed" | "development", manager: installation.manager as "package_owner" | "uv",
+        managementScope: "owner_only" as const, locationRef, evidenceRef,
+        sourceRevision: asString(installation.source_revision) ?? undefined }];
+    }),
     roleGroup,
     official,
     displayNameI18n: asLocalizedText(record.display_name_i18n),

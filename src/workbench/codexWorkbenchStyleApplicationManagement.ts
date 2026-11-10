@@ -39,6 +39,21 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     height: 100%;
   }
 
+  .opl-dsh-plugin-manager [data-plugin-owner-package] span:has(> .opl-catalog-summary) { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .opl-dsh-plugin-manager [data-plugin-owner-detail] .opl-catalog-id,
+  .opl-dsh-plugin-manager [data-plugin-owner-detail] .opl-catalog-summary > .software-catalog-versions { display: none; }
+  .opl-dsh-owner-section > button + h4 { margin-top: 24px; }
+  .opl-dsh-owner-section .agent-package-row { background: transparent; border-radius: 0; border: 0; border-bottom: 1px solid var(--dsw-alias-border-l3); }
+  .opl-catalog-summary { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .opl-catalog-id { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+  .opl-catalog-id > span { margin-right: 4px; }
+  .opl-catalog-id code { font-size: inherit; font-variant-numeric: tabular-nums; }
+  .opl-catalog-description { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+  .opl-catalog-summary .software-catalog-versions { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 3px 0 0; font-size: 12px; line-height: 18px; }
+  .opl-catalog-summary .software-catalog-versions > span { display: inline-flex; gap: 7px; align-items: baseline; }
+  .opl-catalog-summary .software-catalog-versions strong { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary); }
+  .opl-catalog-summary .software-catalog-versions strong[data-unknown] { font-weight: 400; color: var(--dsw-alias-label-secondary); }
+
   .opl-dsh-owner-filters {
     display: flex;
     flex-wrap: wrap;
@@ -46,7 +61,9 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     gap: 8px;
   }
 
-  .opl-dsh-owner-filters > input { flex: 1 1 240px; min-width: 160px; }
+  .opl-dsh-owner-filters > :first-child { flex: 1 1 280px; min-width: 160px; }
+  .opl-dsh-owner-filters input { width: 100%; }
+  .opl-dsh-owner-filters input::placeholder { color: var(--dsw-alias-label-secondary); opacity: 1; }
   .opl-dsh-owner-filters select { min-height: 32px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 4px 8px; }
   .opl-dsh-owner-section { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
   .opl-dsh-owner-section h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
@@ -61,7 +78,13 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     .opl-dsh-plugin-manager .page { --plugin-page-inset: 16px; }
     .opl-dsh-plugin-manager .pageBody { width: 100%; margin-inline: 0; padding-inline: 0; }
     .opl-dsh-owner-filters { width: 100%; }
-    .opl-dsh-owner-filters > input { flex-basis: 100%; }
+    .opl-dsh-owner-filters > :first-child { flex-basis: 100%; }
+    .opl-dsh-plugin-manager [data-plugin-owner-package] > div { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px 12px; align-items: start; padding-block: 14px; }
+    .opl-dsh-plugin-manager [data-plugin-owner-package] > div > :first-child { width: 36px; height: 36px; }
+    .opl-dsh-plugin-manager [data-plugin-owner-package] > div > :last-child { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; }
+    .opl-dsh-plugin-manager [data-plugin-owner-package] button[aria-describedby] { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+    .opl-catalog-summary .software-catalog-versions { gap: 4px 16px; }
+    .opl-dsh-owner-section dl > div { grid-template-columns: 90px minmax(0, 1fr); }
     .opl-dsh-owner-filters .segmented-control { flex: 1 1 auto; }
     .opl-dsh-owner-filters select { flex: 1 1 auto; max-width: 100%; }
   }

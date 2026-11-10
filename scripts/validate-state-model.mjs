@@ -165,7 +165,7 @@ for (const marker of [
   assert(workbenchModelSource.includes(marker), `workbench model missing package lifecycle marker ${marker}`);
 }
 const settingsPanelSource = readSettingsSource();
-for (const marker of ["PackageCatalog", "agent-package-list"]) {
+for (const marker of ["PackageCatalog", "DshPluginManagerOwner"]) {
   assert(settingsPanelSource.includes(marker), `Settings renderer missing package lifecycle marker ${marker}`);
 }
 assert(fs.readFileSync(path.join(root, "src/composition/dshPluginManagerOwner.tsx"), "utf8").includes("opl-settings-agent-catalog"), "Plugin Manager owner renderer is missing its catalog marker");
