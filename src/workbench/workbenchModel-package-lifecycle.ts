@@ -589,8 +589,6 @@ function packageLifecycleItem(
     ...(installedVersion ? { installedVersion } : {}),
     ...(availableVersion ? { availableVersion } : {}),
     ...(version ? { version, versionKind: installedVersion ? "installed" as const : "available" as const } : {}),
-    ...(installedVersion ? { installedVersion } : {}),
-    ...(firstStringField(record, ["available_version"]) ? { availableVersion: firstStringField(record, ["available_version"]) as string } : {}),
     currentness: asString(packageCurrentness?.status) ?? "unknown",
     sourceMode: packageSourceMode(record),
     access: packageAccess(record),

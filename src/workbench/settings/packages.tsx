@@ -239,8 +239,6 @@ export function PackageCatalog({
   const catalogLabel = kind === "agents" ? "智能体" : "扩展";
   const catalogLabelEn = kind === "agents" ? "agents and workflows" : "extensions and apps";
   const packages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && (kind === "all" || isAgentCatalogPackage(item)));
-  const installableCount = packages.filter((item) => packageInstallAllowed(item)).length;
-  const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length;
   const scoped = packages.filter((item) => scope === "all" || item.official);
   const manifestInstallAvailable = Boolean(
     manifestInstallAction

@@ -175,8 +175,6 @@ export type AgentPackageLifecycleRef = {
    */
   version?: string;
   versionKind?: "installed" | "available";
-  installedVersion?: string;
-  availableVersion?: string;
   currentness: string;
   sourceMode: string;
   /** Registry access is independent of local install and business runtime grants. */
