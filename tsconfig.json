@@ -48,8 +48,26 @@
       "@deepseek-ai/dsh-client-ui-slots": [
         "./src/vendor/deepseek-harness/packages/client/ui-slots/src/index.ts"
       ],
+      "@deepseek-ai/dsh-client-ui-plugin-manager/client": [
+        "./src/vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx"
+      ],
+      "@opl-vendor/dsh-plugin-manager-page": [
+        "./src/vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx"
+      ],
+      "@deepseek-ai/dsh-plugin-manager/registry": [
+        "./src/vendor/deepseek-harness/packages/boot/plugin-manager/src/registry.ts"
+      ],
+      "@deepseek-ai/dsh-plugin-manager/types": [
+        "./src/vendor/deepseek-harness/packages/boot/plugin-manager/src/types.ts"
+      ],
+      "@deepseek-ai/dsh-plugin-detail/types": [
+        "./node_modules/@deepseek-ai/dsh-plugin-detail/lib/types/types.d.ts"
+      ],
       "@deepseek-ai/dsh-api-remotes/client": [
-        "./src/integrations/deepseek-harness/runtimeShim.ts"
+        "./node_modules/@deepseek-ai/dsh-api-remotes/lib/types/client/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-official-bundles": [
+        "./src/vendor/deepseek-harness/packages/util/official-bundles/src/index.ts"
       ],
       "@deepseek-ai/dsh-client-ui-conversation/client": [
         "./src/integrations/deepseek-harness/emptyModule.ts"

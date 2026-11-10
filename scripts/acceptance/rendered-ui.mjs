@@ -176,7 +176,7 @@ try {
     await new Promise(requestAnimationFrame);
     return { icons, initialMenu, unpinned, menuIcon, repinned: Boolean(nav.querySelector('button[aria-label="计划任务"]')) };
   }`, cliRoot);
-  assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: ['管理应用与扩展'], unpinned: true, menuIcon: true, repinned: true });
+  assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: [], unpinned: true, menuIcon: true, repinned: true });
 
   const primaryPanels = [];
   for (const [label, testid] of [['应用管理', 'opl-app-management'], ['计划任务', 'opl-scheduled-tasks']]) {
@@ -291,7 +291,7 @@ try {
     await new Promise(requestAnimationFrame);
     return { drawer: dialog?.getAttribute('aria-modal') === 'true', moreOpen: more.getAttribute('aria-expanded') === 'true', menu: Array.from(document.querySelectorAll('[role="menuitem"]')).map(row => row.textContent.trim()) };
   }`, cliRoot);
-  assert.deepEqual(narrowNavigation, { drawer: true, moreOpen: true, menu: ['管理应用与扩展'] });
+  assert.deepEqual(narrowNavigation, { drawer: true, moreOpen: true, menu: [] });
   await cli(["press", "Escape"], cliRoot);
   await cli(["press", "Escape"], cliRoot);
   await evaluate(`() => { document.activeElement?.blur(); return true; }`, cliRoot);
@@ -472,7 +472,7 @@ try {
       more.click(); await new Promise(requestAnimationFrame);
       return { theme: document.documentElement.getAttribute('data-ds-theme-source'), dark: document.body.hasAttribute('data-ds-dark-theme'), newTask: Boolean(newTask), menu: Array.from(document.querySelectorAll('[role="menuitem"]')).map(row => row.textContent.trim()), overflow: document.documentElement.scrollWidth > innerWidth };
     }`, cliRoot);
-    assert.deepEqual(variant, { theme, dark: theme === 'dark', newTask: true, menu: ['Manage apps and extensions'], overflow: false });
+    assert.deepEqual(variant, { theme, dark: theme === 'dark', newTask: true, menu: [], overflow: false });
     themeVariants.push(variant);
     await cli(["screenshot"], cliRoot);
     await copyFile(await latestScreenshot(cliRoot), path.join(outputRoot, `webui-en-${theme}.png`));

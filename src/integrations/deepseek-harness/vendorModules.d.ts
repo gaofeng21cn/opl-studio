@@ -119,8 +119,6 @@ declare module "@opl-vendor/dsh-model-select" {
   export const ModelSelect: (props: any) => JSX.Element;
 }
 
-declare module "@deepseek-ai/dsh-client-ui-settings/client" {}
-
 declare module "@deepseek-ai/dsh-client-runtime/client" {
   import type {
     ActionsDecl,

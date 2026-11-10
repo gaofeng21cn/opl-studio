@@ -1,4 +1,10 @@
 import type { Context } from "@deepseek-ai/cordis";
+import type {
+  SettingsGeneralItemOwnerProps,
+  SettingsHeaderOwnerProps,
+  SettingsOnboardingOwnerProps,
+  SettingsSectionOwnerProps,
+} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { zh as sidebarZh, en as sidebarEn } from "../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/locales.ts";
 import { zh as workspaceZh, en as workspaceEn } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/locales.ts";
@@ -46,13 +52,13 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "conversation.hero.workspace": { kind: "single"; scope: "root"; owner: object };
     "conversation.hero.agentPreset": { kind: "single"; scope: "root"; owner: object };
     "settings.trigger": { kind: "single"; scope: "root"; owner: { wide: boolean } };
-    "settings.header": { kind: "single"; scope: "root"; owner: object };
-    "settings.action": { kind: "list"; scope: "root"; owner: object };
-    "settings.close": { kind: "single"; scope: "root"; owner: object };
-    "settings.section": { kind: "list"; scope: "root"; owner: object };
+    "settings.header": { kind: "single"; scope: "root"; owner: SettingsHeaderOwnerProps };
+    "settings.action": { kind: "list"; scope: "root"; owner: SettingsHeaderOwnerProps };
+    "settings.close": { kind: "single"; scope: "root"; owner: SettingsHeaderOwnerProps };
+    "settings.section": { kind: "list"; scope: "root"; owner: SettingsSectionOwnerProps };
     "settings.section.icon": { kind: "list"; scope: "root"; inline: true; owner: { size: number; active: boolean } };
-    "settings.general.item": { kind: "list"; scope: "root"; owner: object };
-    "settings.onboarding": { kind: "list"; scope: "root"; owner: object };
+    "settings.general.item": { kind: "list"; scope: "root"; owner: SettingsGeneralItemOwnerProps };
+    "settings.onboarding": { kind: "list"; scope: "root"; owner: SettingsOnboardingOwnerProps };
     "composer.palette": { kind: "list"; scope: "root"; owner: object };
     "runtime.detail": { kind: "list"; scope: "root"; owner: object };
   }

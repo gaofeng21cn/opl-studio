@@ -1,0 +1,115 @@
+--- a/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx
++++ b/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx
+@@ -20,7 +20,7 @@
+   SegmentedTabs, StateDot, Switch, Tag, TerminalBlock, Toast, Tooltip, useDismissOnOutsidePointer,
+   type IconProps, type StateDotState, type TerminalBlockLabels,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+-import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
++import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+ import { EXTENSION_BUNDLES, HIDDEN_BUNDLES, MORE_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
+ import type { createNavigationStore } from './navigation-store.ts'
+ import type { PluginHeaderLayoutFace } from './header-scroll.ts'
+@@ -49,6 +49,40 @@
+   >
+   & InjectFace<PluginManagerFace & PluginHeaderLayoutFace>
+   & PropsStore<ReturnType<typeof createNavigationStore>>
++
++/** Render-only owner page contract. It reuses the official card/detail shells without DSH Host authority. */
++export type PluginManagerOwnerItem = {
++  readonly id: string
++  readonly title: string
++  readonly description?: ReactNode
++  readonly icon?: ReactNode
++  readonly tags?: ReactNode
++  readonly status?: ReactNode
++  readonly actions?: ReactNode
++  readonly detail?: ReactNode
++  readonly detailActions?: ReactNode
++  readonly detailBadges?: ReactNode
++}
++
++export type PluginManagerOwnerGroup = { readonly id: string; readonly label: string; readonly items: readonly PluginManagerOwnerItem[] }
++export type PluginManagerOwnerTab = { readonly id: string; readonly label: string; readonly content: ReactNode }
++export type PluginManagerOwnerPageProps = {
++  readonly t: TranslateNS<'pluginManager'>
++  readonly title: string
++  readonly intro: string
++  readonly installedLabel?: string
++  readonly groups: readonly PluginManagerOwnerGroup[]
++  readonly tabs?: readonly PluginManagerOwnerTab[]
++  readonly selectedTab?: string
++  readonly onTabChange?: (tab: string) => void
++  readonly onRefresh?: () => void
++  readonly toolbar?: ReactNode
++  readonly headerStatus?: ReactNode
++  readonly empty?: ReactNode
++  readonly createHeaderRef: PluginHeaderLayoutFace['createHeaderRef']
++  readonly useStore: PluginManagerPageProps['useStore']
++  readonly actions: PluginManagerPageProps['actions']
++}
+ 
+ /** The page's slot renderer, narrowed to the configuration slots. */
+ type RenderConfig = PluginManagerPageProps['renderSlot']
+@@ -587,6 +621,62 @@
+       <CardHead title={item.label} t={t} onOpen={onOpen} icon={itemArtwork(item.id)} description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })} />
+     </li>
+   )
++}
++
++function OwnerCard({ item, t, onOpen }: { item: PluginManagerOwnerItem; t: Translate; onOpen(): void }): ReactNode {
++  return <li className={`${css.card} ${css.cardLink}`} data-plugin-owner-package={item.id}>
++    <CardHead title={item.title} t={t} onOpen={onOpen} icon={item.icon ?? <PluginArtworkDefault size={CARD_ARTWORK_SIZE} />}
++      tags={item.tags} description={item.description} end={<>{item.status}{item.actions}</>} />
++  </li>
++}
++
++function OwnerDetail({ item, t, onBack }: { item: PluginManagerOwnerItem; t: Translate; onBack(): void }): ReactNode {
++  return <div className={css.detail} data-plugin-owner-detail={item.id}>
++    <DetailTop crumbLabel={t('backToList')} crumbText={t('crumbRoot')} onBack={onBack}
++      icon={item.icon ?? <PluginArtworkDefault size={CARD_ARTWORK_SIZE} />}
++      actions={<div className={css.detailActions}>{item.detailActions ?? item.actions}</div>} />
++    <div className={css.detailMain}><div className={css.titleRow}><h3 className={css.detailTitle}>{item.title}</h3>{item.detailBadges ?? item.tags}</div>
++      <p className={css.detailName}><code>{item.id}</code></p>{item.description === undefined ? null : <p className={css.detailDesc}>{item.description}</p>}
++    </div>
++    <div className={css.detailSections}>{item.detail}</div>
++  </div>
++}
++
++/** Owner branch shares the DSH page's layout, card, detail, tabs, and navigation primitives only. */
++export function PluginManagerOwnerPage(props: PluginManagerOwnerPageProps): ReactNode {
++  const [openId, setOpenId] = useState<string | null>(null)
++  const selected = props.selectedTab ?? 'installed'
++  const tabs = props.tabs ?? []
++  const item = props.groups.flatMap(group => group.items).find(candidate => candidate.id === openId)
++  const [headerRef] = useState(props.createHeaderRef)
++  const { setView, setTab } = props.actions
++  useEffect(() => { if (openId === null) setView({ kind: 'list' }) }, [openId, setView])
++  const back = () => { setOpenId(null); setView({ kind: 'list' }) }
++  return <section className={css.page} data-plugin-panel data-plugin-owner-panel>
++    <div className={css.pageBody} data-plugin-body>
++      <div className={`${css.pageBar}${tabs.length > 0 ? ` ${css.pageBarWithTabs}` : ''}`} data-plugin-bar ref={headerRef}>
++        <header className={css.pageHead} data-window-drag>
++          <div className={css.pageHeading}><h1 className={css.pageTitle} data-plugin-header-part="title">{props.title}</h1>
++            <div className={css.pageIntro} data-plugin-header-part="intro"><span>{props.intro}</span></div></div>
++          <div className={css.toolbar} data-plugin-toolbar data-plugin-header-part="toolbar">{props.onRefresh ? <Button variant="outline" size="sm" onClick={props.onRefresh}>{props.t('refresh')}</Button> : null}{props.toolbar}</div>
++          {tabs.length ? <div className={css.pageTabs} data-plugin-header-part="tabs"><SegmentedTabs size="sm" className={css.pageTabList} label={props.t('tabsLabel')} value={selected}
++            onChange={next => { setTab(next); props.onTabChange?.(next) }} items={[
++              { value: 'installed', label: props.installedLabel ?? props.t('installedTab'), id: 'opl-plugin-owner-installed', panelId: 'opl-plugin-owner-installed-panel' },
++              ...tabs.map(tab => ({ value: tab.id, label: tab.label, id: `opl-plugin-owner-${tab.id}`, panelId: `opl-plugin-owner-${tab.id}-panel` })),
++            ]} /></div> : null}
++        </header>
++      </div>
++      {props.headerStatus}
++      {selected !== 'installed' ? <div role="tabpanel" id={`opl-plugin-owner-${selected}-panel`} className={css.tabPanel}>{tabs.find(tab => tab.id === selected)?.content}</div>
++        : item ? <OwnerDetail item={item} t={props.t} onBack={back} /> : <div className={css.installedPanel} id="opl-plugin-owner-installed-panel" role="tabpanel" aria-labelledby="opl-plugin-owner-installed">
++          {props.groups.map(group => <section key={group.id} className={css.group} data-plugin-owner-group={group.id}>
++            <div className={css.groupHead}><h3 className={css.groupTitle}>{group.label}</h3></div>
++            <ul className={css.cards}>{group.items.map(entry => <OwnerCard key={entry.id} item={entry} t={props.t} onOpen={() => { setView({ kind: 'package', name: entry.id }); setOpenId(entry.id) }} />)}</ul>
++          </section>)}
++          {props.groups.every(group => group.items.length === 0) ? props.empty ?? <p className={css.empty}>{props.t('empty')}</p> : null}
++        </div>}
++    </div>
++  </section>
+ }
+ 
+ /** One row as the detail slots see it. */

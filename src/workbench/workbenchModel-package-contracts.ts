@@ -120,7 +120,24 @@ export type SoftwareSourceActionRef = {
   reason?: string;
 };
 
-export type SoftwareSourceRef = {
+export type CatalogOrigin = "opl" | "external" | "unknown";
+
+export type CatalogOriginBasis = "owner_projection" | "owner_manifest" | "native_carrier" | "unknown";
+
+export type CatalogSourceRef = {
+  manager: string;
+  marketplaceId?: string;
+  delivery: "host_bundled" | "marketplace" | "local" | "unknown";
+};
+
+/** Maintenance provenance is display metadata, independent of trust and action authorization. */
+export type CatalogProvenanceRef = {
+  catalogOrigin?: CatalogOrigin;
+  originBasis?: CatalogOriginBasis;
+  catalogSource?: CatalogSourceRef;
+};
+
+export type SoftwareSourceRef = CatalogProvenanceRef & {
   sourceId: string;
   displayName: string;
   sourceKind: "registry" | "tap" | string;
@@ -132,10 +149,45 @@ export type SoftwareSourceRef = {
   credentialHandlePresent: boolean;
   verifiedAt?: string;
   entryCount?: number;
+  inventoryStatus?: "available" | "not_checked" | "unavailable" | "unknown";
+  inventoryReason?: string;
+  inventoryCheckedAt?: string;
+  versionAuthority?: string;
+  installationOwner?: string;
+  nativeItems?: NativeSoftwareItemRef[];
+  availableActions: SoftwareSourceActionRef[];
+};
+
+export type NativeSoftwareItemRef = CatalogProvenanceRef & {
+  itemId: string;
+  productId?: string;
+  productDisplayName?: string;
+  homebrewInstalled?: boolean | null;
+  homebrewInstalledVersion?: string;
+  installationOwner?: string;
+  installationKind?: string;
+  installationEvidence?: string;
+  ownerSettingsRoute?: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  displayNameI18n?: AgentPackageLocalizedText;
+  descriptionI18n?: AgentPackageLocalizedText;
+  kind: "formula" | "cask" | "managed_runtime";
+  installed: boolean | null;
+  installedVersion?: string;
+  installedDisplayVersion?: string;
+  installedBuildKind?: "local-development";
+  installedBuildId?: string;
+  availableVersion?: string;
+  availableDisplayVersion?: string;
+  updateStatus: "available" | "current" | "not_installed" | "unknown";
+  revision?: string;
   availableActions: SoftwareSourceActionRef[];
 };
 
 export type SoftwareSourcesProjection = {
+  installedProducts?: NativeSoftwareItemRef[];
   status: "available" | "attention_required" | "unknown";
   entries: SoftwareSourceRef[];
   authorityBoundary?: {
@@ -144,13 +196,31 @@ export type SoftwareSourcesProjection = {
   };
 };
 
-export type AgentPackageLifecycleRef = {
+export type PackageLocalInstallation = {
+  installationId: string;
+  kind: "owner_managed" | "uv_tool";
+  version: string;
+  mode: "installed" | "development";
+  manager: "package_owner" | "uv";
+  managementScope: "owner_only";
+  locationRef: string;
+  evidenceRef: string;
+  sourceRevision?: string;
+};
+
+export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   id: string;
   packageId: string;
   label: string;
   description: string;
   publisher: string;
   packageRole: string;
+  /** Catalog admission and distribution are independent of product maturity. */
+  softwareType?: "application" | "agent" | "capability" | "unknown";
+  catalogScope?: "software" | "host_component" | "unknown";
+  localInstallations?: PackageLocalInstallation[];
+  distributionChannel?: "release" | "source" | "unknown";
+  releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";
   official: boolean;
   displayNameI18n: AgentPackageLocalizedText;
@@ -180,6 +250,7 @@ export type AgentPackageLifecycleRef = {
   /** Registry access is independent of local install and business runtime grants. */
   access?: AgentPackageAccessRef;
   installable?: boolean | null;
+  installabilityReason?: string;
   automaticUpdate: boolean | null;
   homeShortcuts: AgentPackageShortcutRef[];
   recommendedActionId?: string;

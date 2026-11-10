@@ -6,11 +6,13 @@ import {
   deriveWorkbenchModelFromState
 } from "../../src/workbench/workbenchModel.ts";
 
-test("App visibility preserves native installation and callable package metadata", () => {
+test("App visibility preserves native installation and callable package metadata", async () => {
+  const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
-    directory: { entries: [{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
+    directory: { entries: compactPackageRows([{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
       package_role: "capability_package", display_name: "Private phone", presence: { callable: true } },
-      { package_id: "new-extension", installed: true }] }
+      { package_id: "new-extension", installed: true, release_channel: "preview",
+        installability: { installable: false, reason: "package_install_source_unavailable" } }]) }
   } } });
   const hidden = model.packageLifecycle.find((item) => item.packageId === "private-phone")!;
   assert.equal(hidden.appEnabled, false);
@@ -18,6 +20,11 @@ test("App visibility preserves native installation and callable package metadata
   assert.equal(hidden.activated, true);
   assert.equal(hidden.readiness.callable, true);
   assert.equal(model.packageLifecycle.find((item) => item.packageId === "new-extension")?.appEnabled, true);
+  assert.equal(hidden.releaseChannel, undefined);
+  const preview = model.packageLifecycle.find((item) => item.packageId === "new-extension")!;
+  assert.equal(preview.releaseChannel, "preview");
+  assert.equal(preview.installable, false);
+  assert.equal(preview.installabilityReason, "package_install_source_unavailable");
 });
 
 test("registry access stays owner projected and unavailable actions remain unavailable", () => {
@@ -27,7 +34,7 @@ test("registry access stays owner projected and unavailable actions remain unava
       package_access: { visibility: "authorized_only", status: "revoked", provider_id: "github",
         source_ref: "ghcr.io/example/private-agent", access_policy_ref: "package:private-agent:read",
         verified_at: "2026-11-10T03:00:00Z", security_revision: "r2", discover_allowed: true, download_allowed: false },
-      installability: { installable: false }, available_actions: [{ action_id: "agent_package_update",
+      installability: { installable: false, reason: "package_access_revoked" }, available_actions: [{ action_id: "agent_package_update",
         action_ref: "app_state.actions#agent_package_update", semantic: "update", status: "unavailable", reason: "package_access_revoked" }] }] } }
   } });
   const item = model.packageLifecycle[0]!;
@@ -37,6 +44,7 @@ test("registry access stays owner projected and unavailable actions remain unava
   assert.equal(item.access?.downloadAllowed, false);
   assert.equal(item.access?.securityRevision, "r2");
   assert.equal(item.installable, false);
+  assert.equal(item.installabilityReason, "package_access_revoked");
   assert.equal(item.actions[0]?.status, "unavailable");
   assert.equal(item.actions[0]?.reason, "package_access_revoked");
   assert.match(item.searchMetadata.query, /revoked/);
@@ -61,6 +69,35 @@ test("software sources project public and authorized entries without exposing cr
   assert.equal(privateSource.availableActions[0]?.payload.credential_handle, "provider:github_packages:gh-cli");
   assert.equal("token" in privateSource.availableActions[0]!.payload, false);
   assert.equal(model.softwareSources?.authorityBoundary?.credentialValuesExposed, false);
+});
+
+test("native source inventory preserves unknown state and version-bound owner actions", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareMatches, softwareSourceStatusLabel } = await import("../../src/workbench/softwareSources.ts");
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", version_authority: "homebrew_local_metadata", entry_count: 1,
+      native_items: [{ item_id: "cask:opl-studio", name: "opl-studio", display_name: "OPL Studio", display_name_i18n: { "zh-CN": "OPL 应用宿主", "en-US": "OPL Studio", malformed: { token: "private-value" } }, description_i18n: { zh: "管理和运行智能体应用。", en: "Manage and run agent apps." }, kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "r1", token: "private-value", available_actions: [
+        { action_id: "source_update", status: "available", default_payload: { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1", token: "private-value", shell: "untrusted" }, payload_fields: ["source_id", "item_id", "expected_revision"], confirmation_required: true }
+      ] }]
+    }, { source_id: "unread", display_name: "Unread", source_kind: "tap", status: "public", inventory_status: "not_checked", entry_count: null, native_items: [] }]
+  }))!;
+  const source = projection.entries[0]!;
+  const item = source.nativeItems![0]!;
+  assert.equal(item.displayName, "OPL Studio");
+  assert.equal(item.name, "opl-studio");
+  assert.deepEqual(item.displayNameI18n, { zh: "OPL 应用宿主", en: "OPL Studio" });
+  assert.deepEqual(item.descriptionI18n, { zh: "管理和运行智能体应用。", en: "Manage and run agent apps." });
+  assert.deepEqual(item.availableActions[0]!.payload, { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1" });
+  assert.doesNotMatch(JSON.stringify(projection), /private-value|untrusted/);
+  assert.deepEqual(nativeSoftwareInventory(projection), { total: 1, installed: 1, installable: 0, updatesAvailable: 1, complete: false });
+  assert.equal(projection.entries[1]!.entryCount, undefined);
+  assert.equal(nativeSoftwareMatches(item, source, "studio", "update:update_available"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "应用宿主", "all"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "管理和运行", "all"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "cask:opl-studio", "all"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "studio", "not_installed"), false);
+  assert.equal(softwareSourceStatusLabel({ ...source, status: "authorized" }, "zh"), "账户已连接");
 });
 
 test("current Package directory entries replace retired private lifecycle fields", () => {
@@ -367,6 +404,7 @@ test("package projection keeps the complete dynamic catalog and separates OPL ro
     package_id: `package-${index}`,
     display_name: `Package ${index}`,
     publisher: index < 9 ? "one-person-lab" : "OpenAI",
+    catalog_origin: index < 9 ? "opl" : "external",
     package_role: index < 5 ? "standard_agent" : index < 7 ? "capability_package" : index === 7 ? "workflow_profile" : "standard_agent",
     source_explanation: { kind: "first_party_framework_projection" },
     installed: true,
@@ -392,14 +430,14 @@ test("package projection keeps the complete dynamic catalog and separates OPL ro
   assert.equal(model.packageLifecycle.filter((item) => item.roleGroup === "other").length, 3);
 });
 
-test("package projection derives the OPL baseline when official is omitted", () => {
+test("package projection derives OPL membership from owner provenance", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {
       agent_packages: {
         directory: {
           entries: [
-            { package_id: "mas", publisher: "one-person-lab", package_role: "standard_agent", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } },
-            { package_id: "weixin", publisher: "one-person-lab", package_role: "capability_package", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } }
+            { package_id: "mas", publisher: "one-person-lab", catalog_origin: "opl", package_role: "standard_agent", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } },
+            { package_id: "weixin", publisher: "one-person-lab", catalog_origin: "opl", package_role: "capability_package", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } }
           ]
         },
         status_index: { packages: {} }
@@ -412,6 +450,61 @@ test("package projection derives the OPL baseline when official is omitted", () 
   assert.equal(capability?.official, true);
   assert.equal(standard?.roleGroup, "agent");
   assert.equal(capability?.roleGroup, "supporting");
+});
+
+test("maintenance provenance separates OPL software, external extensions and unknown origin without trusting names", async () => {
+  const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const entries = compactPackageRows([
+    { package_id: "travel-passport", publisher: "gaofeng21cn", catalog_origin: "opl", origin_basis: "owner_manifest", catalog_scope: "software",
+      catalog_source: { manager: "codex_plugin_manager", marketplace_id: "journey-atlas", delivery: "local", token: "must-not-cross" } },
+    { package_id: "pdf@openai-primary-runtime", publisher: "OpenAI", catalog_origin: "external", origin_basis: "native_carrier", catalog_scope: "software",
+      catalog_source: { manager: "codex_plugin_manager", marketplace_id: "openai-primary-runtime", delivery: "host_bundled" } },
+    { package_id: "opl-looking-name", publisher: "one-person-lab", official: true },
+    { package_id: "malformed", catalog_origin: "future", origin_basis: "future", catalog_source: { manager: { token: "must-not-cross" }, delivery: "future" } }
+  ]);
+  assert.doesNotMatch(JSON.stringify(entries), /must-not-cross/);
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries } } } });
+  const [journey, pdf, unclassified, malformed] = model.packageLifecycle;
+  assert.equal(journey.catalogOrigin, "opl");
+  assert.equal(journey.originBasis, "owner_manifest");
+  assert.equal(journey.official, true);
+  assert.deepEqual(journey.catalogSource, { manager: "codex_plugin_manager", marketplaceId: "journey-atlas", delivery: "local" });
+  assert.equal(pdf.catalogOrigin, "external");
+  assert.equal(pdf.catalogScope, "software");
+  assert.equal(pdf.catalogSource?.delivery, "host_bundled");
+  assert.match(pdf.searchMetadata.query, /codex_plugin_manager/);
+  assert.equal(pdf.official, false);
+  assert.equal(unclassified.catalogOrigin, "unknown");
+  assert.equal(unclassified.official, false);
+  assert.equal(malformed.catalogOrigin, "unknown");
+  assert.equal(malformed.originBasis, "unknown");
+  assert.deepEqual(malformed.catalogSource, { manager: "unknown", delivery: "unknown" });
+});
+
+test("native products preserve maintenance provenance separately from installation and distribution managers", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../src/workbench/softwareSources.ts");
+  const raw = {
+    surface_kind: "opl_software_sources_projection.v1",
+    installed_products: [{ item_id: "managed:framework", product_id: "framework", name: "framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12",
+      catalog_origin: "opl", origin_basis: "owner_manifest", catalog_source: { manager: "opl_framework", delivery: "local" } }],
+    entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available",
+      catalog_origin: "opl", origin_basis: "owner_projection", catalog_source: { manager: "homebrew", delivery: "marketplace", token: "must-not-cross" },
+      native_items: [{ item_id: "formula:opl", product_id: "framework", name: "opl", kind: "formula", installed: false, available_version: "0.3.11",
+        catalog_origin: "opl", origin_basis: "owner_projection", catalog_source: { manager: "homebrew", delivery: "marketplace" } }] }]
+  };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  assert.equal(projection.entries[0].catalogOrigin, "opl");
+  assert.equal(projection.entries[0].catalogSource?.manager, "homebrew");
+  const [product] = nativeSoftwareProducts(projection);
+  assert.equal(product.item.catalogOrigin, "opl");
+  assert.equal(product.item.catalogSource?.manager, "opl_framework");
+  assert.equal(product.item.installedVersion, "0.3.12");
+  assert.equal(product.item.availableVersion, "0.3.11");
+  assert.equal(product.channels[0].item.catalogSource?.manager, "homebrew");
+  const unknown = readSoftwareSourcesProjection({ surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "one-person-lab", display_name: "OPL", source_kind: "tap" }] })!;
+  assert.equal(unknown.entries[0].catalogOrigin, "unknown");
 });
 
 test("selection availability fails open for unknown diagnostics and blocks explicit owner rejection", () => {
@@ -487,4 +580,87 @@ test("package version prefers installed identity over the available release", ()
   assert.equal(model.packageLifecycle[1]?.versionKind, "available");
   assert.equal(model.packageLifecycle[1]?.installedVersion, undefined);
   assert.equal(model.packageLifecycle[1]?.availableVersion, "2.1");
+});
+
+
+test("native product counts collapse distribution channels and retain actual installation authority", async () => {
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts, nativeCarrierInstalled } = await import("../../src/workbench/softwareSources.ts");
+  const { compactSoftwareSources, compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({ surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [
+    ...["app", "app-full", "app-nightly"].map(name => ({ item_id: `cask:${name}`, name, display_name: "OPL App", kind: "cask", product_id: "github:owner/app", installed: true, installed_version: "26.11.1091", homebrew_installed: false, homebrew_installed_version: null, installation_kind: "app_bundle", installation_owner: "application", available_version: "26.11.890", update_status: "unknown" })),
+    { item_id: "formula:opl", name: "opl", display_name: "OPL Framework", kind: "formula", product_id: "github:owner/framework", installed: true, installed_version: "0.3.12", homebrew_installed: false, installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", available_version: "0.3.10", update_status: "unknown" }
+  ] }] }))!;
+  assert.deepEqual(nativeSoftwareInventory(projection), { total: 2, installed: 2, installable: 0, updatesAvailable: 0, complete: true });
+  const products = nativeSoftwareProducts(projection);
+  assert.equal(products[0].channels.length, 3);
+  assert.equal(products[0].item.installedVersion, "26.11.1091");
+  assert.equal(nativeCarrierInstalled(products[0].item), false);
+  assert.equal(products[1].item.installationKind, "managed_runtime");
+  assert.equal(products[1].item.ownerSettingsRoute, "updates");
+  const rows = compactPackageRows([{ package_id: "device", catalog_scope: "software", distribution_channel: "source" }, { package_id: "browser", catalog_scope: "host_component" }]);
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: rows } } } });
+  assert.equal(model.packageLifecycle[0].catalogScope, "software");
+  assert.equal(model.packageLifecycle[0].distributionChannel, "source");
+  assert.equal(model.packageLifecycle[1].catalogScope, "host_component");
+});
+
+
+test("owner-managed Framework remains visible without Homebrew and merges with its optional distribution channel", async () => {
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts } = await import("../../src/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const product = { product_id: "github:owner/framework", product_display_name: "OPL Framework", item_id: "managed:framework", name: "opl-framework", display_name: "OPL Framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12", installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", token: "must-not-cross" };
+  const raw = { surface_kind: "opl_software_sources_projection.v1", installed_products: [product], entries: [] };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  const products = nativeSoftwareProducts(projection);
+  assert.equal(products.length, 1);
+  assert.equal(products[0].source, undefined);
+  assert.equal(products[0].item.installedVersion, "0.3.12");
+  assert.equal(products[0].channels.length, 0);
+  assert.equal(nativeSoftwareInventory(projection).installed, 1);
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  const withTap = readSoftwareSourcesProjection(compactSoftwareSources({ ...raw, entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [{ ...product, item_id: "formula:opl", name: "opl", kind: "formula", installed: false, installed_version: null, homebrew_installed: false, available_version: "0.3.11" }] }] }))!;
+  const merged = nativeSoftwareProducts(withTap);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].item.installed, true);
+  assert.equal(merged[0].item.installedVersion, "0.3.12");
+  assert.equal(merged[0].item.availableVersion, "0.3.11");
+  assert.equal(merged[0].channels.length, 1);
+});
+
+test("native display identities survive the host bridge without changing machine versions or channel selection", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts, nativeInstalledDisplayVersion } = await import("../../src/workbench/softwareSources.ts");
+  const { nativeCatalogAvailableVersion, nativeCatalogState } = await import("../../src/workbench/softwareCatalog.ts");
+  const installed = {
+    product_id: "github:owner/app", item_id: "installed:app", name: "app", kind: "cask", installed: true,
+    installed_version: "26.11.1091", installed_display_version: "26.11.10", installed_build_kind: "local-development",
+    installed_build_id: "local.src079635b92c5c", update_status: "unknown", token: "must-not-cross"
+  };
+  const channel = {
+    product_id: installed.product_id, item_id: "cask:app", name: "app", kind: "cask", installed: true,
+    installed_version: "26.11.1091", homebrew_installed: false, available_version: "26.11.991,26.11.9",
+    available_display_version: "26.11.9", update_status: "unknown", available_actions: []
+  };
+  const raw = { surface_kind: "opl_software_sources_projection.v1", installed_products: [installed], entries: [{
+    source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [channel]
+  }] };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  const product = nativeSoftwareProducts(projection)[0];
+  assert.equal(nativeInstalledDisplayVersion(product.item), "26.11.10");
+  assert.equal(product.item.installedVersion, "26.11.1091");
+  assert.equal(product.item.installedBuildKind, "local-development");
+  assert.equal(product.item.installedBuildId, "local.src079635b92c5c");
+  assert.equal(product.item.availableVersion, "26.11.991,26.11.9");
+  assert.equal(nativeCatalogAvailableVersion(product, "zh"), "26.11.9");
+  assert.equal(nativeCatalogState(product.item), "installed");
+  assert.deepEqual(product.item.availableActions, []);
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  raw.entries[0].native_items.push({ ...channel, item_id: "cask:app-full", name: "app-full", available_version: "26.11.992,26.11.9" });
+  const multiple = nativeSoftwareProducts(readSoftwareSourcesProjection(compactSoftwareSources(raw))!)[0];
+  assert.equal(nativeCatalogAvailableVersion(multiple, "zh"), "多个渠道");
+  const unknown = readSoftwareSourcesProjection(compactSoftwareSources({ ...raw, installed_products: [{ ...installed,
+    installed_display_version: null, installed_build_kind: "guessed-development"
+  }] }))!;
+  assert.equal(nativeInstalledDisplayVersion(unknown.installedProducts![0]), "26.11.1091");
+  assert.equal(unknown.installedProducts![0].installedBuildKind, undefined);
 });

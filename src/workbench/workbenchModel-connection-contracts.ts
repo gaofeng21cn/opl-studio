@@ -9,7 +9,8 @@ export type AuthorizedConnectionSummary = {
   displayName: string;
   providerType?: string;
   status?: string;
-  securityRevision?: number;
+  securityRevision?: number | string;
+  disabled?: boolean;
   accountLabel?: string;
   capabilities: ConnectionAuthorizationCapability[];
 };
@@ -59,4 +60,7 @@ export type ConnectionAuthorizationProjection = {
   invocations: ConnectionInvocation[];
   connections: AuthorizedConnectionSummary[];
   availableRelayConnections: AvailableRelayConnection[];
+  availableRelayConnectionsStatus?: "available" | "unavailable" | "unknown";
+  availableRelayConnectionsReason?: string;
+  defaultConnectionId?: string;
 };

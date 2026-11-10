@@ -64,6 +64,53 @@ function compactFastApplicationManagementProjection(value) {
   };
 }
 
+// The startup budget applies to unrelated catalog entries, not to actions that
+// a retained view offers. Resolve those references against the owner catalog;
+// never manufacture an executable action from a projection or payload.
+function retainProjectedActions(state, actionCatalog, taskCatalog) {
+  const actions = Array.isArray(actionCatalog) ? actionCatalog : [];
+  const tasks = Array.isArray(taskCatalog) ? taskCatalog : [];
+  const byId = new Map(actions.filter((action) => typeof action?.action_id === "string")
+    .map((action) => [action.action_id, action]));
+  const tasksByAction = new Map();
+  for (const task of tasks) {
+    if (typeof task?.action_id !== "string") continue;
+    const matching = tasksByAction.get(task.action_id) ?? [];
+    matching.push(task);
+    tasksByAction.set(task.action_id, matching);
+  }
+  const selected = new Set();
+  const pending = [];
+  const add = (value) => {
+    if (typeof value !== "string") return;
+    const id = value.startsWith("app_state.actions#") ? value.slice("app_state.actions#".length) : value;
+    if (!byId.has(id) || selected.has(id)) return;
+    selected.add(id);
+    pending.push(id);
+  };
+  const inspect = (value, actionValues = false) => {
+    if (typeof value === "string") { if (actionValues || value.startsWith("app_state.actions#")) add(value); return; }
+    if (Array.isArray(value)) { value.forEach((entry) => inspect(entry, actionValues)); return; }
+    if (!value || typeof value !== "object") return;
+    for (const [key, entry] of Object.entries(value)) {
+      if (key === "payload" || key === "default_payload") continue;
+      inspect(entry, actionValues || /(^|_)action_ids?$/.test(key)
+        || key === "action_ref" || key === "actions" || key === "next_action" || key === "recommended_action");
+    }
+  };
+  actions.slice(0, 100).forEach((action) => add(action?.action_id));
+  inspect(state);
+  for (let index = 0; index < pending.length; index += 1) {
+    const id = pending[index];
+    inspect(byId.get(id));
+    for (const task of tasksByAction.get(id) ?? []) inspect(task);
+  }
+  state.actions = actions.filter((action) => selected.has(action?.action_id)).map(compactAction);
+  if (state.settings_control_center) {
+    state.settings_control_center.task_entries = tasks.filter((task, index) => index < 64 || selected.has(task?.action_id));
+  }
+}
+
 function compactFastState(value) {
   const root = value && typeof value === "object" ? value : {};
   const appState = root.app_state && typeof root.app_state === "object" ? root.app_state : root;
@@ -75,7 +122,7 @@ function compactFastState(value) {
   const settings = appState.settings_control_center && typeof appState.settings_control_center === "object"
     ? appState.settings_control_center
     : undefined;
-  return {
+  const compact = {
     ...(root.version !== undefined ? { version: root.version } : {}),
     app_state: {
       schema_version: appState.schema_version,
@@ -94,7 +141,7 @@ function compactFastState(value) {
       active_project_lines: firstRecords(appState.active_project_lines, 12),
       home_agent_shortcuts: compactHomeShortcutPreferences(appState.home_agent_shortcuts, 16),
       modules: { items: firstRecords(appState.modules?.items, 8) ?? [] },
-      actions: Array.isArray(appState.actions) ? appState.actions.slice(0, 100).map(compactAction) : [],
+      actions: [],
       operator: operator ? {
         summary: operator.summary,
         refs: firstRecords(operator.refs, 16) ?? [],
@@ -142,6 +189,8 @@ function compactFastState(value) {
       } : undefined
     }
   };
+  retainProjectedActions(compact.app_state, appState.actions, settings?.task_entries);
+  return compact;
 }
 
 export { compactFastState, compactInitialize, mergeChannelProviderState };
@@ -259,7 +308,23 @@ export function createOplPassthrough({
     async readState(profile = "fast") {
       const normalizedProfile = profile === "full" ? "full" : "fast";
       const args = [command, "app", "state", "--profile", normalizedProfile, "--json"];
-      const result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      let result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      if (normalizedProfile === "fast" && result.exitCode === 0) {
+        const sources = jsonValue(result.stdout)?.app_state?.agent_packages?.sources?.entries;
+        const refreshIds = new Set(Array.isArray(sources) ? sources.filter(source =>
+          (source?.access_refresh_required === true || source?.inventory_refresh_required === true)
+          && typeof source.source_id === "string" && source.source_id.trim()
+          && Array.isArray(source.available_actions) && source.available_actions.some(action =>
+            action?.action_id === "source_check" && (action.status === undefined || action.status === "available")
+            && action.confirmation_required !== true)
+        ).map(source => source.source_id) : []);
+        for (const sourceId of refreshIds) {
+          await run(command, ["sources", "check", "--source-id", sourceId, "--json"], { cwd, env, timeoutMs: stateTimeoutMs });
+        }
+        // Publish one owner readback after its requested source checks. The owner
+        // decides freshness and cooldown; this read never recursively retries.
+        if (refreshIds.size) result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      }
       const base = mergeChannelProviderState(jsonValue(result.stdout), channelProviderHost);
       const patch = workbenchHost?.appStatePatch() ?? { workbench_services: { schema_version: 'opl-workbench-services.v1', status: 'owner_action_required', reason: workbenchError } };
       let parsed = base?.app_state ? { ...base, app_state: { ...base.app_state, ...patch } } : base;
@@ -382,6 +447,7 @@ export function createOplPassthrough({
     async executeAction(request = {}) {
       const actionId = typeof request.actionId === "string" ? request.actionId.trim() : "";
       if (!actionId) throw Object.assign(new Error("missing actionId"), { code: "invalid_request" });
+      const nativeSourceAction = ["source_setup", "source_refresh", "source_install", "source_update", "source_uninstall"].includes(actionId);
       const payload = request.payload && typeof request.payload === "object" ? request.payload : {};
       if (actionId === "official_profile_restore") {
         const dryRun = request.dryRun !== false;
@@ -456,13 +522,17 @@ export function createOplPassthrough({
         : !dryRun && !confirmed
         ? { exitCode: -1, stdout: "", stderr: "confirmation_required", timedOut: false }
         : await run(command, args.slice(1), { cwd, env,
-          timeoutMs: ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "install_from_manifest_url"].includes(actionId)
+          timeoutMs: nativeSourceAction || ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "install_from_manifest_url"].includes(actionId)
             ? 20 * 60_000 : actionId === "codex_install" ? 120_000 : 45_000 });
       const ownerJson = jsonValue(result.stdout);
       const ownerExecution = ownerJson?.app_action_execution ?? ownerJson;
       const ownerStatus = ownerExecution?.result?.status ?? ownerExecution?.status;
+      const nativeAction = ownerExecution?.result?.native_action;
+      const nativeStatus = nativeSourceAction && nativeAction?.action_id === actionId
+        ? nativeAction.status : undefined;
       const ownerFailure = ownerExecution?.success === false || ownerExecution?.result?.success === false
-        || ["error", "failed", "blocked", "unavailable", "not_configured", "owner_action_required"].includes(ownerStatus);
+        || ["error", "failed", "blocked", "unavailable", "not_configured", "owner_action_required"].includes(ownerStatus)
+        || nativeStatus === "needs_attention";
       return {
         actionId,
         dryRun,
@@ -475,11 +545,11 @@ export function createOplPassthrough({
           ? "timed_out"
           : (blockedReadOnly
               ? "blocked_read_only"
-              : (!dryRun && !confirmed ? "confirmation_required" : (result.exitCode === 0 ? ownerFailure ? "error" : ownerStatus === "unsupported" ? "unsupported" : ["no_op", "noop"].includes(ownerStatus) ? "no_op" : (dryRun ? "preview_ready" : "executed") : "error"))),
+              : (!dryRun && !confirmed ? "confirmation_required" : (result.exitCode === 0 ? ownerFailure ? "error" : ownerStatus === "unsupported" ? "unsupported" : ["no_op", "noop"].includes(ownerStatus) || nativeStatus === "already_connected" ? "no_op" : (dryRun ? "preview_ready" : "executed") : "error"))),
         ...commandReadback(args, result),
         payload,
         stdoutJson: ownerJson,
-        ...(ownerFailure ? { blockedReason: `owner_${ownerStatus ?? "failed"}` } : {}),
+        ...(ownerFailure ? { blockedReason: `owner_${nativeStatus === "needs_attention" ? nativeStatus : ownerStatus ?? "failed"}` } : {}),
         stderrJson: jsonValue(result.stderr),
         ...(payload.confirmationId ? { confirmationId: payload.confirmationId } : {}),
         ...(payload.receiptId ? { receiptId: payload.receiptId } : {}),

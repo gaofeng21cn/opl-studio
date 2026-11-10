@@ -16,6 +16,50 @@ test("App state timeout keeps the interactive default and admits a bounded cold-
   assert.throws(() => createOplPassthrough({ readStateTimeoutMs: 120_001 }), /100 through 120000/);
 });
 
+test("fast state rechecks owner-requested source access before publishing one fresh catalog", async context => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-source-refresh-test-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const command = path.join(directory, "fake-opl");
+  await writeFile(command, `#!${process.execPath}
+import fs from 'node:fs';
+const args = process.argv.slice(2);
+fs.appendFileSync('calls.jsonl', JSON.stringify(args) + '\\n');
+const fixture = JSON.parse(fs.readFileSync('fixture.json', 'utf8'));
+if (args[0] === 'sources') {
+  fs.writeFileSync('checked', 'yes');
+  process.exit(fixture.checkFails ? 1 : 0);
+}
+const checked = fs.existsSync('checked');
+console.log(JSON.stringify({app_state:{agent_packages:{
+  sources:{entries:fixture.sources},
+  directory:{entries:checked && !fixture.checkFails ? [{package_id:'private-agent',installed:false}] : []}
+}}}));
+`);
+  await chmod(command, 0o755);
+  const source = { source_id: "github-packages:owner", access_refresh_required: true,
+    available_actions: [{ action_id: "source_check", confirmation_required: false }] };
+  for (const scenario of [
+    { sources: [source, source], profile: "fast", check: true, visible: true },
+    { sources: [source], profile: "fast", check: true, visible: false, checkFails: true },
+    { sources: [{ ...source, access_refresh_required: false }], profile: "fast", check: false },
+    { sources: [{ ...source, source_kind: "tap", access_refresh_required: false, inventory_refresh_required: true }], profile: "fast", check: true, visible: true },
+    { sources: [], profile: "fast", check: false },
+    { sources: [{ ...source, available_actions: [{ action_id: "source_check", status: "unavailable" }] }], profile: "fast", check: false },
+    { sources: [source], profile: "full", check: false }
+  ]) {
+    await writeFile(path.join(directory, "fixture.json"), JSON.stringify(scenario));
+    await writeFile(path.join(directory, "calls.jsonl"), "");
+    await rm(path.join(directory, "checked"), { force: true });
+    const result = await createOplPassthrough({ command, cwd: directory }).readState(scenario.profile);
+    const calls = (await readFile(path.join(directory, "calls.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
+    const read = ["app", "state", "--profile", scenario.profile, "--json"];
+    assert.deepEqual(calls, scenario.check ? [read, ["sources", "check", "--source-id", source.source_id, "--json"], read] : [read]);
+    const entries = result.app_state.app_state.agent_packages.directory.entries;
+    assert.equal(entries.some(entry => entry.package_id === "private-agent"), scenario.visible === true);
+    assert.equal(result.readback.exitCode, 0);
+  }
+});
+
 test("fast state preserves software source access metadata and opaque default references", () => {
   const compact = compactFastState({ app_state: { agent_packages: {
     surface_kind: "opl_app_agent_packages_projection.v1",
@@ -23,12 +67,13 @@ test("fast state preserves software source access metadata and opaque default re
       surface_kind: "opl_software_sources_projection.v1",
       status: "attention_required",
       authority_boundary: { owner: "opl_framework", credential_values_exposed: false, private_value: "omit" },
-      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false,
+      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false, access_refresh_required: false,
         available_actions: [{ action_id: "source_configure", label: "Configure", payload_fields: ["source_id", "provider_id", "credential_handle", "enabled"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli", token: "must-omit" }, status: "available" }] }]
     }
   } } });
   const sources = compact.app_state.agent_packages.sources;
   assert.equal(sources.entries[0].source_id, "github-packages");
+  assert.equal(sources.entries[0].access_refresh_required, false);
   assert.equal(sources.entries[0].available_actions[0].default_payload.credential_handle, "provider:github_packages:gh-cli");
   assert.equal("token" in sources.entries[0].available_actions[0].default_payload, false);
   assert.equal(sources.authority_boundary.private_value, undefined);
@@ -989,6 +1034,39 @@ test("fast state exposes only the Settings read model fields needed by the share
     assert.equal(projected.includes(privateMarker), false, `must omit ${privateMarker}`);
   }
   assert.deepEqual(readModel.opl_gateway_account.actions, { disconnect: "gateway_account_disconnect" });
+});
+
+test("fast settings retain shared connection and knowledge controls without credential or source bodies", () => {
+  const request = { request_id: "request-1", consumer_package_id: "research", connection_id: "mail", status: "requested", connection_security_revision: "revision-uuid", capabilities: [{ capability_id: "mail.read", label: "Read mail", risk: "read", body: "private-marker" }], access_token: "private-marker" };
+  const compact = compactFastState({ app_state: { settings_control_center: { app_settings_read_model: {
+    connections: { default_connection_id: "mail", action_ids: ["connection_test", "connection_update", "connection_delete"], authorization: {
+      surface_kind: "opl_connection_authorization_projection.v1",
+      connections: [{ connection_id: "mail", name: "Work mail", security_revision: "revision-uuid", disabled: false, credential_handle: "private-marker" }],
+      requests: [request], grants: [{ ...request, grant_id: "grant-1", status: "granted" }],
+      invocations: [{ invocation_id: "run-1", disposition: "unknown_after_dispatch", arguments: { query: "private-marker" }, result: { body: "private-marker" } }],
+      available_connections: [{ mailbox_ref: "relay-mailbox://opaque", display_name: "Work mail", account_label: "user@example.test", provider_type: "opl-relay", token: "private-marker" }],
+      available_connections_status: "available"
+    } },
+    resource_sources: { surface_kind: "opl_knowledge_sources_projection.v1", status: "available",
+      contexts: [{ context_id: "personal", label: "Personal", selected: true, revision: "context-r1", available_scope_ids: ["personal"], root: "/private-marker/vault" }],
+      items: [{ resource_id: "resource-1", source_id: "obsidian", context_id: "personal", label: "Obsidian", status: "ready", scope_ids: ["personal"], source_writable: true, consumer_domain_ids: ["research"], authorization: { status: "authorized", token: "private-marker" }, revision: { status: "current", security_revision: "source-r1" }, freshness: { status: "fresh", observed_at: "2026-11-10T00:00:00Z" }, readiness: { status: "ready" }, action_ids: ["knowledge_source_check"], knowledge_health: { current_count: 6, review_due_count: 2, inactive_count: 0, unavailable_count: 0, checked_count: 8, truncated: false, body: "private-marker", issues: [{ knowledge_id: "finance.history", status: "review_due", reason: "knowledge_review_overdue", body: "private-marker", absolute_path: "/private-marker/note" }] }, root: "/private-marker/vault", body_ref: "private-marker", body: "private-marker" }],
+      available_consumers: [{ domain_id: "research", label: "Research", package_id: "research-agent", path: "private-marker" }],
+      available_actions: [{ action_id: "knowledge_source_configure", label: "Configure", payload_fields: ["resource_id", "expected_revision"], default_payload: { resource_id: "resource-1", expected_revision: "source-r1", absolute_path: "/private-marker/vault" }, payload: { scope_ids: ["personal"], body: "private-marker" }, confirmation_required: true }],
+      authority_boundary: { body_included: false, absolute_paths_included: false, second_registry: false, source_owner: "profile_workspace_knowledge_registry", path: "private-marker" }
+    }
+  } } } });
+  const readModel = compact.app_state.settings_control_center.app_settings_read_model;
+  assert.deepEqual(readModel.connections.action_ids, ["connection_test", "connection_update", "connection_delete"]);
+  assert.equal(readModel.connections.authorization.connections[0].security_revision, "revision-uuid");
+  assert.equal(readModel.connections.authorization.grants[0].grant_id, "grant-1");
+  assert.equal(readModel.connections.authorization.invocations[0].disposition, "unknown_after_dispatch");
+  assert.equal(readModel.connections.authorization.available_connections[0].mailbox_ref, "relay-mailbox://opaque");
+  assert.equal(readModel.connections.authorization.available_connections_status, "available");
+  assert.equal(readModel.resource_sources.contexts[0].revision, "context-r1");
+  assert.equal(readModel.resource_sources.items[0].authorization.status, "authorized");
+  assert.deepEqual(readModel.resource_sources.items[0].knowledge_health, { current_count: 6, review_due_count: 2, inactive_count: 0, unavailable_count: 0, checked_count: 8, truncated: false, issues: [{ knowledge_id: "finance.history", status: "review_due", reason: "knowledge_review_overdue" }] });
+  assert.deepEqual(readModel.resource_sources.available_actions[0].default_payload, { resource_id: "resource-1", expected_revision: "source-r1" });
+  assert.equal(JSON.stringify(readModel).includes("private-marker"), false);
 });
 
 test("fast state keeps the complete package catalog and bounded runtime control projection", () => {

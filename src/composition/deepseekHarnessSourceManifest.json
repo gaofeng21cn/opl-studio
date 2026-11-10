@@ -19,6 +19,8 @@
       "@deepseek-ai/cordis-plugin-loader@1.1.0",
       "@deepseek-ai/dsh-client-connection@0.2.2-rc.1",
       "@deepseek-ai/dsh-client-store@0.2.2-rc.1",
+      "@deepseek-ai/dsh-official-bundles@0.2.2-rc.1",
+      "@deepseek-ai/dsh-util-crypto@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-workspace-path@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-file-drag@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-values@0.2.2-rc.1",
@@ -99,10 +101,13 @@
       "packages/client/ui-deliverables/src",
       "packages/client/ui-open-in-app/src",
       "packages/client/ui-dockkit/src",
+      "packages/client/ui-plugin-manager/src",
+      "packages/boot/plugin-manager/src",
+      "packages/util/official-bundles/src",
       "packages/client/resources/src",
       "packages/util/workspace-path/src"
     ],
-    "file_count": 701
+    "file_count": 741
   },
   "compatibility_patches": [
     {
@@ -116,6 +121,12 @@
       "sha256": "ba7bef4d150a193349be43ac55c083dc1e7b12db326dc7e29dcd4b605a3e1d51",
       "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
       "reason": "Optional owner view fields, timing limits, manual creation and execution-history slots for Framework/Temporal and canonical Codex tasks; default DSH Schedule behavior retained."
+    },
+    {
+      "path": "src/integrations/deepseek-harness/patches/plugin-manager-owner.patch",
+      "sha256": "a4c709a0804a753210fe65c9196984c4a4d034af856d5fbcde771d0850b13b4d",
+      "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
+      "reason": "Render-only owner card/detail projection and contributed tabs reuse the official plugin management page while Framework retains Package lifecycle authority; upstream default behavior is retained."
     }
   ],
   "opl_delta_roots": [
@@ -134,6 +145,74 @@
     {
       "path": "LICENSE",
       "sha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/build-approval.ts",
+      "sha256": "4365c31aad4f31495daa88ec1de9741cd9019fcab5bea39235d56fd086a7a35b"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/bundle-detail.ts",
+      "sha256": "6e3cbb4441fbd8786878b567a071fc58d9affcc9679707eddc8924640102c58d"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/diagnostic.ts",
+      "sha256": "9c0d71193caea6d68de6e26736c1f8b4e6a79c087e1c7e3b026e11f5784367b8"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/failure.ts",
+      "sha256": "be844c9f33d599510f47c6e40bff6f8fe01bd9aab8a89c12da381f5d5775f32a"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/git-transport.ts",
+      "sha256": "5cef5a076283395ae771f5cf5d651c952e40428b3d8e74f7043c44d358937f62"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/github-connection.ts",
+      "sha256": "63794746af5640d92926d142e20b2f9308eb0fcd42e729041edc6225adc57309"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/index.ts",
+      "sha256": "afefce94db7ad95269712ead9c683a4d93b396b0e44fa935a61652d63ce50993"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/install-failure.ts",
+      "sha256": "f1c20b0876183003b54f0e3ad71f6c0007f0fae3edccbb8189eaf48f782bc189"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/install-spec.ts",
+      "sha256": "6877a45aef9f358961f1f654fadc2c9bc4fd633728a1e2bdd960af7af139aacb"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/official-install-target.ts",
+      "sha256": "d47c42c4b6b4370173177ff5da9175a1e0c8712693628c9aa5af2cf9d040873b"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/operations.ts",
+      "sha256": "4b4f4c95c4421695efa3749686140416c94502da2f9fc93cb913c840add7e581"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/patch.ts",
+      "sha256": "4f9c6a2c0245bbc892a5b51ddf0c51c87b5f9837e5c82746060421c4f569001a"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/registry.ts",
+      "sha256": "0a653419b34607bffc5b758549abad6c030077568417a9169ba7ccfadb03a7c9"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/run-tree.ts",
+      "sha256": "d3da95db5f30882ed1a7dfb499de7b35cb9fd71eb137fc2384ebc2a5d18c38cd"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/tools.ts",
+      "sha256": "067d6e2d9f226c09fe70937d0c45343e606339d709594812a01d1d21c3bc967c"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/types.ts",
+      "sha256": "cd58611f468c3f8ad38d438c58f257dfffbbe7d15bc0466205ba749479aa2ae7"
+    },
+    {
+      "path": "packages/boot/plugin-manager/src/versions.ts",
+      "sha256": "ffde36514263fcadd370e9e2d783143f7dc5101752703f19d81187511a1360d5"
     },
     {
       "path": "packages/client/resources/src/client/contract.ts",
@@ -1071,6 +1150,83 @@
     {
       "path": "packages/client/ui-open-in-app/src/index.ts",
       "sha256": "34e08b62795c8c679a0bf085a3dabdcf051dafd1820055a6b61d566f782d0443"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/BundleDetailSection.tsx",
+      "sha256": "a5c639a61a394c1a9d104c302ffda2e377df6e13a35da186b187cd9a48c2c526"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/PluginManagerPage.module.css",
+      "sha256": "1f61f75903069e9e17a059937797abaea99ed3fb0f7e32448eceda8695df6d8f"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx",
+      "sha256": "b97b7e0e74874182df20882be415e53a70f61b4243a7965b5075be92047b89de",
+      "upstream_sha256": "06e10ea90f5ec9450f6a67f593842cbb83dcdef5ddd07dd31d8d85e19bf0a7bb"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/PluginRefreshToast.tsx",
+      "sha256": "e3988954700a0478d12075f1dd3ba3ec26813aef1d773d17a599fb2bfdd301f7"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/PluginsPanelIcon.tsx",
+      "sha256": "bbd6923ee6d3d993017ab7e1a9a08aebf7209ea76a5e8b3cdd34b19d38bb7d30"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/config-ledger.ts",
+      "sha256": "e5d9f3680919a691cd0f9167e088eea0b956709b62a0320895704c0ec4fa766b"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/detail-store.ts",
+      "sha256": "7b6ff1fd4516b8980ec3b58c772060ff40236c382c300fa3f2293d0e8f113897"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/header-scroll.ts",
+      "sha256": "c2d50d5a42e6130a5efde3335664a97c1877a943ac94426174cf4c66e4648672"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/index.ts",
+      "sha256": "a60608c71b691dfdd4de147cd0383eb16840a11bca0e905fb3ec7cbabdea704d"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/locales.ts",
+      "sha256": "dc2b570fc321e7ddc83a4dbe1e3f579cffc780472250d512d190209c0a0c78e3"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/manager-store.ts",
+      "sha256": "1eb5859efda243ef7234021c86b98ca98bab09a0c4039bbad73974d319101381"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/navigation-store.ts",
+      "sha256": "21daf1abdc46ad0c42ed306656d658f548e05dbbb286c21b8cc1f104af8269e6"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/presentation.ts",
+      "sha256": "8fb0c3f7870fa1e56200fd8554712cc8e0cfe07a581fa06abde76597c8586b94"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/sanitize-install-input.ts",
+      "sha256": "99af7f620375757d01c28807a6ffead17a33c1412b0bb5c915072e48b35579fd"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/slot-contract.ts",
+      "sha256": "86330fa197154eb7b282c083cf655d105b2a1181a2e962cff8b5eee4bca03845"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/tab-ledger.ts",
+      "sha256": "75136d6b2660ddd734bc4b6f01f87adffc948e7391fa98c57ea15fdfc7030e94"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/client/versions.tsx",
+      "sha256": "581ebc0e50e1ea9b36576477d749635b8905a5845e2bade1ef0bab1cdcd7a366"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/css-modules.d.ts",
+      "sha256": "e28410d74a0d763364c04fa690c2ca2202ad3019c74f8f5205e8dc6cba69c02f"
+    },
+    {
+      "path": "packages/client/ui-plugin-manager/src/index.ts",
+      "sha256": "2c495cb8e45c2a581c0ca2263b8731993fd14fb851bff04a33f4fde218c7e336"
     },
     {
       "path": "packages/client/ui-primitives/src/AnimatedRows.module.css",
@@ -2071,54 +2227,6 @@
       "sha256": "3b474f82465d7640f9746579b047fdff47545d017fc8bd70df57a2de10e0f5dc"
     },
     {
-      "path": "packages/client/ui-sidebar/src/client/HeaderLeadingControls.module.css",
-      "sha256": "054dbbcf4cc260903c82cd9158fdcb6427c8582b6cf9c25b2fd14d06a1453bf2"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/HeaderLeadingControls.tsx",
-      "sha256": "3a5d0a28b0b6a63874935a23834c5e779a735c48c06a6201877330a65cc0da95"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/PanelIcon.tsx",
-      "sha256": "3624d445da4652043f54c4973740ea638d9ccf310297fc3775e412dae1f5cfa1"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/SidebarRoot.module.css",
-      "sha256": "15923805f46f7c84f8fe8de1c33ae9f3d793190ecfc5bdf84efb73e0c4917ab5"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
-      "sha256": "726376bee11703e9ea621f88fed8c4ab06ff1196f2097f87f0dfc40d2d6701af"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/contract/slots.ts",
-      "sha256": "7583ce7a93eba5acea3a8cee26e75ff63e946ba88b0fafe01a0ed90cf04ac380"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/index.ts",
-      "sha256": "bfc3483f9843d3c7538f05270bed84fc09b54387309488e3bf21a9c3c83871b9"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/locales.ts",
-      "sha256": "e8c5d98bd691cf45882e78be4b30624731dac7abf9331bd3a99328103ec92ed3"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/panel-pins.ts",
-      "sha256": "aa50c9eeee25bf161ba1aa0c75fb46796cdb1258ecada82b56349bc7fe84dffc"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/client/scroll-handoff.ts",
-      "sha256": "f6ca8cc4ddba22a4f43ccc8152e7b99efe3871db998ad7119ee39573c1d1ec0d"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/css-modules.d.ts",
-      "sha256": "e28410d74a0d763364c04fa690c2ca2202ad3019c74f8f5205e8dc6cba69c02f"
-    },
-    {
-      "path": "packages/client/ui-sidebar/src/index.ts",
-      "sha256": "5a683e2d5b799d6f7387bb2e1e527d95e5860e077b2030c232f1209092bdd95c"
-    },
-    {
       "path": "packages/client/ui-sidebar-documentpreview/src/client/LoadingIndicator.module.css",
       "sha256": "636ca4bb3f68ccdeabd4667d3d6fcaeaf0c8e318e534b6afba0e922310ba38bd"
     },
@@ -2698,6 +2806,54 @@
       "sha256": "6e750848be842c9a8436c57271cff06e0ef5dab3f8f21e74e06d76fb278b2569"
     },
     {
+      "path": "packages/client/ui-sidebar/src/client/HeaderLeadingControls.module.css",
+      "sha256": "054dbbcf4cc260903c82cd9158fdcb6427c8582b6cf9c25b2fd14d06a1453bf2"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/HeaderLeadingControls.tsx",
+      "sha256": "3a5d0a28b0b6a63874935a23834c5e779a735c48c06a6201877330a65cc0da95"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/PanelIcon.tsx",
+      "sha256": "3624d445da4652043f54c4973740ea638d9ccf310297fc3775e412dae1f5cfa1"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/SidebarRoot.module.css",
+      "sha256": "15923805f46f7c84f8fe8de1c33ae9f3d793190ecfc5bdf84efb73e0c4917ab5"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
+      "sha256": "726376bee11703e9ea621f88fed8c4ab06ff1196f2097f87f0dfc40d2d6701af"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/contract/slots.ts",
+      "sha256": "7583ce7a93eba5acea3a8cee26e75ff63e946ba88b0fafe01a0ed90cf04ac380"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/index.ts",
+      "sha256": "bfc3483f9843d3c7538f05270bed84fc09b54387309488e3bf21a9c3c83871b9"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/locales.ts",
+      "sha256": "e8c5d98bd691cf45882e78be4b30624731dac7abf9331bd3a99328103ec92ed3"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/panel-pins.ts",
+      "sha256": "aa50c9eeee25bf161ba1aa0c75fb46796cdb1258ecada82b56349bc7fe84dffc"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/client/scroll-handoff.ts",
+      "sha256": "f6ca8cc4ddba22a4f43ccc8152e7b99efe3871db998ad7119ee39573c1d1ec0d"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/css-modules.d.ts",
+      "sha256": "e28410d74a0d763364c04fa690c2ca2202ad3019c74f8f5205e8dc6cba69c02f"
+    },
+    {
+      "path": "packages/client/ui-sidebar/src/index.ts",
+      "sha256": "5a683e2d5b799d6f7387bb2e1e527d95e5860e077b2030c232f1209092bdd95c"
+    },
+    {
       "path": "packages/client/ui-slots/src/index.ts",
       "sha256": "419ab5d0e22e76ad439b8e4c9b90d2118ab4dfe7acece44b0a54d78e417435ab"
     },
@@ -2940,6 +3096,22 @@
     {
       "path": "packages/client/ui-workspace/src/index.ts",
       "sha256": "7a4f9356cd158169c0e87d92eee6871ca6b1527851fb905a9c5ab8d9e87cd864"
+    },
+    {
+      "path": "packages/util/official-bundles/src/bundles.ts",
+      "sha256": "b498ab7e29a0a01a6b24d6c926857cfb0c8df28ba4173b68eb7972d064bce225"
+    },
+    {
+      "path": "packages/util/official-bundles/src/catalog.generated.ts",
+      "sha256": "dff4aed1c7b1819395b45a2bc3ab86e8b6b398c49a8955f0771c83230e235fd4"
+    },
+    {
+      "path": "packages/util/official-bundles/src/index.ts",
+      "sha256": "fe3c6ee65859c831246d4d1e2d40ad222ee63d5d0d120ec71af2fcdf30bed7c4"
+    },
+    {
+      "path": "packages/util/official-bundles/src/plugin-manager.ts",
+      "sha256": "61e7be23785b2b5f5c9e30b617e100c03024d572fde84c306ed2c7bf20337049"
     },
     {
       "path": "packages/util/workspace-path/src/file-address.ts",

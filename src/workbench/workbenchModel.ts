@@ -35,6 +35,7 @@ import { readUiContributionsProjection } from "../composition/contributionProjec
 import { readManagedCompanions } from "./managedCompanions";
 import { deriveServiceRecoveryModel } from "./serviceRecoveryModel";
 import { readSoftwareSourcesProjection } from "./softwareSources";
+import { readKnowledgeSourcesProjection } from "./knowledgeSources";
 
 // Renderer source-contract markers: these public projection fields and type
 // names remain owned by this facade while their implementations live in the
@@ -332,6 +333,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     settingsProjection,
     applicationManagement: readApplicationManagementProjection(appState.application_management),
     softwareSources: readSoftwareSourcesProjection(canonicalPackageProjection?.sources),
+    knowledgeSources: readKnowledgeSourcesProjection(asRecord(settingsControlCenter?.app_settings_read_model)?.resource_sources),
     runtimeOverview,
     serviceRecovery: deriveServiceRecoveryModel({ temporal, actions, stateFresh: true }),
     workItemRuntime,

@@ -25,6 +25,7 @@ import {
   firstString
 } from "./workbenchModel-primitives";
 import { firstStringField, uniqueStrings } from "./workbenchModel-presentation";
+import { readCatalogProvenance } from "./softwareSources";
 
 function packageIdentity(record: Record<string, unknown>, index: number): string {
   return firstStringField(record, ["package_id", "packageId", "agent_id", "module_id", "id"])
@@ -401,9 +402,13 @@ function packageSearchMetadata(
   const codexSurface = packageCodexSurface(record);
   const physicalSurface = packagePhysicalSurface(record);
   const access = packageAccess(record);
+  const provenance = readCatalogProvenance(record);
   const query = uniqueStrings([
     packageIdentity(record, 0),
     packageLabel(record),
+    provenance.catalogOrigin,
+    provenance.catalogSource.manager,
+    provenance.catalogSource.marketplaceId,
     access.visibility,
     access.status,
     access.providerId,
@@ -535,8 +540,8 @@ function packageLifecycleItem(
   const packageId = packageIdentity(record, 0);
   const publisher = firstStringField(record, ["publisher"]) ?? "unknown";
   const packageRole = firstStringField(record, ["package_role"]) ?? "unknown";
-  const official = asOptionalBoolean(record.official)
-    ?? publisher.toLowerCase() === "one-person-lab";
+  const provenance = readCatalogProvenance(record);
+  const official = provenance.catalogOrigin === "opl";
   const roleGroup: AgentPackageLifecycleRef["roleGroup"] = packageRole === "standard_agent"
     ? (official ? "agent" : "other")
     : packageRole === "workflow_profile"
@@ -573,7 +578,25 @@ function packageLifecycleItem(
     label: packageLabel(record),
     description: firstStringField(record, ["description"]) ?? "",
     publisher,
+    ...provenance,
     packageRole,
+    softwareType: ["application", "agent", "capability"].includes(String(record.software_type)) ? record.software_type as "application" | "agent" | "capability" : "unknown",
+    catalogScope: record.catalog_scope === "software" || record.catalog_scope === "host_component" ? record.catalog_scope : "unknown",
+    ...(["release", "source", "unknown"].includes(String(record.distribution_channel)) ? { distributionChannel: record.distribution_channel as "release" | "source" | "unknown" } : {}),
+    ...(record.release_channel === "preview" || record.release_channel === "stable"
+      ? { releaseChannel: record.release_channel } : {}),
+    localInstallations: asRecordArray(record.local_installations).flatMap(installation => {
+      const id = asString(installation.installation_id), version = asString(installation.version);
+      const locationRef = asString(installation.location_ref), evidenceRef = asString(installation.evidence_ref);
+      if (!id || !version || !locationRef || !evidenceRef || installation.entrypoint_verified !== true
+        || !["owner_managed", "uv_tool"].includes(String(installation.kind))
+        || !["installed", "development"].includes(String(installation.mode))
+        || !["package_owner", "uv"].includes(String(installation.manager)) || installation.management_scope !== "owner_only") return [];
+      return [{ installationId: id, version, kind: installation.kind as "owner_managed" | "uv_tool",
+        mode: installation.mode as "installed" | "development", manager: installation.manager as "package_owner" | "uv",
+        managementScope: "owner_only" as const, locationRef, evidenceRef,
+        sourceRevision: asString(installation.source_revision) ?? undefined }];
+    }),
     roleGroup,
     official,
     displayNameI18n: asLocalizedText(record.display_name_i18n),
@@ -593,6 +616,7 @@ function packageLifecycleItem(
     sourceMode: packageSourceMode(record),
     access: packageAccess(record),
     installable: asOptionalBoolean(asRecord(record.installability)?.installable),
+    installabilityReason: asString(asRecord(record.installability)?.reason) ?? undefined,
     automaticUpdate: packageAutomaticUpdate(record),
     homeShortcuts,
     ...(firstStringField(record, ["recommended_action", "recommendedAction"])
