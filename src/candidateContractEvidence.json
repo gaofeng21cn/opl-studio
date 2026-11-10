@@ -988,10 +988,10 @@
     "receipt_path": "out/qualification/client-conformance.json",
     "receipt_is_git_ignored": true,
     "external_cohort": {
-      "framework_commit": "446241a46180d481f42070c659c2d177ddfdb229",
-      "framework_tree": "bf90e21b1f3b4dda5a06b04d96d00cf49b495244",
-      "app_commit": "eba2b9d335e1be6372911ca98379540bf51a49fa",
-      "app_tree": "2cc60e30cd299fa5ca395a89bc5d777064f8c1c4"
+      "framework_commit": "d2b26695e7f91ad364d4c795653096ccef6cb4b6",
+      "framework_tree": "2dd87d01b57d473816f0c44635678ec24d52bb30",
+      "app_commit": "dd0f3b2ae326e7e571bce1e70ef8690fc12566ba",
+      "app_tree": "c2a0e353046dc1c7743fb9b3f4393aacf0a6d927"
     },
     "framework_producer": "src/read-models/operator/app-state-ui-contributions.ts#buildAppUiContributionsProjection",
     "host_app_studio_e2e": true,
