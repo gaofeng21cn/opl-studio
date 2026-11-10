@@ -626,3 +626,41 @@ test("owner-managed Framework remains visible without Homebrew and merges with i
   assert.equal(merged[0].item.availableVersion, "0.3.11");
   assert.equal(merged[0].channels.length, 1);
 });
+
+test("native display identities survive the host bridge without changing machine versions or channel selection", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts, nativeInstalledDisplayVersion } = await import("../../src/workbench/softwareSources.ts");
+  const { nativeCatalogAvailableVersion, nativeCatalogState } = await import("../../src/workbench/softwareCatalog.ts");
+  const installed = {
+    product_id: "github:owner/app", item_id: "installed:app", name: "app", kind: "cask", installed: true,
+    installed_version: "26.11.1091", installed_display_version: "26.11.10", installed_build_kind: "local-development",
+    installed_build_id: "local.src079635b92c5c", update_status: "unknown", token: "must-not-cross"
+  };
+  const channel = {
+    product_id: installed.product_id, item_id: "cask:app", name: "app", kind: "cask", installed: true,
+    installed_version: "26.11.1091", homebrew_installed: false, available_version: "26.11.991,26.11.9",
+    available_display_version: "26.11.9", update_status: "unknown", available_actions: []
+  };
+  const raw = { surface_kind: "opl_software_sources_projection.v1", installed_products: [installed], entries: [{
+    source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [channel]
+  }] };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  const product = nativeSoftwareProducts(projection)[0];
+  assert.equal(nativeInstalledDisplayVersion(product.item), "26.11.10");
+  assert.equal(product.item.installedVersion, "26.11.1091");
+  assert.equal(product.item.installedBuildKind, "local-development");
+  assert.equal(product.item.installedBuildId, "local.src079635b92c5c");
+  assert.equal(product.item.availableVersion, "26.11.991,26.11.9");
+  assert.equal(nativeCatalogAvailableVersion(product, "zh"), "26.11.9");
+  assert.equal(nativeCatalogState(product.item), "installed");
+  assert.deepEqual(product.item.availableActions, []);
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  raw.entries[0].native_items.push({ ...channel, item_id: "cask:app-full", name: "app-full", available_version: "26.11.992,26.11.9" });
+  const multiple = nativeSoftwareProducts(readSoftwareSourcesProjection(compactSoftwareSources(raw))!)[0];
+  assert.equal(nativeCatalogAvailableVersion(multiple, "zh"), "多个渠道");
+  const unknown = readSoftwareSourcesProjection(compactSoftwareSources({ ...raw, installed_products: [{ ...installed,
+    installed_display_version: null, installed_build_kind: "guessed-development"
+  }] }))!;
+  assert.equal(nativeInstalledDisplayVersion(unknown.installedProducts![0]), "26.11.1091");
+  assert.equal(unknown.installedProducts![0].installedBuildKind, undefined);
+});

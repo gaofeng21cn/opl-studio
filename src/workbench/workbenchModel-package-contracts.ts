@@ -176,7 +176,11 @@ export type NativeSoftwareItemRef = CatalogProvenanceRef & {
   kind: "formula" | "cask" | "managed_runtime";
   installed: boolean | null;
   installedVersion?: string;
+  installedDisplayVersion?: string;
+  installedBuildKind?: "local-development";
+  installedBuildId?: string;
   availableVersion?: string;
+  availableDisplayVersion?: string;
   updateStatus: "available" | "current" | "not_installed" | "unknown";
   revision?: string;
   availableActions: SoftwareSourceActionRef[];

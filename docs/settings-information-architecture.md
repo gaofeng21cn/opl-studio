@@ -29,6 +29,11 @@ Package 来自 Framework 目录，原生分发渠道来自软件源 `native_item
 不能卸载或更新由 uv 或软件自身管理的实例。原生软件的 `installed_version` 来自
 实际检测，`homebrew_installed` 与 `homebrew_installed_version` 只代表渠道收据；
 OPL 受管运行时和 App bundle 已存在时，不能因 Brew 无记录而标成未安装。
+原生软件优先展示 owner 提供的 `installed_display_version` 和
+`available_display_version`；原始机器版本、Homebrew 配方版本与渠道收据保留在详情，
+继续用于原有更新与管理判断。只有 owner 明确报告
+`installed_build_kind=local-development` 时标注“开发版”，不从版本大小推断构建类型，
+也不在界面换算版本号。构建 ID 用于详情辨认本机开发构建。
 
 搜索与状态筛选共用目录；软件源页展示渠道级记录。“更新”页复用当前管理者的
 动作，Framework 的受管安装从详情进入既有更新页。普通刷新按 owner 的

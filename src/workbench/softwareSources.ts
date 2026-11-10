@@ -52,7 +52,11 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
     kind: item.kind as NativeSoftwareItemRef["kind"],
     installed: asOptionalBoolean(item.installed),
     installedVersion: asString(item.installed_version) ?? undefined,
+    installedDisplayVersion: asString(item.installed_display_version) ?? undefined,
+    installedBuildKind: item.installed_build_kind === "local-development" ? "local-development" : undefined,
+    installedBuildId: asString(item.installed_build_id) ?? undefined,
     availableVersion: asString(item.available_version) ?? undefined,
+    availableDisplayVersion: asString(item.available_display_version) ?? undefined,
     updateStatus: ["available", "current", "not_installed"].includes(String(item.update_status)) ? item.update_status as NativeSoftwareItemRef["updateStatus"] : "unknown",
     revision: asString(item.revision) ?? undefined,
     availableActions: asRecordArray(item.available_actions).flatMap((action) => {
@@ -197,6 +201,7 @@ export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
       itemId: primary?.item.itemId ?? installed.itemId,
       name: primary?.item.name ?? installed.name,
       availableVersion: primary?.item.availableVersion ?? installed.availableVersion,
+      availableDisplayVersion: primary?.item.availableDisplayVersion ?? installed.availableDisplayVersion,
       availableActions: primary?.item.availableActions ?? [],
       revision: primary?.item.revision,
       homebrewInstalled: primary?.item.homebrewInstalled,
@@ -244,6 +249,15 @@ export function nativeInstallationLabel(item: NativeSoftwareItemRef, locale: "zh
     source_link: ["源码开发连接", "Source development link"],
   };
   return labels[item.installationKind ?? ""]?.[locale === "zh" ? 0 : 1] ?? (locale === "zh" ? "安装方式待确认" : "Installation method not confirmed");
+}
+
+/** Display identities are owner supplied; updater and carrier versions remain unchanged. */
+export function nativeInstalledDisplayVersion(item: NativeSoftwareItemRef): string | undefined {
+  return item.installedDisplayVersion ?? item.installedVersion;
+}
+
+export function nativeAvailableDisplayVersion(item: NativeSoftwareItemRef): string | undefined {
+  return item.availableDisplayVersion ?? item.availableVersion;
 }
 
 /** Carrier actions are bound to the carrier receipt, not product presence. */

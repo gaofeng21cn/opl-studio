@@ -880,6 +880,52 @@ test("catalog state counts development as installed and prioritizes blocked acce
   assert.equal(nativeCatalogAvailableVersion(nativeSoftwareProducts(model.softwareSources)[0], "zh"), "多个渠道");
 });
 
+test("native catalog shows owner display versions and identifies development builds separately from channel receipts", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { NativeSoftwareList } = await import("../../src/workbench/SoftwareSourcesPage.tsx");
+  const { nativeSoftwareEntries } = await import("../../src/workbench/softwareSources.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [{
+        catalog_origin: "opl", product_id: "github:owner/app", item_id: "cask:app", name: "app", display_name: "One Person Lab", kind: "cask",
+        installed: true, installed_version: "26.11.1091", installed_display_version: "26.11.10", installed_build_kind: "local-development",
+        installed_build_id: "local.src079635b92c5c", installation_kind: "app_bundle", installation_owner: "application",
+        homebrew_installed: false, homebrew_installed_version: null, available_version: "26.11.991,26.11.9", available_display_version: "26.11.9",
+        update_status: "unknown", available_actions: []
+      }]
+    }]
+  } } } });
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
+    const row = container.querySelector('[data-plugin-owner-package="github:owner/app"]')!;
+    assert.equal(row.querySelector('[data-label="已装版本"]')?.textContent, "26.11.10");
+    assert.equal(row.querySelector('[data-label="可用版本"]')?.textContent, "26.11.9");
+    assert.match(row.textContent ?? "", /开发版/);
+    assert.doesNotMatch(row.textContent ?? "", /26\.11\.1091|26\.11\.991|local\.src|可更新/);
+    render(createElement(NativeSoftwareList, { entries: nativeSoftwareEntries(model.softwareSources), locale: "zh", channelView: true, actionBusyKey: null, onAction() {} }));
+    const summary = container.querySelector("summary")!;
+    assert.match(summary.textContent ?? "", /Homebrew 记录\s*无记录/);
+    assert.match(summary.textContent ?? "", /来源版本\s*26\.11\.9/);
+    assert.doesNotMatch(summary.textContent ?? "", /26\.11\.1091|26\.11\.991|开发版/);
+    const details = container.querySelector(".agent-package-details")!;
+    assert.match(details.textContent ?? "", /本机版本26\.11\.10 · 开发版/);
+    assert.match(details.textContent ?? "", /本机机器版本26\.11\.1091/);
+    assert.match(details.textContent ?? "", /Homebrew 配方版本26\.11\.991,26\.11\.9/);
+    assert.match(details.textContent ?? "", /构建 IDlocal\.src079635b92c5c/);
+    assert.match(details.textContent ?? "", /Homebrew 安装记录无记录/);
+    assert.equal(container.querySelectorAll("button").length, 0);
+    const withReceipt = nativeSoftwareEntries(model.softwareSources).map(entry => ({ ...entry, item: {
+      ...entry.item, homebrewInstalled: true, homebrewInstalledVersion: "26.11.891,26.11.8"
+    } }));
+    render(createElement(NativeSoftwareList, { entries: withReceipt, locale: "zh", channelView: true, actionBusyKey: null, onAction() {} }));
+    assert.match(container.querySelector("summary")?.textContent ?? "", /Homebrew 记录\s*有记录/);
+    assert.doesNotMatch(container.querySelector("summary")?.textContent ?? "", /26\.11\.891|26\.11\.1091|26\.11\.991/);
+    assert.match(container.querySelector(".agent-package-details")?.textContent ?? "", /Homebrew 安装记录26\.11\.891,26\.11\.8/);
+  });
+});
+
 test("source access attention opens sources and does not repair an installation", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");

@@ -13,7 +13,7 @@ import { actionPayloadComplete, type SettingsActionRequest } from "../workbench/
 import type { SettingsPanelProps } from "../workbench/settings/types";
 import { NativeSoftwareList } from "../workbench/SoftwareSourcesPage";
 import { catalogDisplayName } from "../workbench/SoftwareCatalogMetadata";
-import { nativeSoftwareProducts, nativeSoftwareMatches, softwareSourceActionLabel, nativeInstallationLabel, nativeCarrierInstalled } from "../workbench/softwareSources";
+import { nativeSoftwareProducts, nativeSoftwareMatches, softwareSourceActionLabel, nativeInstallationLabel, nativeCarrierInstalled, nativeInstalledDisplayVersion } from "../workbench/softwareSources";
 import { catalogInstalledVersion, catalogManagerLabel, packageInstallationManagers, catalogStateLabel, catalogTypeLabel, nativeCatalogState, nativeCatalogAvailableVersion, packageCatalogState, softwareCatalogPackages, softwareCatalogNativeProducts, type SoftwareCatalogScope, type SoftwareCatalogState } from "../workbench/softwareCatalog";
 import { formatStatus } from "../workbench/settings/presentation";
 import { agentAvailabilityDetail, agentPackageUpdateStatus, isAgentCatalogPackage, localizedPackageDescription, packageAccessStatusLabel, packageInstallAllowed, packageActionLabel, packagePresentLocally, packageAccessNeedsAttention, agentPackageNeedsAttention, packageDevelopmentLinked } from "../workbench/settings/packages";
@@ -143,13 +143,15 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     const nativeButtons = (all = false) => (all ? executable : executable.filter(action => action.actionId === (item.installed === false ? "source_install" : "source_update"))).map(action => <Button key={action.actionId} size="sm" variant={action.actionId === "source_uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => onAction({ key: `source:${source?.sourceId}:${item.itemId}:${action.actionId}`, actionId: action.actionId, label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${name}`, payload: action.payload, confirmationRequired: true, dryRunSupported: action.dryRunSupported })}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</Button>);
     return { id: productId, title: name,
       description: <span className="opl-catalog-row-description">{item.descriptionI18n?.[locale] || item.description || (isZh ? "尚未提供软件说明。" : "No software description provided.")}</span>,
-      tags: <><CatalogRowFacts type={isZh ? "应用" : "Application"} installedVersion={item.installedVersion ?? (item.installed === false ? "—" : undefined)} availableVersion={nativeCatalogAvailableVersion({ source, item, productId, channels }, locale)} state={nativeCatalogState(item)} locale={locale} />{item.installationKind === "source_link" ? <Tag tone="quiet">{isZh ? "开发接入" : "Development"}</Tag> : null}</>,
+      tags: <><CatalogRowFacts type={isZh ? "应用" : "Application"} installedVersion={nativeInstalledDisplayVersion(item) ?? (item.installed === false ? "—" : undefined)} availableVersion={nativeCatalogAvailableVersion({ source, item, productId, channels }, locale)} state={nativeCatalogState(item)} locale={locale} />{item.installedBuildKind === "local-development" ? <Tag tone="quiet">{isZh ? "开发版" : "Development build"}</Tag> : item.installationKind === "source_link" ? <Tag tone="quiet">{isZh ? "开发接入" : "Development"}</Tag> : null}</>,
       actions: <span className="opl-catalog-row-actions">{nativeButtons()}</span>, detailActions: nativeButtons(true),
       status: <CatalogState state={nativeCatalogState(item)} locale={locale} />,
       detail: <>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Local installation"}</h4><dl>
           <div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{productId}</code></dd></div>
-          <div><dt>{isZh ? "本机版本" : "Local version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (isZh ? "未安装" : "Not installed") : (isZh ? "待确认" : "Not confirmed"))}</dd></div>
+          <div><dt>{isZh ? "本机版本" : "Local version"}</dt><dd>{nativeInstalledDisplayVersion(item) ?? (item.installed === false ? (isZh ? "未安装" : "Not installed") : (isZh ? "待确认" : "Not confirmed"))}{item.installedBuildKind === "local-development" ? ` · ${isZh ? "开发版" : "Development build"}` : ""}</dd></div>
+          {item.installedDisplayVersion && item.installedVersion !== item.installedDisplayVersion ? <div><dt>{isZh ? "机器版本" : "Machine version"}</dt><dd>{item.installedVersion}</dd></div> : null}
+          {item.installedBuildId ? <div><dt>{isZh ? "构建 ID" : "Build ID"}</dt><dd><code>{item.installedBuildId}</code></dd></div> : null}
           <div><dt>{isZh ? "安装方式" : "Installation method"}</dt><dd>{nativeInstallationLabel(item, locale)}</dd></div>
           <div><dt>{isZh ? "安装管理者" : "Installation owner"}</dt><dd>{item.installationOwner === "opl_framework" ? "OPL Framework" : item.installationOwner === "homebrew" ? "Homebrew" : item.installationOwner === "application" ? (isZh ? "软件自身管理" : "Managed by the software") : (isZh ? "待确认" : "Not confirmed")}</dd></div>
         </dl>{item.ownerSettingsRoute === "updates" && props.onTabChange ? <Button size="sm" variant="outline" onClick={() => props.onTabChange?.("updates")}>{isZh ? "前往更新" : "Go to updates"}</Button> : null}</section>

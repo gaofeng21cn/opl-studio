@@ -298,7 +298,7 @@ function compactNativeSoftwareItem(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
   return {
     ...compactCatalogProvenance(item),
-    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_source_revision", "available_version", "update_status", "revision"]),
+    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_display_version", "installed_build_kind", "installed_build_id", "installed_source_revision", "available_version", "available_display_version", "update_status", "revision"]),
     display_name_i18n: compactLocalizedText(item.display_name_i18n),
     description_i18n: compactLocalizedText(item.description_i18n),
     available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []
