@@ -62,6 +62,68 @@ function compactCodexPersonalization(value) {
   };
 }
 
+const records = value => Array.isArray(value) ? value.filter(item => item && typeof item === "object" && !Array.isArray(item)) : [];
+const strings = value => Array.isArray(value) ? value.filter(item => typeof item === "string") : [];
+function compactCapabilities(value) {
+  return (Array.isArray(value) ? value : []).flatMap(item => typeof item === "string" ? [item]
+    : item && typeof item === "object" ? [selectedFields(item, ["capability_id", "id", "label", "risk"])] : []);
+}
+function compactConnection(value) {
+  if (!value || typeof value !== "object") return undefined;
+  return {
+    ...selectedFields(value, ["connection_id", "id", "display_name", "name", "connection_display_name", "provider_type", "connection_provider_type", "connection_type", "status", "security_revision", "account_label", "disabled"]),
+    capabilities: compactCapabilities(value.capabilities)
+  };
+}
+function compactConnectionRequest(value) {
+  return {
+    ...selectedFields(value, ["request_id", "grant_id", "status", "consumer_package_id", "consumer_display_name", "connection_id", "connection_display_name", "connection_provider_type", "provider_type", "connection_status", "connection_security_revision", "connection_account_label", "requested_at", "created_at", "granted_at", "decided_at", "stale_reason"]),
+    consumer: selectedFields(value.consumer, ["package_id", "display_name"]),
+    connection: compactConnection(value.connection),
+    capabilities: compactCapabilities(value.capabilities ?? value.capability_ids)
+  };
+}
+function compactConnectionAuthorization(value) {
+  if (!value || typeof value !== "object") return undefined;
+  return {
+    ...selectedFields(value, ["schema", "surface_kind", "available_connections_status", "available_connections_reason"]),
+    connections: records(value.connections).map(compactConnection),
+    requests: records(value.requests).map(compactConnectionRequest),
+    grants: records(value.grants).map(compactConnectionRequest),
+    invocations: records(value.invocations).slice(0, 20).map(item => selectedFields(item, ["invocation_id", "consumer_package_id", "consumer_display_name", "connection_id", "connection_display_name", "capability_id", "capability_label", "started_at", "finished_at", "disposition"])),
+    available_connections: records(value.available_connections).map(item => selectedFields(item, ["mailbox_ref", "display_name", "name", "account_label", "provider_type"]))
+  };
+}
+function compactKnowledgeSources(value) {
+  if (!value || value.surface_kind !== "opl_knowledge_sources_projection.v1") return undefined;
+  const payloadFields = ["resource_id", "context_id", "source_id", "label", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"];
+  const payload = value => Object.fromEntries(Object.entries(selectedFields(value, payloadFields) ?? {}).filter(([, entry]) => typeof entry === "string" || Array.isArray(entry) && entry.every(item => typeof item === "string")));
+  return {
+    ...selectedFields(value, ["surface_kind", "status"]),
+    contexts: records(value.contexts).map(item => ({
+      ...selectedFields(item, ["context_id", "label", "selected", "revision", "status"]),
+      available_scope_ids: strings(item.available_scope_ids)
+    })),
+    items: records(value.items).map(item => ({
+      ...selectedFields(item, ["resource_id", "source_id", "label", "context_id", "status", "connected", "source_writable", "revision_identity", "knowledge_count", "reason", "owner_settings_route", "access_editable", "access_edit_reason", "scope_expansion_allowed"]),
+      scope_ids: strings(item.scope_ids), available_scope_ids: strings(item.available_scope_ids), consumer_domain_ids: strings(item.consumer_domain_ids),
+      consumer_package_ids: strings(item.consumer_package_ids), write_domain_ids: strings(item.write_domain_ids), action_ids: strings(item.action_ids),
+      authorization: selectedFields(item.authorization, ["status", "consumer_count", "grant_count"]),
+      revision: selectedFields(item.revision, ["status", "security_revision"]),
+      freshness: selectedFields(item.freshness, ["status", "observed_at"]),
+      readiness: selectedFields(item.readiness, ["status", "reason"])
+    })),
+    available_consumers: records(value.available_consumers).map(item => selectedFields(item, ["domain_id", "label", "package_id"])),
+    failures: records(value.failures).map(item => selectedFields(item, ["context_id", "reason"])),
+    authority_boundary: selectedFields(value.authority_boundary, ["body_included", "absolute_paths_included", "second_registry", "source_owner"]),
+    available_actions: records(value.available_actions).filter(item => typeof item.action_id === "string" && item.action_id.startsWith("knowledge_source_")).map(item => ({
+      ...selectedFields(item, ["action_id", "label", "status", "dry_run_supported", "confirmation_required", "reason"]),
+      payload_fields: strings(item.payload_fields), follow_up_action_ids: strings(item.follow_up_action_ids),
+      payload: payload(item.payload), default_payload: payload(item.default_payload)
+    }))
+  };
+}
+
 function compactSettingsReadModel(value) {
   if (!value || typeof value !== "object") return undefined;
   const connections = value.connections && typeof value.connections === "object" ? value.connections : undefined;
@@ -93,12 +155,15 @@ function compactSettingsReadModel(value) {
     } : undefined,
     connections: connections ? {
       ...selectedFields(connections, ["surface_kind", "source_ref", "allowed_statuses", "default_connection_id"]),
+      action_ids: strings(connections.action_ids),
+      authorization: compactConnectionAuthorization(connections.authorization),
       connections: Array.isArray(connections.connections)
         ? connections.connections.slice(0, 16).map((connection) => selectedFields(connection, [
             "connection_id", "name", "connection_type", "endpoint", "status", "status_code", "last_tested_at"
           ]) ?? {})
         : []
     } : undefined,
+    resource_sources: compactKnowledgeSources(value.resource_sources),
     docker_webui: dockerWebui ? {
       ...selectedFields(dockerWebui, ["surface_kind", "ordinary_status", "doctor_read_model_ref", "action_ids", "issue_ids"]),
       runtime_proxy: selectedFields(dockerWebui.runtime_proxy, ["status"]),

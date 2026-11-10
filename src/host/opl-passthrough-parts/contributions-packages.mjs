@@ -270,8 +270,8 @@ function compactPackageRows(value, limit = 64) {
 
 function compactSoftwareSourceAction(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled"]);
-  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled"]);
+  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision"]);
+  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision"]);
   return {
     ...selectedFields(value, [
       "action_id", "label", "delegated_surface", "payload_fields", "mutates", "dry_run_supported",
@@ -288,11 +288,21 @@ function compactSoftwareSources(value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
     const compact = selectedFields(entry, [
       "source_id", "display_name", "source_kind", "source_ref", "visibility", "provider_id", "status",
-      "enabled", "credential_handle_present", "verified_at", "entry_count"
+      "enabled", "credential_handle_present", "verified_at", "entry_count",
+      "inventory_status", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
     ]) ?? {};
     compact.available_actions = Array.isArray(entry.available_actions)
       ? entry.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean)
       : [];
+    if (entry.source_kind === "tap") {
+      compact.native_items = Array.isArray(entry.native_items) ? entry.native_items.slice(0, 256).flatMap(item => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+        return [{
+          ...selectedFields(item, ["item_id", "name", "display_name", "description", "kind", "installed", "installed_version", "available_version", "update_status", "revision"]),
+          available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []
+        }];
+      }) : [];
+    }
     return [compact];
   }) : [];
   return {

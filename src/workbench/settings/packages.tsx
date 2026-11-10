@@ -8,6 +8,8 @@ import type { WorkbenchSettings } from "../settingsModel";
 
 import { actionPayloadComplete, type SettingsActionRequest } from "../settingsActions";
 import type { AgentPackageAccessRef } from "../workbenchModel-package-contracts";
+import { NativeSoftwareCatalog } from "../SoftwareSourcesPage";
+import { nativeSoftwareEntries, nativeSoftwareInventory, nativeSoftwareMatches } from "../softwareSources";
 
 import { SettingsPanelProps } from "./types";
 import { trapDialogFocus, statusTone, formatStatus } from "./presentation";
@@ -236,9 +238,11 @@ export function PackageCatalog({
     };
   }, [installOpen]);
   const locale = settings.locale;
-  const catalogLabel = kind === "agents" ? "智能体" : "扩展";
-  const catalogLabelEn = kind === "agents" ? "agents and workflows" : "extensions and apps";
+  const catalogLabel = kind === "all" ? "软件" : kind === "agents" ? "智能体" : "扩展";
+  const catalogLabelEn = kind === "all" ? "software, name or source" : kind === "agents" ? "agents and workflows" : "extensions and apps";
   const packages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && (kind === "all" || isAgentCatalogPackage(item)));
+  const nativeInventory = kind === "all" ? nativeSoftwareInventory(model.softwareSources) : null;
+  const nativeEntries = kind === "all" ? nativeSoftwareEntries(model.softwareSources) : [];
   const scoped = packages.filter((item) => scope === "all" || item.official);
   const manifestInstallAvailable = Boolean(
     manifestInstallAction
@@ -247,8 +251,8 @@ export function PackageCatalog({
     && manifestInstallAction.payloadFields.includes("manifest_url")
     && manifestInstallAction.payloadFields.includes("trust_tier")
   );
-  const statusOptions = [...new Set(["not_installed", ...scoped.map(agentPackagePresentationStatus)])].sort();
-  const updateStatusOptions = [...new Set(scoped.map(agentPackageUpdateStatus).filter((status) => status !== "not_installed"))].sort();
+  const statusOptions = [...new Set(["not_installed", ...scoped.map(agentPackagePresentationStatus), ...nativeEntries.map(({ item }) => item.installed === true ? "ready" : item.installed === false ? "not_installed" : "unknown")])].sort();
+  const updateStatusOptions = [...new Set([...scoped.map(agentPackageUpdateStatus), ...nativeEntries.map(({ item }) => item.updateStatus === "available" ? "update_available" : item.updateStatus)].filter((status) => status !== "not_installed"))].sort();
   const homeShortcutOrder = model.packageLifecycle.flatMap((item) => item.homeShortcuts.map((shortcut) => ({
     packageId: item.packageId,
     ...shortcut
@@ -260,9 +264,11 @@ export function PackageCatalog({
       : statusFilter !== "all" && agentPackagePresentationStatus(item) !== statusFilter) return false;
     return !normalizedQuery || item.searchMetadata.query.includes(normalizedQuery);
   });
-  const installedCount = packages.filter((item) => item.installed === true).length;
-  const installableCount = packages.filter((item) => packageInstallAllowed(item)).length;
-  const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length;
+  const visibleNative = nativeEntries.filter(({ source, item }) => nativeSoftwareMatches(item, source, query, statusFilter));
+  const totalCount = packages.length + nativeEntries.length;
+  const installedCount = packages.filter((item) => item.installed === true).length + (nativeInventory?.installed ?? 0);
+  const installableCount = packages.filter((item) => packageInstallAllowed(item)).length + (nativeInventory?.installable ?? 0);
+  const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length + (nativeInventory?.updatesAvailable ?? 0);
   const groups = [
     { key: "standard_agent", label: locale === "zh" ? "领域智能体" : "Domain agents", icon: Bot },
     { key: "workflow_profile", label: locale === "zh" ? "工作流" : "Workflows", icon: Boxes },
@@ -275,16 +281,16 @@ export function PackageCatalog({
       <div className="agent-catalog-heading">
         <div>
           <h2>{locale === "zh" ? "软件目录" : "Software catalog"}</h2>
-          <p>{locale === "zh" ? "来自 OPL Package Directory 的可发现条目；Homebrew 只负责系统依赖，不作为 Agent 目录。" : "Discoverable entries from the OPL Package Directory; Homebrew remains a system dependency carrier, not the Agent catalog."}</p>
+          <p>{locale === "zh" ? "统一查看智能体、工作流、桌面应用和命令行工具，按需安装与更新。" : "Browse agents, workflows, desktop apps and command-line tools together, then install and update what you need."}</p>
         </div>
-        <span className="agent-catalog-source">{locale === "zh" ? "Framework owner projection" : "Framework owner projection"}</span>
       </div>
       <div className="agent-catalog-inventory" role="status" aria-label={locale === "zh" ? "软件目录统计" : "Software catalog totals"}>
-        <span><strong>{packages.length}</strong>{locale === "zh" ? "个目录条目" : "catalog entries"}</span>
+        <span><strong>{totalCount}</strong>{locale === "zh" ? "个已读取条目" : "entries read"}</span>
         <span><strong>{installableCount}</strong>{locale === "zh" ? "个可安装" : "installable"}</span>
         <span><strong>{installedCount}</strong>{locale === "zh" ? "个已安装" : "installed"}</span>
         <span className={updateCount ? "has-update" : undefined}><strong>{updateCount}</strong>{locale === "zh" ? "个有更新" : "updates available"}</span>
       </div>
+      {nativeInventory && !nativeInventory.complete ? <p className="settings-inline-note" data-testid="opl-native-inventory-pending">{locale === "zh" ? "原生软件清单尚未完整读取。到“软件源”检查 Homebrew 后会补全这里的列表和数量。" : "The native software list is not fully loaded. Check Homebrew in Software sources to complete this list and its totals."}</p> : null}
       <div className="agent-catalog-toolbar">
         <label className="settings-search-field">
           <Search aria-hidden="true" size={14} />
@@ -316,7 +322,7 @@ export function PackageCatalog({
           {statusOptions.map((status) => <option key={status} value={status}>{formatStatus(status === "ready" ? "installed" : status, locale)}</option>)}
           {updateStatusOptions.map((status) => <option key={`update:${status}`} value={`update:${status}`}>{locale === "zh" ? `更新：${formatStatus(status, locale)}` : `Update: ${formatStatus(status, locale)}`}</option>)}
         </select>
-        <span>{locale === "zh" ? `显示 ${visible.length} / ${packages.length} 个条目` : `Showing ${visible.length} of ${packages.length} entries`}</span>
+        <span>{locale === "zh" ? `显示 ${visible.length + visibleNative.length} / ${totalCount} 个已读取条目` : `Showing ${visible.length + visibleNative.length} of ${totalCount} entries read`}</span>
       </div>
       {groups.length ? groups.map((group) => (
         <section key={group.key} className="agent-catalog-group">
@@ -499,9 +505,10 @@ export function PackageCatalog({
             })}
           </div>
         </section>
-      )) : (
+      )) : !visibleNative.length ? (
           <div className="settings-empty-state"><Search aria-hidden="true" size={18} /><span>{locale === "zh" ? "没有符合条件的项目" : "No matching items"}</span></div>
-      )}
+      ) : null}
+      {kind === "all" ? <NativeSoftwareCatalog projection={model.softwareSources} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} query={query} statusFilter={statusFilter} /> : null}
       {model.officialProfileRestore ? <details className="settings-secondary-details agent-catalog-recovery">
         <summary>{locale === "zh" ? "找不到原有扩展？" : "Missing a previously installed extension?"}</summary>
         <p className="settings-inline-note">{locale === "zh" ? "升级会保留安装选择。可恢复官方组合，或通过“添加扩展”逐项安装。" : "Upgrades preserve installation choices. Restore the official combination or use Add extension to install individually."}</p>

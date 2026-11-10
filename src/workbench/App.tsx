@@ -911,6 +911,9 @@ export function App({
         message: settings.locale === "zh" ? "当前以只读评估模式运行，预检查可用，但执行已被阻止。" : "The app is running in read-only evaluation mode. Preview is available, but execution is blocked."
       };
     }
+    if (/^(source_|knowledge_source_)/.test(receipt.actionId)) {
+      return { tone: "attention", message: settings.locale === "zh" ? `${label}尚未完成，请查看当前状态并重新检查；输入已保留。` : `${label} did not complete. Review the current status and check again; your input is retained.` };
+    }
     return {
       tone: "attention",
       message: receipt.blockedReason || receipt.stderr || (settings.locale === "zh" ? `${label}未完成。` : `${label} did not complete.`)
@@ -978,7 +981,7 @@ export function App({
         : null;
       let stateReadFailed = false;
       if (diagnostic) setDockerDiagnostic(diagnostic);
-      if (receipt.status === "executed") {
+      if (receipt.status === "executed" || /^(source_|knowledge_source_)/.test(receipt.actionId) && receipt.status !== "blocked_read_only") {
         captureManagedUpdateReceipt(receipt);
         if (request.actionId === "settings_diagnose_docker_webui") {
           // The doctor is a receipt-only read; its result is already authoritative
@@ -993,7 +996,7 @@ export function App({
       settleWorkbenchAction(request.key, { ...receipt, status: receipt.status });
       setSettingsActionFeedback(stateReadFailed ? {
         tone: "attention",
-        message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
+        message: settings.locale === "zh" ? "操作结果已返回，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action returned a result, but its latest state could not be read. Refresh to verify; do not submit it again."
       } : diagnostic ? {
         tone: diagnostic.status === "attention" || (diagnostic.attentionCount ?? 0) > 0 ? "attention" : "success",
         message: settings.locale === "zh"
@@ -1020,7 +1023,7 @@ export function App({
         dryRun: false
       });
       let stateReadFailed = false;
-      if (receipt.status === "executed") {
+      if (receipt.status === "executed" || /^(source_|knowledge_source_)/.test(receipt.actionId) && receipt.status !== "blocked_read_only") {
         captureManagedUpdateReceipt(receipt);
         const profile = model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === confirmation.request.actionId)) ? "full" : settings.runtimeProfile;
         stateReadFailed = await loadState(profile) === null;
@@ -1030,7 +1033,7 @@ export function App({
       settleWorkbenchAction(confirmation.request.key, { ...receipt, status: receipt.status });
       setSettingsActionFeedback(stateReadFailed ? {
         tone: "attention",
-        message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
+        message: settings.locale === "zh" ? "操作结果已返回，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action returned a result, but its latest state could not be read. Refresh to verify; do not submit it again."
       } : settingsReceiptFeedback(receipt, confirmation.request.label));
       setSettingsActionConfirmation(null);
     } catch (error) {
@@ -2776,6 +2779,9 @@ export function App({
     primaryView,
     applicationManagement: <ApplicationManagementPage
       model={model}
+      stateStatus={stateStatus}
+      stateError={stateError}
+      onApproveConnectionAccess={bridge.platformCapabilities.connectionAccessApproval ? approveConnectionAccess : undefined}
       settings={settings}
       managedUpdate={managedUpdate}
       actionViewModel={settingsActionViewModel}

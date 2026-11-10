@@ -991,6 +991,38 @@ test("fast state exposes only the Settings read model fields needed by the share
   assert.deepEqual(readModel.opl_gateway_account.actions, { disconnect: "gateway_account_disconnect" });
 });
 
+test("fast settings retain shared connection and knowledge controls without credential or source bodies", () => {
+  const request = { request_id: "request-1", consumer_package_id: "research", connection_id: "mail", status: "requested", connection_security_revision: "revision-uuid", capabilities: [{ capability_id: "mail.read", label: "Read mail", risk: "read", body: "private-marker" }], access_token: "private-marker" };
+  const compact = compactFastState({ app_state: { settings_control_center: { app_settings_read_model: {
+    connections: { default_connection_id: "mail", action_ids: ["connection_test", "connection_update", "connection_delete"], authorization: {
+      surface_kind: "opl_connection_authorization_projection.v1",
+      connections: [{ connection_id: "mail", name: "Work mail", security_revision: "revision-uuid", disabled: false, credential_handle: "private-marker" }],
+      requests: [request], grants: [{ ...request, grant_id: "grant-1", status: "granted" }],
+      invocations: [{ invocation_id: "run-1", disposition: "unknown_after_dispatch", arguments: { query: "private-marker" }, result: { body: "private-marker" } }],
+      available_connections: [{ mailbox_ref: "relay-mailbox://opaque", display_name: "Work mail", account_label: "user@example.test", provider_type: "opl-relay", token: "private-marker" }],
+      available_connections_status: "available"
+    } },
+    resource_sources: { surface_kind: "opl_knowledge_sources_projection.v1", status: "available",
+      contexts: [{ context_id: "personal", label: "Personal", selected: true, revision: "context-r1", available_scope_ids: ["personal"], root: "/private-marker/vault" }],
+      items: [{ resource_id: "resource-1", source_id: "obsidian", context_id: "personal", label: "Obsidian", status: "ready", scope_ids: ["personal"], source_writable: true, consumer_domain_ids: ["research"], authorization: { status: "authorized", token: "private-marker" }, revision: { status: "current", security_revision: "source-r1" }, freshness: { status: "fresh", observed_at: "2026-11-10T00:00:00Z" }, readiness: { status: "ready" }, action_ids: ["knowledge_source_check"], root: "/private-marker/vault", body_ref: "private-marker", body: "private-marker" }],
+      available_consumers: [{ domain_id: "research", label: "Research", package_id: "research-agent", path: "private-marker" }],
+      available_actions: [{ action_id: "knowledge_source_configure", label: "Configure", payload_fields: ["resource_id", "expected_revision"], default_payload: { resource_id: "resource-1", expected_revision: "source-r1", absolute_path: "/private-marker/vault" }, payload: { scope_ids: ["personal"], body: "private-marker" }, confirmation_required: true }],
+      authority_boundary: { body_included: false, absolute_paths_included: false, second_registry: false, source_owner: "profile_workspace_knowledge_registry", path: "private-marker" }
+    }
+  } } } });
+  const readModel = compact.app_state.settings_control_center.app_settings_read_model;
+  assert.deepEqual(readModel.connections.action_ids, ["connection_test", "connection_update", "connection_delete"]);
+  assert.equal(readModel.connections.authorization.connections[0].security_revision, "revision-uuid");
+  assert.equal(readModel.connections.authorization.grants[0].grant_id, "grant-1");
+  assert.equal(readModel.connections.authorization.invocations[0].disposition, "unknown_after_dispatch");
+  assert.equal(readModel.connections.authorization.available_connections[0].mailbox_ref, "relay-mailbox://opaque");
+  assert.equal(readModel.connections.authorization.available_connections_status, "available");
+  assert.equal(readModel.resource_sources.contexts[0].revision, "context-r1");
+  assert.equal(readModel.resource_sources.items[0].authorization.status, "authorized");
+  assert.deepEqual(readModel.resource_sources.available_actions[0].default_payload, { resource_id: "resource-1", expected_revision: "source-r1" });
+  assert.equal(JSON.stringify(readModel).includes("private-marker"), false);
+});
+
 test("fast state keeps the complete package catalog and bounded runtime control projection", () => {
   const entries = Array.from({ length: 12 }, (_, index) => ({
     package_id: `package-${index}`,

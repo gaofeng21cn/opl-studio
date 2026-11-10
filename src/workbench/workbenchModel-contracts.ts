@@ -2,6 +2,7 @@ import type { WorkbenchPurpose, WorkbenchArtifactRef, WorkspaceSession, Artifact
 import type { AgentPackageLifecycleRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
 import type { WorkItemRuntimeProjection, RuntimeOverviewRef } from "./workbenchModel-runtime-contracts";
 import type { WorkbenchGatewayAccount, WorkbenchSettingsProjection } from "./workbenchModel-settings-contracts";
+import type { KnowledgeSourcesProjection } from "./knowledgeSources";
 
 import { deriveFeatureRefs } from "./featureModel";
 
@@ -38,6 +39,7 @@ export type WorkbenchModel = {
   actionReceipts: ActionReceiptSummary[];
   packageLifecycle: AgentPackageLifecycleRef[];
   softwareSources?: SoftwareSourcesProjection;
+  knowledgeSources?: KnowledgeSourcesProjection;
   officialProfileRestore?: WorkbenchActionRef;
   starters: WorkbenchStarter[];
   confirmations: ConfirmationCard[];

@@ -21,7 +21,7 @@ const passthrough = read("src/host/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
 const model = read("src/workbench/workbenchModel.ts");
 const runtimePage = read("src/workbench/RuntimeOverviewPage.tsx");
-const applicationManagementPage = read("src/workbench/ApplicationManagementPage.tsx");
+const applicationManagementPage = read("src/workbench/ApplicationManagementPage.tsx") + read("src/workbench/SharedResourcesPage.tsx") + read("src/workbench/KnowledgeSourcesSection.tsx");
 const runtimeCache = read("src/workbench/runtimeOverviewCache.ts");
 const settingsPanel = read("src/workbench/SettingsPanel.tsx") + fs.readdirSync(path.join(root, 'src/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'src/workbench/settings', file), 'utf8')).join('\n');
 const styleSources = [
@@ -177,7 +177,7 @@ test("Studio exposes one App-owned application management surface", () => {
   assert.match(applicationManagementPage, /PackageCatalog kind="all"/);
   assert.match(applicationManagementPage, /UpdatesSettingsPage/);
   assert.match(applicationManagementPage, /model\.applicationManagement\?\.sharedResources/);
-  assert.match(applicationManagementPage, /resourceKindLabel/);
+  assert.match(applicationManagementPage, /KnowledgeSourcesSection/);
   assert.match(applicationManagementPage, /opl-app-management-knowledge-empty/);
   assert.doesNotMatch(applicationManagementPage, /Open owner|查看 Owner|第二套依赖注册表/);
   assert.match(applicationManagementPage, /ArrowRight|ArrowLeft/);

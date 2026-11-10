@@ -493,6 +493,58 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     color: var(--opl-muted);
   }
 
+  .opl-app-management-state { width: min(100%, 960px); margin: 12px auto 0; padding: 12px 0; color: var(--opl-muted); font-size: var(--opl-text-sm); line-height: var(--opl-leading-relaxed); }
+  .opl-app-management-state[data-tone="attention"] { color: var(--opl-warning); }
+  .opl-app-management-state p { margin: 0 0 8px; overflow-wrap: anywhere; }
+  .opl-app-management-state details { margin-top: 8px; }
+  .opl-app-management-state summary, .opl-resource-details summary { cursor: pointer; }
+  .opl-resource-intro { margin: 0 0 24px; max-width: 72ch; color: var(--opl-muted); font-size: var(--opl-text-sm); line-height: var(--opl-leading-relaxed); }
+  .opl-resource-section { margin: 30px 0; }
+  .opl-resource-section-heading h2 { margin: 0; font-size: var(--opl-text-lg); font-weight: var(--opl-weight-semibold); }
+  .opl-resource-section-heading p, .opl-resource-group-heading p { margin: 5px 0 12px; max-width: 72ch; color: var(--opl-muted); font-size: var(--opl-text-sm); line-height: var(--opl-leading-relaxed); }
+  .opl-resource-section > .settings-group { margin-top: 18px; }
+  .opl-resource-group-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .opl-resource-group-heading > p { flex: 1; }
+  .opl-resource-group-heading > .runtime-setting-control { flex: 0 0 auto; }
+  .opl-shared-resource-list { min-width: 0; }
+  .opl-shared-resource-row { padding: 16px 0; border-top: 1px solid var(--opl-border); }
+  .opl-shared-resource-heading, .opl-shared-resource-footer { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .opl-shared-resource-heading > div { min-width: 0; }
+  .opl-shared-resource-heading h3 { margin: 0; font-size: var(--opl-text-sm); font-weight: var(--opl-weight-semibold); overflow-wrap: anywhere; }
+  .opl-shared-resource-heading p { margin: 5px 0 0; color: var(--opl-muted); font-size: var(--opl-text-xs); line-height: var(--opl-leading-relaxed); overflow-wrap: anywhere; }
+  .opl-shared-resource-footer { margin-top: 12px; align-items: center; }
+  .opl-shared-resource-footer > span { color: var(--opl-muted); font-size: var(--opl-text-xs); }
+  .opl-resource-details { margin-top: 12px; color: var(--opl-muted); font-size: var(--opl-text-xs); }
+  .opl-resource-details summary { width: fit-content; }
+  .opl-resource-details dl { display: grid; gap: 6px; margin: 10px 0; }
+  .opl-resource-details dl > div { display: grid; grid-template-columns: minmax(100px, .4fr) minmax(0, 1fr); gap: 12px; }
+  .opl-resource-details dd { margin: 0; overflow-wrap: anywhere; }
+  .opl-resource-form { margin: 18px 0 8px; padding-top: 20px; border-top: 1px solid var(--opl-border); max-width: 720px; color: var(--opl-text); font-size: var(--opl-text-sm); }
+  .opl-resource-form-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .opl-resource-form h3 { margin: 0; font-size: var(--opl-text-sm); font-weight: var(--opl-weight-semibold); }
+  .opl-resource-form > label, .opl-resource-form .opl-resource-details > label { display: grid; gap: 7px; margin: 14px 0; }
+  .opl-resource-form input:not([type="checkbox"]), .opl-resource-form select { min-width: 0; width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--opl-border); border-radius: 6px; background: var(--opl-canvas); color: var(--opl-text); font: inherit; }
+  .opl-resource-form input::placeholder { color: var(--opl-muted); }
+  .opl-resource-form :is(input, select, button, summary):focus-visible, .opl-resource-details summary:focus-visible { outline: 2px solid color-mix(in srgb, var(--opl-text) 55%, transparent); outline-offset: 2px; }
+  .opl-resource-form input[type="checkbox"] { accent-color: var(--opl-text); width: 16px; height: 16px; }
+  .opl-resource-form fieldset { min-width: 0; margin: 22px 0 0; padding: 0; border: 0; }
+  .opl-resource-form legend { padding: 0; font-weight: var(--opl-weight-medium); }
+  .opl-resource-form fieldset > p { margin: 6px 0 12px; color: var(--opl-muted); line-height: var(--opl-leading-relaxed); }
+  .opl-resource-consumers > div { display: flex; justify-content: space-between; align-items: center; gap: 18px; min-height: 40px; border-bottom: 1px solid var(--opl-border); }
+  .opl-resource-consumers label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .opl-resource-consumers label:first-child { flex: 1; }
+  .opl-resource-consumers label > span { overflow-wrap: anywhere; }
+  .opl-resource-consumers label:last-child { color: var(--opl-muted); font-size: var(--opl-text-xs); flex: 0 0 auto; }
+  .opl-resource-form-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+  .opl-resource-form-error { color: var(--opl-warning); line-height: var(--opl-leading-relaxed); }
+  @media (max-width: 680px) {
+    .opl-resource-group-heading, .opl-shared-resource-footer { flex-direction: column; gap: 10px; align-items: flex-start; }
+    .opl-resource-group-heading > p { margin-bottom: 0; }
+    .opl-resource-group-heading { margin-bottom: 16px; }
+    .opl-resource-form-actions { justify-content: flex-start; }
+    .opl-app-management-resources .runtime-setting-control { justify-content: flex-start; }
+  }
+
   @media (max-width: 680px) {
     .opl-app-management {
       padding-right: 16px;
@@ -536,5 +588,9 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     .opl-software-source-actions {
       justify-content: flex-start;
     }
+  }
+  @media (max-width: 480px) {
+    .opl-app-management-tabs button { flex: 1 0 auto; padding-inline: 8px; }
+    .opl-app-management-tabs button svg { display: none; }
   }
 `;

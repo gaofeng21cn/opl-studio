@@ -572,3 +572,54 @@ test("software source management keeps private credentials refs-only", async () 
   assert.doesNotMatch(html, /provider:github_packages:gh-cli/);
   assert.doesNotMatch(html, /访问令牌/);
 });
+
+test("native software shares the application catalog and dispatches revision-bound lifecycle actions", async () => {
+  const { createElement } = await import("react");
+  const { createRoot } = await import("react-dom/client");
+  const { flushSync } = await import("react-dom");
+  const { Window } = await import("happy-dom");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { NativeSoftwareList } = await import("../../src/workbench/SoftwareSourcesPage.tsx");
+  const { nativeSoftwareEntries } = await import("../../src/workbench/softwareSources.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", entry_count: 1, native_items: [{
+        item_id: "cask:studio", name: "studio", display_name: "Native Studio", kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "r1",
+        available_actions: ["source_update", "source_uninstall"].map(action_id => ({ action_id, status: "available", payload_fields: ["source_id", "item_id", "expected_revision"], default_payload: { source_id: "homebrew", item_id: "cask:studio", expected_revision: "r1" }, confirmation_required: true }))
+      }]
+    }]
+  } } } });
+  const browser = new Window({ url: "http://localhost/" });
+  const keys = ["window", "document", "HTMLElement", "Node"] as const;
+  const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  keys.forEach(key => Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === "window" ? browser : browser[key] }));
+  const container = browser.document.createElement("div");
+  browser.document.body.append(container);
+  const root = createRoot(container as unknown as Element);
+  const actions: unknown[] = [];
+  try {
+    flushSync(() => root.render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction: action => actions.push(action) })));
+    assert.match(container.textContent!, /Native Studio/);
+    assert.match(container.textContent!, /来源版本 2/);
+    assert.equal(container.querySelectorAll('[aria-label="按状态筛选"]').length, 1);
+    const filter = container.querySelector('[aria-label="按状态筛选"]') as HTMLSelectElement;
+    flushSync(() => { filter.value = "not_installed"; filter.dispatchEvent(new browser.Event("change", { bubbles: true })); });
+    assert.equal(container.querySelector('[data-testid="opl-native-software-row"]'), null);
+    flushSync(() => { filter.value = "update:update_available"; filter.dispatchEvent(new browser.Event("change", { bubbles: true })); });
+    const update = [...container.querySelectorAll("button")].find(button => button.textContent === "更新")!;
+    update.click();
+    assert.equal((actions[0] as { actionId: string }).actionId, "source_update");
+    assert.deepEqual((actions[0] as { payload: unknown }).payload, { source_id: "homebrew", item_id: "cask:studio", expected_revision: "r1" });
+    assert.equal((actions[0] as { confirmationRequired: boolean }).confirmationRequired, true);
+    const entries = nativeSoftwareEntries(model.softwareSources);
+    entries[0]!.item.revision = "r2";
+    flushSync(() => root.render(createElement(NativeSoftwareList, { entries, locale: "zh", actionBusyKey: null, onAction: action => actions.push(action) })));
+    assert.equal([...container.querySelectorAll("button")].some(button => button.textContent === "更新" || button.textContent === "卸载"), false);
+  } finally {
+    flushSync(() => root.unmount());
+    await new Promise(resolve => setImmediate(resolve));
+    browser.close();
+    keys.forEach(key => { const original = originals.get(key); if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); });
+  }
+});
