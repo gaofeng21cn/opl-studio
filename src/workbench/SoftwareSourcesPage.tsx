@@ -5,7 +5,7 @@ import { catalogDisplayName, SoftwareCatalogIdentity, SoftwareCatalogVersions } 
 import type { WorkbenchSettings } from "./settingsModel";
 import type { CatalogOrigin, NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
 import { actionPayloadComplete, type SettingsActionRequest } from "./settingsActions";
-import { nativeSoftwareEntries, nativeSoftwareMatches, nativeCarrierInstalled, nativeInstallationLabel, softwareSourceActionLabel, softwareSourceStatusLabel, softwareSourceStatusTone } from "./softwareSources";
+import { nativeSoftwareEntries, nativeSoftwareMatches, nativeCarrierInstalled, nativeInstallationLabel, nativeInstalledDisplayVersion, nativeAvailableDisplayVersion, softwareSourceActionLabel, softwareSourceStatusLabel, softwareSourceStatusTone } from "./softwareSources";
 
 function sourceHref(value: string): string | null {
   try {
@@ -50,7 +50,8 @@ export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction, c
   return <div className="agent-package-list" data-testid="opl-native-software-list">{entries.map(({ source, item }) => {
     const carrierInstalled = nativeCarrierInstalled(item);
     const displayInstalled = channelView ? carrierInstalled : item.installed;
-    const displayVersion = channelView ? (item.homebrewInstalled === undefined ? item.installedVersion : item.homebrewInstalledVersion) : item.installedVersion;
+    const receiptVersion = item.homebrewInstalled === undefined ? item.installedVersion : item.homebrewInstalledVersion;
+    const displayVersion = channelView ? (carrierInstalled === true ? (zh ? "有记录" : "Recorded") : undefined) : nativeInstalledDisplayVersion(item);
     const displayName = catalogDisplayName(item.displayName, item.displayNameI18n, locale);
     const description = item.descriptionI18n?.[locale]?.trim() || item.description?.trim()
       || (zh ? "尚未提供软件说明。" : "No software description provided.");
@@ -64,15 +65,26 @@ export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction, c
     const busy = actionBusyKey?.startsWith(`source:${source.sourceId}:${item.itemId}:`) === true;
     return <details key={`${source.sourceId}:${item.itemId}`} className="agent-package-row software-catalog-row" data-testid="opl-native-software-row" data-item-id={item.itemId} aria-busy={busy}>
       <summary>
-        <SoftwareCatalogIdentity name={displayName} id={item.name} description={description} kind={item.kind === "cask" ? (zh ? "桌面应用" : "Desktop app") : (zh ? "命令行工具" : "Command-line tool")} publisher={source.displayName} />
-        <SoftwareCatalogVersions installedLabel={channelView ? (zh ? "渠道版本" : "Channel version") : undefined} missingLabel={channelView ? (zh ? "无记录" : "No receipt") : undefined} installed={displayInstalled} installedVersion={displayVersion} availableVersion={item.availableVersion} locale={locale} />
+        <SoftwareCatalogIdentity name={displayName} id={item.name} description={description} kind={item.kind === "cask" ? (zh ? "桌面应用" : "Desktop app") : (zh ? "命令行工具" : "Command-line tool")} publisher={source.displayName} channel={!channelView && item.installedBuildKind === "local-development" ? (zh ? "开发版" : "Development build") : undefined} />
+        <SoftwareCatalogVersions installedLabel={channelView ? (zh ? "Homebrew 记录" : "Homebrew receipt") : undefined} missingLabel={channelView ? (zh ? "无记录" : "No receipt") : undefined} installed={displayInstalled} installedVersion={displayVersion} availableVersion={nativeAvailableDisplayVersion(item)} locale={locale} />
         <span className="agent-package-summary-actions">
           <span className="settings-status" data-tone={item.updateStatus === "available" ? "attention" : displayInstalled === true ? "ready" : "neutral"}><span aria-hidden="true" />{item.updateStatus === "available" ? (zh ? "有更新" : "Update available") : displayInstalled === true ? (zh ? "已安装" : "Installed") : displayInstalled === false ? (zh ? (channelView ? "无渠道安装记录" : "未安装") : (channelView ? "No channel receipt" : "Not installed")) : (zh ? "待确认" : "Not confirmed")}</span>
           {primary ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null} onClick={event => { event.preventDefault(); run(primary); }}>{busy ? <LoaderCircle className="spin" size={13} aria-hidden="true" /> : null}{softwareSourceActionLabel(primary.actionId, locale, primary.label)}</button> : null}
           <ChevronDown className="agent-package-chevron" size={15} aria-hidden="true" />
         </span>
       </summary>
-      <div className="agent-package-details"><dl className="agent-state-axis-grid"><div><dt>{zh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.name}</code></dd></div><div><dt>{zh ? "软件源" : "Software source"}</dt><dd>{source.displayName}</dd></div><div><dt>{zh ? "安装位置" : "Installation"}</dt><dd>{nativeInstallationLabel(item, locale)}</dd></div><div><dt>{zh ? "来源版本" : "Source version"}</dt><dd>{item.availableVersion ?? (zh ? "待确认" : "Not confirmed")}</dd></div><div><dt>{zh ? "已安装版本" : "Installed version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (zh ? "未由 Homebrew 安装" : "Not installed through Homebrew") : (zh ? "待确认" : "Not confirmed"))}</dd></div><div><dt>{zh ? "更新状态" : "Update status"}</dt><dd>{nativeUpdateLabel(item, zh)}</dd></div></dl><p className="settings-inline-note">{zh ? "版本来自本机 Homebrew 目录。更新软件源目录后可检查新的发布版本。" : "Versions come from the local Homebrew catalog. Update the source catalog to check new releases."}</p>{executable.length ? <div className="agent-package-actions">{executable.map(action => <button key={action.actionId} type="button" className={`settings-action-button${action.actionId === "source_uninstall" ? " danger" : ""}`} disabled={actionBusyKey !== null} onClick={() => run(action)}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</button>)}</div> : <p className="settings-inline-note">{channelView && carrierInstalled === false ? (zh ? "此渠道尚无安装记录。" : "This channel has no installation receipt.") : (zh ? "当前没有可执行的管理操作，请检查软件源状态。" : "No management action is available. Check the software source status.")}</p>}</div>
+      <div className="agent-package-details"><dl className="agent-state-axis-grid">
+        <div><dt>{zh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.name}</code></dd></div>
+        <div><dt>{zh ? "软件源" : "Software source"}</dt><dd>{source.displayName}</dd></div>
+        <div><dt>{zh ? "安装位置" : "Installation"}</dt><dd>{nativeInstallationLabel(item, locale)}</dd></div>
+        <div><dt>{zh ? "来源版本" : "Source version"}</dt><dd>{nativeAvailableDisplayVersion(item) ?? (zh ? "待确认" : "Not confirmed")}</dd></div>
+        {item.availableDisplayVersion && item.availableVersion !== item.availableDisplayVersion ? <div><dt>{zh ? "Homebrew 配方版本" : "Homebrew recipe version"}</dt><dd>{item.availableVersion}</dd></div> : null}
+        <div><dt>{zh ? "本机版本" : "Local version"}</dt><dd>{nativeInstalledDisplayVersion(item) ?? (item.installed === false ? (zh ? "未安装" : "Not installed") : (zh ? "待确认" : "Not confirmed"))}{item.installedBuildKind === "local-development" ? ` · ${zh ? "开发版" : "Development build"}` : ""}</dd></div>
+        {item.installedDisplayVersion && item.installedVersion !== item.installedDisplayVersion ? <div><dt>{zh ? "本机机器版本" : "Local machine version"}</dt><dd>{item.installedVersion}</dd></div> : null}
+        {item.installedBuildId ? <div><dt>{zh ? "构建 ID" : "Build ID"}</dt><dd><code>{item.installedBuildId}</code></dd></div> : null}
+        {channelView ? <div><dt>{zh ? "Homebrew 安装记录" : "Homebrew installation receipt"}</dt><dd>{receiptVersion ?? (carrierInstalled === false ? (zh ? "无记录" : "No receipt") : (zh ? "待确认" : "Not confirmed"))}</dd></div> : null}
+        <div><dt>{zh ? "更新状态" : "Update status"}</dt><dd>{nativeUpdateLabel(item, zh)}</dd></div>
+      </dl><p className="settings-inline-note">{zh ? "来源版本来自本机 Homebrew 目录。更新软件源目录后可检查新的发布版本。" : "Source versions come from the local Homebrew catalog. Update the source catalog to check new releases."}</p>{executable.length ? <div className="agent-package-actions">{executable.map(action => <button key={action.actionId} type="button" className={`settings-action-button${action.actionId === "source_uninstall" ? " danger" : ""}`} disabled={actionBusyKey !== null} onClick={() => run(action)}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</button>)}</div> : <p className="settings-inline-note">{channelView && carrierInstalled === false ? (zh ? "此渠道尚无安装记录。" : "This channel has no installation receipt.") : (zh ? "当前没有可执行的管理操作，请检查软件源状态。" : "No management action is available. Check the software source status.")}</p>}</div>
     </details>;
   })}</div>;
 }

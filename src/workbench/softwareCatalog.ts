@@ -1,6 +1,6 @@
 import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
 import type { NativeSoftwareItemRef } from "./workbenchModel-package-contracts";
-import { nativeSoftwareProducts } from "./softwareSources";
+import { nativeAvailableDisplayVersion, nativeSoftwareProducts } from "./softwareSources";
 import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
 
 export type SoftwareCatalogScope = "opl" | "external" | "components";
@@ -81,7 +81,8 @@ export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLif
 /** Multiple channels need an explicit receipt before one becomes the selected version. */
 export function nativeCatalogAvailableVersion(product: ReturnType<typeof nativeSoftwareProducts>[number], locale: "zh" | "en") {
   const selected = product.channels.filter(channel => channel.item.homebrewInstalled === true);
-  if (selected.length === 1) return selected[0].item.availableVersion;
+  if (selected.length === 1) return nativeAvailableDisplayVersion(selected[0].item);
   const versions = [...new Set(product.channels.map(channel => channel.item.availableVersion).filter(Boolean))];
-  return versions.length > 1 ? (locale === "zh" ? "多个渠道" : "Multiple channels") : versions[0] ?? product.item.availableVersion;
+  return versions.length > 1 ? (locale === "zh" ? "多个渠道" : "Multiple channels")
+    : nativeAvailableDisplayVersion(product.channels.find(channel => channel.item.availableVersion)?.item ?? product.item);
 }
