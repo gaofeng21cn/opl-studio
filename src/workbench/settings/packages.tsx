@@ -27,21 +27,14 @@ export function packageRoleLabel(role: string, locale: WorkbenchSettings["locale
 }
 
 export function localizedPackageDescription(
-  item: Pick<AgentPackageLifecycleRef, "description" | "descriptionI18n" | "packageRole">,
+  item: Pick<AgentPackageLifecycleRef, "description" | "descriptionI18n">,
   locale: WorkbenchSettings["locale"]
 ): string {
   const ownerLocalized = item.descriptionI18n[locale]?.trim();
   if (ownerLocalized) return ownerLocalized;
   const englishFallback = item.descriptionI18n.en?.trim() || item.description.trim();
   if (englishFallback) return englishFallback;
-  const fallback: Record<string, [string, string]> = {
-    standard_agent: ["用于专业任务规划、执行与交付的领域智能体。", "A domain agent for planning, execution, and delivery."],
-    workflow_profile: ["提供可复用的任务流程与执行步骤。", "Provides reusable task workflows and execution steps."],
-    capability_package: ["为智能体提供共享能力与连接支持。", "Provides shared capabilities and connections for agents."],
-    framework_capability_package: ["为智能体提供共享能力与连接支持。", "Provides shared capabilities and connections for agents."]
-  };
-  return fallback[item.packageRole]?.[locale === "zh" ? 0 : 1]
-    ?? (locale === "zh" ? "提供可在 One Person Lab 中使用的扩展能力。" : "Adds capabilities to One Person Lab.");
+  return locale === "zh" ? "尚未提供软件说明。" : "No software description provided.";
 }
 
 export function packageActionLabel(action: PackageLifecycleActionRef, locale: WorkbenchSettings["locale"]): string {
