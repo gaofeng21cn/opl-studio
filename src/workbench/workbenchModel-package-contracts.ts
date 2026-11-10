@@ -146,6 +146,8 @@ export type NativeSoftwareItemRef = {
   name: string;
   displayName: string;
   description?: string;
+  displayNameI18n?: AgentPackageLocalizedText;
+  descriptionI18n?: AgentPackageLocalizedText;
   kind: "formula" | "cask";
   installed: boolean | null;
   installedVersion?: string;
@@ -171,6 +173,8 @@ export type AgentPackageLifecycleRef = {
   description: string;
   publisher: string;
   packageRole: string;
+  /** Publication channel reported by the catalog owner, independent of installation. */
+  releaseChannel?: "preview" | "stable";
   roleGroup: "agent" | "workflow" | "supporting" | "other";
   official: boolean;
   displayNameI18n: AgentPackageLocalizedText;
@@ -200,6 +204,7 @@ export type AgentPackageLifecycleRef = {
   /** Registry access is independent of local install and business runtime grants. */
   access?: AgentPackageAccessRef;
   installable?: boolean | null;
+  installabilityReason?: string;
   automaticUpdate: boolean | null;
   homeShortcuts: AgentPackageShortcutRef[];
   recommendedActionId?: string;

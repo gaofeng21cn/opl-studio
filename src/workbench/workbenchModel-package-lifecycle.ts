@@ -574,6 +574,8 @@ function packageLifecycleItem(
     description: firstStringField(record, ["description"]) ?? "",
     publisher,
     packageRole,
+    ...(record.release_channel === "preview" || record.release_channel === "stable"
+      ? { releaseChannel: record.release_channel } : {}),
     roleGroup,
     official,
     displayNameI18n: asLocalizedText(record.display_name_i18n),
@@ -593,6 +595,7 @@ function packageLifecycleItem(
     sourceMode: packageSourceMode(record),
     access: packageAccess(record),
     installable: asOptionalBoolean(asRecord(record.installability)?.installable),
+    installabilityReason: asString(asRecord(record.installability)?.reason) ?? undefined,
     automaticUpdate: packageAutomaticUpdate(record),
     homeShortcuts,
     ...(firstStringField(record, ["recommended_action", "recommendedAction"])

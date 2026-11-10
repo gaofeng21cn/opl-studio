@@ -1,5 +1,5 @@
 import type { NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
-import { asOptionalBoolean, asRecord, asRecordArray, asString, asStringArray } from "./workbenchModel-primitives";
+import { asLocalizedText, asOptionalBoolean, asRecord, asRecordArray, asString, asStringArray } from "./workbenchModel-primitives";
 
 const statuses = new Set(["public", "authorized", "signed_out", "forbidden", "expired", "revoked"]);
 
@@ -21,6 +21,8 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
   return {
     itemId, name, displayName: asString(item.display_name) ?? name,
     description: asString(item.description) ?? undefined,
+    displayNameI18n: asLocalizedText(item.display_name_i18n),
+    descriptionI18n: asLocalizedText(item.description_i18n),
     kind: item.kind as NativeSoftwareItemRef["kind"],
     installed: asOptionalBoolean(item.installed),
     installedVersion: asString(item.installed_version) ?? undefined,
@@ -156,7 +158,9 @@ export function nativeSoftwareInventory(projection?: SoftwareSourcesProjection) 
 
 export function nativeSoftwareMatches(item: NativeSoftwareItemRef, source: SoftwareSourceRef, query: string, statusFilter: string): boolean {
   const normalizedQuery = query.trim().toLowerCase();
-  if (normalizedQuery && ![item.name, item.displayName, item.description, source.displayName, source.sourceRef].join(" ").toLowerCase().includes(normalizedQuery)) return false;
+  if (normalizedQuery && ![item.itemId, item.name, item.displayName, item.description,
+    ...Object.values(item.displayNameI18n ?? {}), ...Object.values(item.descriptionI18n ?? {}),
+    source.displayName, source.sourceRef].join(" ").toLowerCase().includes(normalizedQuery)) return false;
   if (statusFilter === "all") return true;
   if (statusFilter === "ready" || statusFilter === "installed") return item.installed === true;
   if (statusFilter === "not_installed") return item.installed === false;

@@ -525,12 +525,11 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   }
 
   .agent-package-copy > strong {
-    overflow: hidden;
     color: var(--opl-text);
-    font-size: var(--opl-text-md);
+    font-size: var(--opl-text-body);
     font-weight: var(--opl-weight-semibold);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: var(--opl-leading-normal);
+    overflow-wrap: anywhere;
   }
 
   .agent-package-copy > small {
@@ -560,7 +559,6 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    margin-left: 8px;
     color: var(--opl-muted);
     font-size: var(--opl-text-xs);
     white-space: nowrap;
@@ -586,6 +584,155 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     display: grid;
     gap: 13px;
     padding: 2px 0 16px;
+  }
+
+  .agent-package-row.software-catalog-row > summary {
+    grid-template-columns: minmax(0, 1fr) minmax(145px, 180px) minmax(115px, auto);
+    gap: 24px;
+    min-height: 118px;
+    padding: 18px 12px;
+    margin-inline: -12px;
+    cursor: pointer;
+    border-radius: var(--opl-radius-control);
+  }
+
+  .agent-package-row.software-catalog-row > summary:hover {
+    background: var(--opl-hover);
+  }
+
+  .agent-package-row.software-catalog-row > summary:focus-visible {
+    outline: 2px solid var(--opl-accent);
+    outline-offset: 2px;
+  }
+
+  .software-catalog-row .agent-package-copy {
+    gap: 5px;
+  }
+
+  .software-catalog-title {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+
+  .software-catalog-channel {
+    padding: 2px 6px;
+    border: 1px solid var(--opl-border);
+    border-radius: var(--opl-radius-control);
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-normal);
+    white-space: nowrap;
+  }
+
+  .software-catalog-identity {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 7px;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+  }
+
+  .software-catalog-identity code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .software-catalog-kind::before {
+    content: "·";
+    margin-right: 7px;
+  }
+
+  .software-catalog-description {
+    max-width: 70ch;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-sm);
+    line-height: var(--opl-leading-relaxed);
+  }
+
+  .software-catalog-publisher {
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+  }
+
+  .software-catalog-versions {
+    min-width: 0;
+    display: grid;
+    gap: 7px;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .software-catalog-versions > span {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 8px;
+  }
+
+  .software-catalog-versions > span > span {
+    flex: 0 0 4em;
+  }
+
+  .software-catalog-versions strong {
+    min-width: 0;
+    color: var(--opl-text);
+    font-weight: var(--opl-weight-medium);
+    overflow-wrap: anywhere;
+  }
+
+  .software-catalog-versions strong[data-unknown="true"] {
+    color: var(--opl-muted);
+    font-weight: var(--opl-weight-regular);
+  }
+
+  .software-catalog-row .agent-package-summary-actions {
+    flex-wrap: wrap;
+    max-width: 180px;
+    row-gap: 10px;
+  }
+
+  .software-catalog-update {
+    margin: 0;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-sm);
+  }
+
+  .software-catalog-row .agent-package-details {
+    padding: 0 0 20px;
+  }
+
+  @media (max-width: 900px) {
+    .agent-package-row.software-catalog-row > summary {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px 18px;
+    }
+
+    .software-catalog-row .agent-package-copy { grid-column: 1; }
+    .software-catalog-row .agent-package-summary-actions { grid-column: 2; grid-row: 1 / 3; }
+    .software-catalog-versions { grid-column: 1; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    .software-catalog-versions > span > span { flex-basis: auto; }
+  }
+
+  @media (max-width: 760px) {
+    .agent-catalog .agent-catalog-toolbar .settings-search-field { flex: 0 0 auto; min-height: 40px; }
+  }
+
+  @media (max-width: 560px) {
+    .agent-package-row.software-catalog-row > summary { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-block: 18px; }
+    .software-catalog-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .software-catalog-versions > span { display: grid; gap: 4px; }
+    .software-catalog-row .agent-package-summary-actions { max-width: none; justify-content: flex-end; }
+    .software-catalog-row .agent-package-summary-actions > .settings-status { margin-right: auto; }
+    .software-catalog-row .agent-package-summary-actions .settings-action-button { min-height: 36px; }
   }
 
   .agent-package-details > dl,

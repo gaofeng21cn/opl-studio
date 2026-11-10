@@ -65,7 +65,7 @@ function compactManagedUpdateProjection(value) {
 
 const packageFields = [
   "package_id", "packageId", "agent_id", "module_id", "id",
-  "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role",
+  "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role", "release_channel",
   "lifecycle_status", "status", "install_state", "install_status", "health_status",
   "update_state", "update_status", "source_state", "trust_state", "trust_tier",
   "codex_surface_state", "codex_visible_entry", "codex_surface_ref", "shortcut_id", "display_policy",
@@ -299,6 +299,8 @@ function compactSoftwareSources(value) {
         if (!item || typeof item !== "object" || Array.isArray(item)) return [];
         return [{
           ...selectedFields(item, ["item_id", "name", "display_name", "description", "kind", "installed", "installed_version", "available_version", "update_status", "revision"]),
+          display_name_i18n: compactLocalizedText(item.display_name_i18n),
+          description_i18n: compactLocalizedText(item.description_i18n),
           available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []
         }];
       }) : [];
