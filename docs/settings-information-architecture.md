@@ -6,12 +6,34 @@ Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 st
 
 ## 统一应用管理
 
-一级“应用管理”与主对话并行，分为“我的应用、更新、共享资源、软件源”。
-“我的应用”统一展示领域智能体、工作流、应用与共享能力，以及 Homebrew 管理的
-原生 App 和命令行工具，共用搜索、状态筛选和统计。Package 来自 Framework
-目录，原生软件来自同一个软件源的 `native_items` 投影。软件源页复用相同行组件；
-“更新”页复用其待更新筛选。设置中的“扩展与应用”和“智能体”仍消费同一目录。
+一级“应用管理”与主对话并行，分为“软件目录、更新、共享资源、软件源”。
+目录以独立软件为对象，按 owner 声明的 `software_type` 分为应用、智能体、能力包；
+非标准智能体同样属于智能体，未知类型单独显示“类型待确认”。技术 `package_role`
+只在详情解释，不替代产品类型。`catalog_scope=host_component` 的宿主组件可切换
+查看；缺少 scope 的旧投影显示“分类待确认”，不自动计入软件总数。概念仓、源码
+开发依赖和个人数据不因出现在仓库清单中就成为目录软件。
 
+列表保留 DSH Plugin Manager 的官方列表、详情、导航与控件；OPL 的描述插槽展示
+正式名称、稳定 ID、用途、本机版本与来源版本。产品成熟度只接受 owner 声明，
+`development_only`、固定源码分发、`0.x` 版本都不能推导成“预览版”。
+软件源的发行包或固定源码版本在详情显示，来源版本不称为“最新版本”。
+
+Package 来自 Framework 目录，原生分发渠道来自软件源 `native_items`；本机基座安装由根 `installed_products` 独立投影，未安装 Homebrew 或尚未检查软件源时也可读取。原生产品按
+`product_id` 去重；同一 App 的 Standard、Full、Nightly 配方在详情列为安装渠道，
+不重复计算软件数。详情采用 owner 的 `product_display_name` 与安装身份，各渠道
+仍保留原配方名、来源版本和 Homebrew 安装记录。
+
+软件版本与安装实例分开读取。`installed` 是当前 Package carrier 的安装状态；未发现该 carrier 时只表述“未在此宿主安装”，不推断整台机器不存在此软件。
+`local_installations` 可补充已验证的独立安装或开发接入，保留各自版本、管理者和
+位置引用。开发接入单独计数，不能计成安装版。插件管理操作只作用于当前宿主副本，
+不能卸载或更新由 uv 或软件自身管理的实例。原生软件的 `installed_version` 来自
+实际检测，`homebrew_installed` 与 `homebrew_installed_version` 只代表渠道收据；
+OPL 受管运行时和 App bundle 已存在时，不能因 Brew 无记录而标成未安装。
+
+搜索与状态筛选共用目录；软件源页展示渠道级记录。“更新”页复用当前管理者的
+动作，Framework 的受管安装从详情进入既有更新页。普通刷新按 owner 的
+`access_refresh_required` / `inventory_refresh_required` 调用 `source_check` 后回读，
+不会把本机清单检查变成 `brew update`。
 只有已回读的条目进入统计；缺少目录、首次加载或读取失败不显示虚假的零条目或
 健康状态。共享资源过期或授权失效计入页眉，并保留最近一次回读时间。读取失败时
 保留已有信息，用户可重试；变更按钮等当前状态重新确认后恢复。

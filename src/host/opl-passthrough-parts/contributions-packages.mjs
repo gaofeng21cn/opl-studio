@@ -65,7 +65,7 @@ function compactManagedUpdateProjection(value) {
 
 const packageFields = [
   "package_id", "packageId", "agent_id", "module_id", "id",
-  "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role", "release_channel",
+  "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role", "software_type", "catalog_scope", "distribution_channel", "release_channel",
   "lifecycle_status", "status", "install_state", "install_status", "health_status",
   "update_state", "update_status", "source_state", "trust_state", "trust_tier",
   "codex_surface_state", "codex_visible_entry", "codex_surface_ref", "shortcut_id", "display_policy",
@@ -254,6 +254,7 @@ function compactPackageRecord(value) {
     ...(packageCurrentness ? { package_currentness: packageCurrentness } : {}),
     ...(packageAccess ? { package_access: packageAccess } : {}),
     ...(installability ? { installability } : {}),
+    ...(Array.isArray(value?.local_installations) ? { local_installations: value.local_installations.slice(0, 32).map(installation => selectedFields(installation, ["installation_id", "kind", "version", "mode", "manager", "management_scope", "location_ref", "evidence_ref", "entrypoint_verified", "source_revision"])) } : {}),
     ...(Array.isArray(value?.required_by_package_ids) ? { required_by_package_ids: compactStringArray(value.required_by_package_ids) } : {}),
     ...(availableActions ? { available_actions: availableActions } : {}),
     ...(files ? { files } : {}),
@@ -282,6 +283,16 @@ function compactSoftwareSourceAction(value) {
   };
 }
 
+function compactNativeSoftwareItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
+  return {
+    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_source_revision", "available_version", "update_status", "revision"]),
+    display_name_i18n: compactLocalizedText(item.display_name_i18n),
+    description_i18n: compactLocalizedText(item.description_i18n),
+    available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []
+  };
+}
+
 function compactSoftwareSources(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const entries = Array.isArray(value.entries) ? value.entries.slice(0, 32).flatMap((entry) => {
@@ -289,26 +300,19 @@ function compactSoftwareSources(value) {
     const compact = selectedFields(entry, [
       "source_id", "display_name", "source_kind", "source_ref", "visibility", "provider_id", "status",
       "enabled", "credential_handle_present", "access_refresh_required", "verified_at", "entry_count",
-      "inventory_status", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
+      "inventory_status", "inventory_refresh_required", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
     ]) ?? {};
     compact.available_actions = Array.isArray(entry.available_actions)
       ? entry.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean)
       : [];
     if (entry.source_kind === "tap") {
-      compact.native_items = Array.isArray(entry.native_items) ? entry.native_items.slice(0, 256).flatMap(item => {
-        if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-        return [{
-          ...selectedFields(item, ["item_id", "name", "display_name", "description", "kind", "installed", "installed_version", "available_version", "update_status", "revision"]),
-          display_name_i18n: compactLocalizedText(item.display_name_i18n),
-          description_i18n: compactLocalizedText(item.description_i18n),
-          available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []
-        }];
-      }) : [];
+      compact.native_items = Array.isArray(entry.native_items) ? entry.native_items.slice(0, 256).map(compactNativeSoftwareItem).filter(Boolean) : [];
     }
     return [compact];
   }) : [];
   return {
     ...selectedFields(value, ["surface_kind", "status"]),
+    installed_products: Array.isArray(value.installed_products) ? value.installed_products.slice(0, 256).map(compactNativeSoftwareItem).filter(Boolean) : [],
     entries,
     authority_boundary: selectedFields(value.authority_boundary, ["owner", "credential_values_exposed", "installation_mutation_owner"]) ?? {}
   };

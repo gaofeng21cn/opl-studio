@@ -294,17 +294,18 @@ test("private package access is visible and gates install without inventing auth
   } as never), true);
 });
 
-test("agent catalog keeps agent and workflow packages together while excluding capability packages", () => {
+test("agent catalog follows declared product type and preserves legacy standard-agent compatibility", () => {
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "standard_agent" }), true);
-  assert.equal(presentation.isAgentCatalogPackage({ packageRole: "workflow_profile" }), true);
+  assert.equal(presentation.isAgentCatalogPackage({ packageRole: "workflow_profile" }), false);
+  assert.equal(presentation.isAgentCatalogPackage({ packageRole: "capability_package", softwareType: "agent" }), true);
+  assert.equal(presentation.isAgentCatalogPackage({ packageRole: "standard_agent", softwareType: "application" }), false);
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "capability_package" }), false);
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "framework_capability_package" }), false);
 });
 
-test("package catalog defaults to All while exposing App-owned manifest install", () => {
+test("package catalog defaults to software while exposing App-owned manifest install", () => {
   const ownerSource = readFileSync(new URL("../../src/composition/dshPluginManagerOwner.tsx", import.meta.url), "utf8");
-  assert.match(ownerSource, /useState\("all"\)/);
-  assert.match(ownerSource, /scope === "all" \|\| item\.official/);
+  assert.match(ownerSource, /useState\("software"\)/);
   assert.match(ownerSource, /PluginManagerOwnerPage/);
   assert.match(ownerSource, /manifest_url: manifestUrl\.trim\(\), trust_tier: trustTier/);
   assert.match(ownerSource, /actionId: props\.manifestInstallAction\.actionId/);
@@ -528,8 +529,8 @@ test("unified catalog includes private capability packages and defers package st
   const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
   const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
-    { package_id: "private-phone", package_role: "capability_package", display_name: "Private Phone", publisher: "Local owner", installed: true, activated: true, app_enabled: false, selected_version: "2.7" },
-    { package_id: "future-app", package_role: "future_extension", display_name: "Future App", installed: true, app_enabled: true }
+    { package_id: "private-phone", catalog_scope: "software", package_role: "capability_package", display_name: "Private Phone", publisher: "Local owner", installed: true, activated: true, app_enabled: false, selected_version: "2.7" },
+    { package_id: "future-app", catalog_scope: "software", package_role: "future_extension", display_name: "Future App", installed: true, app_enabled: true }
   ] } } } });
   let statusReads = 0;
   const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, renderPackageContributions() { statusReads++; return null; } }));
@@ -549,7 +550,7 @@ test("unified catalog shows private source access and hides gated install", asyn
   const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
   const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
-    { package_id: "private-agent", package_role: "standard_agent", display_name: "Private Agent", publisher: "OPL", installed: false,
+    { package_id: "private-agent", catalog_scope: "software", package_role: "standard_agent", display_name: "Private Agent", publisher: "OPL", installed: false,
       package_access: { visibility: "authorized_only", status: "signed_out", provider_id: "github", discover_allowed: true, download_allowed: false, reason: "github_source_account_required" },
       installability: { installable: false }, available_actions: [{ action_id: "agent_package_install", action_ref: "app_state.actions#agent_package_install", semantic: "install", status: "unavailable", reason: "github_source_account_required", payload: { package_id: "private-agent" }, required_payload_fields: ["package_id"] }] }
   ] } } } });
@@ -764,5 +765,64 @@ test("application updates tab lists native software with an available update", a
       payload: { source_id: "homebrew", item_id: "cask:studio", expected_revision: "revision-1" },
       confirmationRequired: true
     }]);
+  });
+});
+
+
+test("catalog separates owner-admitted software from host components without inventing maturity", async () => {
+  const { flushSync } = await import("react-dom");
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
+    { package_id: "kindle-pilot", display_name: "Kindle Pilot", catalog_scope: "software", package_role: "capability_package", release_channel: "preview", distribution_channel: "source", installed: true, installed_version: "1.2.0", selected_version: "1.1.0", description: "Manage a reading device." },
+    { package_id: "host-browser", display_name: "Host Browser", catalog_scope: "host_component", installed: true },
+    { package_id: "legacy-unknown", display_name: "Unknown legacy item", installed: true },
+  ] } } } });
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
+    const text = container.textContent ?? "";
+    assert.match(text, /Kindle Pilot/);
+    assert.match(text, /kindle-pilot/);
+    assert.match(text, /本机版本 1.2.0/);
+    assert.match(text, /来源版本 1.1.0/);
+    assert.doesNotMatch(text, /preview|预览版|stable|稳定版|Host Browser|Unknown legacy item/);
+    const scope = [...container.querySelectorAll("button")].find(button => button.textContent === "系统组件");
+    assert.ok(scope);
+    flushSync(() => scope.click());
+    assert.match(container.textContent ?? "", /Host Browser/);
+    assert.match(container.textContent ?? "", /Unknown legacy item/);
+    assert.doesNotMatch(container.textContent ?? "", /Kindle Pilot/);
+  });
+});
+
+
+test("nonstandard agents use declared type and local installations never masquerade as host plugins", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const installation = { installation_id: "owner:rednote", kind: "owner_managed", version: "0.2.3", mode: "installed", manager: "package_owner", management_scope: "owner_only", location_ref: "local-data:rednote/app/current", evidence_ref: "owner:status", entrypoint_verified: true };
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
+    { package_id: "persona", display_name: "Persona", catalog_scope: "software", software_type: "agent", package_role: "capability_package", installed: true, installed_version: "1" },
+    { package_id: "rednote", display_name: "RedNote", catalog_scope: "software", software_type: "application", package_role: "capability_package", installed: false, selected_version: "0.2.3", local_installations: [installation] },
+    { package_id: "vault", display_name: "Vault", catalog_scope: "software", software_type: "application", package_role: "capability_package", installed: false, selected_version: "0.1.0", local_installations: [{ ...installation, installation_id: "uv:vault", kind: "uv_tool", version: "0.1.0", mode: "development", manager: "uv" }] }
+  ] } } } });
+  const { packageInstalledLocally, packageDevelopmentLinked } = await import("../../src/workbench/settings/packages.tsx");
+  assert.equal(packageInstalledLocally(model.packageLifecycle[1]), true);
+  assert.equal(packageInstalledLocally(model.packageLifecycle[2]), false);
+  assert.equal(packageDevelopmentLinked(model.packageLifecycle[2]), true);
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
+    const rednote = container.querySelector('[data-plugin-owner-package="rednote"]');
+    assert.match(rednote?.textContent ?? "", /本机版本 0.2.3/);
+    assert.match(rednote?.textContent ?? "", /独立安装/);
+    assert.doesNotMatch(rednote?.textContent ?? "", /未安装/);
+    const vault = container.querySelector('[data-plugin-owner-package="vault"]');
+    assert.match(vault?.textContent ?? "", /开发接入/);
+    assert.match(container.textContent ?? "", /智能体/);
+    assert.doesNotMatch(container.textContent ?? "", /能力包/);
+    render(createElement(presentation.PackageCatalog, { kind: "agents", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
+    assert.match(container.textContent ?? "", /Persona/);
+    assert.doesNotMatch(container.textContent ?? "", /RedNote|Vault/);
   });
 });

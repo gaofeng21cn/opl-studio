@@ -312,7 +312,7 @@ export function createOplPassthrough({
       if (normalizedProfile === "fast" && result.exitCode === 0) {
         const sources = jsonValue(result.stdout)?.app_state?.agent_packages?.sources?.entries;
         const refreshIds = new Set(Array.isArray(sources) ? sources.filter(source =>
-          source?.access_refresh_required === true
+          (source?.access_refresh_required === true || source?.inventory_refresh_required === true)
           && typeof source.source_id === "string" && source.source_id.trim()
           && Array.isArray(source.available_actions) && source.available_actions.some(action =>
             action?.action_id === "source_check" && (action.status === undefined || action.status === "available")
@@ -321,7 +321,7 @@ export function createOplPassthrough({
         for (const sourceId of refreshIds) {
           await run(command, ["sources", "check", "--source-id", sourceId, "--json"], { cwd, env, timeoutMs: stateTimeoutMs });
         }
-        // Publish one owner readback after its requested access checks. The owner
+        // Publish one owner readback after its requested source checks. The owner
         // decides freshness and cooldown; this read never recursively retries.
         if (refreshIds.size) result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
       }
