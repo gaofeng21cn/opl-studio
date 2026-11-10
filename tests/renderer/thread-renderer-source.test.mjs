@@ -197,6 +197,12 @@ test("new task and runtime entries use the pinned DSH sidebar controls", () => {
   assert.doesNotMatch(styles, /\.opl-primary-nav/);
 });
 
+test("DSH More menu does not duplicate the pinned OPL application management entry", () => {
+  const navigationSlots = read("src/composition/dshSlotHost-parts/navigationSlots.tsx");
+  assert.match(navigationSlots, /entries\.filter\(entry => !entry\.pinned\)/);
+  assert.doesNotMatch(navigationSlots, /管理应用与扩展|Manage apps and extensions/);
+});
+
 test("local storage keeps only UI metadata and drafts after one-way legacy backup", () => {
   assert.match(app, /legacyChatSessionsBackupKey/);
   assert.match(app, /storage\.removeItem\(legacyChatSessionsStorageKey\)/);

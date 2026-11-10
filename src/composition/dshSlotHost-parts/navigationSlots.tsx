@@ -162,7 +162,7 @@ export function SidebarPanelActionsSlot({ entries, onOpen, onPinnedChange, onDis
   return <>{entries.filter(entry => !entry.pinned).map(entry => <div key={entry.id} className="opl-sidebar-more-entry">
     <MenuItemButton current={entry.active === true} icon={renderFactorySlot("sidebar.panel.icon", { id: entry.id, size: 16, active: entry.active === true })} onSelect={() => { onDismiss(); onOpen(entry.id); }}>{entry.label}</MenuItemButton>
     <Button size="sm" role="menuitem" aria-label={zh ? `固定${entry.label}` : `Pin ${entry.label}`} onClick={() => { onDismiss(); onPinnedChange(entry.id, true); }}><IconPinOutlineRegular size={14} /></Button>
-  </div>)}<MenuItemButton onSelect={() => { onDismiss(); studio.openPrimaryView("applications"); }}>{zh ? "管理应用与扩展" : "Manage apps and extensions"}</MenuItemButton></>;
+  </div>)}</>;
 }
 
 export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller, renderFactorySlot }: { wide: boolean; expandSidebar(): void; useSectionScroller: any; renderFactorySlot: any }) {
