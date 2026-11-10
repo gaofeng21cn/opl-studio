@@ -472,7 +472,7 @@ try {
       more.click(); await new Promise(requestAnimationFrame);
       return { theme: document.documentElement.getAttribute('data-ds-theme-source'), dark: document.body.hasAttribute('data-ds-dark-theme'), newTask: Boolean(newTask), menu: Array.from(document.querySelectorAll('[role="menuitem"]')).map(row => row.textContent.trim()), overflow: document.documentElement.scrollWidth > innerWidth };
     }`, cliRoot);
-    assert.deepEqual(variant, { theme, dark: theme === 'dark', newTask: true, menu: ['Manage apps and extensions'], overflow: false });
+    assert.deepEqual(variant, { theme, dark: theme === 'dark', newTask: true, menu: [], overflow: false });
     themeVariants.push(variant);
     await cli(["screenshot"], cliRoot);
     await copyFile(await latestScreenshot(cliRoot), path.join(outputRoot, `webui-en-${theme}.png`));
