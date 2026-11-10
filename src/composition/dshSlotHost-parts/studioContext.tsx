@@ -1,5 +1,6 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
+import { zh as sidebarZh, en as sidebarEn } from "../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/locales.ts";
 import { zh as workspaceZh, en as workspaceEn } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/locales.ts";
 import { zh as conversationZh, en as conversationEn } from "../../vendor/deepseek-harness/packages/client/ui-conversation/src/client/locales.ts";
 import { zh as modelZh, en as modelEn } from "../../vendor/deepseek-harness/packages/client/ui-model-selection/src/client/locales.ts";
@@ -9,6 +10,14 @@ import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, ty
 export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";
 import { workspaceEntries } from "../workspaceViewModel";
+type SidebarPanelActionsOwnerProps = {
+  entries: readonly { id: string; label: string; pinned: boolean; active?: boolean }[];
+  onOpen(id: string): void;
+  onPinnedChange(id: string, pinned: boolean): void;
+  onDismiss(): void;
+};
+type SidebarSectionHookContext = { useSectionScroller: () => { bindScrollerRef: (element: HTMLElement | null) => void } };
+type SidebarSectionInjected = { hooks: { sectionScroller: (standard: unknown, context: SidebarSectionHookContext) => SidebarSectionHookContext["useSectionScroller"] } };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -18,10 +27,11 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "shell.overlay": { kind: "list"; scope: "root"; owner: object };
     "shell.leading": { kind: "single"; scope: "root"; owner: object };
     "shell.bottom": { kind: "single"; scope: "root"; owner: object };
-    "sidebar.workspaces": { kind: "single"; scope: "root"; owner: { wide: boolean; expandSidebar(): void } };
+    "sidebar.workspaces": { kind: "single"; scope: "root"; owner: { wide: boolean; expandSidebar(): void }; hookContext: SidebarSectionHookContext; inject: SidebarSectionInjected };
     "sidebar.settings": { kind: "single"; scope: "root"; owner: { wide: boolean } };
     "sidebar.footer.action": { kind: "list"; scope: "root"; owner: { wide: boolean } };
     "sidebar.panellist": { kind: "list"; scope: "root"; owner: { size: number; active: boolean } };
+    "sidebar.panellist.actions": { kind: "list"; scope: "root"; owner: SidebarPanelActionsOwnerProps };
     "conversation.session.header": { kind: "single"; scope: "root"; owner: object };
     "conversation.session": { kind: "single"; scope: "root"; owner: object };
     "conversation.composer.bar": { kind: "single"; scope: "root"; owner: Record<string, unknown> };
@@ -169,8 +179,8 @@ export function translate(locale: "zh" | "en", key: string, params?: Record<stri
     "queue.steerFailed": ["插话发送失败，请重试。", "Steering failed. Try again."]
   };
   const dshDictionary = locale === "zh"
-    ? { ...conversationZh, ...workspaceZh, ...modelZh, ...agentZh, ...settingsZh }
-    : { ...conversationEn, ...workspaceEn, ...modelEn, ...agentEn, ...settingsEn };
+    ? { ...sidebarZh, ...conversationZh, ...workspaceZh, ...modelZh, ...agentZh, ...settingsZh }
+    : { ...sidebarEn, ...conversationEn, ...workspaceEn, ...modelEn, ...agentEn, ...settingsEn };
   let value = copy[key]?.[locale === "zh" ? 0 : 1] ?? dshDictionary[key as keyof typeof dshDictionary] ?? key;
   for (const [name, replacement] of Object.entries(params ?? {})) value = value.replaceAll(`{${name}}`, String(replacement));
   return value;
@@ -180,13 +190,20 @@ export function translate(locale: "zh" | "en", key: string, params?: Record<stri
 // main-slot key. A non-null id denotes a global panel and clears row selection.
 export function useConversationPanelInfo<T>(selector: (info: { activePanelId: string | null }) => T): T {
   const studio = useStudio();
-  return selector({ activePanelId: studio.primaryView === "workspace" ? "workspace" : null });
+  return selector({ activePanelId: studio.primaryView === "conversation" ? null : studio.primaryView });
 }
 export function useStudioPanels<T>(selector: (panels: readonly { id: string; order: number; label: string }[]) => T): T {
   const studio = useStudio();
-  return selector(workspaceEntries(studio.uiContributions.entries).length ? [{
-    id: "workspace", order: 10, label: studio.locale === "zh" ? "能力工作台" : "Capability workspace"
-  }] : []);
+  const zh = studio.locale === "zh";
+  const panels = [
+    { id: "applications", order: 10, label: zh ? "应用管理" : "Application management" },
+    { id: "runtime", order: 20, label: zh ? "运行状态" : "Runtime status" },
+    { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
+  ];
+  if (workspaceEntries(studio.uiContributions.entries).length) {
+    panels.push({ id: "workspace", order: 40, label: zh ? "能力工作台" : "Capability workspace" });
+  }
+  return selector(panels);
 }
 // Match the official layout injector's browser posture observable. This hook
 // reads browser geometry only; it does not introduce a runtime or state owner.

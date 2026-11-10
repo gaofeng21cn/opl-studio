@@ -75,7 +75,7 @@ const contributionProjection = read("src/composition/contributionProjection.ts")
 const primitiveIndex = read("src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
 const scopedSlots = read("src/vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx");
 const runtimeShim = read("src/integrations/deepseek-harness/runtimeShim.ts");
-const bunBuild = read("scripts/bun-build-renderer-entry.ts");
+const rendererBuild = read("scripts/vite-build-renderer-entry.mjs");
 const sourceManifest = JSON.parse(read("src/composition/deepseekHarnessSourceManifest.json"));
 const candidateEvidence = JSON.parse(read("src/candidateContractEvidence.json"));
 const packageJson = JSON.parse(read("package.json"));
@@ -137,9 +137,11 @@ test("primary settings actions keep readable contrast on hover", () => {
 });
 
 test("Studio exposes an App-projected first-level runtime overview", () => {
-  assert.match(slotHost, /function RuntimeNavigation/);
+  assert.match(slotHost, /name: "main", key: "runtime", registrant: "opl-studio"/);
+  assert.match(slotHost, /export function RuntimeMainSlot\(\) \{ return <\>\{useStudio\(\)\.runtimeOverview\}<\/>; \}/);
   assert.doesNotMatch(slotHost, /SidebarPrimaryNavigationSlot|opl-primary-navigation/);
-  assert.match(slotHost, /studio\.primaryView === "runtime"/);
+  assert.match(slotHost, /id: "runtime", order: 20, label: zh \? "运行状态" : "Runtime status"/);
+  assert.match(slotHost, /usePanels=\{useStudioPanels\}/);
   assert.match(app, /<RuntimeOverviewPage/);
   assert.match(bridge, /workbench\?: Record<string, unknown>/);
   assert.match(model, /work_item_projection_v2/);
@@ -165,8 +167,8 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
 });
 
 test("Studio exposes one App-owned application management surface", () => {
-  assert.match(slotHost, /studio\.primaryView === "applications"/);
-  assert.match(slotHost, /studio\.applicationManagement/);
+  assert.match(slotHost, /name: "main", key: "applications", registrant: "opl-studio"/);
+  assert.match(slotHost, /export function ApplicationMainSlot\(\) \{ return <\>\{useStudio\(\)\.applicationManagement\}<\/>; \}/);
   assert.match(app, /<ApplicationManagementPage/);
   assert.match(app, /applicationManagement:/);
   assert.match(read("src/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
@@ -185,11 +187,14 @@ test("Studio exposes one App-owned application management surface", () => {
   assert.match(styles, /\.opl-app-management/);
 });
 
-test("new task and runtime entries share the light primary navigation treatment", () => {
-  assert.match(slotHost, /function RuntimeNavigation/);
-  assert.match(styles, /\.opl-primary-nav button[\s\S]*?border: 0;[\s\S]*?background: transparent;/);
-  assert.match(styles, /button\[class\*="newSession"\][\s\S]*?border: 0;[\s\S]*?background: transparent;/);
-  assert.match(styles, /button\[aria-current="page"\][\s\S]*?background: var\(--opl-selected\)/);
+test("new task and runtime entries use the pinned DSH sidebar controls", () => {
+  assert.match(slotHost, /<SidebarRoot/);
+  assert.match(slotHost, /name: "sidebar.panellist", id: "runtime"/);
+  assert.match(slotHost, /name: "sidebar.panel.icon"/);
+  assert.match(slotHost, /name: "sidebar.panellist.actions"/);
+  assert.match(read("src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.module.css"), /\.newSession \{/);
+  assert.doesNotMatch(styles, /button\[class\*="newSession"\]/);
+  assert.doesNotMatch(styles, /\.opl-primary-nav/);
 });
 
 test("local storage keeps only UI metadata and drafts after one-way legacy backup", () => {
@@ -213,9 +218,10 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.match(slotHost, /className="opl-workspace-browser-seat"/);
   assert.ok(slotHost.indexOf("<WorkspaceBrowser") < slotHost.indexOf("<RecentSessionsSection"));
   assert.doesNotMatch(slotHost, /key === "group\.ungrouped"/);
-  assert.doesNotMatch(slotHost.slice(slotHost.indexOf("function RecentSessionsSection"), slotHost.indexOf("function RuntimeNavigation")), /aria-expanded|<Folder|<Chevron/);
-  assert.match(styles, /\.opl-workspace-browser-seat \{[^}]*overflow-y: auto;[^}]*scrollbar-gutter: stable;/s);
-  assert.match(styles, /\.opl-workspace-browser-seat \[role="tree"\] \{[^}]*overflow: visible;/s);
+  assert.doesNotMatch(slotHost.slice(slotHost.indexOf("function RecentSessionsSection"), slotHost.indexOf("export function ConversationSlot")), /aria-expanded|<Folder|<Chevron/);
+  assert.match(slotHost, /useSectionScroller=\{useSectionScroller\}/);
+  assert.match(read("src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx"), /data-sidebar-scrollport=\{wide \? '' : undefined\}/);
+  assert.match(read("src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx"), /data-sidebar-list-area=""/);
   const recentStyles = styles.slice(styles.indexOf(".opl-recent-sessions {"), styles.indexOf(".opl-recent-sessions h2"));
   assert.doesNotMatch(recentStyles, /overflow|max-height/);
   assert.match(slotHost, /project\.threads\.map/);
@@ -558,7 +564,8 @@ test("desktop exposes a drag region before the DSH application mounts", () => {
 test("wide DSH sidebar gives the product title a deliberate top inset", () => {
   assert.match(slotHost, /className="opl-dsh-sidebar-shell" data-collapsed=\{collapsed \|\| undefined\}/);
   assert.match(adapterStyles, /\.opl-dsh-sidebar-shell \{\s*display: contents;\s*\}/s);
-  assert.match(adapterStyles, /\.opl-dsh-sidebar-shell:not\(\[data-collapsed\]\) > div:first-child \{\s*padding-top: 18px;\s*\}/s);
+  assert.match(appFrameStyles, /--dsh-frame-top-clearance: 48px;/);
+  assert.doesNotMatch(adapterStyles, /padding-top: 18px/);
 });
 
 test("App update restart follows the carrier result instead of a host-name special case", () => {
@@ -786,7 +793,7 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   assert.match(slotHost, /useHostInfo=\{\(selector: any\) => selector\(\{ home: undefined \}\)\}/);
   assert.match(runtimeShim, /export function abbreviateHomePath/);
   assert.match(runtimeShim, /isWindowsStylePath/);
-  assert.match(bunBuild, /"process\.env\.DSH_CLIENT_COMMIT_HASH": JSON\.stringify\(""\)/);
+  assert.match(rendererBuild, /"process\.env\.DSH_CLIENT_COMMIT_HASH": JSON\.stringify\(""\)/);
   assert.match(slotHost, /"hero.headline": \["One Person Lab", "One Person Lab"\]/);
   assert.match(slotHost, /function SettingsHeaderSlot\(\) \{ return <>One Person Lab<\/>; \}/);
   assert.doesNotMatch(main, /--opl-brand-logo/);
@@ -824,9 +831,8 @@ test("primary surfaces preserve scrolling and settings expose a narrow scrollbar
   assert.match(conversationStyles, /\.scrollBody \{[^}]*overflow-y: auto;/s);
   assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;[^}]*scrollbar-width: thin;/s);
   const workspaceStyles = read("src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css");
-  assert.match(workspaceStyles, /\.list \{[\s\S]*overflow-y: auto;/);
-  assert.match(styles, /\.opl-workspace-browser-seat \{[^}]*overflow-y: auto;/s);
-  assert.match(styles, /\.opl-workspace-browser-seat \[role="tree"\] \{[^}]*overflow: visible;/s);
+  assert.match(workspaceStyles, /\.root:not\(\.rail\) \.listArea \{[\s\S]*overflow-y: auto;/);
+  assert.match(workspaceStyles, /@container scroll-state\(scrollable: bottom\)/);
   assert.match(styles, /\.sidebar-scroll > \*,[\s\S]*\.thread-directory-row \{[^}]*min-width: 0;[^}]*max-width: 100%;/s);
   assert.match(styles, /\.history-list li \.thread-directory-open \{[^}]*max-width: 100%;[^}]*overflow: hidden;/s);
   assert.match(styles, /\.history-list li \.thread-directory-open \.thread-directory-copy \{[^}]*max-width: 100%;[^}]*overflow: hidden;/s);

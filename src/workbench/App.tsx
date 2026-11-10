@@ -3,7 +3,7 @@ import type { McpAppOpen } from "../bridge/mcpApps";
 import { useWorkbenchShortcuts } from "./shortcuts";
 import { VoiceInput } from "./VoiceInput";
 import { appendVoiceTranscript, voiceInputContextKey, type VoiceInputContext } from "../composition/voiceInputModel";
-import { ScheduledTasksPanel } from "./plugins/WorkbenchServicesPanel";
+import { DshScheduledTasksPanel } from "./plugins/WorkbenchServicesPanel";
 import { SettingsActionDialog } from "./settings/SettingsActionDialog";
 import { agentAvailabilityDetail } from "./settings/packages";
 import { gatewayAccountErrorMessage } from "./settings/gatewayAccountMessages";
@@ -359,6 +359,11 @@ export function App({
   const [settingsActionFeedback, setSettingsActionFeedback] = useState<SettingsActionFeedback | null>(null);
   const [dockerDiagnostic, setDockerDiagnostic] = useState<SettingsDockerDiagnostic | null>(null);
   const [settingsActionConfirmation, setSettingsActionConfirmation] = useState<SettingsActionConfirmation | null>(null);
+  const workbenchActionResolver = useRef<{ key: string; resolve(value: { status: string; [key: string]: unknown }): void } | null>(null);
+  useEffect(() => () => {
+    workbenchActionResolver.current?.resolve({ status: "cancelled" });
+    workbenchActionResolver.current = null;
+  }, []);
   const [uiMetadata, setUiMetadata] = useState<WorkbenchUiMetadata>(persistedUi.metadata);
   const [drafts, setDrafts] = useState<WorkbenchDrafts>(persistedUi.drafts);
   const [prompt, setPrompt] = useState(persistedUi.drafts.prompts[persistedUi.metadata.selectedThreadId ?? "new"] ?? "");
@@ -691,6 +696,7 @@ export function App({
     const applyTheme = () => {
       const dark = settings.theme === "dark" || (settings.theme === "system" && media?.matches === true);
       document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      document.documentElement.setAttribute("data-ds-theme-source", settings.theme);
       document.body.toggleAttribute("data-ds-dark-theme", dark);
     };
     applyTheme();
@@ -911,7 +917,32 @@ export function App({
     };
   }
 
+  function settleWorkbenchAction(key: string, result: { status: string; [key: string]: unknown }) {
+    const pending = workbenchActionResolver.current;
+    if (!pending || pending.key !== key) return;
+    workbenchActionResolver.current = null;
+    pending.resolve(result);
+  }
+
+  function cancelSettingsAction() {
+    if (settingsActionBusyKey !== null) return;
+    if (settingsActionConfirmation) settleWorkbenchAction(settingsActionConfirmation.request.key, { status: "cancelled" });
+    setSettingsActionConfirmation(null);
+  }
+
   async function runSettingsAction(request: SettingsActionRequest) {
+    const pendingWorkbench = workbenchActionResolver.current;
+    if (pendingWorkbench && pendingWorkbench.key !== request.key) {
+      const result = { status: "failed", error: "Another App action is awaiting confirmation." };
+      if (request.key.startsWith("workbench:task_")) settleWorkbenchAction(request.key, result);
+      setSettingsActionFeedback({ tone: "attention", message: settings.locale === "zh" ? "另一个操作正在等待确认，请先完成或取消该操作。" : "Another action is awaiting confirmation. Finish or cancel it first." });
+      return;
+    }
+    if (settingsActionBusyKey !== null || settingsActionConfirmation !== null) {
+      settleWorkbenchAction(request.key, { status: "failed", error: "Another App action is awaiting confirmation." });
+      setSettingsActionFeedback({ tone: "attention", message: settings.locale === "zh" ? "请先完成或取消当前操作。" : "Finish or cancel the current action first." });
+      return;
+    }
     setSettingsActionBusyKey(request.key);
     setSettingsActionFeedback(null);
     setSettingsActionReceipt(null);
@@ -931,6 +962,7 @@ export function App({
         if (!["preview_ready", "confirmation_required"].includes(preview.status)) {
           setSettingsActionReceipt(actionReceiptView(preview));
           setSettingsActionFeedback(settingsReceiptFeedback(preview, request.label));
+          settleWorkbenchAction(request.key, { ...preview, status: preview.status });
           return;
         }
         setSettingsActionConfirmation({ request, previewStatus: preview.status, preview: actionReceiptView(preview), confirmationId: preview.confirmationId, receiptId: preview.receiptId });
@@ -958,6 +990,7 @@ export function App({
         if (initializationActionIds.has(request.actionId)) await loadInitialize();
       }
       setSettingsActionReceipt(actionReceiptView(receipt));
+      settleWorkbenchAction(request.key, { ...receipt, status: receipt.status });
       setSettingsActionFeedback(stateReadFailed ? {
         tone: "attention",
         message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
@@ -969,6 +1002,7 @@ export function App({
       } : settingsReceiptFeedback(receipt, request.label));
     } catch (error) {
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
+      settleWorkbenchAction(request.key, { status: "failed", error: String(error) });
     } finally {
       setSettingsActionBusyKey(null);
     }
@@ -993,6 +1027,7 @@ export function App({
         if (initializationActionIds.has(confirmation.request.actionId)) await loadInitialize();
       }
       setSettingsActionReceipt(actionReceiptView(receipt));
+      settleWorkbenchAction(confirmation.request.key, { ...receipt, status: receipt.status });
       setSettingsActionFeedback(stateReadFailed ? {
         tone: "attention",
         message: settings.locale === "zh" ? "操作已执行，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action executed, but its latest state could not be read. Refresh to verify; do not submit it again."
@@ -1000,6 +1035,8 @@ export function App({
       setSettingsActionConfirmation(null);
     } catch (error) {
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
+      settleWorkbenchAction(confirmation.request.key, { status: "failed", error: String(error) });
+      setSettingsActionConfirmation(null);
     } finally {
       setSettingsActionBusyKey(null);
     }
@@ -2569,9 +2606,22 @@ export function App({
 
   const workbenchOpenThread = useRef(openCanonicalThreadRef);
   workbenchOpenThread.current = openCanonicalThreadRef;
+  const workbenchRunAction = useRef(runSettingsAction);
+  workbenchRunAction.current = runSettingsAction;
   const workbenchServices = useMemo(() => ({
     read: (operation: string, input: Record<string, unknown> = {}) => bridge.readContribution({ packageId: 'opl-workbench-services', ref: `workbench#${operation}`, input }).then(value => value.result),
     openThread: (id: string) => workbenchOpenThread.current(id),
+    execute: (operation: string, input: Record<string, unknown>, label: string): Promise<{ status: string; [key: string]: unknown }> => {
+      if (workbenchActionResolver.current) return Promise.resolve({ status: "failed", error: "Another workbench action is awaiting confirmation." });
+      const requestId = crypto.randomUUID();
+      const key = `workbench:${operation}:${requestId}`;
+      return new Promise(resolve => {
+        workbenchActionResolver.current = { key, resolve };
+        void workbenchRunAction.current({ key, actionId: "package_contribution_execute", label,
+          payload: { package_id: "opl-workbench-services", ref: `workbench#${operation}`, input: { ...input, requestId } },
+          confirmationRequired: true, dryRunSupported: true });
+      });
+    },
   }), [bridge]);
 
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
@@ -2646,7 +2696,7 @@ export function App({
       actionFeedback={settingsActionFeedback}
       pendingConfirmation={null}
       onConfirmAction={() => void confirmSettingsAction()}
-      onCancelAction={() => setSettingsActionConfirmation(null)}
+      onCancelAction={cancelSettingsAction}
       renderPackageContributions={(packageId) => renderPackageContributions(packageId, renderContribution)}
     />
   );
@@ -2742,11 +2792,10 @@ export function App({
       actionFeedback={settingsActionFeedback}
       actionReceipt={settingsActionReceipt}
     />,
-    scheduledTasks: <section className="settings-page opl-schedules-page" aria-label={settings.locale === "zh" ? "计划任务" : "Scheduled tasks"}>
-      <header className="settings-detail-header"><h1>{settings.locale === "zh" ? "计划任务" : "Scheduled tasks"}</h1><p>{settings.locale === "zh" ? "安排重复工作，查看执行结果。" : "Schedule recurring work and review results."}</p></header>
-      <ScheduledTasksPanel client={workbenchServices} locale={settings.locale} onAction={request => void runSettingsAction(request)} busy={settingsActionBusyKey !== null} revision={settingsActionReceipt?.receiptId} cwd={selectedProject?.workspace ?? currentProject} onOpened={() => setPrimaryView("conversation")} />
+    scheduledTasks: <>
+      <DshScheduledTasksPanel client={workbenchServices} locale={settings.locale} onAction={() => undefined} busy={settingsActionBusyKey !== null} revision={settingsActionReceipt?.receiptId} cwd={selectedProject?.workspace ?? currentProject} onOpened={() => setPrimaryView("conversation")} />
       {settingsActionFeedback ? <p role="status">{settingsActionFeedback.message}</p> : null}
-    </section>,
+    </>,
     runtimeOverview: <RuntimeOverviewPage
       locale={settings.locale}
       projection={model.workItemRuntime}
@@ -2807,7 +2856,7 @@ export function App({
     setupCapabilities,
     chooseWorkspaceRoot,
     installCodex,
-    overlay: <><SettingsActionDialog settings={settings} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={() => setSettingsActionConfirmation(null)} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={cancelContributionAction} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={cancelContributionAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => void confirmContributionAction()}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>}>{contributionActionConfirmation ? <><h3>{contributionLabel(contributionActionConfirmation.command.label, settings.locale, contributionActionConfirmation.command.commandId)}</h3><WorkspaceReviewPreview value={{...contributionActionConfirmation.preview, ...contributionActionConfirmation.input}} zh={settings.locale === "zh"}/></> : null}</Modal></>,
+    overlay: <><SettingsActionDialog settings={settings} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={cancelSettingsAction} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={cancelContributionAction} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={cancelContributionAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => void confirmContributionAction()}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>}>{contributionActionConfirmation ? <><h3>{contributionLabel(contributionActionConfirmation.command.label, settings.locale, contributionActionConfirmation.command.commandId)}</h3><WorkspaceReviewPreview value={{...contributionActionConfirmation.preview, ...contributionActionConfirmation.input}} zh={settings.locale === "zh"}/></> : null}</Modal></>,
     detailsRequestRevision,
     startSession: startNewChat,
     startSessionInProject: startNewChatInProject,

@@ -324,7 +324,7 @@ export function PackageCatalog({
           <div className="agent-package-list">
             {group.items.map((item) => {
               const appAction = item.actions.find((action) => action.actionId === "package_app_set_enabled" && action.status === "available");
-              const executableActions = item.actions.filter((action) => action.actionId !== "package_app_set_enabled" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields));
+              const executableActions = item.actions.filter((action) => action.actionId !== "package_app_set_enabled" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)));
               const preferenceAction = item.actions.find((action) => action.kind === "preferences" && action.actionId !== "package_app_set_enabled" && action.status === "available");
               const presentationStatus = agentPackagePresentationStatus(item);
               const primaryAction = executableActions.find((action) => action.actionId === item.recommendedActionId)
@@ -342,8 +342,8 @@ export function PackageCatalog({
                       <span className="agent-package-meta">
                         {packageVersionLabel(item, locale) ? <span data-testid="opl-package-version-summary">{packageVersionLabel(item, locale)}</span> : <span>{locale === "zh" ? "版本尚未返回" : "Version not reported"}</span>}
                         <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
-                        <span data-testid="opl-package-access-status">{packageAccessStatusLabel(item.access, locale)}</span>
                         {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
+                        <span data-testid="opl-package-access-status">{packageAccessStatusLabel(item.access, locale)}</span>
                         <span data-testid="opl-package-update-status">{locale === "zh" ? `更新：${formatStatus(updateStatus, locale)}` : `Update: ${formatStatus(updateStatus, locale)}`}</span>
                       </span>
                     </span>

@@ -82,6 +82,7 @@ export async function loadEcosystemClient(id: EcosystemClientId): Promise<Client
 
 export type EcosystemTranslate = (key: string, values?: Record<string, unknown>) => string;
 export type EcosystemLocale = {
+  readonly getSnapshot: () => { revision: number };
   bind(namespace: string): EcosystemTranslate;
   register(namespace: string, dictionaries: Record<string, Record<string, string>>): () => void;
   subscribe(listener: () => void): () => void;
@@ -91,15 +92,21 @@ export type EcosystemLocale = {
 export function createEcosystemLocale(readLocale: () => "zh" | "en"): EcosystemLocale {
   const dictionaries = new Map<string, Record<string, Record<string, string>>>();
   const listeners = new Set<() => void>();
+  let snapshot = { revision: 0 };
+  const refresh = () => {
+    snapshot = { revision: snapshot.revision + 1 };
+    for (const listener of listeners) listener();
+  };
   return {
+    getSnapshot: () => snapshot,
     bind: (namespace) => (key, values) => {
       let text = dictionaries.get(namespace)?.[readLocale()]?.[key] ?? dictionaries.get(namespace)?.en?.[key] ?? key;
       for (const [name, value] of Object.entries(values ?? {})) text = text.replaceAll(`{${name}}`, String(value));
       return text;
     },
-    register(namespace, value) { dictionaries.set(namespace, value); return () => { dictionaries.delete(namespace); }; },
+    register(namespace, value) { dictionaries.set(namespace, value); refresh(); return () => { dictionaries.delete(namespace); refresh(); }; },
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    refresh() { for (const listener of listeners) listener(); },
+    refresh,
   };
 }
 

@@ -13,6 +13,8 @@ body {
   font-family: var(--dsw-font-family);
 }
 
+html[data-platform="darwin"] body { background: transparent; }
+
 .opl-studio-dsh-root {
   width: 100%;
   height: 100%;
@@ -21,15 +23,28 @@ body {
   letter-spacing: 0;
 }
 
-/* The native DSH wide sidebar starts its logo row at the window's content
-   edge. Give the product title a little breathing room below macOS traffic
-   lights while leaving the compact rail geometry untouched. */
+/* The official SidebarRoot owns column geometry and platform clearance. */
 .opl-dsh-sidebar-shell {
   display: contents;
 }
 
-.opl-dsh-sidebar-shell:not([data-collapsed]) > div:first-child {
-  padding-top: 18px;
+/* Keep OPL's panel actions inside the official DSH More-menu row geometry. */
+.opl-sidebar-more-entry { position: relative; }
+.opl-sidebar-more-entry > div:first-child button[role="menuitem"] { width: 100%; padding-right: 34px; }
+.opl-sidebar-more-entry > button[role="menuitem"] {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+}
+.opl-sidebar-more-entry > button:not(:first-child)[role="menuitem"]:hover,
+.opl-sidebar-more-entry > button:not(:first-child)[role="menuitem"]:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
 }
 
 .opl-dsh-sidebar-shell[data-narrow-expanded] > div { position: relative; z-index: 3; }
@@ -1060,7 +1075,7 @@ select {
 
 @media (max-width: 640px) {
   .opl-dsh-thread { width: min(100% - 24px, 748px); }
-  .opl-dsh-session-header { padding-right: 16px; padding-left: 16px; }
+  .opl-dsh-session-header { padding-right: 64px; padding-left: max(52px, var(--dsh-frame-leading-clearance, 0px)); }
   .opl-dsh-session-header-copy { display: block; }
   .opl-dsh-session-header-copy span { display: block; }
 }

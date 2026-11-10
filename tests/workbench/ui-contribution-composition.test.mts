@@ -157,14 +157,15 @@ test("native slot stores and factories follow the client plugin lifetime", async
 test("capability workspace installs into DSH main and sidebar panel slots and disposes both", () => {
   const host = createHost();
   const beforeMain = host.core.entries("main").length;
+  const beforePanels = host.core.entries("sidebar.panellist");
   const beforeOverlay = host.core.entries("shell.overlay").length;
   const dispose = installWorkspaceClientPlugin(host.core, () => ({} as never));
-  expect(host.core.snapshot("sidebar.panellist")[0]?.occupants[0]?.id).toBe("workspace");
+  expect(host.core.entries("sidebar.panellist").map(entry => entry.options.id)).toContain("workspace");
   expect(host.core.entries("main").length).toBe(beforeMain + 1);
   expect(host.core.entries("shell.overlay").length).toBe(beforeOverlay);
   expect(host.core.entries("sidebar.footer.action")).toHaveLength(0);
   dispose();
-  expect(host.core.entries("sidebar.panellist")).toHaveLength(0);
+  expect(host.core.entries("sidebar.panellist")).toEqual(beforePanels);
   expect(host.core.entries("main").length).toBe(beforeMain);
 });
 const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../src/composition/contributionComponents.tsx");

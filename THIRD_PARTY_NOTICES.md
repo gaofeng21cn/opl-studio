@@ -32,9 +32,9 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`
+Inspected source ref: `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`
 
-The complete `src/` trees of nineteen client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
+The complete `src/` trees of twenty-one client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
 
 - `ui-layout`
 - `ui-sidebar`
@@ -51,6 +51,8 @@ The complete `src/` trees of nineteen client packages are vendored from that ref
 - `ui-sidebar-files`
 - `ui-sidebar-documentpreview`
 - `ui-sidebar-right`
+- `ui-slots`
+- `ui-schedule`
 - `ui-deliverables`
 - `ui-open-in-app`
 - `ui-dockkit`
@@ -59,27 +61,30 @@ The complete `src/` trees of nineteen client packages are vendored from that ref
 The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
-The snapshot contains 633 files, including the upstream `LICENSE`. Its package
+The snapshot contains 701 files, including the upstream `LICENSE`. Its package
 roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.1`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
-checks every local digest and reverts the declared React 19 compatibility patch
-in a temporary copy to prove the original upstream bytes. Nine upstream GUI
-files carry this bounded patch: ref initialization, nullable DOM refs, the boolean
-`inert` attribute, and Tooltip ref/cleanup forwarding. The patch digest, pinned
+checks every local digest and reverts the declared compatibility patches
+in a temporary copy to prove the original upstream bytes. Eleven GUI files
+carry the React 19 patch for refs, inert, cleanup forwarding, and convergent
+menu anchor effects. Three Schedule UI files carry an optional owner-view
+patch for permissions, timeout, supported timing, manual creation, and
+Framework/Codex execution history. Default DSH Schedule behavior is preserved.
+The patch digests, pinned
 upstream ref, and each changed file's original SHA-256 are recorded explicitly;
-all other files remain byte-identical. The replay applies this patch after copying
+all other files remain byte-identical. The replay applies these patches after copying
 the official source, without introducing another runtime or state owner.
 
 The live One Person Lab composition directly renders upstream `AppFrame`,
 `SidebarRoot`, `WorkspaceBrowser`, `ConversationRoot`/`EmptyHero`, `InputBar`,
-`AgentPresetSeat`, `ModelSelect`, and `SettingsRoot`.
+`AgentPresetSeat`, `ModelSelect`, `SettingsRoot`, `TaskManagerPage`, and `TaskDetail`.
 `SlotCore` and the pinned `ui-renderer` source for `createSlotRenderer()` provide
 registration, disposal, and entry error isolation. OPL components import `Button`, `Pill`, `Input`, `Tooltip`,
 `StateDot`, `projectUserText`, and icons directly from the vendored upstream
 `@deepseek-ai/dsh-client-ui-primitives` index. User-visible identity uses the
-DSH 0.2.2-rc.1 brand slots with the text `One Person Lab`; no OPL logo, parallel
-type scale, layout, color system, primitive control, or icon is introduced. The
+DSH 0.2.2-rc.1 brand slots with the text `One Person Lab`; OPL adds no logo artwork or replacement shell palette. OPL-owned content pages
+retain bounded layout and typography adapters outside the upstream source. The
 DSH 0.2.2-rc.1 attachment slot is occupied by a null adapter and does not enable a
 multimodal runtime. Workspace host description remains unavailable until the
 App ABI supplies it; the POSIX home-path compatibility shim therefore does not
