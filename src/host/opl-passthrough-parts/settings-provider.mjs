@@ -111,7 +111,11 @@ function compactKnowledgeSources(value) {
       authorization: selectedFields(item.authorization, ["status", "consumer_count", "grant_count"]),
       revision: selectedFields(item.revision, ["status", "security_revision"]),
       freshness: selectedFields(item.freshness, ["status", "observed_at"]),
-      readiness: selectedFields(item.readiness, ["status", "reason"])
+      readiness: selectedFields(item.readiness, ["status", "reason"]),
+      ...(item.knowledge_health && typeof item.knowledge_health === "object" ? { knowledge_health: {
+        ...selectedFields(item.knowledge_health, ["current_count", "review_due_count", "inactive_count", "unavailable_count", "checked_count", "truncated"]),
+        issues: records(item.knowledge_health.issues).map(issue => selectedFields(issue, ["knowledge_id", "status", "reason"]))
+      } } : {})
     })),
     available_consumers: records(value.available_consumers).map(item => selectedFields(item, ["domain_id", "label", "package_id"])),
     failures: records(value.failures).map(item => selectedFields(item, ["context_id", "reason"])),

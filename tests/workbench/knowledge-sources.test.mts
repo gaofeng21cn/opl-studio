@@ -60,6 +60,42 @@ test("knowledge projection accepts only references and preserves unknown state",
   expect(knowledgeSourceNeedsAttention({ ...parsed.entries[0]!, freshnessStatus: "stale" })).toBe(true);
 });
 
+test("expired history is visible in knowledge details without making a ready source unhealthy", () => {
+  const input = ownerProjection();
+  Object.assign(input.items[0]!, { knowledge_health: {
+    current_count: 6, review_due_count: 2, inactive_count: 0, unavailable_count: 0, checked_count: 8, truncated: false,
+    body: "private-marker", issues: [{ knowledge_id: "finance.dated-state", status: "review_due", reason: "knowledge_review_overdue", body: "private-marker", path: "/private-marker/note.md" }]
+  } });
+  const parsed = readKnowledgeSourcesProjection(input)!;
+  expect(parsed.entries[0]!.knowledgeHealth).toMatchObject({ currentCount: 6, reviewDueCount: 2, checkedCount: 8, truncated: false });
+  expect(knowledgeSourceNeedsAttention(parsed.entries[0]!)).toBe(false);
+  expect(knowledgeSourceStatus(parsed.entries[0]!)).toBe("ready");
+  expect(JSON.stringify(parsed)).not.toContain("private-marker");
+  const markup = renderToStaticMarkup(createElement(KnowledgeSourcesSection, { projection: parsed, locale: "zh", actionBusyKey: null, onAction() {}, onRefresh() {} }));
+  expect(markup).toContain("6条可用 · 2条过期记录已排除");
+  expect(markup).toContain("finance.dated-state");
+  expect(markup).toContain("已过复核期限，已排除");
+  expect(markup).not.toContain("延期");
+  const incomplete = readKnowledgeSourcesProjection({ ...input, items: [{ ...input.items[0], knowledge_health: { current_count: 6 } }] })!;
+  expect(incomplete.entries[0]!.knowledgeHealth).toBeUndefined();
+});
+
+test("unreadable or changed knowledge and partial checks retain distinct explanations", () => {
+  const input = ownerProjection();
+  Object.assign(input.items[0]!, { status: "attention", readiness: { status: "attention" }, knowledge_health: {
+    current_count: 98, review_due_count: 0, inactive_count: 4, unavailable_count: 2, checked_count: 100, truncated: true,
+    issues: [{ knowledge_id: "finance.changed", status: "unavailable", reason: "knowledge_source_body_requires_review" }, { knowledge_id: "finance.missing", status: "unavailable", reason: "knowledge_source_body_unavailable" }]
+  } });
+  const parsed = readKnowledgeSourcesProjection(input)!;
+  expect(knowledgeSourceNeedsAttention(parsed.entries[0]!)).toBe(true);
+  const markup = renderToStaticMarkup(createElement(KnowledgeSourcesSection, { projection: parsed, locale: "zh", actionBusyKey: null, onAction() {}, onRefresh() {} }));
+  expect(markup).toContain("98条可用 · 4条停用或已替代记录已排除 · 2条暂不可用");
+  expect(markup).toContain("本次已检查100条，尚未覆盖全部记录。");
+  expect(markup).toContain("原文有变更，需要复核");
+  expect(markup).toContain("原文暂不可读取");
+  expect(markup).not.toContain("过期记录");
+});
+
 function applicationMarkup(model: WorkbenchModel, stateStatus: "loading" | "ready" | "error") {
   return renderToStaticMarkup(createElement(ApplicationManagementPage, {
     model, stateStatus, stateError: stateStatus === "error" ? "State service is unavailable" : null,
