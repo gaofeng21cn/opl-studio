@@ -49,7 +49,8 @@ export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction }:
   const zh = locale === "zh";
   return <div className="agent-package-list" data-testid="opl-native-software-list">{entries.map(({ source, item }) => {
     const displayName = catalogDisplayName(item.displayName, item.displayNameI18n, locale);
-    const description = item.descriptionI18n?.[locale] || item.description;
+    const description = item.descriptionI18n?.[locale]?.trim() || item.description?.trim()
+      || (zh ? "尚未提供软件说明。" : "No software description provided.");
     const executable = item.availableActions.filter(action => action.status === "available" && Boolean(item.revision) && actionPayloadComplete(action.payload, [...action.payloadFields, "source_id", "item_id", "expected_revision"])
       && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId && action.payload.expected_revision === item.revision
       && (action.actionId === "source_install" ? item.installed === false : action.actionId === "source_update" ? item.installed === true && item.updateStatus === "available" : item.installed === true));

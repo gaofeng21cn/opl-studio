@@ -11,18 +11,19 @@ import { SettingRow, SettingsGroup } from "../../settings/primitives";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
 export function PreferencesSettingsPage({ settings, renderSettingControl, onSettingChange, zh, setPermissionAcknowledged, setPermissionConfirmation, navigate }: Pick<SettingsPageContext, "settings" | "renderSettingControl" | "onSettingChange" | "zh" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "navigate">) {
+      const themeCopy: Readonly<Record<string, string>> = settings.locale === "zh" ? themeZh : themeEn;
 
       return (
         <>
           <SettingsGroup title={settings.locale === "zh" ? "界面" : "Interface"}>
             <SettingRow label={settings.locale === "zh" ? "语言" : "Language"}>{renderSettingControl("locale")}</SettingRow>
             <div className="settings-appearance" data-slot="settings.general.item"><StudioAppearanceRow
-              t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key}
+              t={(key) => themeCopy[key] ?? key}
               setTheme={(theme) => onSettingChange("theme", theme)}
               useStore={(selector) => selector({ preference: settings.theme, revision: 0 })}
               actions={{ sync: () => undefined }}
             /></div>
-            <div className="settings-font-size" data-slot="settings.general.item"><StudioFontSizeRow role="text" t={(key) => (settings.locale === "zh" ? themeZh : themeEn)[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSizes: { text: settings.fontSize, code: settings.fontSize, terminal: settings.fontSize }, fontFamilies: { text: "", code: "", terminal: "" }, revision: 0 })} actions={{ sync: () => undefined }} /></div>
+            <div className="settings-font-size" data-slot="settings.general.item"><StudioFontSizeRow role="text" t={(key) => themeCopy[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSizes: { text: settings.fontSize, code: settings.fontSize, terminal: settings.fontSize }, fontFamilies: { text: "", code: "", terminal: "" }, revision: 0 })} actions={{ sync: () => undefined }} /></div>
           </SettingsGroup>
           <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
             <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>

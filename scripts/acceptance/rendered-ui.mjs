@@ -176,7 +176,7 @@ try {
     await new Promise(requestAnimationFrame);
     return { icons, initialMenu, unpinned, menuIcon, repinned: Boolean(nav.querySelector('button[aria-label="计划任务"]')) };
   }`, cliRoot);
-  assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: ['管理应用与扩展'], unpinned: true, menuIcon: true, repinned: true });
+  assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: [], unpinned: true, menuIcon: true, repinned: true });
 
   const primaryPanels = [];
   for (const [label, testid] of [['应用管理', 'opl-app-management'], ['计划任务', 'opl-scheduled-tasks']]) {

@@ -577,9 +577,14 @@
       {
         "file": "src/workbench/settings/packages.tsx",
         "contains": [
-          "PackageCatalog",
-          "opl-settings-agent-catalog",
-          "opl-settings-agent-row"
+          "PackageCatalog"
+        ]
+      },
+      {
+        "file": "src/composition/dshPluginManagerOwner.tsx",
+        "contains": [
+          "PluginManagerOwnerPage",
+          "opl-settings-agent-catalog"
         ]
       },
       {
@@ -847,6 +852,8 @@
       "@deepseek-ai/cordis-plugin-loader@1.1.0",
       "@deepseek-ai/dsh-client-connection@0.2.2-rc.1",
       "@deepseek-ai/dsh-client-store@0.2.2-rc.1",
+      "@deepseek-ai/dsh-official-bundles@0.2.2-rc.1",
+      "@deepseek-ai/dsh-util-crypto@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-workspace-path@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-file-drag@0.2.2-rc.1",
       "@deepseek-ai/dsh-util-values@0.2.2-rc.1",
@@ -879,7 +886,7 @@
     ],
     "vendored_source_root": "src/vendor/deepseek-harness",
     "source_manifest": "src/composition/deepseekHarnessSourceManifest.json",
-    "vendored_file_count": 701,
+    "vendored_file_count": 741,
     "byte_identical": false,
     "byte_identical_to_pinned_ref": false,
     "vendored_package_roots": [
@@ -903,6 +910,9 @@
       "packages/client/ui-deliverables/src",
       "packages/client/ui-open-in-app/src",
       "packages/client/ui-dockkit/src",
+      "packages/client/ui-plugin-manager/src",
+      "packages/boot/plugin-manager/src",
+      "packages/util/official-bundles/src",
       "packages/client/resources/src",
       "packages/util/workspace-path/src"
     ],
@@ -931,7 +941,8 @@
       "packages/client/ui-settings-general/src/client/SettingsRoot.tsx#SettingsRoot",
       "packages/client/ui-renderer/src/client/scoped-slots.tsx#createSlotRenderer",
       "packages/client/ui-schedule/src/client/TaskManagerPage.tsx#TaskManagerPage",
-      "packages/client/ui-schedule/src/client/TaskDetail.tsx#TaskDetail"
+      "packages/client/ui-schedule/src/client/TaskDetail.tsx#TaskDetail",
+      "packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx#PluginManagerOwnerPage"
     ],
     "other_gui_source_reuse": [],
     "deepseek_harness_selected_source_reused": true,
@@ -954,6 +965,12 @@
         "sha256": "ba7bef4d150a193349be43ac55c083dc1e7b12db326dc7e29dcd4b605a3e1d51",
         "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
         "reason": "Optional owner view fields, timing limits, manual creation and execution-history slots for Framework/Temporal and canonical Codex tasks; default DSH Schedule behavior retained."
+      },
+      {
+        "path": "src/integrations/deepseek-harness/patches/plugin-manager-owner.patch",
+        "sha256": "a4c709a0804a753210fe65c9196984c4a4d034af856d5fbcde771d0850b13b4d",
+        "upstream_ref": "fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159",
+        "reason": "Render-only owner card/detail projection and contributed tabs reuse the official plugin management page while Framework retains Package lifecycle authority; upstream default behavior is retained."
       }
     ],
     "provenance": "pinned_upstream_plus_reviewed_compatibility_patches"
@@ -1425,7 +1442,7 @@
     ],
     "renderer_testids": [
       "opl-settings-agent-catalog",
-      "opl-settings-agent-row"
+      "data-plugin-owner-package"
     ],
     "forbidden_claims": [
       "package_ready",

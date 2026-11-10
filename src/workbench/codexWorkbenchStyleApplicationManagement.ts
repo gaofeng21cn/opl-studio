@@ -1,20 +1,69 @@
 export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     min-width: 0;
     min-height: 100%;
-    overflow-y: auto;
-    padding: 28px clamp(24px, 4vw, 48px) 48px;
-    background: var(--opl-canvas);
-    color: var(--opl-text);
+    padding: 0;
   }
 
   .opl-app-management-header,
   .opl-app-management-title,
   .opl-app-management-environment,
   .opl-app-management-summary,
-  .opl-app-management-tabs,
   .opl-app-management-resources .runtime-setting-control {
     display: flex;
     align-items: center;
+  }
+
+  .opl-app-management-status {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .opl-app-management-overview {
+    width: min(100%, 960px);
+    margin-inline: auto;
+  }
+
+  .opl-app-management-overview .opl-app-management-summary {
+    width: 100%;
+  }
+
+  .opl-app-management-status .opl-app-management-summary { margin: 0; box-sizing: border-box; }
+
+  .opl-app-management-summary > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+
+  .opl-dsh-plugin-manager {
+    min-width: 0;
+    height: 100%;
+  }
+
+  .opl-dsh-owner-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .opl-dsh-owner-filters > input { flex: 1 1 240px; min-width: 160px; }
+  .opl-dsh-owner-filters select { min-height: 32px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 4px 8px; }
+  .opl-dsh-owner-section { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+  .opl-dsh-owner-section h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+  .opl-dsh-owner-section p { margin: 0 0 12px; }
+  .opl-dsh-owner-section dl { display: grid; gap: 10px; margin: 0 0 16px; }
+  .opl-dsh-owner-section dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+  .opl-dsh-owner-section dt { color: var(--dsw-alias-label-tertiary); }
+  .opl-dsh-owner-section dd { margin: 0; overflow-wrap: anywhere; }
+  .opl-dsh-owner-shortcut { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; }
+
+  @media (max-width: 680px) {
+    .opl-dsh-plugin-manager .page { --plugin-page-inset: 16px; }
+    .opl-dsh-plugin-manager .pageBody { width: 100%; margin-inline: 0; padding-inline: 0; }
+    .opl-dsh-owner-filters { width: 100%; }
+    .opl-dsh-owner-filters > input { flex-basis: 100%; }
+    .opl-dsh-owner-filters .segmented-control { flex: 1 1 auto; }
+    .opl-dsh-owner-filters select { flex: 1 1 auto; max-width: 100%; }
   }
 
   .opl-app-management-header {
@@ -69,7 +118,6 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   }
 
   .opl-app-management-summary,
-  .opl-app-management-tabs,
   .opl-app-management-content {
     width: min(100%, 960px);
     margin-right: auto;
@@ -547,8 +595,7 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
 
   @media (max-width: 680px) {
     .opl-app-management {
-      padding-right: 16px;
-      padding-left: 16px;
+      padding: 0;
     }
 
     .opl-app-management-header {
@@ -559,8 +606,14 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
 
     .opl-app-management-environment {
       width: 100%;
-      justify-content: flex-end;
+      justify-content: flex-start;
     }
+
+    .opl-app-management-status .opl-app-management-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+    .opl-app-management-status .opl-app-management-summary > span { min-width: 0; }
+    .opl-dsh-owner-filters { align-items: stretch; }
+    .opl-dsh-owner-filters > input { flex-basis: 100%; min-width: 0; }
+    .opl-dsh-owner-filters select { max-width: 100%; }
 
     .opl-app-management-tabs {
       overflow-x: auto;
