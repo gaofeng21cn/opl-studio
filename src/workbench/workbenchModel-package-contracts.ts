@@ -132,6 +132,26 @@ export type SoftwareSourceRef = {
   credentialHandlePresent: boolean;
   verifiedAt?: string;
   entryCount?: number;
+  inventoryStatus?: "available" | "not_checked" | "unavailable" | "unknown";
+  inventoryReason?: string;
+  inventoryCheckedAt?: string;
+  versionAuthority?: string;
+  installationOwner?: string;
+  nativeItems?: NativeSoftwareItemRef[];
+  availableActions: SoftwareSourceActionRef[];
+};
+
+export type NativeSoftwareItemRef = {
+  itemId: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  kind: "formula" | "cask";
+  installed: boolean | null;
+  installedVersion?: string;
+  availableVersion?: string;
+  updateStatus: "available" | "current" | "not_installed" | "unknown";
+  revision?: string;
   availableActions: SoftwareSourceActionRef[];
 };
 

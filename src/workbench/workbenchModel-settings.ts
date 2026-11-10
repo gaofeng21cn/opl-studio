@@ -253,7 +253,7 @@ function deriveAuthorizedConnection(value: Record<string, unknown> | null): Auth
   const id = asString(value?.connection_id) ?? asString(value?.id);
   const displayName = asString(value?.display_name) ?? asString(value?.name) ?? asString(value?.connection_display_name) ?? id;
   if (!id || !displayName) return null;
-  const revision = asFiniteNumber(value?.security_revision);
+  const revision = asString(value?.security_revision) ?? asFiniteNumber(value?.security_revision);
   return {
     id,
     displayName,
@@ -261,7 +261,8 @@ function deriveAuthorizedConnection(value: Record<string, unknown> | null): Auth
       ? { providerType: (asString(value?.provider_type) ?? asString(value?.connection_provider_type) ?? asString(value?.connection_type)) as string }
       : {}),
     ...(asString(value?.status) ? { status: asString(value?.status) as string } : {}),
-    ...(revision !== null && Number.isSafeInteger(revision) && revision >= 0 ? { securityRevision: revision } : {}),
+    ...(typeof revision === "string" || revision !== null && Number.isSafeInteger(revision) && revision >= 0 ? { securityRevision: revision } : {}),
+    ...(typeof value?.disabled === "boolean" ? { disabled: value.disabled } : {}),
     ...(asString(value?.account_label) ? { accountLabel: asString(value?.account_label) as string } : {}),
     capabilities: deriveConnectionCapabilities(value?.capabilities)
   };
@@ -298,7 +299,7 @@ function deriveConnectionRequest(value: Record<string, unknown>): ConnectionAcce
   };
 }
 
-function deriveConnectionAuthorization(value: Record<string, unknown> | null): ConnectionAuthorizationProjection | undefined {
+function deriveConnectionAuthorization(value: Record<string, unknown> | null, defaultConnectionId: unknown): ConnectionAuthorizationProjection | undefined {
   if (!value || (value.schema !== "opl_connection_authorization_projection.v1"
     && value.surface_kind !== "opl_connection_authorization_projection.v1")) return undefined;
   const requests = asRecordArray(value.requests).flatMap((item) => {
@@ -353,13 +354,21 @@ function deriveConnectionAuthorization(value: Record<string, unknown> | null): C
       ...(asString(item.account_label) ? { accountLabel: asString(item.account_label) as string } : {})
     }] : [];
   });
-  return { requests, grants, invocations, connections, availableRelayConnections };
+  const availability = value.available_connections_status;
+  return { requests, grants, invocations, connections, availableRelayConnections,
+    availableRelayConnectionsStatus: availability === "available" || availability === "unavailable" ? availability : "unknown",
+    ...(asString(value.available_connections_reason) ? { availableRelayConnectionsReason: asString(value.available_connections_reason) as string } : {}),
+    ...(asString(defaultConnectionId) ? { defaultConnectionId: asString(defaultConnectionId) as string } : {})
+  };
 }
 
 const connectionActionIds = [
   "connection_access_request_deny",
   "connection_grant_revoke",
-  "connection_relay_import"
+  "connection_relay_import",
+  "connection_test",
+  "connection_update",
+  "connection_delete"
 ];
 
 function deriveConnectionActions(actionRecords: ReadonlyMap<string, Record<string, unknown>>) {
@@ -506,7 +515,7 @@ export function deriveWorkbenchSettingsProjection({
         localEnvironment: deriveLocalEnvironment(localEnvironment),
         workspace: deriveWorkspace(workspaceServices),
         externalConnections: deriveExternalConnections(asRecord(appSettingsReadModel?.connections)),
-        connectionAuthorization: deriveConnectionAuthorization(asRecord(asRecord(appSettingsReadModel?.connections)?.authorization)),
+        connectionAuthorization: deriveConnectionAuthorization(asRecord(asRecord(appSettingsReadModel?.connections)?.authorization), asRecord(appSettingsReadModel?.connections)?.default_connection_id),
         connectionActions: deriveConnectionActions(actionRecords),
         dockerWebui: deriveDockerWebui(asRecord(appSettingsReadModel?.docker_webui), actionRecords),
         personalization: derivePersonalization(codexPersonalization),

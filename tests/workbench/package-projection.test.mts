@@ -63,6 +63,28 @@ test("software sources project public and authorized entries without exposing cr
   assert.equal(model.softwareSources?.authorityBoundary?.credentialValuesExposed, false);
 });
 
+test("native source inventory preserves unknown state and version-bound owner actions", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareMatches, softwareSourceStatusLabel } = await import("../../src/workbench/softwareSources.ts");
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", version_authority: "homebrew_local_metadata", entry_count: 1,
+      native_items: [{ item_id: "cask:opl-studio", name: "opl-studio", display_name: "OPL Studio", kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "r1", token: "private-value", available_actions: [
+        { action_id: "source_update", status: "available", default_payload: { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1", token: "private-value", shell: "untrusted" }, payload_fields: ["source_id", "item_id", "expected_revision"], confirmation_required: true }
+      ] }]
+    }, { source_id: "unread", display_name: "Unread", source_kind: "tap", status: "public", inventory_status: "not_checked", entry_count: null, native_items: [] }]
+  }))!;
+  const source = projection.entries[0]!;
+  const item = source.nativeItems![0]!;
+  assert.deepEqual(item.availableActions[0]!.payload, { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1" });
+  assert.doesNotMatch(JSON.stringify(projection), /private-value|untrusted/);
+  assert.deepEqual(nativeSoftwareInventory(projection), { total: 1, installed: 1, installable: 0, updatesAvailable: 1, complete: false });
+  assert.equal(projection.entries[1]!.entryCount, undefined);
+  assert.equal(nativeSoftwareMatches(item, source, "studio", "update:update_available"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "studio", "not_installed"), false);
+  assert.equal(softwareSourceStatusLabel({ ...source, status: "authorized" }, "zh"), "账户已连接");
+});
+
 test("current Package directory entries replace retired private lifecycle fields", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {
