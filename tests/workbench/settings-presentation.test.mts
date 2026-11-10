@@ -244,6 +244,9 @@ test("standard Agent summary is derived from the same installed, enabled, callab
   assert.equal(presentation.agentPackagePresentationStatus(agent({ homeShortcuts: [] })), "ready");
   assert.equal(presentation.agentPackageHasHomeShortcutRoute(agent({ homeShortcuts: [] })), false);
   assert.match(presentation.agentAvailabilityDetail(agent({ homeShortcuts: [] }), "zh"), /首页入口/);
+  const previewWithoutSource = agent({ installed: false, releaseChannel: "preview", installabilityReason: "package_install_source_unavailable" });
+  assert.match(presentation.agentAvailabilityDetail(previewWithoutSource, "zh"), /安装来源尚未发布/);
+  assert.doesNotMatch(presentation.agentAvailabilityDetail(previewWithoutSource, "zh"), /点击“安装”/);
   assert.equal(presentation.agentPackagePresentationStatus(agent({ packageRole: "workflow_profile", homeShortcuts: [] })), "ready");
 });
 
@@ -531,7 +534,9 @@ test("unified catalog includes private capability packages and defers package st
   const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, renderPackageContributions() { statusReads++; return null; } }));
   assert.match(html, /Private Phone/);
   assert.match(html, /Future App/);
-  assert.match(html, /可安装 2\.7/);
+  assert.match(html, /来源版本/);
+  assert.match(html, /<strong[^>]*>2\.7<\/strong>/);
+  assert.match(html, /<code>private-phone<\/code>/);
   assert.match(html, /role="switch" aria-checked="false" aria-label="在 OPL App 中启用 Private Phone"/);
   assert.match(html, /在 OPL App 中启用 Private Phone/);
   assert.equal(statusReads, 0);

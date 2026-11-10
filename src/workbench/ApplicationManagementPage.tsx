@@ -104,7 +104,7 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
     <header className="opl-app-management-header">
       <div>
         <div className="opl-app-management-title"><Sparkles aria-hidden="true" size={18} /><h1>{zh ? "应用管理" : "Application management"}</h1></div>
-        <p>{zh ? "在一个地方安装、管理和更新 Agent、工作流与共享能力。" : "Install, manage, and update Agents, workflows, and shared capabilities in one place."}</p>
+        <p>{zh ? "安装、管理和更新你的应用、智能体与共享能力。" : "Install, manage, and update your apps, agents, and shared capabilities."}</p>
       </div>
       <div className="opl-app-management-environment" data-testid="opl-app-management-environment"><span>{zh ? "当前环境" : "Current environment"}</span><strong>{zh ? "本机 OPL" : "Local OPL"}</strong><button type="button" className="settings-icon-button" aria-label={zh ? "刷新应用管理状态" : "Refresh application management"} title={zh ? "刷新" : "Refresh"} onClick={onRefresh} disabled={actionBusyKey !== null || stateStatus === "loading"}><RefreshCw aria-hidden="true" size={15} /></button></div>
     </header>

@@ -6,11 +6,13 @@ import {
   deriveWorkbenchModelFromState
 } from "../../src/workbench/workbenchModel.ts";
 
-test("App visibility preserves native installation and callable package metadata", () => {
+test("App visibility preserves native installation and callable package metadata", async () => {
+  const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
-    directory: { entries: [{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
+    directory: { entries: compactPackageRows([{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
       package_role: "capability_package", display_name: "Private phone", presence: { callable: true } },
-      { package_id: "new-extension", installed: true }] }
+      { package_id: "new-extension", installed: true, release_channel: "preview",
+        installability: { installable: false, reason: "package_install_source_unavailable" } }]) }
   } } });
   const hidden = model.packageLifecycle.find((item) => item.packageId === "private-phone")!;
   assert.equal(hidden.appEnabled, false);
@@ -18,6 +20,11 @@ test("App visibility preserves native installation and callable package metadata
   assert.equal(hidden.activated, true);
   assert.equal(hidden.readiness.callable, true);
   assert.equal(model.packageLifecycle.find((item) => item.packageId === "new-extension")?.appEnabled, true);
+  assert.equal(hidden.releaseChannel, undefined);
+  const preview = model.packageLifecycle.find((item) => item.packageId === "new-extension")!;
+  assert.equal(preview.releaseChannel, "preview");
+  assert.equal(preview.installable, false);
+  assert.equal(preview.installabilityReason, "package_install_source_unavailable");
 });
 
 test("registry access stays owner projected and unavailable actions remain unavailable", () => {
@@ -27,7 +34,7 @@ test("registry access stays owner projected and unavailable actions remain unava
       package_access: { visibility: "authorized_only", status: "revoked", provider_id: "github",
         source_ref: "ghcr.io/example/private-agent", access_policy_ref: "package:private-agent:read",
         verified_at: "2026-11-10T03:00:00Z", security_revision: "r2", discover_allowed: true, download_allowed: false },
-      installability: { installable: false }, available_actions: [{ action_id: "agent_package_update",
+      installability: { installable: false, reason: "package_access_revoked" }, available_actions: [{ action_id: "agent_package_update",
         action_ref: "app_state.actions#agent_package_update", semantic: "update", status: "unavailable", reason: "package_access_revoked" }] }] } }
   } });
   const item = model.packageLifecycle[0]!;
@@ -37,6 +44,7 @@ test("registry access stays owner projected and unavailable actions remain unava
   assert.equal(item.access?.downloadAllowed, false);
   assert.equal(item.access?.securityRevision, "r2");
   assert.equal(item.installable, false);
+  assert.equal(item.installabilityReason, "package_access_revoked");
   assert.equal(item.actions[0]?.status, "unavailable");
   assert.equal(item.actions[0]?.reason, "package_access_revoked");
   assert.match(item.searchMetadata.query, /revoked/);
@@ -69,18 +77,25 @@ test("native source inventory preserves unknown state and version-bound owner ac
   const projection = readSoftwareSourcesProjection(compactSoftwareSources({
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
       source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", version_authority: "homebrew_local_metadata", entry_count: 1,
-      native_items: [{ item_id: "cask:opl-studio", name: "opl-studio", display_name: "OPL Studio", kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "r1", token: "private-value", available_actions: [
+      native_items: [{ item_id: "cask:opl-studio", name: "opl-studio", display_name: "OPL Studio", display_name_i18n: { "zh-CN": "OPL 应用宿主", "en-US": "OPL Studio", malformed: { token: "private-value" } }, description_i18n: { zh: "管理和运行智能体应用。", en: "Manage and run agent apps." }, kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "r1", token: "private-value", available_actions: [
         { action_id: "source_update", status: "available", default_payload: { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1", token: "private-value", shell: "untrusted" }, payload_fields: ["source_id", "item_id", "expected_revision"], confirmation_required: true }
       ] }]
     }, { source_id: "unread", display_name: "Unread", source_kind: "tap", status: "public", inventory_status: "not_checked", entry_count: null, native_items: [] }]
   }))!;
   const source = projection.entries[0]!;
   const item = source.nativeItems![0]!;
+  assert.equal(item.displayName, "OPL Studio");
+  assert.equal(item.name, "opl-studio");
+  assert.deepEqual(item.displayNameI18n, { zh: "OPL 应用宿主", en: "OPL Studio" });
+  assert.deepEqual(item.descriptionI18n, { zh: "管理和运行智能体应用。", en: "Manage and run agent apps." });
   assert.deepEqual(item.availableActions[0]!.payload, { source_id: "homebrew", item_id: "cask:opl-studio", expected_revision: "r1" });
   assert.doesNotMatch(JSON.stringify(projection), /private-value|untrusted/);
   assert.deepEqual(nativeSoftwareInventory(projection), { total: 1, installed: 1, installable: 0, updatesAvailable: 1, complete: false });
   assert.equal(projection.entries[1]!.entryCount, undefined);
   assert.equal(nativeSoftwareMatches(item, source, "studio", "update:update_available"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "应用宿主", "all"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "管理和运行", "all"), true);
+  assert.equal(nativeSoftwareMatches(item, source, "cask:opl-studio", "all"), true);
   assert.equal(nativeSoftwareMatches(item, source, "studio", "not_installed"), false);
   assert.equal(softwareSourceStatusLabel({ ...source, status: "authorized" }, "zh"), "账户已连接");
 });

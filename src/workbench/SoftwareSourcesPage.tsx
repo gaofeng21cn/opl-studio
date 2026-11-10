@@ -1,5 +1,6 @@
 import { Box, Check, ChevronDown, ExternalLink, KeyRound, Link2, LoaderCircle, RefreshCw, Unplug } from "lucide-react";
 import { useState } from "react";
+import { catalogDisplayName, SoftwareCatalogIdentity, SoftwareCatalogVersions } from "./SoftwareCatalogMetadata";
 
 import type { WorkbenchSettings } from "./settingsModel";
 import type { NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
@@ -47,18 +48,27 @@ type NativeSoftwareListProps = {
 export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction }: NativeSoftwareListProps) {
   const zh = locale === "zh";
   return <div className="agent-package-list" data-testid="opl-native-software-list">{entries.map(({ source, item }) => {
+    const displayName = catalogDisplayName(item.displayName, item.displayNameI18n, locale);
+    const description = item.descriptionI18n?.[locale] || item.description;
     const executable = item.availableActions.filter(action => action.status === "available" && Boolean(item.revision) && actionPayloadComplete(action.payload, [...action.payloadFields, "source_id", "item_id", "expected_revision"])
       && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId && action.payload.expected_revision === item.revision
       && (action.actionId === "source_install" ? item.installed === false : action.actionId === "source_update" ? item.installed === true && item.updateStatus === "available" : item.installed === true));
     const primary = executable.find(action => action.actionId === (item.installed === false ? "source_install" : "source_update"));
     const run = (action: SoftwareSourceActionRef) => onAction({ key: `source:${source.sourceId}:${item.itemId}:${action.actionId}`, actionId: action.actionId,
-      label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${item.displayName}`, payload: action.payload,
+      label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${displayName}`, payload: action.payload,
       confirmationRequired: true, dryRunSupported: action.dryRunSupported });
     const busy = actionBusyKey?.startsWith(`source:${source.sourceId}:${item.itemId}:`) === true;
-    return <details key={`${source.sourceId}:${item.itemId}`} className="agent-package-row" data-testid="opl-native-software-row" data-item-id={item.itemId} aria-busy={busy}>
-      <summary><span className="agent-package-copy"><strong>{item.displayName}</strong>{item.description ? <small>{item.description}</small> : null}<span className="agent-package-meta"><span>{item.installed === true ? `${zh ? "已安装" : "Installed"} ${item.installedVersion ?? (zh ? "版本待确认" : "version not confirmed")}` : item.installed === false ? (zh ? "未由 Homebrew 安装" : "Not installed through Homebrew") : (zh ? "安装状态待确认" : "Installation not confirmed")}</span><span>{zh ? "来源版本" : "Source version"} {item.availableVersion ?? (zh ? "待确认" : "not confirmed")}</span><span>{source.displayName}</span><span>{nativeUpdateLabel(item, zh)}</span></span></span>
-        <span className="agent-package-summary-actions"><span className="settings-status" data-tone={item.updateStatus === "available" ? "attention" : "neutral"}><span aria-hidden="true" />{item.kind === "cask" ? (zh ? "桌面应用" : "Desktop app") : (zh ? "命令行工具" : "Command-line tool")}</span>{primary ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null} onClick={event => { event.preventDefault(); run(primary); }}>{busy ? <LoaderCircle className="spin" size={13} aria-hidden="true" /> : null}{softwareSourceActionLabel(primary.actionId, locale, primary.label)}</button> : null}<ChevronDown className="agent-package-chevron" size={15} aria-hidden="true" /></span></summary>
-      <div className="agent-package-details"><dl className="agent-state-axis-grid"><div><dt>{zh ? "安装位置" : "Installation"}</dt><dd>{zh ? "由本机 Homebrew 管理" : "Managed by Homebrew on this device"}</dd></div><div><dt>{zh ? "来源版本" : "Source version"}</dt><dd>{item.availableVersion ?? (zh ? "待确认" : "Not confirmed")}</dd></div><div><dt>{zh ? "已安装版本" : "Installed version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (zh ? "未由 Homebrew 安装" : "Not installed through Homebrew") : (zh ? "待确认" : "Not confirmed"))}</dd></div><div><dt>{zh ? "更新状态" : "Update status"}</dt><dd>{nativeUpdateLabel(item, zh)}</dd></div></dl><p className="settings-inline-note">{zh ? "版本来自本机 Homebrew 目录。更新软件源目录后可检查新的发布版本。" : "Versions come from the local Homebrew catalog. Update the source catalog to check new releases."}</p>{executable.length ? <div className="agent-package-actions">{executable.map(action => <button key={action.actionId} type="button" className={`settings-action-button${action.actionId === "source_uninstall" ? " danger" : ""}`} disabled={actionBusyKey !== null} onClick={() => run(action)}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</button>)}</div> : <p className="settings-inline-note">{zh ? "当前没有可执行的管理操作，请检查软件源状态。" : "No management action is available. Check the software source status."}</p>}</div>
+    return <details key={`${source.sourceId}:${item.itemId}`} className="agent-package-row software-catalog-row" data-testid="opl-native-software-row" data-item-id={item.itemId} aria-busy={busy}>
+      <summary>
+        <SoftwareCatalogIdentity name={displayName} id={item.name} description={description} kind={item.kind === "cask" ? (zh ? "桌面应用" : "Desktop app") : (zh ? "命令行工具" : "Command-line tool")} publisher={source.displayName} />
+        <SoftwareCatalogVersions installed={item.installed} installedVersion={item.installedVersion} availableVersion={item.availableVersion} locale={locale} />
+        <span className="agent-package-summary-actions">
+          <span className="settings-status" data-tone={item.updateStatus === "available" ? "attention" : item.installed === true ? "ready" : "neutral"}><span aria-hidden="true" />{item.updateStatus === "available" ? (zh ? "有更新" : "Update available") : item.installed === true ? (zh ? "已安装" : "Installed") : item.installed === false ? (zh ? "未安装" : "Not installed") : (zh ? "待确认" : "Not confirmed")}</span>
+          {primary ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null} onClick={event => { event.preventDefault(); run(primary); }}>{busy ? <LoaderCircle className="spin" size={13} aria-hidden="true" /> : null}{softwareSourceActionLabel(primary.actionId, locale, primary.label)}</button> : null}
+          <ChevronDown className="agent-package-chevron" size={15} aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="agent-package-details"><dl className="agent-state-axis-grid"><div><dt>{zh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.name}</code></dd></div><div><dt>{zh ? "软件源" : "Software source"}</dt><dd>{source.displayName}</dd></div><div><dt>{zh ? "安装位置" : "Installation"}</dt><dd>{zh ? "由本机 Homebrew 管理" : "Managed by Homebrew on this device"}</dd></div><div><dt>{zh ? "来源版本" : "Source version"}</dt><dd>{item.availableVersion ?? (zh ? "待确认" : "Not confirmed")}</dd></div><div><dt>{zh ? "已安装版本" : "Installed version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (zh ? "未由 Homebrew 安装" : "Not installed through Homebrew") : (zh ? "待确认" : "Not confirmed"))}</dd></div><div><dt>{zh ? "更新状态" : "Update status"}</dt><dd>{nativeUpdateLabel(item, zh)}</dd></div></dl><p className="settings-inline-note">{zh ? "版本来自本机 Homebrew 目录。更新软件源目录后可检查新的发布版本。" : "Versions come from the local Homebrew catalog. Update the source catalog to check new releases."}</p>{executable.length ? <div className="agent-package-actions">{executable.map(action => <button key={action.actionId} type="button" className={`settings-action-button${action.actionId === "source_uninstall" ? " danger" : ""}`} disabled={actionBusyKey !== null} onClick={() => run(action)}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</button>)}</div> : <p className="settings-inline-note">{zh ? "当前没有可执行的管理操作，请检查软件源状态。" : "No management action is available. Check the software source status."}</p>}</div>
     </details>;
   })}</div>;
 }
@@ -66,7 +76,7 @@ export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction }:
 export function NativeSoftwareCatalog({ projection, locale, actionBusyKey, onAction, query = "", statusFilter = "all" }: Omit<NativeSoftwareListProps, "entries"> & { projection?: SoftwareSourcesProjection; query?: string; statusFilter?: string }) {
   const entries = nativeSoftwareEntries(projection).filter(({ source, item }) => nativeSoftwareMatches(item, source, query, statusFilter));
   if (!entries.length) return null;
-  return <section className="agent-catalog-group"><h2><Box size={15} aria-hidden="true" />{locale === "zh" ? "桌面应用与命令行工具" : "Desktop apps and command-line tools"}</h2><NativeSoftwareList entries={entries} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} /></section>;
+  return <section className="agent-catalog-group"><h2><Box size={15} aria-hidden="true" />{locale === "zh" ? "桌面应用与命令行工具" : "Desktop apps and command-line tools"}<span>{entries.length}</span></h2><NativeSoftwareList entries={entries} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} /></section>;
 }
 
 function SourceRow({ source, locale, actionBusyKey, onAction }: {

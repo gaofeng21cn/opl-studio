@@ -9,6 +9,7 @@ import type { WorkbenchSettings } from "../settingsModel";
 import { actionPayloadComplete, type SettingsActionRequest } from "../settingsActions";
 import type { AgentPackageAccessRef } from "../workbenchModel-package-contracts";
 import { NativeSoftwareCatalog } from "../SoftwareSourcesPage";
+import { catalogDisplayName, SoftwareCatalogIdentity, SoftwareCatalogVersions } from "../SoftwareCatalogMetadata";
 import { nativeSoftwareEntries, nativeSoftwareInventory, nativeSoftwareMatches } from "../softwareSources";
 
 import { SettingsPanelProps } from "./types";
@@ -120,6 +121,9 @@ export function componentReadinessStatus(ready: boolean | null | undefined, stat
 export function agentAvailabilityDetail(item: AgentPackageLifecycleRef, locale: WorkbenchSettings["locale"]): string {
   const zh = locale === "zh";
   const status = agentPackagePresentationStatus(item);
+  if (item.installed !== true && item.installabilityReason === "package_install_source_unavailable") return zh
+    ? "此软件已列入目录，安装来源尚未发布。来源可用后即可从这里安装。"
+    : "This software is listed in the catalog. It will be installable here when its installation source is published.";
   if (status === "ready" && item.packageRole === "standard_agent" && !agentPackageHasHomeShortcutRoute(item)) return zh
     ? "智能体已安装、已启用且可调用；首页入口需由智能体更新提供，无需重复修复安装。"
     : "The agent is installed, enabled and callable. A package update must provide its home entry; reinstalling is unnecessary.";
@@ -190,16 +194,6 @@ export function isCapabilityCatalogPackage(item: Pick<AgentPackageLifecycleRef, 
   return role === "capability_package" || role.endsWith("_capability_package");
 }
 
-function packageVersionLabel(item: Pick<AgentPackageLifecycleRef, "installedVersion" | "availableVersion" | "version" | "versionKind">, locale: WorkbenchSettings["locale"]): string | null {
-  const installed = item.installedVersion ?? (item.versionKind === "installed" ? item.version : undefined);
-  const available = item.availableVersion ?? (item.versionKind === "available" ? item.version : undefined);
-  if (installed && available && installed !== available) {
-    return locale === "zh" ? `已安装 ${installed} · 可安装 ${available}` : `Installed ${installed} · Available ${available}`;
-  }
-  if (installed) return locale === "zh" ? `已安装 ${installed}` : `Installed ${installed}`;
-  if (available) return locale === "zh" ? `可安装 ${available}` : `Available ${available}`;
-  return null;
-}
 
 export function PackageCatalog({
   model,
@@ -284,12 +278,12 @@ export function PackageCatalog({
           <p>{locale === "zh" ? "统一查看智能体、工作流、桌面应用和命令行工具，按需安装与更新。" : "Browse agents, workflows, desktop apps and command-line tools together, then install and update what you need."}</p>
         </div>
       </div>
-      <div className="agent-catalog-inventory" role="status" aria-label={locale === "zh" ? "软件目录统计" : "Software catalog totals"}>
+      {kind !== "all" ? <div className="agent-catalog-inventory" role="status" aria-label={locale === "zh" ? "软件目录统计" : "Software catalog totals"}>
         <span><strong>{totalCount}</strong>{locale === "zh" ? "个已读取条目" : "entries read"}</span>
         <span><strong>{installableCount}</strong>{locale === "zh" ? "个可安装" : "installable"}</span>
         <span><strong>{installedCount}</strong>{locale === "zh" ? "个已安装" : "installed"}</span>
         <span className={updateCount ? "has-update" : undefined}><strong>{updateCount}</strong>{locale === "zh" ? "个有更新" : "updates available"}</span>
-      </div>
+      </div> : null}
       {nativeInventory && !nativeInventory.complete ? <p className="settings-inline-note" data-testid="opl-native-inventory-pending">{locale === "zh" ? "原生软件清单尚未完整读取。到“软件源”检查 Homebrew 后会补全这里的列表和数量。" : "The native software list is not fully loaded. Check Homebrew in Software sources to complete this list and its totals."}</p> : null}
       <div className="agent-catalog-toolbar">
         <label className="settings-search-field">
@@ -310,7 +304,6 @@ export function PackageCatalog({
           {locale === "zh" ? `添加${catalogLabel}` : "Add extension"}
         </button>
       </div>
-      <p className="settings-inline-note">{locale === "zh" ? "开关控制扩展在 OPL App 中的入口和状态。关闭后仍可在 Codex 中使用。" : "Switches control entries and status in OPL App. Turning one off keeps it available in Codex."}</p>
       <div className="agent-catalog-filters">
         <div className="segmented-control" role="group" aria-label={locale === "zh" ? "目录范围" : "Catalog scope"}>
           <button type="button" data-active={scope === "official"} aria-pressed={scope === "official"} onClick={() => setScope("official")}>{locale === "zh" ? "官方" : "Official"}</button>
@@ -322,13 +315,15 @@ export function PackageCatalog({
           {statusOptions.map((status) => <option key={status} value={status}>{formatStatus(status === "ready" ? "installed" : status, locale)}</option>)}
           {updateStatusOptions.map((status) => <option key={`update:${status}`} value={`update:${status}`}>{locale === "zh" ? `更新：${formatStatus(status, locale)}` : `Update: ${formatStatus(status, locale)}`}</option>)}
         </select>
+        {query || statusFilter !== "all" || scope !== "all" ? <button type="button" className="settings-inline-command" onClick={() => { setQuery(""); setStatusFilter("all"); setScope("all"); }}>{locale === "zh" ? "清除筛选" : "Clear filters"}</button> : null}
         <span>{locale === "zh" ? `显示 ${visible.length + visibleNative.length} / ${totalCount} 个已读取条目` : `Showing ${visible.length + visibleNative.length} of ${totalCount} entries read`}</span>
       </div>
       {groups.length ? groups.map((group) => (
         <section key={group.key} className="agent-catalog-group">
-          <h2><group.icon aria-hidden="true" size={15} />{group.label}</h2>
+          <h2><group.icon aria-hidden="true" size={15} />{group.label}<span>{group.items.length}</span></h2>
           <div className="agent-package-list">
             {group.items.map((item) => {
+              const displayName = catalogDisplayName(item.label, item.displayNameI18n, locale);
               const appAction = item.actions.find((action) => action.actionId === "package_app_set_enabled" && action.status === "available");
               const executableActions = item.actions.filter((action) => action.actionId !== "package_app_set_enabled" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)));
               const preferenceAction = item.actions.find((action) => action.kind === "preferences" && action.actionId !== "package_app_set_enabled" && action.status === "available");
@@ -339,20 +334,13 @@ export function PackageCatalog({
                 ?? (agentPackagePresentationStatus(item) === "unavailable" ? executableActions.find((action) => action.kind === "repair") : undefined);
               const updateStatus = agentPackageUpdateStatus(item);
               return (
-                <details key={item.id} className="agent-package-row" data-testid="opl-settings-agent-row" data-package-id={item.packageId}
+                <details key={item.id} className="agent-package-row software-catalog-row" data-testid="opl-settings-agent-row" data-package-id={item.packageId}
                   onToggle={(event) => { const open = event.currentTarget.open; setExpandedPackages(previous => { const next = new Set(previous); if (open) next.add(item.packageId); else next.delete(item.packageId); return next; }); }}>
                   <summary>
-                    <span className="agent-package-copy">
-                      <strong>{item.label}</strong>
-                      <small>{localizedPackageDescription(item, locale)}</small>
-                      <span className="agent-package-meta">
-                        {packageVersionLabel(item, locale) ? <span data-testid="opl-package-version-summary">{packageVersionLabel(item, locale)}</span> : <span>{locale === "zh" ? "版本尚未返回" : "Version not reported"}</span>}
-                        <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
-                        {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
-                        <span data-testid="opl-package-access-status">{packageAccessStatusLabel(item.access, locale)}</span>
-                        <span data-testid="opl-package-update-status">{locale === "zh" ? `更新：${formatStatus(updateStatus, locale)}` : `Update: ${formatStatus(updateStatus, locale)}`}</span>
-                      </span>
-                    </span>
+                    <SoftwareCatalogIdentity name={displayName} id={item.packageId} description={localizedPackageDescription(item, locale)}
+                      channel={item.releaseChannel === "preview" ? (locale === "zh" ? "预览版" : "Preview") : undefined}
+                      publisher={item.official ? (locale === "zh" ? "OPL 官方" : "OPL Official") : item.publisher === "unknown" ? undefined : item.publisher} />
+                    <SoftwareCatalogVersions installed={item.installed} installedVersion={item.installedVersion ?? (item.versionKind === "installed" ? item.version : undefined)} availableVersion={item.availableVersion ?? (item.versionKind === "available" ? item.version : undefined)} locale={locale} />
                     <span className="agent-package-summary-actions">
                       <StatusValue status={packageAccessNeedsAttention(item) ? "attention" : presentationStatus === "ready" ? "installed" : presentationStatus} locale={locale} />
                       {primaryAction ? (
@@ -365,7 +353,7 @@ export function PackageCatalog({
                             onAction({
                               key: `${item.packageId}:${primaryAction.actionId}`,
                               actionId: primaryAction.actionId,
-                              label: `${packageActionLabel(primaryAction, locale)} ${item.label}`,
+                              label: `${packageActionLabel(primaryAction, locale)} ${displayName}`,
                               payload: primaryAction.payload,
                               confirmationRequired: primaryAction.confirmationRequired
                             });
@@ -375,23 +363,26 @@ export function PackageCatalog({
                           {packageActionLabel(primaryAction, locale)}
                         </button>
                       ) : null}
-                      {item.installed === true ? <span className="agent-package-app-toggle" onClick={(event) => event.stopPropagation()}>
-                        <span>OPL App</span>
-                        <Switch checked={item.appEnabled} disabled={!appAction || actionBusyKey !== null}
-                          label={locale === "zh" ? `在 OPL App 中启用 ${item.label}` : `Enable ${item.label} in OPL App`}
-                          onChange={(enabled) => { if (appAction) onAction({ key: `app:${item.packageId}:enabled`, actionId: appAction.actionId,
-                            label: locale === "zh" ? `${enabled ? "启用" : "关闭"} ${item.label} 的 OPL App 入口` : `${enabled ? "Enable" : "Turn off"} ${item.label} in OPL App`,
-                            payload: { ...appAction.payload, package_id: item.packageId, enabled }, confirmationRequired: false, dryRunSupported: appAction.dryRunSupported }); }} />
-                      </span> : null}
                       <ChevronDown className="agent-package-chevron" aria-hidden="true" size={15} />
                     </span>
                   </summary>
                   <div className="agent-package-details">
+                      {item.installed === true ? <span className="agent-package-app-toggle">
+                        <span>{locale === "zh" ? "在 OPL App 中显示" : "Show in OPL App"}</span>
+                        <Switch checked={item.appEnabled} disabled={!appAction || actionBusyKey !== null}
+                          label={locale === "zh" ? `在 OPL App 中启用 ${displayName}` : `Enable ${displayName} in OPL App`}
+                          onChange={(enabled) => { if (appAction) onAction({ key: `app:${item.packageId}:enabled`, actionId: appAction.actionId,
+                            label: locale === "zh" ? `${enabled ? "启用" : "关闭"} ${displayName} 的 OPL App 入口` : `${enabled ? "Enable" : "Turn off"} ${displayName} in OPL App`,
+                            payload: { ...appAction.payload, package_id: item.packageId, enabled }, confirmationRequired: false, dryRunSupported: appAction.dryRunSupported }); }} />
+                      </span> : null}
+
+                    <p className="software-catalog-update" data-testid="opl-package-update-status">{locale === "zh" ? `更新：${formatStatus(updateStatus, locale)}` : `Update: ${formatStatus(updateStatus, locale)}`}{item.automaticUpdate !== null ? ` · ${item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}` : ""}</p>
                     {(agentPackagePresentationStatus(item) !== "ready" || (item.packageRole === "standard_agent" && !agentPackageHasHomeShortcutRoute(item))) ? <p className="settings-inline-note">{agentAvailabilityDetail(item, locale)}</p> : null}
                     {(item.readiness.reason || item.readiness.statusReadError) && agentPackagePresentationStatus(item) !== "ready" ? <details className="settings-secondary-details"><summary>{locale === "zh" ? "检查详情" : "Check details"}</summary><p>{item.readiness.reason}</p><code>{item.readiness.statusReadError}</code></details> : null}
                     <dl className="agent-state-axis-grid">
+                      <div><dt>{locale === "zh" ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div>
                       <div><dt>{locale === "zh" ? "来源" : "Source"}</dt><dd>{packageSourceLabel(item.sourceMode, locale)} · {packageAccessVisibilityLabel(item.access, locale)}</dd></div>
-                      <div><dt>{locale === "zh" ? "访问" : "Access"}</dt><dd>{packageAccessStatusLabel(item.access, locale)}{item.access?.providerId ? ` · ${item.access.providerId}` : ""}</dd></div>
+                      <div><dt>{locale === "zh" ? "访问" : "Access"}</dt><dd data-testid="opl-package-access-status">{packageAccessStatusLabel(item.access, locale)}{item.access?.providerId ? ` · ${item.access.providerId}` : ""}</dd></div>
                       <div><dt>{locale === "zh" ? "安装" : "Installed"}</dt><dd>{booleanStateLabel(item.installed, locale)}{item.installedVersion ? ` · ${item.installedVersion}` : ""}</dd></div>
                       <div><dt>{locale === "zh" ? "可用版本" : "Available version"}</dt><dd>{item.availableVersion ?? (item.versionKind === "available" ? item.version : undefined) ?? (locale === "zh" ? "尚未检查" : "Not checked")}</dd></div>
                       <div><dt>{locale === "zh" ? "执行平台启用" : "Enabled on platform"}</dt><dd>{booleanStateLabel(item.activated, locale)}</dd></div>
@@ -421,7 +412,7 @@ export function PackageCatalog({
                             onAction({
                               key,
                               actionId: preferenceAction.actionId,
-                              label: locale === "zh" ? `更新 ${item.label} 的新任务入口` : `Update ${item.label} New Task entry`,
+                              label: locale === "zh" ? `更新 ${displayName} 的新任务入口` : `Update ${displayName} New Task entry`,
                               payload: {
                                 ...preferenceAction.payload,
                                 shortcut_id: shortcut.shortcutId,
@@ -479,7 +470,7 @@ export function PackageCatalog({
                             onClick={() => onAction({
                               key: `${item.packageId}:${action.actionId}`,
                               actionId: action.actionId,
-                              label: `${packageActionLabel(action, locale)} ${item.label}`,
+                              label: `${packageActionLabel(action, locale)} ${displayName}`,
                               payload: action.payload,
                               confirmationRequired: action.confirmationRequired
                             })}
