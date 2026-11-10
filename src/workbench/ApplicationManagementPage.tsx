@@ -1,7 +1,7 @@
 import { CircleAlert, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
-import type { NativeAppUpdateResult } from "../bridge/oplBridge";
+import type { CodexCapabilityCatalog, NativeAppUpdateResult } from "../bridge/oplBridge";
 import type { ActionReceiptView } from "./actionReceiptView";
 import type { ManagedUpdateProjection, WorkbenchModel } from "./workbenchModel";
 import type { WorkbenchSettings } from "./settingsModel";
@@ -15,6 +15,7 @@ import { SharedResourcesPage } from "./SharedResourcesPage";
 import { NativeSoftwareCatalog, SoftwareSourcesPage } from "./SoftwareSourcesPage";
 import { knowledgeSourceNeedsAttention } from "./knowledgeSources";
 import { nativeSoftwareInventory } from "./softwareSources";
+import { softwareCatalogInventory, softwareCatalogPackages } from "./softwareCatalog";
 
 export type ApplicationManagementTab = "applications" | "updates" | "resources" | "sources";
 
@@ -45,21 +46,25 @@ type ApplicationManagementPageProps = {
   onTabChange?: (tab: ApplicationManagementTab) => void;
   actionFeedback?: SettingsActionFeedback | null;
   actionReceipt?: ActionReceiptView | null;
+  capabilityCatalog?: CodexCapabilityCatalog;
+  capabilityStatus?: "idle" | "loading" | "ready" | "error";
+  capabilityError?: string;
+  onRefreshCapabilities?: () => void;
 };
 
-export function ApplicationManagementPage({ model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, renderPackageContributions, onOpenSettings, initialTab = "applications", onTabChange, actionFeedback, actionReceipt }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, renderPackageContributions, onOpenSettings, initialTab = "applications", onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
-  const catalogPackages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && item.catalogScope === "software");
+  const catalogPackages = softwareCatalogPackages(model, "opl");
+  const inventory = softwareCatalogInventory(model);
   const catalogAvailable = model.packageLifecycle.some(item => item.packageId === "agent_packages_directory" || item.statusAxes.some(axis => axis.source === "canonical_agent_packages"));
   const effectiveBusyKey = actionBusyKey ?? (stateStatus !== "ready" ? "application-management:state" : null);
   const nativeInventory = nativeSoftwareInventory(model.softwareSources);
-  const installed = nativeInventory.installed + catalogPackages.filter(packageInstalledLocally).length;
-  const developmentLinked = catalogPackages.filter(packageDevelopmentLinked).length;
-  const installable = nativeInventory.installable + catalogPackages.filter((item) => !packagePresentLocally(item) && packageInstallAllowed(item)).length;
-  const updatesAvailable = nativeInventory.updatesAvailable + catalogPackages.filter((item) => item.currentness.trim().toLowerCase() === "update_available").length;
-  const attention = catalogPackages.filter((item) => agentPackageNeedsAttention(item) || packageAccessNeedsAttention(item)).length;
+  const installed = inventory.installed;
+  const notInstalled = inventory.notInstalled;
+  const updatesAvailable = inventory.updates;
+  const attention = inventory.attention;
   const sourceAttention = model.softwareSources?.entries.filter((source) => source.enabled !== false && source.credentialHandlePresent && ["forbidden", "expired", "revoked", "unknown"].includes(source.status)).length ?? 0;
   const resources = model.applicationManagement?.sharedResources ?? [];
   const resourceAttentionIds = new Set(resources.filter(resource => resource.status === "attention" || resource.authorization?.status === "attention" || resource.revision?.status === "stale" || resource.freshness?.status === "stale" || resource.readiness?.status === "attention").map(resource => resource.resourceId));
@@ -84,15 +89,14 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
     onHostAction
   };
   const pageTabs = [
-    { id: "updates", label: zh ? "更新" : "Updates", content: <><UpdatesSettingsPage {...updatesProps} /><NativeSoftwareCatalog projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} statusFilter="update:update_available" /></> },
+    { id: "updates", label: zh ? "更新" : "Updates", content: <><UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => { setTab("sources"); onTabChange?.("sources"); }} /><NativeSoftwareCatalog catalogOrigin="opl" projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} statusFilter="update:update_available" /></> },
     { id: "resources", label: zh ? "共享资源" : "Shared resources", content: <SharedResourcesPage model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} onApproveConnectionAccess={onApproveConnectionAccess} onOpenSettings={onOpenSettings} onOpenApplicationTab={(nextTab) => { setTab(nextTab); onTabChange?.(nextTab); }} /> },
     { id: "sources", label: zh ? "软件源" : "Software sources", content: <SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} /> }
   ];
   const headerStatus = <div className="opl-app-management-status"><div className="opl-app-management-overview"><div className="opl-app-management-environment" data-testid="opl-app-management-environment"><span>{zh ? "当前环境" : "Current environment"}</span><strong>{zh ? "本机 OPL" : "Local OPL"}</strong></div>
     <div className="opl-app-management-summary" role="status">
-      {catalogAvailable ? <><span><strong>{catalogPackages.length + nativeInventory.total}</strong> {zh ? (nativeInventory.complete ? "个软件" : "个已读取软件") : (nativeInventory.complete ? "software items" : "software items read")}</span><span><strong>{installable}</strong> {zh ? "个可安装" : "installable"}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span></> : <span>{zh ? "尚未读取应用目录" : "App catalog has not been read"}</span>}
-      {developmentLinked ? <span><strong>{developmentLinked}</strong> {zh ? "个开发接入" : "development checkouts"}</span> : null}
-      {updatesAvailable ? <span className="attention"><RefreshCw aria-hidden="true" size={14} /><strong>{updatesAvailable}</strong> {zh ? "个有更新" : "updates available"}</span> : null}
+      {catalogAvailable ? <><span><strong>{inventory.total}</strong> {zh ? (nativeInventory.complete ? "个 OPL 软件" : "个已读取 OPL 软件") : (nativeInventory.complete ? "software items" : "software items read")}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span><span><strong>{notInstalled}</strong> {zh ? "个未安装" : "not installed"}</span></> : <span>{zh ? "尚未读取应用目录" : "App catalog has not been read"}</span>}
+      {updatesAvailable ? <span className="attention"><RefreshCw aria-hidden="true" size={14} /><strong>{updatesAvailable}</strong> {zh ? "个可更新" : "updates available"}</span> : null}
       {attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个应用需处理" : "apps need attention"}</span> : null}
       {resourceAttention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{resourceAttention}</strong> {zh ? "项共享资源需处理" : "shared resources need attention"}</span> : null}
       {sourceAttention || model.softwareSources?.status === "attention_required" ? <span className="attention"><CircleAlert aria-hidden="true" size={14} />{sourceAttention ? (zh ? `${sourceAttention} 个软件源需处理` : `${sourceAttention} sources need attention`) : (zh ? "软件源需要处理" : "Software sources need attention")}</span> : null}
@@ -105,5 +109,5 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
     </div> : null}
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}</div>;
-  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner kind="all" model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={onAction} manifestInstallAction={manifestInstallAction} renderPackageContributions={renderPackageContributions} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "应用管理" : "Application management"} pageIntro={zh ? "安装、管理和更新你的应用、智能体与共享能力。" : "Install, manage, and update your apps, agents, and shared capabilities."} onRefresh={onRefresh} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;
+  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner kind="all" model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={onAction} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} renderPackageContributions={renderPackageContributions} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "应用管理" : "Application management"} pageIntro={zh ? "安装、管理和更新你的应用、智能体与共享能力。" : "Install, manage, and update your apps, agents, and shared capabilities."} onRefresh={onRefresh} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;
 }

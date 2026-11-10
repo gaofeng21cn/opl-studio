@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Button, Checkbox, Input, Modal, SegmentedControl, SegmentedTabs, StateDot, Switch, Tag } from "@deepseek-ai/dsh-client-ui-primitives";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Button, Checkbox, Input, Modal, SegmentedTabs, StateDot, Switch, Tag } from "@deepseek-ai/dsh-client-ui-primitives";
 import { PluginManagerOwnerPage, type PluginManagerOwnerItem, type PluginManagerOwnerTab, type PluginManagerOwnerPageProps } from "@opl-vendor/dsh-plugin-manager-page";
 import { createNavigationStore } from "../vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/navigation-store.ts";
 import { createPluginHeaderRef } from "../vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/header-scroll.ts";
@@ -7,14 +7,16 @@ import { en, zh, type PluginManagerLocaleKey } from "../vendor/deepseek-harness/
 import { bindSnapshotSelector } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/bind.ts";
 import type { AgentPackageLifecycleRef, PackageLifecycleActionRef, WorkbenchModel } from "../workbench/workbenchModel";
 import type { WorkbenchSettings } from "../workbench/settingsModel";
-import type { NativeSoftwareItemRef, SoftwareSourceRef } from "../workbench/workbenchModel-package-contracts";
+import type { CodexCapabilityCatalog, CodexSkillCapability } from "../bridge/oplBridge";
+import type { SettingsDestinationId } from "../workbench/settings/types";
 import { actionPayloadComplete, type SettingsActionRequest } from "../workbench/settingsActions";
 import type { SettingsPanelProps } from "../workbench/settings/types";
 import { NativeSoftwareList } from "../workbench/SoftwareSourcesPage";
-import { catalogDisplayName, SoftwareCatalogSummary } from "../workbench/SoftwareCatalogMetadata";
+import { catalogDisplayName } from "../workbench/SoftwareCatalogMetadata";
 import { nativeSoftwareProducts, nativeSoftwareMatches, softwareSourceActionLabel, nativeInstallationLabel, nativeCarrierInstalled } from "../workbench/softwareSources";
+import { catalogInstalledVersion, catalogManagerLabel, packageInstallationManagers, catalogStateLabel, catalogTypeLabel, nativeCatalogState, nativeCatalogAvailableVersion, packageCatalogState, softwareCatalogPackages, softwareCatalogNativeProducts, type SoftwareCatalogScope, type SoftwareCatalogState } from "../workbench/softwareCatalog";
 import { formatStatus } from "../workbench/settings/presentation";
-import { agentAvailabilityDetail, agentPackagePresentationStatus, agentPackageUpdateStatus, isAgentCatalogPackage, localizedPackageDescription, packageAccessStatusLabel, packageInstallAllowed, packageActionLabel, packageRoleLabel, packagePresentLocally, packageLocalVersion, agentPackageNeedsAttention, packageInstalledLocally, packageDevelopmentLinked } from "../workbench/settings/packages";
+import { agentAvailabilityDetail, agentPackageUpdateStatus, isAgentCatalogPackage, localizedPackageDescription, packageAccessStatusLabel, packageInstallAllowed, packageActionLabel, packagePresentLocally, packageAccessNeedsAttention, agentPackageNeedsAttention, packageDevelopmentLinked } from "../workbench/settings/packages";
 
 export type DshPluginManagerOwnerProps = {
   kind?: "agents" | "all";
@@ -32,6 +34,11 @@ export type DshPluginManagerOwnerProps = {
   onRefresh?: () => void;
   stateStatus?: "loading" | "ready" | "error";
   headerStatus?: ReactNode;
+  capabilityCatalog?: CodexCapabilityCatalog;
+  capabilityStatus?: "idle" | "loading" | "ready" | "error";
+  capabilityError?: string;
+  onRefreshCapabilities?: () => void;
+  onOpenSettings?: (destination: SettingsDestinationId) => void;
 };
 
 const noop = () => {};
@@ -40,34 +47,59 @@ function PackageContribution({ packageId, render }: { packageId: string; render:
   return <section className="opl-dsh-owner-section" data-testid="opl-package-state">{render(packageId)}</section>;
 }
 
+function isPluginSkill(skill: CodexSkillCapability): boolean {
+  return skill.scope === "plugin" || /(?:^|\/)plugins\/(?:cache|marketplaces)\//.test(skill.path.replaceAll("\\", "/"));
+}
+
+function CatalogRowFacts({ type, installedVersion, availableVersion, locale }: { type: string; installedVersion?: string; availableVersion?: string; state: SoftwareCatalogState; locale: "zh" | "en" }) {
+  const zh = locale === "zh";
+  return <span className="opl-catalog-row-facts" data-testid="opl-package-version-summary">
+    <span className="opl-catalog-cell-type" data-label={zh ? "类型" : "Type"}>{type}</span>
+    <span className="opl-catalog-cell-version" data-label={zh ? "已装版本" : "Installed"}>{installedVersion || (zh ? "待检查" : "Not checked")}</span>
+    <span className="opl-catalog-cell-version" data-label={zh ? "可用版本" : "Available"}>{availableVersion || (zh ? "待检查" : "Not checked")}</span>
+
+  </span>;
+}
+
+function CatalogState({ state, locale }: { state: SoftwareCatalogState; locale: "zh" | "en" }) {
+  return <span className="opl-catalog-state" data-label={locale === "zh" ? "状态" : "Status"}><StateDot state={state === "installed" ? "done" : state === "attention" || state === "update_available" ? "warning" : "idle"} />{catalogStateLabel(state, locale)}</span>;
+}
+
 /** The Package owner supplies every fact and command; the DSH page supplies presentation and navigation. */
 export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const { model, settings, onAction, actionBusyKey, kind = "agents" } = props;
   const locale = settings.locale, isZh = locale === "zh", busy = actionBusyKey !== null;
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState("software");
+  const [scope, setScope] = useState<SoftwareCatalogScope>("opl");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [installOpen, setInstallOpen] = useState(false);
   const [manifestUrl, setManifestUrl] = useState("");
   const [trustTier, setTrustTier] = useState("third_party_unverified");
   const navigation = useMemo(() => createNavigationStore().create(), []);
   const useStore = useMemo(() => bindSnapshotSelector(navigation), [navigation]);
-  const packages = model.packageLifecycle.filter(item => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && (kind === "all" || isAgentCatalogPackage(item)));
-  const native = kind === "all" && scope === "software" ? nativeSoftwareProducts(model.softwareSources) : [];
-  const match = (item: AgentPackageLifecycleRef) => (scope === "components" ? item.catalogScope !== "software" : item.catalogScope === "software")
-    && (statusFilter === "all" || (statusFilter === "ready" ? packageInstalledLocally(item) : statusFilter === "development" ? packageDevelopmentLinked(item) : statusFilter === "not_installed" ? !packagePresentLocally(item) : statusFilter === "app_hidden" ? !item.appEnabled : statusFilter.startsWith("update:") ? agentPackageUpdateStatus(item) === statusFilter.slice(7) : agentPackagePresentationStatus(item) === statusFilter))
-    && (!query.trim() || item.searchMetadata.query.includes(query.trim().toLowerCase()));
-  const visible = packages.filter(match);
-  const visibleNative = native.filter(({ channels, source, item }) => nativeSoftwareMatches(item, source, query, statusFilter) || channels.some(channel => nativeSoftwareMatches(channel.item, channel.source, query, statusFilter)));
+  useEffect(() => {
+    if (scope === "external" && props.capabilityStatus === "idle") props.onRefreshCapabilities?.();
+  }, [scope, props.capabilityStatus, props.onRefreshCapabilities]);
+  const packages = softwareCatalogPackages(model, scope).filter(item => kind === "all" || isAgentCatalogPackage(item));
+  const native = kind === "all" ? softwareCatalogNativeProducts(model, scope) : [];
+  const matchesState = (state: SoftwareCatalogState) => statusFilter === "all" || (statusFilter === "installed" ? ["installed", "update_available", "attention"].includes(state) : state === statusFilter);
+  const visible = packages.filter(item => matchesState(packageCatalogState(item))
+    && (typeFilter === "all" || (typeFilter === "plugin" ? item.catalogOrigin !== "opl" && item.catalogSource?.manager === "codex_plugin_manager" : item.softwareType === typeFilter))
+    && (!query.trim() || item.searchMetadata.query.includes(query.trim().toLowerCase())));
+  const visibleNative = native.filter(({ channels, source, item }) => matchesState(nativeCatalogState(item))
+    && (typeFilter === "all" || typeFilter === "application")
+    && (nativeSoftwareMatches(item, source, query, "all") || channels.some(channel => nativeSoftwareMatches(channel.item, channel.source, query, "all"))));
   const run = (item: AgentPackageLifecycleRef, action: PackageLifecycleActionRef, payload = action.payload, key = `${item.packageId}:${action.actionId}`) => onAction({ key, actionId: action.actionId, label: `${packageActionLabel(action, locale)} ${catalogDisplayName(item.label, item.displayNameI18n, locale)}`, payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported });
-  const actionsFor = (item: AgentPackageLifecycleRef) => (item.catalogScope !== "software" ? [] : item.actions).filter(action => action.actionId !== "package_app_set_enabled" && action.kind !== "preferences" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)));
+  const actionsFor = (item: AgentPackageLifecycleRef) => (item.catalogScope !== "software" ? [] : item.actions).filter(action => action.actionId !== "package_app_set_enabled" && action.kind !== "preferences" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)) && (action.kind !== "update" || item.currentness === "update_available") && (!["update", "repair"].includes(action.kind) || !packageAccessNeedsAttention(item)));
   const buttons = (item: AgentPackageLifecycleRef, all = false) => {
     const actions = actionsFor(item);
+    if (!all && packageAccessNeedsAttention(item)) return props.onTabChange ? <Button size="sm" variant="outline" onClick={() => props.onTabChange?.("sources")}>{isZh ? "检查软件源" : "Check source"}</Button> : null;
     const primaryKind = item.installed === false && !packagePresentLocally(item) ? "install"
-      : agentPackageUpdateStatus(item) === "update_available" ? "update"
+      : packageCatalogState(item) === "update_available" ? "update"
         : agentPackageNeedsAttention(item) ? "repair" : undefined;
     const primary = primaryKind ? actions.find(action => action.kind === primaryKind) : undefined;
-    return (all ? actions : primary ? [primary] : []).map(action => <Button key={action.actionId} size="sm" variant={action.kind === "uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => run(item, action)}>{action.kind === "install" && item.localInstallations?.length ? (isZh ? "安装到当前宿主" : "Install in this host") : packageActionLabel(action, locale)}</Button>);
+    return (all ? actions : primary ? [primary] : []).map(action => <Button key={action.actionId} size="sm" variant={action.kind === "uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => run(item, action)}>{action.kind === "install" && item.localInstallations?.length ? (isZh ? "安装到当前宿主" : "Install in this host") : action.kind === "install" ? (isZh ? "安装" : "Install") : packageActionLabel(action, locale)}</Button>);
   };
   const toggle = (item: AgentPackageLifecycleRef) => {
     if (item.installed !== true || item.catalogScope !== "software") return null;
@@ -86,17 +118,19 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     })}</section>;
   };
   const packageItem = (item: AgentPackageLifecycleRef): PluginManagerOwnerItem => {
-    const status = agentPackagePresentationStatus(item), update = agentPackageUpdateStatus(item), name = catalogDisplayName(item.label, item.displayNameI18n, locale);
-    const tags = <>{item.access?.visibility === "authorized_only" ? <Tag tone="quiet">{packageAccessStatusLabel(item.access, locale)}</Tag> : null}{update === "update_available" ? <Tag tone="info">{formatStatus(update, locale)}</Tag> : null}</>;
+    const update = agentPackageUpdateStatus(item), state = packageCatalogState(item), name = catalogDisplayName(item.label, item.displayNameI18n, locale);
+    const development = packageDevelopmentLinked(item);
+    const instanceCount = (item.installed === true ? 1 : 0) + (item.localInstallations?.length ?? 0);
+    const tags = <>{item.access?.visibility === "authorized_only" ? <Tag tone="quiet">{isZh ? "私有" : "Private"}</Tag> : null}{development ? <Tag tone="quiet">{isZh ? "开发接入" : "Development"}</Tag> : null}{instanceCount > 1 ? <Tag tone="quiet">{isZh ? `${instanceCount} 处安装` : `${instanceCount} installations`}</Tag> : null}<CatalogRowFacts type={catalogTypeLabel(item, locale)} installedVersion={catalogInstalledVersion(item, locale)} availableVersion={item.availableVersion} state={state} locale={locale} /></>;
     return { id: item.packageId, title: name,
-      description: <SoftwareCatalogSummary id={item.packageId} description={localizedPackageDescription(item, locale)} installed={packagePresentLocally(item) ? true : item.installed} installedVersion={packageLocalVersion(item)} missingLabel={isZh ? "未在此宿主安装" : "Not installed in this host"} availableVersion={item.availableVersion} locale={locale} />, tags,
-      status: <Tag tone={status === "unavailable" ? "danger" : "quiet"}><StateDot state={status === "ready" ? "done" : status === "unavailable" ? "error" : "idle"} />{item.installed !== true && item.localInstallations?.length ? (item.localInstallations.some(installation => installation.mode === "installed") ? (isZh ? "独立安装" : "Standalone installation") : (isZh ? "开发接入" : "Development checkout")) : status === "not_installed" ? (isZh ? "未在此宿主安装" : "Not installed in this host") : formatStatus(status === "ready" ? "installed" : status, locale)}</Tag>,
-      actions: <>{buttons(item)}{toggle(item)}</>, detailActions: <>{buttons(item, true)}{toggle(item)}</>,
+      description: <span className="opl-catalog-row-description">{localizedPackageDescription(item, locale)}</span>, tags,
+      status: <CatalogState state={state} locale={locale} />,
+      actions: <span className="opl-catalog-row-actions">{buttons(item)}</span>, detailActions: <>{buttons(item, true)}{toggle(item)}</>,
       detail: <>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "安装与运行状态" : "Installation and runtime"}</h4><p>{item.catalogScope !== "software" ? (item.catalogScope === "host_component" ? (isZh ? "此组件由所属宿主管理，随宿主配置维护。" : "This component is managed through its host configuration.") : (isZh ? "所属服务尚未提供软件分类，请刷新或更新基座后确认。" : "The owner has not reported a catalog classification. Refresh or update the foundation to confirm it.")) : agentAvailabilityDetail(item, locale)}</p>
-          <dl><div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div><div><dt>{isZh ? "软件类型" : "Software type"}</dt><dd>{({ application: isZh ? "应用" : "Application", agent: isZh ? "智能体" : "Agent", capability: isZh ? "能力包" : "Capability package", unknown: isZh ? "待确认" : "Not confirmed" })[item.softwareType ?? "unknown"]}</dd></div><div><dt>{isZh ? "技术角色" : "Technical role"}</dt><dd>{packageRoleLabel(item.packageRole, locale)}</dd></div><div><dt>{isZh ? "来源类型" : "Distribution"}</dt><dd>{item.distributionChannel === "source" ? (isZh ? "固定源码版本" : "Pinned source version") : item.distributionChannel === "release" ? (isZh ? "发行包" : "Published artifact") : (isZh ? "待确认" : "Not confirmed")}</dd></div><div><dt>{isZh ? "发布者" : "Publisher"}</dt><dd>{item.publisher}</dd></div><div><dt>{isZh ? "当前宿主版本" : "Current host version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (isZh ? "未安装到此宿主" : "Not installed in this host") : (isZh ? "待确认" : "Not confirmed"))}</dd></div><div><dt>{isZh ? "来源版本" : "Source version"}</dt><dd>{item.availableVersion ?? (isZh ? "待检查" : "Not checked")}</dd></div><div><dt>{isZh ? "当前宿主更新" : "Current host update"}</dt><dd>{formatStatus(update, locale)}</dd></div></dl>
-          <p>{isZh ? "开关只控制 OPL App 入口。Codex 和执行平台的启用、可调用状态独立读取。" : "The switch controls OPL App entries. Codex and execution-platform enablement and callability are read separately."}</p>
-          {item.installed !== true && item.access?.visibility === "authorized_only" && !packageInstallAllowed(item) ? <p data-testid="opl-package-access-gate">{item.access.status === "signed_out" ? (isZh ? "连接软件源账号后才能安装此私有条目。" : "Connect the source account to install this private entry.") : item.access.reason ?? packageAccessStatusLabel(item.access, locale)}</p> : null}
+          <dl><div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div><div><dt>{isZh ? "软件类型" : "Software type"}</dt><dd>{({ application: isZh ? "应用" : "Application", agent: isZh ? "智能体" : "Agent", capability: isZh ? "能力包" : "Capability package", unknown: isZh ? "待确认" : "Not confirmed" })[item.softwareType ?? "unknown"]}</dd></div><div><dt>{isZh ? "软件源管理器" : "Source manager"}</dt><dd>{catalogManagerLabel(item.catalogSource?.manager, locale)}</dd></div><div><dt>{isZh ? "安装管理者" : "Installation owner"}</dt><dd>{packageInstallationManagers(item).map(manager => catalogManagerLabel(manager, locale)).join("、") || "—"}</dd></div><div><dt>{isZh ? "扩展来源" : "Extension source"}</dt><dd>{item.catalogSource?.marketplaceId ?? (item.catalogOrigin === "opl" ? "OPL" : (isZh ? "尚未声明" : "Not declared"))}{item.catalogSource?.delivery === "host_bundled" ? (isZh ? " · Codex 随附" : " · Bundled with Codex") : ""}</dd></div><div><dt>{isZh ? "分发方式" : "Distribution"}</dt><dd>{item.distributionChannel === "source" ? (isZh ? "固定源码版本" : "Pinned source version") : item.distributionChannel === "release" ? (isZh ? "发行包" : "Published artifact") : (isZh ? "待确认" : "Not confirmed")}</dd></div><div><dt>{isZh ? "发布者" : "Publisher"}</dt><dd>{item.publisher}</dd></div><div><dt>{isZh ? "Codex 插件版本" : "Codex plugin version"}</dt><dd>{item.installedVersion ?? (item.installed === false ? (isZh ? "未安装到此宿主" : "Not installed in this host") : (isZh ? "待确认" : "Not confirmed"))}</dd></div><div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{item.availableVersion ?? (isZh ? "待检查" : "Not checked")}</dd></div><div><dt>{isZh ? "更新检查" : "Update check"}</dt><dd>{formatStatus(update, locale)}</dd></div></dl>
+          <p>{item.catalogOrigin === "opl" ? (isZh ? "此软件通过 OPL 目录管理。启用开关控制它在 OPL App 中的入口。" : "This software is managed through the OPL catalog. The switch controls its OPL App entry.") : (isZh ? "此扩展由原来源和安装器维护。宿主随附表示交付方式，不代表运行依赖。" : "This extension is maintained by its source and installer. Bundled delivery does not make it a runtime dependency.")}</p>
+          {item.access?.visibility === "authorized_only" && packageAccessNeedsAttention(item) ? <p data-testid="opl-package-access-gate">{item.access.status === "signed_out" ? (isZh ? "连接软件源账号以检查和更新此私有软件。" : "Connect the source account to check and update this private software.") : item.access.reason ?? packageAccessStatusLabel(item.access, locale)}</p> : null}
           {item.requiredByPackageIds?.length ? <p>{isZh ? `此能力仍被 ${item.requiredByPackageIds.join("、")} 使用；卸载或停用前请先处理这些依赖。` : `Required by ${item.requiredByPackageIds.join(", ")}; resolve dependents before uninstalling or disabling it.`}</p> : null}
         </section>{item.localInstallations?.length ? <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装实例" : "Local installations"}</h4>{item.localInstallations.map(installation => <dl key={installation.installationId} data-testid="opl-local-installation"><div><dt>{isZh ? "安装方式" : "Installation method"}</dt><dd>{installation.mode === "development" ? (isZh ? "开发接入" : "Development checkout") : (isZh ? "独立安装" : "Standalone installation")} · {installation.manager === "uv" ? "uv" : (isZh ? "软件自身管理" : "Managed by the software")}</dd></div><div><dt>{isZh ? "版本" : "Version"}</dt><dd>{installation.version}</dd></div><div><dt>{isZh ? "位置引用" : "Location reference"}</dt><dd><code>{installation.locationRef}</code></dd></div></dl>)}<p>{isZh ? "这些实例通过各自的安装器管理。此页的宿主安装操作只影响当前宿主中的插件副本。" : "These installations use their own installers. Host installation actions affect only the plugin copy in this host."}</p></section> : null}{shortcuts(item)}
         {item.catalogScope === "software" && item.appEnabled && props.renderPackageContributions ? <PackageContribution packageId={item.packageId} render={props.renderPackageContributions} /> : null}
@@ -107,9 +141,11 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const nativeItem = ({ source, item, productId, channels }: ReturnType<typeof nativeSoftwareProducts>[number]): PluginManagerOwnerItem => {
     const name = item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale), executable = item.availableActions.filter(action => source && action.status === "available" && Boolean(item.revision) && actionPayloadComplete(action.payload, [...action.payloadFields, "source_id", "item_id", "expected_revision"]) && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId && action.payload.expected_revision === item.revision && (action.actionId === "source_install" ? nativeCarrierInstalled(item) === false : action.actionId === "source_update" ? nativeCarrierInstalled(item) === true && item.updateStatus === "available" : nativeCarrierInstalled(item) === true));
     const nativeButtons = (all = false) => (all ? executable : executable.filter(action => action.actionId === (item.installed === false ? "source_install" : "source_update"))).map(action => <Button key={action.actionId} size="sm" variant={action.actionId === "source_uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => onAction({ key: `source:${source?.sourceId}:${item.itemId}:${action.actionId}`, actionId: action.actionId, label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${name}`, payload: action.payload, confirmationRequired: true, dryRunSupported: action.dryRunSupported })}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</Button>);
-    return { id: productId, title: name, description: <SoftwareCatalogSummary id={item.name} description={item.descriptionI18n?.[locale] || item.description || (isZh ? "尚未提供软件说明。" : "No software description provided.")} installed={item.installed} installedVersion={item.installedVersion} availableVersion={item.availableVersion} locale={locale} />,
-      tags: null,
-      actions: nativeButtons(), detailActions: nativeButtons(true), status: <Tag tone={item.updateStatus === "available" ? "info" : "quiet"}>{item.updateStatus === "available" ? (isZh ? "有更新" : "Update available") : item.installed === true ? (isZh ? "已安装" : "Installed") : item.installed === false ? (isZh ? "未安装" : "Not installed") : (isZh ? "待确认" : "Not confirmed")}</Tag>,
+    return { id: productId, title: name,
+      description: <span className="opl-catalog-row-description">{item.descriptionI18n?.[locale] || item.description || (isZh ? "尚未提供软件说明。" : "No software description provided.")}</span>,
+      tags: <><CatalogRowFacts type={isZh ? "应用" : "Application"} installedVersion={item.installedVersion ?? (item.installed === false ? "—" : undefined)} availableVersion={nativeCatalogAvailableVersion({ source, item, productId, channels }, locale)} state={nativeCatalogState(item)} locale={locale} />{item.installationKind === "source_link" ? <Tag tone="quiet">{isZh ? "开发接入" : "Development"}</Tag> : null}</>,
+      actions: <span className="opl-catalog-row-actions">{nativeButtons()}</span>, detailActions: nativeButtons(true),
+      status: <CatalogState state={nativeCatalogState(item)} locale={locale} />,
       detail: <>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Local installation"}</h4><dl>
           <div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{productId}</code></dd></div>
@@ -121,22 +157,44 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
       </>,
     };
   };
-  const groups = scope === "components"
-    ? [{ id: "components", label: isZh ? "系统组件 · 由所属宿主管理" : "System components · managed by their host", items: visible.filter(item => item.catalogScope === "host_component").map(packageItem) }, { id: "unclassified", label: isZh ? "分类待确认" : "Classification not confirmed", items: visible.filter(item => item.catalogScope !== "host_component").map(packageItem) }].filter(group => group.items.length)
-    : [
-      { id: "native", label: isZh ? "应用" : "Applications", items: [...visible.filter(item => item.softwareType === "application").map(packageItem), ...visibleNative.map(nativeItem)] },
-      { id: "agents", label: isZh ? "智能体" : "Agents", items: visible.filter(item => item.softwareType === "agent").map(packageItem) },
-      { id: "capabilities", label: isZh ? "能力包" : "Capability packages", items: visible.filter(item => item.softwareType === "capability").map(packageItem) },
-      { id: "unclassified-software", label: isZh ? "类型待确认" : "Type not confirmed", items: visible.filter(item => !["application", "agent", "capability"].includes(item.softwareType ?? "unknown")).map(packageItem) },
-    ].filter(group => group.items.length);
+  // A plugin's exported skills belong to its package. Only independent Skill files are listed here.
+  const looseSkills = scope === "external" && kind === "all" ? (props.capabilityCatalog?.skills ?? []).filter(skill => !isPluginSkill(skill)) : [];
+  const skillItem = (skill: CodexSkillCapability): PluginManagerOwnerItem => ({
+    id: `codex-skill:${skill.path || skill.name}`, title: skill.name,
+    description: <span className="opl-catalog-row-description">{skill.description}</span>,
+    tags: <Tag tone="quiet">Skill</Tag>,
+    status: <CatalogState state="installed" locale={locale} />,
+    actions: <span className="opl-catalog-row-actions" />,
+    detail: <section className="opl-dsh-owner-section"><h4>{isZh ? "Codex Skill" : "Codex Skill"}</h4><p>{isZh ? "独立技能由 Codex 读取，不使用 OPL 软件发布版本。" : "Codex reads this independent skill. It does not use OPL software release versions."}</p><dl><div><dt>{isZh ? "安装器" : "Manager"}</dt><dd>Codex</dd></div><div><dt>{isZh ? "使用范围" : "Scope"}</dt><dd>{skill.scope}</dd></div><div><dt>{isZh ? "启用状态" : "Enabled"}</dt><dd>{skill.enabled ? (isZh ? "已启用" : "Enabled") : (isZh ? "已停用" : "Disabled")}</dd></div><div><dt>{isZh ? "文件位置" : "File location"}</dt><dd><code>{skill.path}</code></dd></div></dl>{props.onOpenSettings ? <Button variant="outline" size="sm" onClick={() => props.onOpenSettings?.("capabilities")}>{isZh ? "打开 Codex 能力设置" : "Open Codex capability settings"}</Button> : null}</section>
+  });
+  const skillItems = looseSkills.filter(skill => (typeFilter === "all" || typeFilter === "skill") && matchesState("installed") && (!query.trim() || `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()))).map(skillItem);
+  const sortItems = (items: PluginManagerOwnerItem[]) => items.sort((a, b) => a.title.localeCompare(b.title, isZh ? "zh-CN" : "en"));
+  const groups = scope === "external"
+    ? [
+      { id: "codex-plugins", label: isZh ? "Codex 插件" : "Codex plugins", items: sortItems(visible.filter(item => item.catalogSource?.manager === "codex_plugin_manager").map(packageItem)) },
+      { id: "codex-skills", label: isZh ? "独立 Skills" : "Independent Skills", items: sortItems(skillItems) },
+      { id: "other-sources", label: isZh ? "其他软件与待确认来源" : "Other software and unconfirmed sources", items: sortItems([...visible.filter(item => item.catalogSource?.manager !== "codex_plugin_manager").map(packageItem), ...visibleNative.map(nativeItem)]) }
+    ].filter(group => group.items.length)
+    : [{ id: scope === "opl" ? "opl-software" : "runtime-components", label: scope === "opl" ? (isZh ? "OPL 软件" : "OPL software") : (isZh ? "运行组件" : "Runtime components"), items: sortItems([...visible.map(packageItem), ...visibleNative.map(nativeItem)]) }];
   const dict = isZh ? zh : en;
   const translate = ((key: PluginManagerLocaleKey | "back", values?: Record<string, string>) => (key === "crumbRoot" ? isZh ? "软件目录" : "Software catalog" : key === "backToList" || key === "back" ? isZh ? "返回软件目录" : "Back to software catalog" : dict[key as PluginManagerLocaleKey]).replace(/\{([^}]+)\}/g, (_, value: string) => values?.[value] ?? `{${value}}`)) as PluginManagerOwnerPageProps["t"];
   const manifestEnabled = Boolean(props.manifestInstallAction?.dryRunSupported && props.manifestInstallAction.confirmationRequired && props.manifestInstallAction.payloadFields.includes("manifest_url") && props.manifestInstallAction.payloadFields.includes("trust_tier"));
-  const filters = <div className="opl-dsh-owner-filters"><Input type="search" aria-label={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} value={query} placeholder={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} onChange={event => setQuery(event.target.value)} /><SegmentedControl id="opl-catalog-scope" label={isZh ? "目录范围" : "Catalog scope"} value={scope} onChange={setScope} options={[{ value: "software", label: isZh ? "软件" : "Software" }, { value: "components", label: isZh ? "系统组件" : "System components" }]} /><select aria-label={isZh ? "按状态筛选" : "Filter by status"} value={statusFilter} onChange={event => setStatusFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部状态" : "All statuses"}</option><option value="not_installed">{isZh ? "未安装" : "Not installed"}</option><option value="ready">{isZh ? "已安装" : "Installed"}</option><option value="development">{isZh ? "开发接入" : "Development checkouts"}</option><option value="app_hidden">{isZh ? "在 OPL App 中已关闭" : "Off in OPL App"}</option><option value="update:update_available">{isZh ? "有更新" : "Updates available"}</option></select></div>;
-  return <div className="opl-dsh-plugin-manager" data-testid="opl-settings-agent-catalog">
+  const changeScope = (value: string) => { setScope(value as SoftwareCatalogScope); setTypeFilter("all"); setStatusFilter("all"); };
+  const scopeNote = scope === "opl" ? (isZh ? "我们维护的软件，使用统一目录安装与更新。" : "Software we maintain, installed and updated through one catalog.")
+    : scope === "external" ? (isZh ? "外部扩展按原来源管理；插件内的 Skills 随插件维护。" : "External extensions use their original managers; packaged Skills are maintained with their plugin.")
+      : (isZh ? "仅列出明确声明的宿主运行依赖，随所属宿主维护。" : "Declared host runtime dependencies, maintained with their host.");
+  const filters = <div className="opl-catalog-controls">
+    <div className="opl-catalog-scope"><div className="opl-catalog-scope-options" role="group" aria-label={isZh ? "维护归属" : "Maintenance origin"}>{[{ value: "opl", label: isZh ? "OPL 软件" : "OPL software" }, { value: "external", label: isZh ? "其他来源" : "Other sources" }, { value: "components", label: isZh ? "运行组件" : "Runtime components" }].map(option => <Button key={option.value} id={`opl-catalog-scope-${option.value}`} size="sm" variant="outline" aria-pressed={scope === option.value} onClick={() => changeScope(option.value)}>{option.label}</Button>)}</div><p>{scopeNote}</p></div>
+    <div className="opl-dsh-owner-filters"><Input type="search" aria-label={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} value={query} placeholder={isZh ? "搜索软件" : "Search software"} onChange={event => setQuery(event.target.value)} />
+      <select aria-label={isZh ? "按类型筛选" : "Filter by type"} value={typeFilter} onChange={event => setTypeFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部类型" : "All types"}</option>{scope === "external" ? <><option value="plugin">{isZh ? "Codex 插件" : "Codex plugins"}</option><option value="skill">Skills</option></> : null}<option value="application">{isZh ? "应用" : "Applications"}</option><option value="agent">{isZh ? "智能体" : "Agents"}</option><option value="capability">{isZh ? "能力包" : "Capabilities"}</option></select>
+      <select aria-label={isZh ? "按状态筛选" : "Filter by status"} value={statusFilter} onChange={event => setStatusFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部状态" : "All statuses"}</option>{(["installed", "update_available", "not_installed", "attention", "unknown"] as const).map(state => <option key={state} value={state}>{catalogStateLabel(state, locale)}</option>)}</select>
+    </div>
+    {scope === "external" ? <div className="opl-catalog-external-status"><span>{props.capabilityStatus === "loading" ? (isZh ? "正在读取独立 Skills…" : "Reading independent Skills…") : props.capabilityStatus === "error" ? (props.capabilityError || (isZh ? "Skills 读取失败，请重试。" : "Could not read Skills. Try again.")) : props.capabilityStatus === "ready" ? (isZh ? `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} 个 Codex 插件 · ${looseSkills.length} 个独立 Skills` : `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} Codex plugins · ${looseSkills.length} independent Skills`) : (isZh ? "独立 Skills 尚未读取" : "Independent Skills have not been read")}</span>{props.onRefreshCapabilities ? <Button size="sm" variant="outline" disabled={props.capabilityStatus === "loading"} onClick={props.onRefreshCapabilities}>{isZh ? "刷新 Skills" : "Refresh Skills"}</Button> : null}<Button size="sm" variant="outline" disabled={busy} onClick={() => setInstallOpen(true)}>{isZh ? "从清单导入" : "Import manifest"}</Button></div> : null}
+  </div>;
+  return <div className="opl-dsh-plugin-manager opl-software-center" data-testid="opl-settings-agent-catalog" data-catalog-scope={scope}>
     <PluginManagerOwnerPage t={translate} title={props.pageTitle ?? (isZh ? "软件目录" : "Software catalog")} intro={props.pageIntro ?? (isZh ? "统一查看并管理软件" : "Browse and manage software")} installedLabel={isZh ? "软件目录" : "Software catalog"} groups={groups} tabs={props.contributedTabs} selectedTab={props.selectedTab} onTabChange={props.onTabChange} onRefresh={props.onRefresh}
       useStore={useStore} actions={navigation.actions} createHeaderRef={typeof ResizeObserver === "undefined" ? () => noop : createPluginHeaderRef} headerStatus={<>{props.headerStatus}{(props.selectedTab ?? "installed") === "installed" ? filters : null}</>}
-      toolbar={<>{model.officialProfileRestore ? <Button variant="outline" size="sm" data-testid="settings-agents-restore-official-profile" disabled={busy} onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id, label: isZh ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" }, confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>{isZh ? "恢复官方组合" : "Restore official combination"}</Button> : null}<Button variant="primary" size="sm" disabled={busy} onClick={() => setInstallOpen(true)}>{isZh ? "添加软件" : "Add software"}</Button></>} empty={<p>{props.stateStatus === "loading" ? (isZh ? "正在读取软件目录…" : "Reading the software catalog…") : (isZh ? "没有符合条件的软件。请清除筛选或刷新目录。" : "No matching software. Clear filters or refresh the catalog.")}</p>} />
+      toolbar={<>{model.officialProfileRestore ? <details className="opl-catalog-more"><summary>{isZh ? "更多" : "More"}</summary><Button variant="outline" size="sm" data-testid="settings-agents-restore-official-profile" disabled={busy} onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id, label: isZh ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" }, confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>{isZh ? "恢复官方组合" : "Restore official combination"}</Button></details> : null}{props.onTabChange ? <Button variant="outline" size="sm" onClick={() => props.onTabChange?.("sources")}>{isZh ? "管理软件源" : "Manage sources"}</Button> : null}</>} empty={<p>{props.stateStatus === "loading" ? (isZh ? "正在读取软件目录…" : "Reading the software catalog…") : (isZh ? scope === "components" ? "当前没有单独列出的运行组件。" : "没有符合条件的软件。请调整筛选或刷新目录。" : scope === "components" ? "No runtime components are listed separately." : "No matching software. Adjust filters or refresh the catalog.")}</p>} />
     {installOpen ? <Modal open onClose={() => setInstallOpen(false)} title={isZh ? "添加软件" : "Add software"} closeLabel={isZh ? "关闭" : "Close"} description={isZh ? "提供软件清单，由软件包负责人检查后安装。" : "Provide a software manifest for its Package owner to verify and install."} footer={<><Button variant="outline" onClick={() => setInstallOpen(false)}>{isZh ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={!manifestEnabled || !manifestUrl.trim() || busy} onClick={() => { if (props.manifestInstallAction) onAction({ key: "package:manifest-install", actionId: props.manifestInstallAction.actionId, label: isZh ? "从清单添加软件" : "Add software from manifest", payload: { manifest_url: manifestUrl.trim(), trust_tier: trustTier }, confirmationRequired: true, dryRunSupported: props.manifestInstallAction.dryRunSupported }); setInstallOpen(false); }}>{isZh ? "检查并安装" : "Check and install"}</Button></>}><Input aria-label={isZh ? "清单地址" : "Manifest URL"} value={manifestUrl} onChange={event => setManifestUrl(event.target.value)} /><SegmentedTabs size="sm" label={isZh ? "清单信任级别" : "Manifest trust"} value={trustTier} onChange={setTrustTier} items={[{ value: "third_party_unverified", label: isZh ? "尚未验证" : "Unverified", id: "opl-manifest-unverified", panelId: "opl-manifest-trust" }, { value: "third_party_verified", label: isZh ? "已验证" : "Verified", id: "opl-manifest-verified", panelId: "opl-manifest-trust" }]} />{!manifestEnabled ? <p>{isZh ? "当前 App 尚未提供清单安装通道。" : "Manifest installation is unavailable."}</p> : null}</Modal> : null}
   </div>;
 }

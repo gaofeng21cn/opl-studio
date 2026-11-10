@@ -404,6 +404,7 @@ test("package projection keeps the complete dynamic catalog and separates OPL ro
     package_id: `package-${index}`,
     display_name: `Package ${index}`,
     publisher: index < 9 ? "one-person-lab" : "OpenAI",
+    catalog_origin: index < 9 ? "opl" : "external",
     package_role: index < 5 ? "standard_agent" : index < 7 ? "capability_package" : index === 7 ? "workflow_profile" : "standard_agent",
     source_explanation: { kind: "first_party_framework_projection" },
     installed: true,
@@ -429,14 +430,14 @@ test("package projection keeps the complete dynamic catalog and separates OPL ro
   assert.equal(model.packageLifecycle.filter((item) => item.roleGroup === "other").length, 3);
 });
 
-test("package projection derives the OPL baseline when official is omitted", () => {
+test("package projection derives OPL membership from owner provenance", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {
       agent_packages: {
         directory: {
           entries: [
-            { package_id: "mas", publisher: "one-person-lab", package_role: "standard_agent", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } },
-            { package_id: "weixin", publisher: "one-person-lab", package_role: "capability_package", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } }
+            { package_id: "mas", publisher: "one-person-lab", catalog_origin: "opl", package_role: "standard_agent", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } },
+            { package_id: "weixin", publisher: "one-person-lab", catalog_origin: "opl", package_role: "capability_package", installed: true, activated: true, readiness: { status: "ready", callable: true, launch_allowed: true } }
           ]
         },
         status_index: { packages: {} }
@@ -449,6 +450,61 @@ test("package projection derives the OPL baseline when official is omitted", () 
   assert.equal(capability?.official, true);
   assert.equal(standard?.roleGroup, "agent");
   assert.equal(capability?.roleGroup, "supporting");
+});
+
+test("maintenance provenance separates OPL software, external extensions and unknown origin without trusting names", async () => {
+  const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const entries = compactPackageRows([
+    { package_id: "travel-passport", publisher: "gaofeng21cn", catalog_origin: "opl", origin_basis: "owner_manifest", catalog_scope: "software",
+      catalog_source: { manager: "codex_plugin_manager", marketplace_id: "journey-atlas", delivery: "local", token: "must-not-cross" } },
+    { package_id: "pdf@openai-primary-runtime", publisher: "OpenAI", catalog_origin: "external", origin_basis: "native_carrier", catalog_scope: "software",
+      catalog_source: { manager: "codex_plugin_manager", marketplace_id: "openai-primary-runtime", delivery: "host_bundled" } },
+    { package_id: "opl-looking-name", publisher: "one-person-lab", official: true },
+    { package_id: "malformed", catalog_origin: "future", origin_basis: "future", catalog_source: { manager: { token: "must-not-cross" }, delivery: "future" } }
+  ]);
+  assert.doesNotMatch(JSON.stringify(entries), /must-not-cross/);
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries } } } });
+  const [journey, pdf, unclassified, malformed] = model.packageLifecycle;
+  assert.equal(journey.catalogOrigin, "opl");
+  assert.equal(journey.originBasis, "owner_manifest");
+  assert.equal(journey.official, true);
+  assert.deepEqual(journey.catalogSource, { manager: "codex_plugin_manager", marketplaceId: "journey-atlas", delivery: "local" });
+  assert.equal(pdf.catalogOrigin, "external");
+  assert.equal(pdf.catalogScope, "software");
+  assert.equal(pdf.catalogSource?.delivery, "host_bundled");
+  assert.match(pdf.searchMetadata.query, /codex_plugin_manager/);
+  assert.equal(pdf.official, false);
+  assert.equal(unclassified.catalogOrigin, "unknown");
+  assert.equal(unclassified.official, false);
+  assert.equal(malformed.catalogOrigin, "unknown");
+  assert.equal(malformed.originBasis, "unknown");
+  assert.deepEqual(malformed.catalogSource, { manager: "unknown", delivery: "unknown" });
+});
+
+test("native products preserve maintenance provenance separately from installation and distribution managers", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../src/workbench/softwareSources.ts");
+  const raw = {
+    surface_kind: "opl_software_sources_projection.v1",
+    installed_products: [{ item_id: "managed:framework", product_id: "framework", name: "framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12",
+      catalog_origin: "opl", origin_basis: "owner_manifest", catalog_source: { manager: "opl_framework", delivery: "local" } }],
+    entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available",
+      catalog_origin: "opl", origin_basis: "owner_projection", catalog_source: { manager: "homebrew", delivery: "marketplace", token: "must-not-cross" },
+      native_items: [{ item_id: "formula:opl", product_id: "framework", name: "opl", kind: "formula", installed: false, available_version: "0.3.11",
+        catalog_origin: "opl", origin_basis: "owner_projection", catalog_source: { manager: "homebrew", delivery: "marketplace" } }] }]
+  };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
+  assert.doesNotMatch(JSON.stringify(projection), /must-not-cross/);
+  assert.equal(projection.entries[0].catalogOrigin, "opl");
+  assert.equal(projection.entries[0].catalogSource?.manager, "homebrew");
+  const [product] = nativeSoftwareProducts(projection);
+  assert.equal(product.item.catalogOrigin, "opl");
+  assert.equal(product.item.catalogSource?.manager, "opl_framework");
+  assert.equal(product.item.installedVersion, "0.3.12");
+  assert.equal(product.item.availableVersion, "0.3.11");
+  assert.equal(product.channels[0].item.catalogSource?.manager, "homebrew");
+  const unknown = readSoftwareSourcesProjection({ surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "one-person-lab", display_name: "OPL", source_kind: "tap" }] })!;
+  assert.equal(unknown.entries[0].catalogOrigin, "unknown");
 });
 
 test("selection availability fails open for unknown diagnostics and blocks explicit owner rejection", () => {
