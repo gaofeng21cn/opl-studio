@@ -1,7 +1,7 @@
 import { Check, FolderPlus, RefreshCw, Settings2, Unplug } from "lucide-react";
 import { useEffect, useState } from "react";
 import { actionPayloadComplete, type SettingsActionRequest } from "./settingsActions";
-import type { KnowledgeSourceRef, KnowledgeSourcesProjection } from "./knowledgeSources";
+import type { KnowledgeSourceHealth, KnowledgeSourceRef, KnowledgeSourcesProjection } from "./knowledgeSources";
 import { knowledgeSourceStatus } from "./knowledgeSources";
 import { SettingsGroup, StatusValue } from "./settings/primitives";
 
@@ -9,6 +9,24 @@ const splitIds = (value: string) => [...new Set(value.split(/[,，\n]/).map(item
 const dateLabel = (value: string | undefined, locale: "zh" | "en") => value && Number.isFinite(Date.parse(value))
   ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(Date.parse(value)) : null;
 const stateLabel = (value: string, zh: boolean) => ({ authorized: zh ? "已授权" : "Authorized", current: zh ? "当前" : "Current", fresh: zh ? "最新" : "Fresh", stale: zh ? "需要复核" : "Review needed", attention: zh ? "需要处理" : "Needs attention", ready: zh ? "就绪" : "Ready" } as Record<string, string>)[value] ?? (zh ? "待确认" : "Not confirmed");
+
+function KnowledgeHealthDetails({ health, zh }: { health: KnowledgeSourceHealth; zh: boolean }) {
+  const counts = [
+    zh ? `${health.currentCount}条可用` : `${health.currentCount} available`,
+    health.reviewDueCount ? (zh ? `${health.reviewDueCount}条过期记录已排除` : `${health.reviewDueCount} expired records excluded`) : null,
+    health.inactiveCount ? (zh ? `${health.inactiveCount}条停用或已替代记录已排除` : `${health.inactiveCount} inactive or superseded records excluded`) : null,
+    health.unavailableCount ? (zh ? `${health.unavailableCount}条暂不可用` : `${health.unavailableCount} unavailable`) : null
+  ].filter(Boolean).join(" · ");
+  const reason = (issue: KnowledgeSourceHealth["issues"][number]) => ({
+    knowledge_review_overdue: zh ? "已过复核期限，已排除" : "Review period expired; excluded",
+    knowledge_source_body_requires_review: zh ? "原文有变更，需要复核" : "Source content changed; review needed",
+    knowledge_source_body_unavailable: zh ? "原文暂不可读取" : "Source content is unavailable"
+  }[issue.reason] ?? (zh ? "暂不可用，需要复核" : "Unavailable; review needed"));
+  return <>
+    <div><dt>{zh ? "知识条目" : "Knowledge records"}</dt><dd data-testid="opl-knowledge-health">{counts}{health.truncated ? <p className="settings-inline-note">{zh ? `本次已检查${health.checkedCount}条，尚未覆盖全部记录。` : `Checked ${health.checkedCount} records; the remaining records have not been checked.`}</p> : null}</dd></div>
+    {health.issues.length ? <div><dt>{zh ? "已排除记录" : "Excluded records"}</dt><dd><ul>{health.issues.map(issue => <li key={issue.knowledgeId}><code>{issue.knowledgeId}</code> · {reason(issue)}</li>)}</ul></dd></div> : null}
+  </>;
+}
 
 export function KnowledgeSourcesSection({ projection, locale, actionBusyKey, onAction, onRefresh }: {
   projection?: KnowledgeSourcesProjection; locale: "zh" | "en"; actionBusyKey: string | null;
@@ -72,7 +90,7 @@ export function KnowledgeSourcesSection({ projection, locale, actionBusyKey, onA
       <div className="opl-shared-resource-heading"><div><h3>{source.label}</h3><p>{projection.contexts.find(context => context.contextId === source.contextId)?.label ?? (zh ? "当前工作区" : "Current workspace")} · {source.consumerDomainIds.length ? source.consumerDomainIds.map(id => projection.consumers.find(consumer => consumer.domainId === id)?.label ?? id).join(zh ? "、" : ", ") : (zh ? "尚未授权应用" : "No apps authorized")}</p></div>{source.connected === false ? <span className="settings-status" data-tone="neutral">{zh ? "已断开" : "Disconnected"}</span> : <StatusValue status={knowledgeSourceStatus(source)} locale={locale} />}</div>
       <div className="opl-shared-resource-footer"><span className="settings-muted">{dateLabel(source.observedAt, locale) ? `${zh ? "最近检查" : "Last checked"} ${dateLabel(source.observedAt, locale)}` : (zh ? "尚未完成检查" : "Not checked yet")}</span><div className="runtime-setting-control">{canRun(source, "knowledge_source_check") ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => run("knowledge_source_check", { resource_id: source.resourceId }, zh ? "检查知识来源" : "Check source")}><RefreshCw size={14} aria-hidden="true" />{zh ? "检查" : "Check"}</button> : null}{canRun(source, "knowledge_source_configure") ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => openForm(source)}><Settings2 size={14} aria-hidden="true" />{source.connected === false ? (zh ? "重新连接" : "Reconnect") : (zh ? "管理授权" : "Manage access")}</button> : null}{canRun(source, "knowledge_source_disconnect") ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => run("knowledge_source_disconnect", { resource_id: source.resourceId, expected_revision: source.revisionIdentity }, zh ? "断开资料库" : "Disconnect library")}><Unplug size={14} aria-hidden="true" />{zh ? "断开" : "Disconnect"}</button> : null}</div></div>
       {source.accessEditable === false ? <p className="settings-inline-note">{zh ? "此资料库按项目分别授权，请由来源管理者调整精细权限。" : "This library has project-specific access. Ask its source manager to adjust those permissions."}</p> : null}
-      <details className="opl-resource-details"><summary>{zh ? "查看详情" : "View details"}</summary><dl><div><dt>{zh ? "授权" : "Authorization"}</dt><dd>{stateLabel(source.authorizationStatus, zh)}</dd></div><div><dt>{zh ? "资料版本" : "Source revision"}</dt><dd>{stateLabel(source.revisionStatus, zh)}</dd></div><div><dt>{zh ? "资料时效" : "Freshness"}</dt><dd>{stateLabel(source.freshnessStatus, zh)}</dd></div><div><dt>{zh ? "知识归属" : "Knowledge scope"}</dt><dd>{source.scopeIds.join(zh ? "、" : ", ") || "—"}</dd></div></dl></details>
+      <details className="opl-resource-details"><summary>{zh ? "查看详情" : "View details"}</summary><dl><div><dt>{zh ? "授权" : "Authorization"}</dt><dd>{stateLabel(source.authorizationStatus, zh)}</dd></div><div><dt>{zh ? "资料版本" : "Source revision"}</dt><dd>{stateLabel(source.revisionStatus, zh)}</dd></div><div><dt>{zh ? "资料时效" : "Freshness"}</dt><dd>{stateLabel(source.freshnessStatus, zh)}</dd></div><div><dt>{zh ? "知识归属" : "Knowledge scope"}</dt><dd>{source.scopeIds.join(zh ? "、" : ", ") || "—"}</dd></div>{source.knowledgeHealth ? <KnowledgeHealthDetails health={source.knowledgeHealth} zh={zh} /> : null}</dl></details>
     </article>)}</div> : <p className="settings-inline-note" data-testid="opl-app-management-knowledge-empty">{projection?.status === "not_configured" ? (zh ? "还没有连接资料库。连接后，可为各应用分别设置读取和维护权限。" : "No library is connected. Connect one to grant read and editing access to your apps.") : (zh ? "知识来源尚未返回。刷新状态后可查看资料库及授权。" : "Knowledge sources have not been returned. Refresh to view libraries and access.")}</p>}
     {editing ? <form className="opl-resource-form" data-testid="opl-knowledge-source-form" onSubmit={event => { event.preventDefault(); submit(); }}>
       <div className="opl-resource-form-heading"><h3>{editing === "new" ? (zh ? "连接资料库" : "Connect library") : `${zh ? "管理授权" : "Manage access"} · ${editing.label}`}</h3><button type="button" className="settings-inline-command" onClick={() => { setEditing(null); setLocation(""); }}>{zh ? "取消" : "Cancel"}</button></div>
