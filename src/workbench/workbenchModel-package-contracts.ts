@@ -110,6 +110,14 @@ export type AgentPackageLifecycleRef = {
   activated: boolean | null;
   appEnabled: boolean;
   readiness: AgentPackageReadinessRef;
+  /** The version currently materialized on this carrier, when known. */
+  installedVersion?: string;
+  /** The version selected by the owner catalog for installation/update, when known. */
+  availableVersion?: string;
+  /**
+   * Legacy display field retained for consumers that only need one version.
+   * New UI should prefer installedVersion and availableVersion.
+   */
   version?: string;
   versionKind?: "installed" | "available";
   currentness: string;

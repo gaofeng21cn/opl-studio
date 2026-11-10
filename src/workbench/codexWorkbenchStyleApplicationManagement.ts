@@ -194,6 +194,69 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     margin-top: 0;
   }
 
+  .opl-app-management .agent-catalog-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 0 14px;
+  }
+
+  .opl-app-management .agent-catalog-heading h2 {
+    margin: 0;
+    color: var(--opl-text);
+    font-size: var(--opl-text-lg);
+    font-weight: var(--opl-weight-semibold);
+    line-height: var(--opl-leading-tight);
+  }
+
+  .opl-app-management .agent-catalog-heading p {
+    max-width: 680px;
+    margin: 5px 0 0;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+    line-height: var(--opl-leading-relaxed);
+  }
+
+  .opl-app-management .agent-catalog-source {
+    flex: 0 0 auto;
+    color: var(--opl-faint);
+    font-size: var(--opl-text-xs);
+    white-space: nowrap;
+  }
+
+  .opl-app-management .agent-catalog-inventory {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin: 0 0 16px;
+    padding: 10px 0;
+    border-block: 1px solid var(--opl-border);
+    color: var(--opl-muted);
+    font-size: var(--opl-text-xs);
+  }
+
+  .opl-app-management .agent-catalog-inventory span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+
+  .opl-app-management .agent-catalog-inventory strong {
+    color: var(--opl-text);
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .opl-app-management .agent-catalog-inventory .has-update {
+    color: var(--opl-warning);
+  }
+
+  .opl-app-management .agent-catalog-inventory .has-update strong {
+    color: var(--opl-warning);
+  }
+
   .opl-app-management-resources {
     min-width: 0;
   }
@@ -274,6 +337,15 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
 
     .opl-app-management-tabs button {
       flex: 0 0 auto;
+    }
+
+    .opl-app-management .agent-catalog-heading {
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .opl-app-management .agent-catalog-source {
+      white-space: normal;
     }
   }
 `;

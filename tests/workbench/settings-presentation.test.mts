@@ -498,7 +498,7 @@ test("unified catalog includes private capability packages and defers package st
   const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, renderPackageContributions() { statusReads++; return null; } }));
   assert.match(html, /Private Phone/);
   assert.match(html, /Future App/);
-  assert.match(html, /版本 2.7/);
+  assert.match(html, /可安装 2\.7/);
   assert.match(html, /role="switch" aria-checked="false" aria-label="在 OPL App 中启用 Private Phone"/);
   assert.match(html, /在 OPL App 中启用 Private Phone/);
   assert.equal(statusReads, 0);

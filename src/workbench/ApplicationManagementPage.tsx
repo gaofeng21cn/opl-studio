@@ -98,6 +98,12 @@ function resourceStateLabel(value: string | undefined, zh: boolean): string {
   })[value ?? "unknown"] ?? (zh ? "未提供" : "Unknown");
 }
 
+function dependencyStatus(item: { readiness: { operationalReady: boolean | null } }): string {
+  if (item.readiness.operationalReady === true) return "available";
+  if (item.readiness.operationalReady === false) return "unavailable";
+  return "unknown";
+}
+
 function observedAtLabel(value: string | undefined, locale: WorkbenchSettings["locale"]): string | undefined {
   if (!value) return undefined;
   const timestamp = Date.parse(value);
@@ -145,7 +151,7 @@ function SharedResources({ model, settings, onOpenSettings }: Pick<ApplicationMa
     </SettingsGroup>
     <SettingsGroup title={zh ? "应用依赖" : "Application dependencies"}>
       <p className="settings-inline-note">{zh ? "卸载或停用前先查看应用依赖关系。" : "Review application dependencies before disabling or removing anything."}</p>
-      {packageDependencies.length ? packageDependencies.map((item) => <SettingRow key={item.packageId} label={item.label} detail={item.dependencies.map((dependency) => dependency.packageId).join(zh ? "、" : ", ")}><span className="runtime-setting-control"><StatusValue status={item.readiness.operationalReady === false ? "unavailable" : "available"} locale={settings.locale} />{item.requiredByPackageIds?.length ? <span className="settings-muted">{zh ? `被 ${item.requiredByPackageIds.length} 个应用依赖` : `Required by ${item.requiredByPackageIds.length} app(s)`}</span> : null}</span></SettingRow>) : <p className="settings-inline-note">{zh ? "当前没有返回共享依赖关系。" : "No shared dependency relationships were returned."}</p>}
+      {packageDependencies.length ? packageDependencies.map((item) => <SettingRow key={item.packageId} label={item.label} detail={item.dependencies.map((dependency) => dependency.packageId).join(zh ? "、" : ", ")}><span className="runtime-setting-control"><StatusValue status={dependencyStatus(item)} locale={settings.locale} />{item.requiredByPackageIds?.length ? <span className="settings-muted">{zh ? `被 ${item.requiredByPackageIds.length} 个应用依赖` : `Required by ${item.requiredByPackageIds.length} app(s)`}</span> : null}</span></SettingRow>) : <p className="settings-inline-note">{zh ? "当前没有返回共享依赖关系。" : "No shared dependency relationships were returned."}</p>}
     </SettingsGroup>
   </div>;
 }
@@ -155,8 +161,11 @@ export function ApplicationManagementPage({ model, settings, managedUpdate, acti
   const tabRefs = useRef<Partial<Record<ApplicationManagementTab, HTMLButtonElement | null>>>({});
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
-  const installed = model.packageLifecycle.filter((item) => item.installed === true).length;
-  const attention = model.packageLifecycle.filter((item) => agentPackageNeedsAttention(item)).length;
+  const catalogPackages = model.packageLifecycle.filter((item) => item.packageId !== "missing_bridge");
+  const installed = catalogPackages.filter((item) => item.installed === true).length;
+  const installable = catalogPackages.filter((item) => item.installed === false && item.actions.some((action) => action.kind === "install" && action.status === "available")).length;
+  const updatesAvailable = catalogPackages.filter((item) => item.currentness.trim().toLowerCase() === "update_available").length;
+  const attention = catalogPackages.filter((item) => agentPackageNeedsAttention(item)).length;
   const tabs: Array<{ id: ApplicationManagementTab; label: string; icon: typeof Box }> = [
     { id: "applications", label: zh ? "我的应用" : "My apps", icon: Box },
     { id: "updates", label: zh ? "更新" : "Updates", icon: RefreshCw },
@@ -193,7 +202,7 @@ export function ApplicationManagementPage({ model, settings, managedUpdate, acti
       </div>
       <div className="opl-app-management-environment" data-testid="opl-app-management-environment"><span>{zh ? "当前环境" : "Current environment"}</span><strong>{zh ? "本机 OPL" : "Local OPL"}</strong><button type="button" className="settings-icon-button" aria-label={zh ? "刷新应用管理状态" : "Refresh application management"} title={zh ? "刷新" : "Refresh"} onClick={onRefresh} disabled={actionBusyKey !== null}><RefreshCw aria-hidden="true" size={15} /></button></div>
     </header>
-    <div className="opl-app-management-summary" role="status"><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span><span><strong>{model.packageLifecycle.length}</strong> {zh ? "个可发现" : "discoverable"}</span>{attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个需处理" : "need attention"}</span> : <span><ShieldCheck aria-hidden="true" size={14} />{zh ? "当前没有已知问题" : "No known issues"}</span>}</div>
+    <div className="opl-app-management-summary" role="status"><span><strong>{catalogPackages.length}</strong> {zh ? "个目录条目" : "catalog entries"}</span><span><strong>{installable}</strong> {zh ? "个可安装" : "installable"}</span><span><strong>{installed}</strong> {zh ? "个已安装" : "installed"}</span>{updatesAvailable ? <span className="attention"><RefreshCw aria-hidden="true" size={14} /><strong>{updatesAvailable}</strong> {zh ? "个有更新" : "updates available"}</span> : null}{attention ? <span className="attention"><CircleAlert aria-hidden="true" size={14} /><strong>{attention}</strong> {zh ? "个需处理" : "need attention"}</span> : <span><ShieldCheck aria-hidden="true" size={14} />{zh ? "当前没有已知问题" : "No known issues"}</span>}</div>
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}
     <nav className="opl-app-management-tabs" data-testid="opl-app-management-tabs" role="tablist" aria-label={zh ? "应用管理分区" : "Application management sections"}>
