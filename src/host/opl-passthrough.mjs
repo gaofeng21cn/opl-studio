@@ -14,6 +14,7 @@ import {
   compactHomeShortcutPreferences,
   compactManagedUpdateProjection,
   compactPackageRows,
+  compactSoftwareSources,
   compactUiContributions,
   selectedFields
 } from "./opl-passthrough-parts/contributions-packages.mjs";
@@ -120,6 +121,7 @@ function compactFastState(value) {
       agent_packages: agentPackages ? {
         surface_kind: agentPackages.surface_kind,
         source: agentPackages.source,
+        sources: compactSoftwareSources(agentPackages.sources),
         directory: directory ? {
           status: directory.status,
           entry_count: directory.entry_count,

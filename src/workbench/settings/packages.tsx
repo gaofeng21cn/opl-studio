@@ -7,6 +7,7 @@ import type { AgentPackageDependencyRef, AgentPackageLifecycleRef, PackageLifecy
 import type { WorkbenchSettings } from "../settingsModel";
 
 import { actionPayloadComplete, type SettingsActionRequest } from "../settingsActions";
+import type { AgentPackageAccessRef } from "../workbenchModel-package-contracts";
 
 import { SettingsPanelProps } from "./types";
 import { trapDialogFocus, statusTone, formatStatus } from "./presentation";
@@ -137,6 +138,40 @@ export function packageSourceLabel(source: string, locale: WorkbenchSettings["lo
   return locale === "zh" ? "已登记来源" : "Registered source";
 }
 
+export function packageAccessStatusLabel(access: AgentPackageAccessRef | undefined, locale: WorkbenchSettings["locale"]): string {
+  const zh = locale === "zh";
+  if (!access) return zh ? "访问状态尚未返回" : "Access status not reported";
+  const labels: Record<AgentPackageAccessRef["status"], string> = {
+    public: zh ? "公开源" : "Public source",
+    authorized: zh ? "已授权私有源" : "Authorized private source",
+    signed_out: zh ? "未连接软件源账号" : "Source account not connected",
+    forbidden: zh ? "无权访问私有源" : "Private source access denied",
+    expired: zh ? "授权已过期" : "Authorization expired",
+    revoked: zh ? "访问已撤销" : "Access revoked",
+    unknown: zh ? "访问状态未知" : "Access status unknown"
+  };
+  return labels[access.status];
+}
+
+export function packageAccessVisibilityLabel(access: AgentPackageAccessRef | undefined, locale: WorkbenchSettings["locale"]): string {
+  if (access?.visibility === "authorized_only") return locale === "zh" ? "私有授权源" : "Authorized-only source";
+  if (access?.visibility === "public") return locale === "zh" ? "公开源" : "Public source";
+  return locale === "zh" ? "来源可见性未知" : "Source visibility unknown";
+}
+
+export function packageAccessNeedsAttention(item: Pick<AgentPackageLifecycleRef, "installed" | "access">): boolean {
+  if (item.installed !== true) return false;
+  return ["signed_out", "forbidden", "expired", "revoked"].includes(item.access?.status ?? "unknown");
+}
+
+export function packageInstallAllowed(item: Pick<AgentPackageLifecycleRef, "installed" | "actions" | "access" | "installable">): boolean {
+  if (item.installed === true) return false;
+  if (item.installable === false) return false;
+  if (item.access?.visibility === "authorized_only" && item.access.status !== "authorized") return false;
+  if (item.access?.downloadAllowed === false) return false;
+  return item.actions.some((action) => action.kind === "install" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields));
+}
+
 export function packageDependencyPresentationStatus(dependency: AgentPackageDependencyRef): string {
   if (dependency.present === false || dependency.callable === false) return "unavailable";
   if (["ready", "available", "callable", "current", "operational"].includes(dependency.status.toLowerCase())) return "ready";
@@ -203,7 +238,7 @@ export function PackageCatalog({
   const locale = settings.locale;
   const catalogLabel = kind === "agents" ? "智能体" : "扩展";
   const catalogLabelEn = kind === "agents" ? "agents and workflows" : "extensions and apps";
-  const packages = model.packageLifecycle.filter((item) => item.packageId !== "missing_bridge" && (kind === "all" || isAgentCatalogPackage(item)));
+  const packages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && (kind === "all" || isAgentCatalogPackage(item)));
   const scoped = packages.filter((item) => scope === "all" || item.official);
   const manifestInstallAvailable = Boolean(
     manifestInstallAction
@@ -226,7 +261,7 @@ export function PackageCatalog({
     return !normalizedQuery || item.searchMetadata.query.includes(normalizedQuery);
   });
   const installedCount = packages.filter((item) => item.installed === true).length;
-  const installableCount = packages.filter((item) => item.installed !== true && item.actions.some((action) => action.kind === "install" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields))).length;
+  const installableCount = packages.filter((item) => packageInstallAllowed(item)).length;
   const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length;
   const groups = [
     { key: "standard_agent", label: locale === "zh" ? "领域智能体" : "Domain agents", icon: Bot },
@@ -293,7 +328,7 @@ export function PackageCatalog({
               const preferenceAction = item.actions.find((action) => action.kind === "preferences" && action.actionId !== "package_app_set_enabled" && action.status === "available");
               const presentationStatus = agentPackagePresentationStatus(item);
               const primaryAction = executableActions.find((action) => action.actionId === item.recommendedActionId)
-                ?? (item.installed === false ? executableActions.find((action) => action.kind === "install") : undefined)
+                ?? (item.installed === false && packageInstallAllowed(item) ? executableActions.find((action) => action.kind === "install") : undefined)
                 ?? (agentPackageUpdateStatus(item) === "update_available" ? executableActions.find((action) => action.kind === "update") : undefined)
                 ?? (agentPackagePresentationStatus(item) === "unavailable" ? executableActions.find((action) => action.kind === "repair") : undefined);
               const updateStatus = agentPackageUpdateStatus(item);
@@ -307,12 +342,13 @@ export function PackageCatalog({
                       <span className="agent-package-meta">
                         {packageVersionLabel(item, locale) ? <span data-testid="opl-package-version-summary">{packageVersionLabel(item, locale)}</span> : <span>{locale === "zh" ? "版本尚未返回" : "Version not reported"}</span>}
                         <span>{item.official ? (locale === "zh" ? "官方" : "Official") : item.publisher}</span>
+                        <span data-testid="opl-package-access-status">{packageAccessStatusLabel(item.access, locale)}</span>
                         {item.automaticUpdate !== null ? <span>{item.automaticUpdate ? (locale === "zh" ? "自动更新" : "Automatic updates") : (locale === "zh" ? "手动更新" : "Manual updates")}</span> : null}
                         <span data-testid="opl-package-update-status">{locale === "zh" ? `更新：${formatStatus(updateStatus, locale)}` : `Update: ${formatStatus(updateStatus, locale)}`}</span>
                       </span>
                     </span>
                     <span className="agent-package-summary-actions">
-                      <StatusValue status={presentationStatus === "ready" ? "installed" : presentationStatus} locale={locale} />
+                      <StatusValue status={packageAccessNeedsAttention(item) ? "attention" : presentationStatus === "ready" ? "installed" : presentationStatus} locale={locale} />
                       {primaryAction ? (
                         <button
                           className="settings-action-button primary"
@@ -348,12 +384,21 @@ export function PackageCatalog({
                     {(agentPackagePresentationStatus(item) !== "ready" || (item.packageRole === "standard_agent" && !agentPackageHasHomeShortcutRoute(item))) ? <p className="settings-inline-note">{agentAvailabilityDetail(item, locale)}</p> : null}
                     {(item.readiness.reason || item.readiness.statusReadError) && agentPackagePresentationStatus(item) !== "ready" ? <details className="settings-secondary-details"><summary>{locale === "zh" ? "检查详情" : "Check details"}</summary><p>{item.readiness.reason}</p><code>{item.readiness.statusReadError}</code></details> : null}
                     <dl className="agent-state-axis-grid">
-                      <div><dt>{locale === "zh" ? "来源" : "Source"}</dt><dd>{packageSourceLabel(item.sourceMode, locale)}</dd></div>
+                      <div><dt>{locale === "zh" ? "来源" : "Source"}</dt><dd>{packageSourceLabel(item.sourceMode, locale)} · {packageAccessVisibilityLabel(item.access, locale)}</dd></div>
+                      <div><dt>{locale === "zh" ? "访问" : "Access"}</dt><dd>{packageAccessStatusLabel(item.access, locale)}{item.access?.providerId ? ` · ${item.access.providerId}` : ""}</dd></div>
                       <div><dt>{locale === "zh" ? "安装" : "Installed"}</dt><dd>{booleanStateLabel(item.installed, locale)}{item.installedVersion ? ` · ${item.installedVersion}` : ""}</dd></div>
                       <div><dt>{locale === "zh" ? "可用版本" : "Available version"}</dt><dd>{item.availableVersion ?? (item.versionKind === "available" ? item.version : undefined) ?? (locale === "zh" ? "尚未检查" : "Not checked")}</dd></div>
                       <div><dt>{locale === "zh" ? "执行平台启用" : "Enabled on platform"}</dt><dd>{booleanStateLabel(item.activated, locale)}</dd></div>
                       <div><dt>{locale === "zh" ? "更新检查" : "Update check"}</dt><dd><StatusValue status={updateStatus} locale={locale} /></dd></div>
                     </dl>
+                    {packageAccessNeedsAttention(item) ? <p className="settings-inline-note" data-testid="opl-package-access-attention">
+                      {item.access?.reason ?? (locale === "zh" ? "私有来源访问已失效；重新连接软件源后才能继续更新。" : "Private source access is unavailable; reconnect the source before updating.")}
+                    </p> : null}
+                    {item.installed !== true && item.access?.visibility === "authorized_only" && !packageInstallAllowed(item) ? <p className="settings-inline-note" data-testid="opl-package-access-gate">
+                      {item.access.status === "signed_out"
+                        ? (locale === "zh" ? "连接软件源账号后才能安装此私有条目。" : "Connect the source account to install this private entry.")
+                        : item.access.reason ?? packageAccessStatusLabel(item.access, locale)}
+                    </p> : null}
                     {item.requiredByPackageIds?.length ? <p className="settings-inline-note" data-testid="opl-package-dependent-guard">
                       {locale === "zh"
                         ? `此能力仍被 ${item.requiredByPackageIds.join("、")} 使用；卸载或停用前请先处理这些依赖。`
