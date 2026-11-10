@@ -94,7 +94,8 @@ export function agentPackageUpdateStatus(item: Pick<AgentPackageLifecycleRef, "c
 }
 
 export function agentPackageNeedsAttention(item: Pick<AgentPackageLifecycleRef, "currentness" | "installed" | "readiness">): boolean {
-  // Uninstalled catalog choices are not broken installed packages.
+  // An uninstalled package is an available choice, not a broken installed state.
+  // Required dependencies are reported through the installed consumer that needs them.
   if (item.installed === false) return false;
   const updateStatus = agentPackageUpdateStatus(item);
   return packageUpdateAttentionStatuses.has(updateStatus)
@@ -237,7 +238,7 @@ export function PackageCatalog({
   const locale = settings.locale;
   const catalogLabel = kind === "agents" ? "智能体" : "扩展";
   const catalogLabelEn = kind === "agents" ? "agents and workflows" : "extensions and apps";
-  const packages = model.packageLifecycle.filter((item) => item.packageId !== "missing_bridge" && (kind === "all" || isAgentCatalogPackage(item)));
+  const packages = model.packageLifecycle.filter((item) => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && (kind === "all" || isAgentCatalogPackage(item)));
   const installableCount = packages.filter((item) => packageInstallAllowed(item)).length;
   const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length;
   const scoped = packages.filter((item) => scope === "all" || item.official);
@@ -262,6 +263,8 @@ export function PackageCatalog({
     return !normalizedQuery || item.searchMetadata.query.includes(normalizedQuery);
   });
   const installedCount = packages.filter((item) => item.installed === true).length;
+  const installableCount = packages.filter((item) => packageInstallAllowed(item)).length;
+  const updateCount = packages.filter((item) => agentPackageUpdateStatus(item) === "update_available").length;
   const groups = [
     { key: "standard_agent", label: locale === "zh" ? "领域智能体" : "Domain agents", icon: Bot },
     { key: "workflow_profile", label: locale === "zh" ? "工作流" : "Workflows", icon: Boxes },
@@ -271,8 +274,19 @@ export function PackageCatalog({
 
   return (
     <div className="agent-catalog" data-testid="opl-settings-agent-catalog">
-      <div className="agent-catalog-heading"><div><h2>{locale === "zh" ? "软件目录" : "Software catalog"}</h2><p>{locale === "zh" ? "来自 OPL Package Directory 的可发现条目；Homebrew 只负责系统依赖，不作为 Agent 目录。" : "Discoverable entries from the OPL Package Directory; Homebrew remains a system dependency carrier, not the Agent catalog."}</p></div><span className="agent-catalog-source">Framework owner projection</span></div>
-      <div className="agent-catalog-inventory" role="status" aria-label={locale === "zh" ? "软件目录统计" : "Software catalog totals"}><span><strong>{packages.length}</strong>{locale === "zh" ? "个目录条目" : "catalog entries"}</span><span><strong>{installableCount}</strong>{locale === "zh" ? "个可安装" : "installable"}</span><span><strong>{installedCount}</strong>{locale === "zh" ? "个已安装" : "installed"}</span><span className={updateCount ? "has-update" : undefined}><strong>{updateCount}</strong>{locale === "zh" ? "个有更新" : "updates available"}</span></div>
+      <div className="agent-catalog-heading">
+        <div>
+          <h2>{locale === "zh" ? "软件目录" : "Software catalog"}</h2>
+          <p>{locale === "zh" ? "来自 OPL Package Directory 的可发现条目；Homebrew 只负责系统依赖，不作为 Agent 目录。" : "Discoverable entries from the OPL Package Directory; Homebrew remains a system dependency carrier, not the Agent catalog."}</p>
+        </div>
+        <span className="agent-catalog-source">{locale === "zh" ? "Framework owner projection" : "Framework owner projection"}</span>
+      </div>
+      <div className="agent-catalog-inventory" role="status" aria-label={locale === "zh" ? "软件目录统计" : "Software catalog totals"}>
+        <span><strong>{packages.length}</strong>{locale === "zh" ? "个目录条目" : "catalog entries"}</span>
+        <span><strong>{installableCount}</strong>{locale === "zh" ? "个可安装" : "installable"}</span>
+        <span><strong>{installedCount}</strong>{locale === "zh" ? "个已安装" : "installed"}</span>
+        <span className={updateCount ? "has-update" : undefined}><strong>{updateCount}</strong>{locale === "zh" ? "个有更新" : "updates available"}</span>
+      </div>
       <div className="agent-catalog-toolbar">
         <label className="settings-search-field">
           <Search aria-hidden="true" size={14} />

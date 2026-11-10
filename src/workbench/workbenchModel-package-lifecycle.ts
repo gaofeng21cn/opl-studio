@@ -565,7 +565,8 @@ function packageLifecycleItem(
   const installedVersion = installed === true
     ? firstStringField(record, ["installed_version"]) ?? asString(asRecord(record.installed_carrier_readback)?.version)
     : null;
-  const version = installedVersion ?? firstStringField(record, ["selected_version", "stable_version"]);
+  const availableVersion = firstStringField(record, ["selected_version", "stable_version"]);
+  const version = installedVersion ?? availableVersion;
   return {
     id: `package-lifecycle-${packageId}`,
     packageId,
@@ -585,6 +586,8 @@ function packageLifecycleItem(
     activated: asOptionalBoolean(record.activated),
     appEnabled: record.app_enabled !== false,
     readiness,
+    ...(installedVersion ? { installedVersion } : {}),
+    ...(availableVersion ? { availableVersion } : {}),
     ...(version ? { version, versionKind: installedVersion ? "installed" as const : "available" as const } : {}),
     ...(installedVersion ? { installedVersion } : {}),
     ...(firstStringField(record, ["available_version"]) ? { availableVersion: firstStringField(record, ["available_version"]) as string } : {}),

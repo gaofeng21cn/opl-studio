@@ -249,7 +249,10 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     font-variant-numeric: tabular-nums;
   }
 
-  .opl-app-management .agent-catalog-inventory .has-update,
+  .opl-app-management .agent-catalog-inventory .has-update {
+    color: var(--opl-warning);
+  }
+
   .opl-app-management .agent-catalog-inventory .has-update strong {
     color: var(--opl-warning);
   }

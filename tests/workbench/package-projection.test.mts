@@ -481,6 +481,10 @@ test("package version prefers installed identity over the available release", ()
   ] } } } });
   assert.equal(model.packageLifecycle[0]?.version, "1.2");
   assert.equal(model.packageLifecycle[0]?.versionKind, "installed");
+  assert.equal(model.packageLifecycle[0]?.installedVersion, "1.2");
+  assert.equal(model.packageLifecycle[0]?.availableVersion, "1.3");
   assert.equal(model.packageLifecycle[1]?.version, "2.1");
   assert.equal(model.packageLifecycle[1]?.versionKind, "available");
+  assert.equal(model.packageLifecycle[1]?.installedVersion, undefined);
+  assert.equal(model.packageLifecycle[1]?.availableVersion, "2.1");
 });
