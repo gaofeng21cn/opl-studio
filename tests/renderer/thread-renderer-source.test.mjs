@@ -23,7 +23,7 @@ const model = read("src/workbench/workbenchModel.ts");
 const runtimePage = read("src/workbench/RuntimeOverviewPage.tsx");
 const applicationManagementPage = read("src/workbench/ApplicationManagementPage.tsx") + read("src/workbench/SharedResourcesPage.tsx") + read("src/workbench/KnowledgeSourcesSection.tsx");
 const runtimeCache = read("src/workbench/runtimeOverviewCache.ts");
-const settingsPanel = read("src/workbench/SettingsPanel.tsx") + fs.readdirSync(path.join(root, 'src/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'src/workbench/settings', file), 'utf8')).join('\n');
+const settingsPanel = read("src/workbench/SettingsPanel.tsx") + read("src/composition/dshPluginManagerOwner.tsx") + fs.readdirSync(path.join(root, 'src/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'src/workbench/settings', file), 'utf8')).join('\n');
 const styleSources = [
   "src/workbench/codexWorkbenchStyleFoundation.ts",
   "src/workbench/codexWorkbenchStyleStartup.ts",
@@ -173,14 +173,15 @@ test("Studio exposes one App-owned application management surface", () => {
   assert.match(app, /applicationManagement:/);
   assert.match(read("src/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
   assert.match(applicationManagementPage, /data-testid="opl-app-management"/);
-  assert.match(applicationManagementPage, /data-testid="opl-app-management-tabs"/);
-  assert.match(applicationManagementPage, /PackageCatalog kind="all"/);
+  assert.match(applicationManagementPage, /DshPluginManagerOwner/);
+  assert.match(read("src/composition/dshPluginManagerOwner.tsx"), /PluginManagerOwnerPage/);
+  assert.match(read("src/vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx"), /PluginManagerOwnerPage/);
   assert.match(applicationManagementPage, /UpdatesSettingsPage/);
   assert.match(applicationManagementPage, /model\.applicationManagement\?\.sharedResources/);
   assert.match(applicationManagementPage, /KnowledgeSourcesSection/);
   assert.match(applicationManagementPage, /opl-app-management-knowledge-empty/);
   assert.doesNotMatch(applicationManagementPage, /Open owner|查看 Owner|第二套依赖注册表/);
-  assert.match(applicationManagementPage, /ArrowRight|ArrowLeft/);
+  assert.match(read("src/vendor/deepseek-harness/packages/client/ui-primitives/src/SegmentedTabs.tsx"), /ArrowRight|ArrowLeft/);
   assert.match(applicationManagementPage, /opl-app-management-receipt/);
   assert.match(model, /application_management/);
   for (const field of ["authorization", "consumer_count", "grant_count", "security_revision", "observed_at", "readiness"]) assert.match(model, new RegExp(field));
@@ -982,7 +983,7 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
     assert.match(settingsPanel, new RegExp(`component\\("${componentId}"\\)`));
   }
   assert.match(settingsPanel, /settings_apply_opl_packages/);
-  assert.match(settingsPanel, /shortcut_id: shortcut\.shortcutId/);
+  assert.match(settingsPanel, /shortcut_id:/);
   assert.match(settingsPanel, /visible,/);
   assert.match(settingsPanel, /sort_order: sortOrder/);
   assert.match(settingsRoot, /renderSlot\('settings\.section'/);

@@ -302,13 +302,14 @@ test("agent catalog keeps agent and workflow packages together while excluding c
 });
 
 test("package catalog defaults to All while exposing App-owned manifest install", () => {
-  assert.match(settingsSource, /useState<"official" \| "all">\("all"\)/);
-  assert.match(settingsSource, /scope === "all" \|\| item\.official/);
-  assert.match(settingsSource, /添加\$\{catalogLabel\}/);
-  assert.match(settingsSource, /manifest_url: manifestUrl\.trim\(\), trust_tier: trustTier/);
-  assert.match(settingsSource, /actionId: manifestInstallAction\.actionId/);
-  assert.match(settingsSource, /dryRunSupported: manifestInstallAction\.dryRunSupported/);
-  assert.doesNotMatch(settingsSource, /agent_package_install_from_manifest_url/);
+  const ownerSource = readFileSync(new URL("../../src/composition/dshPluginManagerOwner.tsx", import.meta.url), "utf8");
+  assert.match(ownerSource, /useState\("all"\)/);
+  assert.match(ownerSource, /scope === "all" \|\| item\.official/);
+  assert.match(ownerSource, /PluginManagerOwnerPage/);
+  assert.match(ownerSource, /manifest_url: manifestUrl\.trim\(\), trust_tier: trustTier/);
+  assert.match(ownerSource, /actionId: props\.manifestInstallAction\.actionId/);
+  assert.match(ownerSource, /dryRunSupported: props\.manifestInstallAction\.dryRunSupported/);
+  assert.doesNotMatch(ownerSource, /agent_package_install_from_manifest_url|PluginManagerController/);
 });
 
 test("capability catalog keeps projected capability package roles out of the agent page", () => {
@@ -535,8 +536,8 @@ test("unified catalog includes private capability packages and defers package st
   assert.match(html, /Private Phone/);
   assert.match(html, /Future App/);
   assert.match(html, /来源版本/);
-  assert.match(html, /<strong[^>]*>2\.7<\/strong>/);
-  assert.match(html, /<code>private-phone<\/code>/);
+  assert.match(html, /2\.7/);
+  assert.match(html, /data-plugin-owner-package="private-phone"/);
   assert.match(html, /role="switch" aria-checked="false" aria-label="在 OPL App 中启用 Private Phone"/);
   assert.match(html, /在 OPL App 中启用 Private Phone/);
   assert.equal(statusReads, 0);
@@ -555,7 +556,7 @@ test("unified catalog shows private source access and hides gated install", asyn
   const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
   assert.match(html, /Private Agent/);
   assert.match(html, /未连接软件源账号/);
-  assert.match(html, /连接软件源账号后才能安装此私有条目/);
+  assert.match(html, /data-plugin-owner-package="private-agent"/);
   assert.doesNotMatch(html, />安装<\/button>/);
 });
 
@@ -627,4 +628,141 @@ test("native software shares the application catalog and dispatches revision-bou
     browser.close();
     keys.forEach(key => { const original = originals.get(key); if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); });
   }
+});
+
+async function withSettingsTestDom(run: (surface: { container: HTMLElement; render(node: unknown): void }) => void) {
+  const { createElement } = await import("react");
+  const { createRoot } = await import("react-dom/client");
+  const { flushSync } = await import("react-dom");
+  const { Window } = await import("happy-dom");
+  const browser = new Window({ url: "http://localhost/" });
+  const keys = ["window", "document", "HTMLElement", "Node", "ResizeObserver"] as const;
+  const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  keys.forEach(key => Object.defineProperty(globalThis, key, {
+    configurable: true,
+    writable: true,
+    value: key === "window" ? browser : key === "ResizeObserver" ? undefined : browser[key]
+  }));
+  const container = browser.document.createElement("div");
+  browser.document.body.append(container);
+  const root = createRoot(container as unknown as Element);
+  try {
+    run({
+      container: container as unknown as HTMLElement,
+      render(node) { flushSync(() => root.render(node as ReturnType<typeof createElement>)); }
+    });
+  } finally {
+    flushSync(() => root.unmount());
+    await new Promise(resolve => setImmediate(resolve));
+    browser.close();
+    keys.forEach(key => {
+      const original = originals.get(key);
+      if (original) Object.defineProperty(globalThis, key, original);
+      else Reflect.deleteProperty(globalThis, key);
+    });
+  }
+}
+
+test("official package restore is exposed through an explicit confirmation action", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { SettingsActionDialog } = await import("../../src/workbench/settings/SettingsActionDialog.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: {
+    agent_packages: { surface_kind: "opl_app_agent_packages_projection", directory: { entries: [], status: "ready" }, sources: { surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [] } },
+    actions: [{ action_id: "official_profile_restore", label: "Restore official combination", payload_fields: ["intent"], mutates: "opl_packages", dry_run_supported: true, confirmation_required: true }]
+  } });
+  const actions: Array<{ actionId: string; payload: Record<string, unknown>; confirmationRequired: boolean; dryRunSupported?: boolean }> = [];
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(presentation.PackageCatalog, {
+      kind: "all", model: { ...model, officialProfileRestore: undefined }, settings: { ...settingsDefaults, locale: "en" }, actionBusyKey: null,
+      onAction: action => actions.push(action)
+    }));
+    assert.equal(container.querySelector('[data-testid="settings-agents-restore-official-profile"]'), null);
+    render(createElement(presentation.PackageCatalog, {
+      kind: "all", model, settings: { ...settingsDefaults, locale: "en" }, actionBusyKey: null,
+      onAction: action => actions.push(action)
+    }));
+    const restore = container.querySelector<HTMLButtonElement>('[data-testid="settings-agents-restore-official-profile"]');
+    assert.ok(restore);
+    restore.click();
+    assert.deepEqual(actions.map(({ actionId, payload, confirmationRequired, dryRunSupported }) => ({ actionId, payload, confirmationRequired, dryRunSupported })), [{
+      actionId: "official_profile_restore",
+      payload: { intent: "explicit_restore" },
+      confirmationRequired: true,
+      dryRunSupported: true
+    }]);
+    render(createElement(SettingsActionDialog, {
+      settings: { ...settingsDefaults, locale: "en" },
+      pendingConfirmation: { request: { key: "official-profile:restore", label: "Restore official combination", ...actions[0] }, previewStatus: "confirmation_required" },
+      actionBusyKey: null, onCancelAction() {}, onConfirmAction() {}
+    }));
+    const dialog = document.querySelector('[data-testid="opl-settings-action-confirmation"]');
+    assert.ok(dialog);
+    assert.match(dialog.textContent ?? "", /Install or repair missing agents and required capabilities/);
+    assert.match(dialog.textContent ?? "", /Confirm/);
+  });
+});
+
+test("official catalog keeps an unknown native installation state as unconfirmed", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
+    surface_kind: "opl_app_agent_packages_projection",
+    directory: { entries: [] },
+    sources: { surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", native_items: [{
+        item_id: "cask:studio", name: "studio", display_name: "Native Studio", kind: "cask", installed: null, update_status: "unknown"
+      }]
+    }] }
+  } } });
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(presentation.PackageCatalog, {
+      kind: "all", model, settings: { ...settingsDefaults, locale: "en" }, actionBusyKey: null, onAction() {}
+    }));
+    const card = container.querySelector('[data-plugin-owner-package="homebrew:cask:studio"]');
+    assert.ok(card);
+    assert.match(card.textContent ?? "", /Native Studio/);
+    assert.match(card.textContent ?? "", /Not confirmed/);
+    assert.doesNotMatch(card.textContent ?? "", /Not installed/);
+  });
+});
+
+test("application updates tab lists native software with an available update", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../src/workbench/ApplicationManagementPage.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
+    surface_kind: "opl_app_agent_packages_projection",
+    directory: { entries: [] },
+    sources: { surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", native_items: [{
+        item_id: "cask:studio", name: "studio", display_name: "Native Studio", kind: "cask", installed: true, installed_version: "1", available_version: "2", update_status: "available", revision: "revision-1",
+        available_actions: [{ action_id: "source_update", label: "Update", status: "available", payload_fields: ["source_id", "item_id", "expected_revision"], default_payload: { source_id: "homebrew", item_id: "cask:studio", expected_revision: "revision-1" }, confirmation_required: true, dry_run_supported: true }]
+      }, {
+        item_id: "formula:current-tool", name: "current-tool", display_name: "Current Native Tool", kind: "formula", installed: true, installed_version: "2", available_version: "2", update_status: "current", revision: "revision-2", available_actions: []
+      }]
+    }] }
+  } } });
+  const actions: Array<{ actionId: string; payload: Record<string, unknown>; confirmationRequired: boolean }> = [];
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(ApplicationManagementPage, {
+      model, settings: { ...settingsDefaults, locale: "en" }, managedUpdate: null, nativeAppUpdate: null,
+      actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [], additionalMaintenanceActions: [] },
+      actionBusyKey: null, initialTab: "updates", onAction: action => actions.push(action), onRefresh() {}
+    }));
+    assert.match(container.textContent ?? "", /Native Studio/);
+    assert.match(container.textContent ?? "", /Update available/);
+    assert.doesNotMatch(container.textContent ?? "", /Current Native Tool/);
+    const update = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent?.trim() === "更新" || button.textContent?.trim() === "Update");
+    assert.ok(update);
+    update.click();
+    assert.deepEqual(actions.map(({ actionId, payload, confirmationRequired }) => ({ actionId, payload, confirmationRequired })), [{
+      actionId: "source_update",
+      payload: { source_id: "homebrew", item_id: "cask:studio", expected_revision: "revision-1" },
+      confirmationRequired: true
+    }]);
+  });
 });
