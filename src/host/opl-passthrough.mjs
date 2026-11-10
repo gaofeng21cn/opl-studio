@@ -308,7 +308,23 @@ export function createOplPassthrough({
     async readState(profile = "fast") {
       const normalizedProfile = profile === "full" ? "full" : "fast";
       const args = [command, "app", "state", "--profile", normalizedProfile, "--json"];
-      const result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      let result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      if (normalizedProfile === "fast" && result.exitCode === 0) {
+        const sources = jsonValue(result.stdout)?.app_state?.agent_packages?.sources?.entries;
+        const refreshIds = new Set(Array.isArray(sources) ? sources.filter(source =>
+          source?.access_refresh_required === true
+          && typeof source.source_id === "string" && source.source_id.trim()
+          && Array.isArray(source.available_actions) && source.available_actions.some(action =>
+            action?.action_id === "source_check" && (action.status === undefined || action.status === "available")
+            && action.confirmation_required !== true)
+        ).map(source => source.source_id) : []);
+        for (const sourceId of refreshIds) {
+          await run(command, ["sources", "check", "--source-id", sourceId, "--json"], { cwd, env, timeoutMs: stateTimeoutMs });
+        }
+        // Publish one owner readback after its requested access checks. The owner
+        // decides freshness and cooldown; this read never recursively retries.
+        if (refreshIds.size) result = await run(command, args.slice(1), { cwd, env, timeoutMs: stateTimeoutMs });
+      }
       const base = mergeChannelProviderState(jsonValue(result.stdout), channelProviderHost);
       const patch = workbenchHost?.appStatePatch() ?? { workbench_services: { schema_version: 'opl-workbench-services.v1', status: 'owner_action_required', reason: workbenchError } };
       let parsed = base?.app_state ? { ...base, app_state: { ...base.app_state, ...patch } } : base;

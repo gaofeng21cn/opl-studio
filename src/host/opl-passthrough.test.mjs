@@ -16,6 +16,49 @@ test("App state timeout keeps the interactive default and admits a bounded cold-
   assert.throws(() => createOplPassthrough({ readStateTimeoutMs: 120_001 }), /100 through 120000/);
 });
 
+test("fast state rechecks owner-requested source access before publishing one fresh catalog", async context => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-source-refresh-test-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const command = path.join(directory, "fake-opl");
+  await writeFile(command, `#!${process.execPath}
+import fs from 'node:fs';
+const args = process.argv.slice(2);
+fs.appendFileSync('calls.jsonl', JSON.stringify(args) + '\\n');
+const fixture = JSON.parse(fs.readFileSync('fixture.json', 'utf8'));
+if (args[0] === 'sources') {
+  fs.writeFileSync('checked', 'yes');
+  process.exit(fixture.checkFails ? 1 : 0);
+}
+const checked = fs.existsSync('checked');
+console.log(JSON.stringify({app_state:{agent_packages:{
+  sources:{entries:fixture.sources},
+  directory:{entries:checked && !fixture.checkFails ? [{package_id:'private-agent',installed:false}] : []}
+}}}));
+`);
+  await chmod(command, 0o755);
+  const source = { source_id: "github-packages:owner", access_refresh_required: true,
+    available_actions: [{ action_id: "source_check", confirmation_required: false }] };
+  for (const scenario of [
+    { sources: [source, source], profile: "fast", check: true, visible: true },
+    { sources: [source], profile: "fast", check: true, visible: false, checkFails: true },
+    { sources: [{ ...source, access_refresh_required: false }], profile: "fast", check: false },
+    { sources: [], profile: "fast", check: false },
+    { sources: [{ ...source, available_actions: [{ action_id: "source_check", status: "unavailable" }] }], profile: "fast", check: false },
+    { sources: [source], profile: "full", check: false }
+  ]) {
+    await writeFile(path.join(directory, "fixture.json"), JSON.stringify(scenario));
+    await writeFile(path.join(directory, "calls.jsonl"), "");
+    await rm(path.join(directory, "checked"), { force: true });
+    const result = await createOplPassthrough({ command, cwd: directory }).readState(scenario.profile);
+    const calls = (await readFile(path.join(directory, "calls.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
+    const read = ["app", "state", "--profile", scenario.profile, "--json"];
+    assert.deepEqual(calls, scenario.check ? [read, ["sources", "check", "--source-id", source.source_id, "--json"], read] : [read]);
+    const entries = result.app_state.app_state.agent_packages.directory.entries;
+    assert.equal(entries.some(entry => entry.package_id === "private-agent"), scenario.visible === true);
+    assert.equal(result.readback.exitCode, 0);
+  }
+});
+
 test("fast state preserves software source access metadata and opaque default references", () => {
   const compact = compactFastState({ app_state: { agent_packages: {
     surface_kind: "opl_app_agent_packages_projection.v1",
@@ -23,12 +66,13 @@ test("fast state preserves software source access metadata and opaque default re
       surface_kind: "opl_software_sources_projection.v1",
       status: "attention_required",
       authority_boundary: { owner: "opl_framework", credential_values_exposed: false, private_value: "omit" },
-      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false,
+      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false, access_refresh_required: false,
         available_actions: [{ action_id: "source_configure", label: "Configure", payload_fields: ["source_id", "provider_id", "credential_handle", "enabled"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli", token: "must-omit" }, status: "available" }] }]
     }
   } } });
   const sources = compact.app_state.agent_packages.sources;
   assert.equal(sources.entries[0].source_id, "github-packages");
+  assert.equal(sources.entries[0].access_refresh_required, false);
   assert.equal(sources.entries[0].available_actions[0].default_payload.credential_handle, "provider:github_packages:gh-cli");
   assert.equal("token" in sources.entries[0].available_actions[0].default_payload, false);
   assert.equal(sources.authority_boundary.private_value, undefined);

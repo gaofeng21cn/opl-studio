@@ -288,7 +288,7 @@ function compactSoftwareSources(value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
     const compact = selectedFields(entry, [
       "source_id", "display_name", "source_kind", "source_ref", "visibility", "provider_id", "status",
-      "enabled", "credential_handle_present", "verified_at", "entry_count",
+      "enabled", "credential_handle_present", "access_refresh_required", "verified_at", "entry_count",
       "inventory_status", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
     ]) ?? {};
     compact.available_actions = Array.isArray(entry.available_actions)
