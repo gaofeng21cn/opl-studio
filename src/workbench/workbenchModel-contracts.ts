@@ -1,5 +1,5 @@
 import type { WorkbenchPurpose, WorkbenchArtifactRef, WorkspaceSession, ArtifactPreview, WorkbenchSourceRef, WorkbenchActionRef, WorkbenchFeatureRef, WorkbenchTraceRef, WorkbenchStarter, ConfirmationCard, InterviewQuestion, ActiveProjectLine, DeliveryPackage, ActionReceiptSummary } from "./workbenchModel-conversation-contracts";
-import type { AgentPackageLifecycleRef } from "./workbenchModel-package-contracts";
+import type { AgentPackageLifecycleRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
 import type { WorkItemRuntimeProjection, RuntimeOverviewRef } from "./workbenchModel-runtime-contracts";
 import type { WorkbenchGatewayAccount, WorkbenchSettingsProjection } from "./workbenchModel-settings-contracts";
 
@@ -37,6 +37,7 @@ export type WorkbenchModel = {
   deliveryPackages: DeliveryPackage[];
   actionReceipts: ActionReceiptSummary[];
   packageLifecycle: AgentPackageLifecycleRef[];
+  softwareSources?: SoftwareSourcesProjection;
   officialProfileRestore?: WorkbenchActionRef;
   starters: WorkbenchStarter[];
   confirmations: ConfirmationCard[];

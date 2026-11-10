@@ -271,6 +271,26 @@ test("uninstalled packages are available choices rather than attention items", (
   }), true);
 });
 
+test("private package access is visible and gates install without inventing auth state", () => {
+  const access = { visibility: "authorized_only", status: "signed_out", discoverAllowed: true, downloadAllowed: false } as const;
+  assert.equal(presentation.packageAccessVisibilityLabel(access, "zh"), "私有授权源");
+  assert.equal(presentation.packageAccessStatusLabel(access, "zh"), "未连接软件源账号");
+  assert.equal(presentation.packageAccessNeedsAttention({ installed: true, access }), true);
+  assert.equal(presentation.packageAccessNeedsAttention({ installed: false, access }), false);
+  assert.equal(presentation.packageInstallAllowed({
+    installed: false,
+    access,
+    installable: true,
+    actions: [{ kind: "install", status: "available", payload: {}, requiredPayloadFields: [] }]
+  } as never), false);
+  assert.equal(presentation.packageInstallAllowed({
+    installed: false,
+    access: { ...access, status: "authorized", downloadAllowed: true },
+    installable: true,
+    actions: [{ kind: "install", status: "available", payload: {}, requiredPayloadFields: [] }]
+  } as never), true);
+});
+
 test("agent catalog keeps agent and workflow packages together while excluding capability packages", () => {
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "standard_agent" }), true);
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "workflow_profile" }), true);
@@ -515,4 +535,40 @@ test("unified catalog includes private capability packages and defers package st
   assert.match(html, /role="switch" aria-checked="false" aria-label="在 OPL App 中启用 Private Phone"/);
   assert.match(html, /在 OPL App 中启用 Private Phone/);
   assert.equal(statusReads, 0);
+});
+
+test("unified catalog shows private source access and hides gated install", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
+    { package_id: "private-agent", package_role: "standard_agent", display_name: "Private Agent", publisher: "OPL", installed: false,
+      package_access: { visibility: "authorized_only", status: "signed_out", provider_id: "github", discover_allowed: true, download_allowed: false, reason: "github_source_account_required" },
+      installability: { installable: false }, available_actions: [{ action_id: "agent_package_install", action_ref: "app_state.actions#agent_package_install", semantic: "install", status: "unavailable", reason: "github_source_account_required", payload: { package_id: "private-agent" }, required_payload_fields: ["package_id"] }] }
+  ] } } } });
+  const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
+  assert.match(html, /Private Agent/);
+  assert.match(html, /未连接软件源账号/);
+  assert.match(html, /连接软件源账号后才能安装此私有条目/);
+  assert.doesNotMatch(html, />安装<\/button>/);
+});
+
+test("software source management keeps private credentials refs-only", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { SoftwareSourcesPage } = await import("../../src/workbench/SoftwareSourcesPage.tsx");
+  const projection = {
+    status: "attention_required",
+    entries: [{
+      sourceId: "github-packages", displayName: "GitHub Packages", sourceKind: "registry", sourceRef: "ghcr.io/gaofeng21cn/one-person-lab-packages", visibility: "authorized_only", providerId: "github_packages", status: "signed_out", enabled: true, credentialHandlePresent: false,
+      availableActions: [{ actionId: "source_configure", label: "Configure", payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli" }, payloadFields: ["source_id", "provider_id", "credential_handle", "enabled"], status: "available", dryRunSupported: true, confirmationRequired: false, followUpActionIds: [] }]
+    }]
+  } as const;
+  const html = renderToStaticMarkup(createElement(SoftwareSourcesPage, { projection, locale: "zh", actionBusyKey: null, onAction() {}, onRefresh() {} }));
+  assert.match(html, /软件源/);
+  assert.match(html, /连接 GitHub 账户/);
+  assert.match(html, /仅授权用户/);
+  assert.doesNotMatch(html, /provider:github_packages:gh-cli/);
+  assert.doesNotMatch(html, /访问令牌/);
 });

@@ -20,6 +20,49 @@ test("App visibility preserves native installation and callable package metadata
   assert.equal(model.packageLifecycle.find((item) => item.packageId === "new-extension")?.appEnabled, true);
 });
 
+test("registry access stays owner projected and unavailable actions remain unavailable", () => {
+  const model = deriveWorkbenchModelFromState({ app_state: {
+    actions: [{ action_id: "agent_package_update", label: "Update", route: "opl app action execute", payload_fields: ["package_id"] }],
+    agent_packages: { directory: { entries: [{ package_id: "private-agent", installed: true,
+      package_access: { visibility: "authorized_only", status: "revoked", provider_id: "github",
+        source_ref: "ghcr.io/example/private-agent", access_policy_ref: "package:private-agent:read",
+        verified_at: "2026-11-10T03:00:00Z", security_revision: "r2", discover_allowed: true, download_allowed: false },
+      installability: { installable: false }, available_actions: [{ action_id: "agent_package_update",
+        action_ref: "app_state.actions#agent_package_update", semantic: "update", status: "unavailable", reason: "package_access_revoked" }] }] } }
+  } });
+  const item = model.packageLifecycle[0]!;
+  assert.equal(item.access?.visibility, "authorized_only");
+  assert.equal(item.access?.status, "revoked");
+  assert.equal(item.access?.providerId, "github");
+  assert.equal(item.access?.downloadAllowed, false);
+  assert.equal(item.access?.securityRevision, "r2");
+  assert.equal(item.installable, false);
+  assert.equal(item.actions[0]?.status, "unavailable");
+  assert.equal(item.actions[0]?.reason, "package_access_revoked");
+  assert.match(item.searchMetadata.query, /revoked/);
+});
+
+test("software sources project public and authorized entries without exposing credential values", () => {
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { sources: {
+    surface_kind: "opl_software_sources_projection.v1",
+    status: "attention_required",
+    authority_boundary: { owner: "opl_framework", credential_values_exposed: false },
+    entries: [
+      { source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", source_ref: "https://github.com/gaofeng21cn/homebrew-one-person-lab", visibility: "public", status: "public", enabled: true, entry_count: 6,
+        available_actions: [{ action_id: "source_list", label: "List", payload_fields: [], status: "available" }] },
+      { source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/gaofeng21cn/one-person-lab-packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false,
+        available_actions: [{ action_id: "source_configure", label: "Configure", payload_fields: ["source_id", "provider_id", "credential_handle"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli", token: "should-not-cross" }, status: "available" }, { action_id: "source_check", label: "Check", payload_fields: ["source_id"], status: "available" }] }
+    ]
+  } } } });
+  assert.equal(model.softwareSources?.entries.length, 2);
+  const privateSource = model.softwareSources?.entries.find((entry) => entry.sourceId === "github-packages")!;
+  assert.equal(privateSource.status, "signed_out");
+  assert.equal(privateSource.credentialHandlePresent, false);
+  assert.equal(privateSource.availableActions[0]?.payload.credential_handle, "provider:github_packages:gh-cli");
+  assert.equal("token" in privateSource.availableActions[0]!.payload, false);
+  assert.equal(model.softwareSources?.authorityBoundary?.credentialValuesExposed, false);
+});
+
 test("current Package directory entries replace retired private lifecycle fields", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {

@@ -12,6 +12,7 @@ import type {
   PackageLifecycleStatusAxis,
   WorkbenchActionRef
 } from "./workbenchModel-contracts";
+import type { AgentPackageAccessRef } from "./workbenchModel-package-contracts";
 import {
   asBoolean,
   asFiniteNumber,
@@ -191,6 +192,25 @@ function packageSourceMode(record: Record<string, unknown>): string {
 
 function packageAutomaticUpdate(record: Record<string, unknown>): boolean | null {
   return asOptionalBoolean(packageEffectiveSourcePolicy(record)?.package_channel_auto_update);
+}
+
+function packageAccess(record: Record<string, unknown>): AgentPackageAccessRef {
+  const access = asRecord(record.package_access);
+  const visibility = asString(access?.visibility);
+  const status = asString(access?.status);
+  return {
+    visibility: visibility === "public" || visibility === "authorized_only" ? visibility : "unknown",
+    status: status === "public" || status === "authorized" || status === "signed_out" || status === "forbidden"
+      || status === "expired" || status === "revoked" ? status : "unknown",
+    ...(asString(access?.provider_id) ? { providerId: asString(access?.provider_id)! } : {}),
+    ...(asString(access?.source_ref) ? { sourceRef: asString(access?.source_ref)! } : {}),
+    ...(asString(access?.access_policy_ref) ? { accessPolicyRef: asString(access?.access_policy_ref)! } : {}),
+    ...(asString(access?.verified_at) ? { verifiedAt: asString(access?.verified_at)! } : {}),
+    ...(asString(access?.security_revision) ? { securityRevision: asString(access?.security_revision)! } : {}),
+    ...(asString(access?.reason) ? { reason: asString(access?.reason)! } : {}),
+    discoverAllowed: asOptionalBoolean(access?.discover_allowed),
+    downloadAllowed: asOptionalBoolean(access?.download_allowed)
+  };
 }
 
 function packageCapabilityMetadata(record: Record<string, unknown>): {
@@ -380,9 +400,14 @@ function packageSearchMetadata(
   const requiredSkill = packageRequiredSkill(record);
   const codexSurface = packageCodexSurface(record);
   const physicalSurface = packagePhysicalSurface(record);
+  const access = packageAccess(record);
   const query = uniqueStrings([
     packageIdentity(record, 0),
     packageLabel(record),
+    access.visibility,
+    access.status,
+    access.providerId,
+    access.sourceRef,
     source,
     sourceKind,
     manifestUrl,
@@ -397,6 +422,8 @@ function packageSearchMetadata(
   const tags = uniqueStrings([
     source,
     sourceKind,
+    `visibility:${access.visibility}`,
+    `access:${access.status}`,
     /managed|root|registry/.test(tagText) ? "managed_source" : null,
     /ghcr|oci|container|image/.test(tagText) ? "ghcr_source" : null,
     manifestUrl ? "manifest_url_source" : null,
@@ -473,7 +500,8 @@ function packageLifecycleActions(
     const confirmationRequired = typeof projectedAction.confirmation_required === "boolean"
       ? projectedAction.confirmation_required
       : action?.confirmationRequired ?? false;
-    const status = action ? "available" : "unavailable";
+    const projectionUnavailable = projectedAction.status === "unavailable" || projectedAction.available === false;
+    const status = action && !projectionUnavailable ? "available" : "unavailable";
     return [{
       kind,
       semantic,
@@ -490,7 +518,9 @@ function packageLifecycleActions(
       owner: action?.owner,
       delegatedSurface: action?.delegatedSurface,
       sourceRef: action?.route ?? actionRef,
-      reason: action
+      reason: projectionUnavailable
+        ? asString(projectedAction.reason) ?? "The Package owner has not authorized this action."
+        : action
         ? "Available through this package row's App-projected action contract."
         : "The package row exposes this action, but the matching App action definition is unavailable."
     } satisfies PackageLifecycleActionRef];
@@ -561,6 +591,8 @@ function packageLifecycleItem(
     ...(version ? { version, versionKind: installedVersion ? "installed" as const : "available" as const } : {}),
     currentness: asString(packageCurrentness?.status) ?? "unknown",
     sourceMode: packageSourceMode(record),
+    access: packageAccess(record),
+    installable: asOptionalBoolean(asRecord(record.installability)?.installable),
     automaticUpdate: packageAutomaticUpdate(record),
     homeShortcuts,
     ...(firstStringField(record, ["recommended_action", "recommendedAction"])
