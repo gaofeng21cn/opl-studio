@@ -93,6 +93,9 @@ export function agentPackageUpdateStatus(item: Pick<AgentPackageLifecycleRef, "c
 }
 
 export function agentPackageNeedsAttention(item: Pick<AgentPackageLifecycleRef, "currentness" | "installed" | "readiness">): boolean {
+  // An uninstalled package is an available choice, not a broken installed state.
+  // Required dependencies are reported through the installed consumer that needs them.
+  if (item.installed === false) return false;
   const updateStatus = agentPackageUpdateStatus(item);
   return packageUpdateAttentionStatuses.has(updateStatus)
     || item.readiness.operationalReady === false

@@ -258,6 +258,19 @@ test("package update state remains separate from installed and callable state", 
   assert.equal(presentation.formatStatus("currentness_not_checked", "zh"), "尚未检查更新");
 });
 
+test("uninstalled packages are available choices rather than attention items", () => {
+  assert.equal(presentation.agentPackageNeedsAttention({
+    installed: false,
+    currentness: "unknown",
+    readiness: { operationalReady: false, callable: false, launchAllowed: false }
+  }), false);
+  assert.equal(presentation.agentPackageNeedsAttention({
+    installed: true,
+    currentness: "unknown",
+    readiness: { operationalReady: false, callable: false, launchAllowed: false }
+  }), true);
+});
+
 test("agent catalog keeps agent and workflow packages together while excluding capability packages", () => {
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "standard_agent" }), true);
   assert.equal(presentation.isAgentCatalogPackage({ packageRole: "workflow_profile" }), true);
