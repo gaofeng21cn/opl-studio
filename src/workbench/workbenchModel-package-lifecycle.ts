@@ -25,6 +25,7 @@ import {
   firstString
 } from "./workbenchModel-primitives";
 import { firstStringField, uniqueStrings } from "./workbenchModel-presentation";
+import { readCatalogProvenance } from "./softwareSources";
 
 function packageIdentity(record: Record<string, unknown>, index: number): string {
   return firstStringField(record, ["package_id", "packageId", "agent_id", "module_id", "id"])
@@ -401,9 +402,13 @@ function packageSearchMetadata(
   const codexSurface = packageCodexSurface(record);
   const physicalSurface = packagePhysicalSurface(record);
   const access = packageAccess(record);
+  const provenance = readCatalogProvenance(record);
   const query = uniqueStrings([
     packageIdentity(record, 0),
     packageLabel(record),
+    provenance.catalogOrigin,
+    provenance.catalogSource.manager,
+    provenance.catalogSource.marketplaceId,
     access.visibility,
     access.status,
     access.providerId,
@@ -535,8 +540,8 @@ function packageLifecycleItem(
   const packageId = packageIdentity(record, 0);
   const publisher = firstStringField(record, ["publisher"]) ?? "unknown";
   const packageRole = firstStringField(record, ["package_role"]) ?? "unknown";
-  const official = asOptionalBoolean(record.official)
-    ?? publisher.toLowerCase() === "one-person-lab";
+  const provenance = readCatalogProvenance(record);
+  const official = provenance.catalogOrigin === "opl";
   const roleGroup: AgentPackageLifecycleRef["roleGroup"] = packageRole === "standard_agent"
     ? (official ? "agent" : "other")
     : packageRole === "workflow_profile"
@@ -573,6 +578,7 @@ function packageLifecycleItem(
     label: packageLabel(record),
     description: firstStringField(record, ["description"]) ?? "",
     publisher,
+    ...provenance,
     packageRole,
     softwareType: ["application", "agent", "capability"].includes(String(record.software_type)) ? record.software_type as "application" | "agent" | "capability" : "unknown",
     catalogScope: record.catalog_scope === "software" || record.catalog_scope === "host_component" ? record.catalog_scope : "unknown",

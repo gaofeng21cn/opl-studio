@@ -14,6 +14,16 @@ function compactStringArray(value, limit = 32) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string").slice(0, limit) : [];
 }
 
+function compactCatalogProvenance(value) {
+  const source = value?.catalog_source;
+  return {
+    ...Object.fromEntries(["catalog_origin", "origin_basis"].flatMap(key => typeof value?.[key] === "string" ? [[key, value[key]]] : [])),
+    ...(source && typeof source === "object" && !Array.isArray(source)
+      ? { catalog_source: Object.fromEntries(["manager", "marketplace_id", "delivery"].flatMap(key => typeof source[key] === "string" ? [[key, source[key]]] : [])) }
+      : {})
+  };
+}
+
 const managedUpdateFlowDependencyFields = [
   "dependency_id", "dependency_kind", "activation", "offline_bundle", "online_install_default",
   "source", "source_path", "owner", "bundle_id", "version_requirement", "install_source",
@@ -234,6 +244,7 @@ function compactPackageRecord(value) {
   const files = selectedFields(value?.files, ["home_shortcut_preferences_file"]);
   return {
     ...record,
+    ...compactCatalogProvenance(value),
     display_name_i18n: compactLocalizedText(value?.display_name_i18n),
     description_i18n: compactLocalizedText(value?.description_i18n),
     session_routing_summary_i18n: compactLocalizedText(value?.session_routing_summary_i18n),
@@ -286,6 +297,7 @@ function compactSoftwareSourceAction(value) {
 function compactNativeSoftwareItem(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
   return {
+    ...compactCatalogProvenance(item),
     ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_source_revision", "available_version", "update_status", "revision"]),
     display_name_i18n: compactLocalizedText(item.display_name_i18n),
     description_i18n: compactLocalizedText(item.description_i18n),
@@ -302,6 +314,7 @@ function compactSoftwareSources(value) {
       "enabled", "credential_handle_present", "access_refresh_required", "verified_at", "entry_count",
       "inventory_status", "inventory_refresh_required", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
     ]) ?? {};
+    Object.assign(compact, compactCatalogProvenance(entry));
     compact.available_actions = Array.isArray(entry.available_actions)
       ? entry.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean)
       : [];

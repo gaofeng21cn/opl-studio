@@ -2779,6 +2779,10 @@ export function App({
     primaryView,
     applicationManagement: <ApplicationManagementPage
       model={model}
+      capabilityCatalog={capabilityCatalog}
+      capabilityStatus={capabilityStatus}
+      capabilityError={capabilityError}
+      onRefreshCapabilities={() => void loadCapabilities(true)}
       stateStatus={stateStatus}
       stateError={stateError}
       onApproveConnectionAccess={bridge.platformCapabilities.connectionAccessApproval ? approveConnectionAccess : undefined}

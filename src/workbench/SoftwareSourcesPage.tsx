@@ -3,7 +3,7 @@ import { useState } from "react";
 import { catalogDisplayName, SoftwareCatalogIdentity, SoftwareCatalogVersions } from "./SoftwareCatalogMetadata";
 
 import type { WorkbenchSettings } from "./settingsModel";
-import type { NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
+import type { CatalogOrigin, NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
 import { actionPayloadComplete, type SettingsActionRequest } from "./settingsActions";
 import { nativeSoftwareEntries, nativeSoftwareMatches, nativeCarrierInstalled, nativeInstallationLabel, softwareSourceActionLabel, softwareSourceStatusLabel, softwareSourceStatusTone } from "./softwareSources";
 
@@ -22,10 +22,10 @@ function sourceDetail(source: SoftwareSourceRef, zh: boolean): string {
   if (source.status === "revoked") return zh ? "访问授权已撤销。已安装软件仍保留在本机，新的下载和更新已暂停。" : "Access was revoked. Installed software remains on this device; new downloads and updates are paused.";
   if (source.status === "unknown") return zh ? "尚未确认此软件源的访问状态。检查后将显示最新结果。" : "Access to this source has not been verified. Check it to read its latest status.";
   return source.sourceKind === "tap"
-    ? (zh ? "提供原生应用、命令行工具和系统依赖，由 Homebrew 完成安装与更新。" : "Provides native apps, command-line tools, and system dependencies installed and updated by Homebrew.")
+    ? (zh ? "通过 Homebrew 获取和维护原生软件。软件仍在统一目录中展示。" : "Install and maintain native software through Homebrew. It remains part of the unified catalog.")
     : source.visibility === "authorized_only"
       ? (zh ? "账户已连接，软件安装权限逐项检查。有权访问的软件使用统一的安装和更新流程。" : "The account is connected. Installation access is checked for each item; accessible software uses the same installation and update flow.")
-      : (zh ? "提供公开的智能体、工作流和共享能力。" : "Provides public agents, workflows, and shared capabilities.");
+      : (zh ? "提供公开软件的安装与更新来源。" : "Provides installation and update sources for public software.");
 }
 
 function checkedAt(value: string | undefined, locale: WorkbenchSettings["locale"]): string | null {
@@ -77,8 +77,8 @@ export function NativeSoftwareList({ entries, locale, actionBusyKey, onAction, c
   })}</div>;
 }
 
-export function NativeSoftwareCatalog({ projection, locale, actionBusyKey, onAction, query = "", statusFilter = "all" }: Omit<NativeSoftwareListProps, "entries"> & { projection?: SoftwareSourcesProjection; query?: string; statusFilter?: string }) {
-  const entries = nativeSoftwareEntries(projection).filter(({ source, item }) => nativeSoftwareMatches(item, source, query, statusFilter));
+export function NativeSoftwareCatalog({ projection, locale, actionBusyKey, onAction, query = "", statusFilter = "all", catalogOrigin }: Omit<NativeSoftwareListProps, "entries"> & { projection?: SoftwareSourcesProjection; query?: string; statusFilter?: string; catalogOrigin?: CatalogOrigin }) {
+  const entries = nativeSoftwareEntries(projection).filter(({ source, item }) => (!catalogOrigin || (item.catalogOrigin ?? "unknown") === catalogOrigin) && nativeSoftwareMatches(item, source, query, statusFilter));
   if (!entries.length) return null;
   return <section className="agent-catalog-group"><h2><Box size={15} aria-hidden="true" />{locale === "zh" ? "桌面应用与命令行工具" : "Desktop apps and command-line tools"}<span>{entries.length}</span></h2><NativeSoftwareList entries={entries} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} /></section>;
 }
@@ -135,7 +135,7 @@ function SourceRow({ source, locale, actionBusyKey, onAction }: {
         {disconnect && (source.credentialHandlePresent || source.status === "authorized") ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={() => run(disconnect)}><Unplug aria-hidden="true" size={14} />{zh ? "断开连接" : "Disconnect"}</button> : null}
       </div>
     </div>
-    {source.sourceKind === "tap" ? <details className="opl-software-source-advanced" open><summary>{zh ? "此来源的软件" : "Software from this source"}{source.inventoryStatus === "available" ? ` (${source.nativeItems?.length ?? 0})` : ""}</summary>{source.inventoryStatus === "available" ? source.nativeItems?.length ? <NativeSoftwareList channelView entries={source.nativeItems.map(item => ({ source, item }))} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} /> : <p className="settings-inline-note">{zh ? "此来源当前没有软件条目。" : "This source currently has no software entries."}</p> : <p className="settings-inline-note">{source.inventoryStatus === "unavailable" ? (zh ? "暂时无法读取本机 Homebrew 目录。检查 Homebrew 后重新读取。" : "The local Homebrew catalog could not be read. Check Homebrew and read it again.") : (zh ? "尚未读取软件清单。检查本机状态后可查看安装情况和来源版本。" : "The software list has not been read. Check local status to view installations and source versions.")}</p>}{checkedAt(source.inventoryCheckedAt, locale) ? <p className="settings-inline-note">{zh ? "清单读取于" : "Catalog read at"} {checkedAt(source.inventoryCheckedAt, locale)}</p> : null}</details> : null}
+    {source.sourceKind === "tap" ? <details className="opl-software-source-advanced"><summary>{zh ? "此来源的软件" : "Software from this source"}{source.inventoryStatus === "available" ? ` (${source.nativeItems?.length ?? 0})` : ""}</summary>{source.inventoryStatus === "available" ? source.nativeItems?.length ? <NativeSoftwareList channelView entries={source.nativeItems.map(item => ({ source, item }))} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} /> : <p className="settings-inline-note">{zh ? "此来源当前没有软件条目。" : "This source currently has no software entries."}</p> : <p className="settings-inline-note">{source.inventoryStatus === "unavailable" ? (zh ? "暂时无法读取本机 Homebrew 目录。检查 Homebrew 后重新读取。" : "The local Homebrew catalog could not be read. Check Homebrew and read it again.") : (zh ? "尚未读取软件清单。检查本机状态后可查看安装情况和来源版本。" : "The software list has not been read. Check local status to view installations and source versions.")}</p>}{checkedAt(source.inventoryCheckedAt, locale) ? <p className="settings-inline-note">{zh ? "清单读取于" : "Catalog read at"} {checkedAt(source.inventoryCheckedAt, locale)}</p> : null}</details> : null}
     {source.sourceKind === "tap" && source.inventoryReason === "homebrew_unavailable" ? <p className="settings-inline-note">{zh ? "本机尚未找到 Homebrew。" : "Homebrew was not found on this device."} <a href="https://brew.sh" target="_blank" rel="noreferrer">{zh ? "查看安装指南" : "View installation guide"}</a></p> : null}
     {configure ? <div className="opl-software-source-advanced">
       <button className="settings-inline-command" type="button" aria-expanded={advancedOpen} aria-controls={`source-advanced-${source.sourceId}`} onClick={() => setAdvancedOpen(!advancedOpen)}><KeyRound aria-hidden="true" size={13} />{zh ? "其他连接方式" : "Other connection methods"}</button>
@@ -156,11 +156,26 @@ export function SoftwareSourcesPage({ projection, locale, actionBusyKey, onActio
   onRefresh: () => void;
 }) {
   const zh = locale === "zh";
+  const sources = projection?.entries ?? [];
+  const sourceGroups = [
+    {
+      id: "opl",
+      label: zh ? "OPL 软件源" : "OPL software sources",
+      description: zh ? "公共软件、授权软件和 Homebrew 安装渠道共用 OPL 软件目录。一个软件可以有多个获取渠道，目录按软件身份合并展示。" : "Public software, authorized software, and Homebrew installation channels share the OPL catalog. Multiple channels for one product appear as one software entry.",
+      entries: sources.filter(source => source.catalogOrigin === "opl")
+    },
+    {
+      id: "external",
+      label: zh ? "其他来源" : "Other sources",
+      description: zh ? "这些来源由各自的发布者和管理器维护。来源未声明维护归属时，也保留在这里。" : "These sources are maintained by their own publishers and managers. Sources without declared ownership are also listed here.",
+      entries: sources.filter(source => source.catalogOrigin !== "opl")
+    }
+  ].filter(group => group.entries.length);
   const listAction = projection?.entries.flatMap((source) => source.availableActions).find((action) => action.actionId === "source_list" && action.status === "available");
   const refresh = () => listAction ? onAction({ key: "source:all:source_list", actionId: listAction.actionId, label: softwareSourceActionLabel(listAction.actionId, locale, listAction.label), payload: listAction.payload, confirmationRequired: listAction.confirmationRequired, dryRunSupported: listAction.dryRunSupported }) : onRefresh();
   return <div className="opl-software-sources" data-testid="opl-software-sources">
-    <div className="opl-software-sources-heading"><div><h2>{zh ? "软件源" : "Software sources"}</h2><p>{zh ? "公开与私有软件汇集在同一目录；连接账户后，只显示你有权访问的内容。" : "Public and private software share one catalog. Connect an account to see the software you can access."}</p></div><button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={refresh}><RefreshCw aria-hidden="true" size={14} />{zh ? "刷新目录" : "Refresh catalog"}</button></div>
-    {projection?.entries.length ? <div className="opl-software-source-list">{projection.entries.map((source) => <SourceRow key={source.sourceId} source={source} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} />)}</div> : <div className="opl-software-sources-empty"><h3>{zh ? "软件源尚未返回" : "Software sources are not available yet"}</h3><p>{zh ? "刷新以读取当前环境的软件源和访问状态。" : "Refresh to read software sources and access status for this environment."}</p><button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={onRefresh}>{zh ? "重新读取" : "Read again"}</button></div>}
-    <p className="opl-software-sources-note">{zh ? "所有软件均可在“软件目录”中管理。断开软件源会暂停后续下载和更新，已安装的软件仍可卸载。" : "Manage all software in Software catalog. Disconnecting pauses future downloads and updates; installed software can still be removed."}</p>
+    <div className="opl-software-sources-heading"><div><h2>{zh ? "软件源" : "Software sources"}</h2><p>{zh ? "管理软件的获取渠道和访问权限。安装与更新沿用各渠道的管理器。" : "Manage download channels and access. Each channel retains its installation and update manager."}</p></div><button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={refresh}><RefreshCw aria-hidden="true" size={14} />{zh ? "刷新目录" : "Refresh catalog"}</button></div>
+    {sourceGroups.length ? sourceGroups.map(group => <section key={group.id} className="opl-software-source-group" data-source-group={group.id} aria-labelledby={`opl-source-group-${group.id}`}><div className="opl-software-source-group-heading"><h2 id={`opl-source-group-${group.id}`}>{group.label}</h2><p>{group.description}</p></div><div className="opl-software-source-list">{group.entries.map(source => <SourceRow key={source.sourceId} source={source} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} />)}</div></section>) : <div className="opl-software-sources-empty"><h3>{zh ? "软件源尚未返回" : "Software sources are not available yet"}</h3><p>{zh ? "刷新以读取当前环境的软件源和访问状态。" : "Refresh to read software sources and access status for this environment."}</p><button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={onRefresh}>{zh ? "重新读取" : "Read again"}</button></div>}
+    <p className="opl-software-sources-note">{zh ? "OPL 软件在统一目录中管理；外部扩展在“其他来源”中查看其管理入口。断开来源会暂停后续下载和更新，已安装软件保留在本机。" : "Manage OPL software in its catalog and find external extension managers under Other sources. Disconnecting a source pauses downloads and updates; installed software stays on this device."}</p>
   </div>;
 }

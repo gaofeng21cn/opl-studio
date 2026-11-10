@@ -120,7 +120,24 @@ export type SoftwareSourceActionRef = {
   reason?: string;
 };
 
-export type SoftwareSourceRef = {
+export type CatalogOrigin = "opl" | "external" | "unknown";
+
+export type CatalogOriginBasis = "owner_projection" | "owner_manifest" | "native_carrier" | "unknown";
+
+export type CatalogSourceRef = {
+  manager: string;
+  marketplaceId?: string;
+  delivery: "host_bundled" | "marketplace" | "local" | "unknown";
+};
+
+/** Maintenance provenance is display metadata, independent of trust and action authorization. */
+export type CatalogProvenanceRef = {
+  catalogOrigin?: CatalogOrigin;
+  originBasis?: CatalogOriginBasis;
+  catalogSource?: CatalogSourceRef;
+};
+
+export type SoftwareSourceRef = CatalogProvenanceRef & {
   sourceId: string;
   displayName: string;
   sourceKind: "registry" | "tap" | string;
@@ -141,7 +158,7 @@ export type SoftwareSourceRef = {
   availableActions: SoftwareSourceActionRef[];
 };
 
-export type NativeSoftwareItemRef = {
+export type NativeSoftwareItemRef = CatalogProvenanceRef & {
   itemId: string;
   productId?: string;
   productDisplayName?: string;
@@ -187,7 +204,7 @@ export type PackageLocalInstallation = {
   sourceRevision?: string;
 };
 
-export type AgentPackageLifecycleRef = {
+export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   id: string;
   packageId: string;
   label: string;

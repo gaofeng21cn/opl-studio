@@ -1,7 +1,23 @@
-import type { NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
+import type { CatalogOriginBasis, CatalogProvenanceRef, CatalogSourceRef, NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
 import { asLocalizedText, asOptionalBoolean, asRecord, asRecordArray, asString, asStringArray } from "./workbenchModel-primitives";
 
 const statuses = new Set(["public", "authorized", "signed_out", "forbidden", "expired", "revoked"]);
+
+/** Read owner metadata without inferring maintenance ownership from a name or publisher. */
+export function readCatalogProvenance(value: Record<string, unknown>): Required<CatalogProvenanceRef> {
+  const source = asRecord(value.catalog_source);
+  return {
+    catalogOrigin: value.catalog_origin === "opl" || value.catalog_origin === "external" ? value.catalog_origin : "unknown",
+    originBasis: ["owner_projection", "owner_manifest", "native_carrier"].includes(String(value.origin_basis))
+      ? value.origin_basis as CatalogOriginBasis : "unknown",
+    catalogSource: {
+      manager: asString(source?.manager) ?? "unknown",
+      ...(asString(source?.marketplace_id) ? { marketplaceId: asString(source?.marketplace_id)! } : {}),
+      delivery: ["host_bundled", "marketplace", "local"].includes(String(source?.delivery))
+        ? source!.delivery as CatalogSourceRef["delivery"] : "unknown"
+    }
+  };
+}
 
 function safeActionPayload(value: unknown): Record<string, unknown> {
   const input = asRecord(value);
@@ -20,6 +36,7 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
   if (!itemId || !name || !["formula", "cask", "managed_runtime"].includes(String(item.kind))) return null;
   return {
     itemId, name,
+    ...readCatalogProvenance(item),
     productId: asString(item.product_id) ?? undefined,
     productDisplayName: asString(item.product_display_name) ?? undefined,
     homebrewInstalled: item.homebrew_installed === undefined ? undefined : asOptionalBoolean(item.homebrew_installed),
@@ -86,6 +103,7 @@ export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesPr
       return [{
         sourceId,
         displayName,
+        ...readCatalogProvenance(entry),
         sourceKind: asString(entry.source_kind) ?? "registry",
         sourceRef: asString(entry.source_ref) ?? "",
         visibility: entry.visibility === "public" || entry.visibility === "authorized_only" ? entry.visibility : "unknown",
@@ -203,6 +221,7 @@ export function nativeSoftwareInventory(projection?: SoftwareSourcesProjection) 
 export function nativeSoftwareMatches(item: NativeSoftwareItemRef, source: SoftwareSourceRef | undefined, query: string, statusFilter: string): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery && ![item.itemId, item.name, item.displayName, item.description,
+    item.catalogSource?.manager, item.catalogSource?.marketplaceId,
     ...Object.values(item.displayNameI18n ?? {}), ...Object.values(item.descriptionI18n ?? {}),
     source?.displayName, source?.sourceRef].join(" ").toLowerCase().includes(normalizedQuery)) return false;
   if (statusFilter === "all") return true;
