@@ -150,6 +150,7 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     launch_route_missing: ["入口未就绪", "Launch entry unavailable"],
     not_ready: ["尚未就绪", "Not ready"],
     local_development: ["本地开发版", "Local development build"],
+    development_preview: ["开发预览", "Development preview"],
     read_only: ["只读", "Read only"],
     loading: ["正在读取", "Loading"],
     active: ["可用", "Available"],

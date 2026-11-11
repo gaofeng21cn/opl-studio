@@ -810,7 +810,8 @@ test("managed Framework updates keep the exact installation owner across catalog
     }));
     const runtimeDetails = container.querySelector<HTMLDetailsElement>('[data-testid="opl-runtime-maintenance-details"]')!;
     assert.equal(runtimeDetails.open, false);
-    assert.match(runtimeDetails.textContent ?? "", /当前桌面宿主.*45\.2\.3/s);
+    assert.match(runtimeDetails.textContent ?? "", /当前桌面宿主.*开发预览.*未发布/s);
+    assert.doesNotMatch(runtimeDetails.textContent ?? "", /45\.2\.3/);
     assert.equal(runtimeDetails.contains(container.querySelector(`[data-product-id="${productId}"]`)), false);
     runtimeDetails.open = true;
     runtimeDetails.querySelector<HTMLButtonElement>("button")!.click();
@@ -856,6 +857,38 @@ test("managed Framework updates keep the exact installation owner across catalog
   });
 });
 
+
+test("preview host identity never falls back to an installed App version", async () => {
+  const { createElement } = await import("react");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { AboutSettingsPage } = await import("../../src/workbench/settings/pages/AboutSettingsPage.tsx");
+  const { ManagedUpdateGroup } = await import("../../src/workbench/settings/maintenance.tsx");
+  const component: import("../../src/workbench/workbenchModel.ts").ManagedUpdateComponentRef = {
+    componentId: "opl_app", lifecycleOwner: "opl_app", label: "OPL App", state: "current",
+    installedVersion: "26.11.10", autoApplyEligible: null, backgroundSafe: null
+  };
+  const preview: import("../../src/bridge/oplBridge.ts").NativeAppUpdateResult = {
+    schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron",
+    operation: "status", supported: false, state: "unsupported", reasonCode: "desktop_updater_requires_packaged_app"
+  };
+  await withSettingsTestDom(({ container, render }) => {
+    for (const nativeUpdate of [preview, { ...preview, currentVersion: "26.11.11", buildKind: "local-development", reasonCode: "local_development_updates_disabled" }]) {
+      const expected = nativeUpdate.buildKind ? /26\.11\.11/ : /未发布/;
+      render(createElement(ManagedUpdateGroup, { component, nativeUpdate, fallbackLabel: "当前桌面宿主", actions: [], locale: "zh", busyKey: null, onAction() {} }));
+      assert.match(container.textContent ?? "", expected);
+      assert.doesNotMatch(container.textContent ?? "", /26\.11\.10/);
+      render(createElement(AboutSettingsPage, {
+        actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [{ componentId: "opl_app", component, actions: [] }], additionalMaintenanceActions: [] },
+        nativeAppUpdate: nativeUpdate, managedUpdate: null, projection: undefined, settings: { ...settingsDefaults, locale: "zh" }, zh: true,
+        carrierDiagnostics: { schema: "opl_app_carrier_diagnostics.v1", owner: "one-person-lab-app_desktop_host", carrier: "electron_desktop", status: "available", setLogDirectorySupported: false },
+        actionBusyKey: null, onAction() {}, onHostAction: undefined, maintenanceStatus: null, maintenanceError: null, stateStatus: "ready"
+      }));
+      assert.match(container.textContent ?? "", expected);
+      assert.match(container.textContent ?? "", nativeUpdate.buildKind ? /本地开发版/ : /开发预览/);
+      assert.doesNotMatch(container.textContent ?? "", /26\.11\.10/);
+    }
+  });
+});
 
 test("catalog separates owner-admitted software from host components without inventing maturity", async () => {
   const { flushSync } = await import("react-dom");

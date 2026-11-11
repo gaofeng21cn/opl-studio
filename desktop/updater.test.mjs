@@ -145,11 +145,13 @@ test("desktop updater does not install when host shutdown preparation fails", as
   assert.equal(autoUpdater.quitAndInstallCalled, undefined);
 });
 
-test("unpackaged desktop reports a truthful unsupported updater", async () => {
-  const updater = createDesktopUpdater({ autoUpdater: new FakeAutoUpdater(), isPackaged: false, currentVersion: "0.1.0" });
+test("unpackaged desktop omits Electron's version from App identity", async () => {
+  const updater = createDesktopUpdater({ autoUpdater: new FakeAutoUpdater(), isPackaged: false, currentVersion: "45.2.3" });
   const result = await updater.perform("check");
   assert.equal(result.supported, false);
   assert.equal(result.reasonCode, "desktop_updater_requires_packaged_app");
+  assert.equal(Object.hasOwn(result, "currentVersion"), false);
+  assert.equal(Object.hasOwn(updater.snapshot(), "currentVersion"), false);
 });
 
 test("desktop defaults to silent download and installs only after normal Host shutdown", async () => {
@@ -191,5 +193,6 @@ test("signed local builds retain identity and never start a public update", asyn
   assert.equal(result.supported, false);
   assert.equal(result.reasonCode, "local_development_updates_disabled");
   assert.equal(result.localBuildId, "local.src123");
+  assert.equal(result.currentVersion, "26.9.2691");
   assert.equal(result.state, "unsupported");
 });

@@ -8,7 +8,7 @@ const baseState = (currentVersion) => ({
   host: "electron",
   supported: true,
   state: "idle",
-  currentVersion,
+  ...(currentVersion ? { currentVersion } : {}),
   restartRequired: false
 });
 
@@ -74,10 +74,12 @@ export function createDesktopUpdater({
   beforeRestart = async () => undefined
 }) {
   const supported = isPackaged && updateConfigAvailable && buildKind !== "local-development";
+  // Electron reports its own version when running an unpackaged source host.
+  const installedVersion = isPackaged ? currentVersion : undefined;
   let state = supported
-    ? baseState(currentVersion)
+    ? baseState(installedVersion)
     : {
-        ...baseState(currentVersion),
+        ...baseState(installedVersion),
         supported: false,
         state: "unsupported",
         reasonCode: buildKind === "local-development" ? "local_development_updates_disabled" : isPackaged ? "desktop_update_config_unavailable" : "desktop_updater_requires_packaged_app"
