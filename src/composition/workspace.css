@@ -1,14 +1,6 @@
 .opl-workspace-page { width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--opl-bg, #fff); color: var(--opl-text, #202020); font-size: 13px; line-height: 1.5; overflow: hidden; }
-.opl-package-artwork { position: relative; display: inline-grid; width: 36px; height: 36px; place-items: center; flex: none; border-radius: 8px; overflow: hidden; color: var(--opl-text, #202020); background: color-mix(in srgb, var(--opl-text, #202020) 8%, var(--opl-canvas, #fff)); }
-.opl-package-artwork[data-tone="1"] { background: color-mix(in srgb, #0f766e 16%, var(--opl-canvas, #fff)); }
-.opl-package-artwork[data-tone="2"] { background: color-mix(in srgb, #b45309 16%, var(--opl-canvas, #fff)); }
-.opl-package-artwork[data-tone="3"] { background: color-mix(in srgb, #be185d 14%, var(--opl-canvas, #fff)); }
-.opl-package-artwork[data-tone="4"] { background: color-mix(in srgb, #4f46e5 14%, var(--opl-canvas, #fff)); }
-.opl-package-artwork[data-tone="5"] { background: color-mix(in srgb, #2563a8 16%, var(--opl-canvas, #fff)); }
-.opl-package-initials { font-size: 12px; line-height: 1; font-weight: 650; margin-bottom: 4px; }
-.opl-package-type-icon { position: absolute; right: 3px; bottom: 2px; }
-.opl-package-artwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.opl-package-artwork svg { display: block; }
+.opl-package-artwork { position: relative; display: inline-grid; width: 36px; height: 36px; place-items: center; flex: none; border-radius: 8px; overflow: hidden; background: transparent; }
+.opl-package-artwork img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .opl-workspace-page > header { display: flex; gap: 12px; align-items: center; min-height: 54px; padding: 10px 16px; border-bottom: 1px solid var(--opl-border, #ddd); }
 html[data-opl-host="desktop"] .opl-workspace-page > header { padding-top: 32px; }
 .opl-workspace-page > header > div { display: flex; gap: 8px; align-items: center; }
