@@ -6,6 +6,26 @@ import {
   deriveWorkbenchModelFromState
 } from "../../src/workbench/workbenchModel.ts";
 
+test("software scope and immutable artwork survive the Host projection", async () => {
+  const { compactPackageRows, compactManagedUpdateProjection } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { softwareCatalogPackages } = await import("../../src/workbench/softwareCatalog.ts");
+  const { publicSoftwareIconUrl } = await import("../../src/workbench/SoftwareArtwork.tsx");
+  const icon = `https://raw.githubusercontent.com/owner/app/${"a".repeat(40)}/plugins/app/assets/icon.svg`;
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([
+    { package_id: "local", catalog_origin: "opl", management_scope: "local_product", icon_url: icon, icon_ref: "assets/icon.svg", installed: true },
+    { package_id: "connector", catalog_origin: "opl", management_scope: "local_component", installed: true },
+    { package_id: "remote", catalog_origin: "opl", management_scope: "deployment_target", deployment_target: "mobile", installed: true }
+  ]) } } } });
+  assert.deepEqual(softwareCatalogPackages(model, "opl").map(item => item.packageId), ["local"]);
+  assert.deepEqual(softwareCatalogPackages(model, "components").map(item => item.packageId), ["connector"]);
+  assert.equal(model.packageLifecycle.find(item => item.packageId === "local")?.iconUrl, icon);
+  assert.equal(publicSoftwareIconUrl(icon), icon);
+  for (const value of [icon.replace("a".repeat(40), "main"), icon.replace("raw.githubusercontent.com", "example.com"), icon + "?token=secret", "file:///private/icon.svg"]) assert.equal(publicSoftwareIconUrl(value), undefined);
+  assert.equal(publicSoftwareIconUrl(icon, true), undefined);
+  const runtime = compactManagedUpdateProjection({ components: [{ component_id: "opl_base", current: { dependency_catalog: { dependencies: [{ dependency_id: "python", installed: true, binary_path: "/managed/python", version: "3.13", credential: "must-not-cross" }] } } }] });
+  assert.deepEqual(runtime.components[0].current.dependency_catalog.dependencies, [{ dependency_id: "python", installed: true, binary_path: "/managed/python", version: "3.13" }]);
+});
+
 test("App visibility preserves native installation and callable package metadata", async () => {
   const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
@@ -597,10 +617,10 @@ test("native product counts collapse distribution channels and retain actual ins
   assert.equal(nativeCarrierInstalled(products[0].item), false);
   assert.equal(products[1].item.installationKind, "managed_runtime");
   assert.equal(products[1].item.ownerSettingsRoute, "updates");
-  const rows = compactPackageRows([{ package_id: "device", catalog_scope: "software", distribution_channel: "source" }, { package_id: "browser", catalog_scope: "host_component" }]);
+  const rows = compactPackageRows([{ package_id: "device", catalog_scope: "software", distribution_channel: "development" }, { package_id: "browser", catalog_scope: "host_component" }]);
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: rows } } } });
   assert.equal(model.packageLifecycle[0].catalogScope, "software");
-  assert.equal(model.packageLifecycle[0].distributionChannel, "source");
+  assert.equal(model.packageLifecycle[0].distributionChannel, "development");
   assert.equal(model.packageLifecycle[1].catalogScope, "host_component");
 });
 

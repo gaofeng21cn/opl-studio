@@ -64,7 +64,7 @@ test("settings navigation exposes primary categories with related destinations g
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("capabilities", "zh").map((destination) => destination.id),
-    ["capabilities", "agents", "instructions"]
+    ["capabilities", "instructions"]
   );
   assert.deepEqual(
     presentation.settingsSubDestinations("services", "zh").map((destination) => destination.id),
@@ -662,6 +662,55 @@ async function withSettingsTestDom(run: (surface: { container: HTMLElement; rend
     });
   }
 }
+
+test("settings delegates software and update management to one software center", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { SoftwareCenterSettingsLink } = await import("../../src/workbench/settings/SoftwareCenterSettingsLink.tsx");
+  const opened: string[] = [];
+  await withSettingsTestDom(({ container, render }) => {
+    for (const section of ["applications", "updates"] as const) {
+      render(createElement(SoftwareCenterSettingsLink, { locale: "zh", section, onOpen: value => opened.push(value) }));
+      flushSync(() => container.querySelector<HTMLButtonElement>("button")!.click());
+      assert.equal(container.querySelector('[data-plugin-owner-package]'), null);
+    }
+    assert.deepEqual(opened, ["applications", "updates"]);
+    render(createElement(SoftwareCenterSettingsLink, { locale: "zh" }));
+    assert.equal(container.querySelector<HTMLButtonElement>("button")!.disabled, true);
+  });
+});
+
+test("runtime catalog versions stay concise while mixed SDK versions remain explicit", async () => {
+  const { managedDependencyVersionSummary } = await import("../../src/workbench/settings/maintenance.tsx");
+  assert.equal(managedDependencyVersionSummary("ffmpeg version 9.0.2 Copyright 2000-2026\nffprobe version 9.0.2"), "9.0.2");
+  assert.equal(managedDependencyVersionSummary({ client: "1.25.0", worker: "1.25.0" }), "1.25.0");
+  assert.equal(managedDependencyVersionSummary({ client: "1.25.0", worker: "1.26.0" }), "client 1.25.0, worker 1.26.0");
+  assert.equal(managedDependencyVersionSummary(null), "—");
+});
+
+test("runtime dependencies stay outside software counts and preserve owner maintenance routing", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState, readManagedUpdateProjection } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../src/composition/dshPluginManagerOwner.tsx");
+  const tabs: string[] = [];
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
+  const managedUpdate = readManagedUpdateProjection({ managed_update: { components: [{ component_id: "opl_base", label: "OPL Base", current: {
+    dependency_catalog: { dependencies: [{ dependency_id: "codex-cli", dependency_kind: "cli", installed: true, version: "1.2.3", latest_version: "1.2.4", status: "available", currentness: "update_available", ownership: "user", update_mode: "explicit_owner_delegated", binary_path: "/opt/homebrew/bin/codex" }] }
+  } }] } });
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(DshPluginManagerOwner, { kind: "all", model, managedUpdate, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, onTabChange: tab => tabs.push(tab) }));
+    assert.equal(container.querySelector('[data-plugin-owner-package="runtime:opl_base:codex-cli"]'), null);
+    flushSync(() => container.querySelector<HTMLButtonElement>("#opl-catalog-scope-components")!.click());
+    const row = container.querySelector('[data-plugin-owner-package="runtime:opl_base:codex-cli"]')!;
+    assert.match(row.textContent ?? "", /Codex CLI/);
+    assert.match(row.textContent ?? "", /1\.2\.3/);
+    assert.match(row.textContent ?? "", /1\.2\.4/);
+    flushSync(() => [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看维护")!.click());
+    assert.deepEqual(tabs, ["updates"]);
+  });
+});
 
 test("official package restore is exposed through an explicit confirmation action", async () => {
   const { createElement } = await import("react");

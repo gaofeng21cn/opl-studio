@@ -582,7 +582,14 @@ function packageLifecycleItem(
     packageRole,
     softwareType: ["application", "agent", "capability"].includes(String(record.software_type)) ? record.software_type as "application" | "agent" | "capability" : "unknown",
     catalogScope: record.catalog_scope === "software" || record.catalog_scope === "host_component" ? record.catalog_scope : "unknown",
-    ...(["release", "source", "unknown"].includes(String(record.distribution_channel)) ? { distributionChannel: record.distribution_channel as "release" | "source" | "unknown" } : {}),
+    ...(["release", "development", "unknown"].includes(String(record.distribution_channel)) ? { distributionChannel: record.distribution_channel as "release" | "development" | "unknown" } : {}),
+    ...(record.management_scope === "local_product" || record.management_scope === "local_component" || record.management_scope === "deployment_target" || record.management_scope === "external_carrier"
+      ? { managementScope: record.management_scope } : {}),
+    ...(record.deployment_target === "cloud" || record.deployment_target === "mobile" || record.deployment_target === "device" || record.deployment_target === "remote_service" || record.deployment_target === "unknown"
+      ? { deploymentTarget: record.deployment_target } : {}),
+    ...(typeof record.icon_url === "string" ? { iconUrl: record.icon_url } : {}),
+    ...(typeof record.icon_ref === "string" ? { iconRef: record.icon_ref } : {}),
+    ...(typeof record.carrier_source_commit === "string" ? { iconSourceCommit: record.carrier_source_commit } : {}),
     ...(record.release_channel === "preview" || record.release_channel === "stable"
       ? { releaseChannel: record.release_channel } : {}),
     activeInstallationId: asString(record.active_installation_id) ?? undefined,

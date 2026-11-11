@@ -257,7 +257,12 @@ export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   activeInstallationStatus?: SoftwareActivationStatus;
   installationManagementReason?: string;
   installationActions?: SoftwareSourceActionRef[];
-  distributionChannel?: "release" | "source" | "unknown";
+  distributionChannel?: "release" | "development" | "unknown";
+  managementScope?: "local_product" | "local_component" | "deployment_target" | "external_carrier";
+  deploymentTarget?: "cloud" | "mobile" | "device" | "remote_service" | "unknown";
+  iconRef?: string;
+  iconUrl?: string;
+  iconSourceCommit?: string;
   releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";
   official: boolean;

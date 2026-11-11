@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { SoftwareArtwork } from "../workbench/SoftwareArtwork";
+import { managedDependencyLabel, managedDependencyVersion, managedDependencyVersionSummary, managedDependencyPolicyLabel } from "../workbench/settings/maintenance";
+import type { ManagedUpdateProjection } from "../workbench/workbenchModel";
 import { Button, Checkbox, Input, Modal, SegmentedTabs, StateDot, Switch, Tag } from "@deepseek-ai/dsh-client-ui-primitives";
 import { PluginManagerOwnerPage, type PluginManagerOwnerItem, type PluginManagerOwnerTab, type PluginManagerOwnerPageProps } from "@opl-vendor/dsh-plugin-manager-page";
 import { createNavigationStore } from "../vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/navigation-store.ts";
@@ -20,6 +23,7 @@ import { agentAvailabilityDetail, agentPackageUpdateStatus, isAgentCatalogPackag
 
 export type DshPluginManagerOwnerProps = {
   kind?: "agents" | "all";
+  managedUpdate?: ManagedUpdateProjection | null;
   model: WorkbenchModel;
   settings: WorkbenchSettings;
   actionBusyKey: string | null;
@@ -124,7 +128,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     const instanceCount = item.installations?.length ?? ((item.installed === true ? 1 : 0) + (item.localInstallations?.length ?? 0));
     const currentVersion = catalogInstalledVersion(item, locale);
     const tags = <>{item.access?.visibility === "authorized_only" ? <Tag tone="quiet">{isZh ? "私有" : "Private"}</Tag> : null}{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}{instanceCount > 1 ? <Tag tone="quiet">{isZh ? `${instanceCount} 份安装` : `${instanceCount} installations`}</Tag> : null}<CatalogRowFacts type={catalogTypeLabel(item, locale)} installedVersion={currentVersion} availableVersion={item.availableVersion} state={state} locale={locale} /></>;
-    return { id: item.packageId, title: name,
+    return { id: item.packageId, title: name, icon: <SoftwareArtwork identity={item.packageId} label={name} kind={item.softwareType} iconUrl={item.iconUrl} privateAsset={item.access?.visibility === "authorized_only"} />,
       description: <span className="opl-catalog-row-description">{localizedPackageDescription(item, locale)}</span>, tags,
       status: <CatalogState state={state} locale={locale} />,
       actions: <span className="opl-catalog-row-actions">{buttons(item)}</span>, detailActions: toggle(item),
@@ -154,7 +158,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     const ownerUpdate = item.updateStatus === "available" && current ? availableInstallationActions(current).find(action => action.payload.operation === "update") : undefined;
     const executable = item.availableActions.filter(action => source && action.status === "available" && Boolean(item.revision) && actionPayloadComplete(action.payload, [...action.payloadFields, "source_id", "item_id", "expected_revision"]) && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId && action.payload.expected_revision === item.revision && (action.actionId === "source_install" ? nativeCarrierInstalled(item) === false : action.actionId === "source_update" ? nativeCarrierInstalled(item) === true && item.updateStatus === "available" : nativeCarrierInstalled(item) === true));
     const nativeButtons = (all = false) => (all ? executable : executable.filter(action => action.actionId === (item.installed === false ? "source_install" : "source_update"))).map(action => <Button key={action.actionId} size="sm" variant={action.actionId === "source_uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => onAction({ key: `source:${source?.sourceId}:${item.itemId}:${action.actionId}`, actionId: action.actionId, label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${name}`, payload: action.payload, confirmationRequired: true, dryRunSupported: action.dryRunSupported })}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</Button>);
-    return { id: productId, title: name,
+    return { id: productId, title: name, icon: <SoftwareArtwork identity={productId} label={name} kind={item.kind === "formula" ? "cli" : "application"} />,
       description: <span className="opl-catalog-row-description">{item.descriptionI18n?.[locale] || item.description || (isZh ? "尚未提供软件说明。" : "No software description provided.")}</span>,
       tags: <><CatalogRowFacts type={isZh ? "应用" : "Application"} installedVersion={version ?? "—"} availableVersion={nativeCatalogAvailableVersion(product, locale)} state={nativeCatalogState(item)} locale={locale} />{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}{installations.length > 1 ? <Tag tone="quiet">{isZh ? `${installations.length} 份安装` : `${installations.length} installations`}</Tag> : null}</>,
       actions: <span className="opl-catalog-row-actions">{ownerUpdate && current ? <Button size="sm" variant="primary" disabled={busy} onClick={() => onAction(installationActionRequest(current, ownerUpdate, locale))}>{installationActionLabel(ownerUpdate, locale)}</Button> : nativeButtons()}</span>,
@@ -177,7 +181,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   // A plugin's exported skills belong to its package. Only independent Skill files are listed here.
   const looseSkills = scope === "external" && kind === "all" ? (props.capabilityCatalog?.skills ?? []).filter(skill => !isPluginSkill(skill)) : [];
   const skillItem = (skill: CodexSkillCapability): PluginManagerOwnerItem => ({
-    id: `codex-skill:${skill.path || skill.name}`, title: skill.name,
+    id: `codex-skill:${skill.path || skill.name}`, title: skill.name, icon: <SoftwareArtwork identity={skill.path || skill.name} label={skill.name} kind="skill" />,
     description: <span className="opl-catalog-row-description">{skill.description}</span>,
     tags: <Tag tone="quiet">Skill</Tag>,
     status: <CatalogState state="installed" locale={locale} />,
@@ -185,6 +189,28 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     detail: <section className="opl-dsh-owner-section"><h4>{isZh ? "Codex Skill" : "Codex Skill"}</h4><p>{isZh ? "独立技能由 Codex 读取，不使用 OPL 软件发布版本。" : "Codex reads this independent skill. It does not use OPL software release versions."}</p><dl><div><dt>{isZh ? "安装器" : "Manager"}</dt><dd>Codex</dd></div><div><dt>{isZh ? "使用范围" : "Scope"}</dt><dd>{skill.scope}</dd></div><div><dt>{isZh ? "启用状态" : "Enabled"}</dt><dd>{skill.enabled ? (isZh ? "已启用" : "Enabled") : (isZh ? "已停用" : "Disabled")}</dd></div><div><dt>{isZh ? "文件位置" : "File location"}</dt><dd><code>{skill.path}</code></dd></div></dl>{props.onOpenSettings ? <Button variant="outline" size="sm" onClick={() => props.onOpenSettings?.("capabilities")}>{isZh ? "打开 Codex 能力设置" : "Open Codex capability settings"}</Button> : null}</section>
   });
   const skillItems = looseSkills.filter(skill => (typeFilter === "all" || typeFilter === "skill") && matchesState("installed") && (!query.trim() || `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()))).map(skillItem);
+  const runtimeItems: PluginManagerOwnerItem[] = scope === "components" && kind === "all"
+    ? (props.managedUpdate?.components ?? []).flatMap(component => (component.runtimeDependencies ?? []).flatMap(dependency => {
+      const name = managedDependencyLabel(dependency.dependencyId, locale);
+      const state: SoftwareCatalogState = dependency.installed === false ? "not_installed" : dependency.installed !== true ? "unknown"
+        : dependency.currentness === "update_available" ? "update_available"
+          : ["failed", "attention_required", "attention_needed", "unavailable"].includes(dependency.status) ? "attention" : "installed";
+      if (!matchesState(state) || !["all", "capability"].includes(typeFilter) || (query.trim() && !`${name} ${dependency.dependencyId} ${component.label}`.toLowerCase().includes(query.trim().toLowerCase()))) return [];
+      return [{ id: `runtime:${component.componentId}:${dependency.dependencyId}`, title: name,
+        icon: <SoftwareArtwork identity={dependency.dependencyId} label={name} kind="runtime" />,
+        description: <span className="opl-catalog-row-description">{managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}</span>,
+        tags: <CatalogRowFacts type={isZh ? "运行依赖" : "Runtime dependency"} installedVersion={managedDependencyVersionSummary(dependency.version)} availableVersion={managedDependencyVersionSummary(dependency.latestVersion)} state={state} locale={locale} />,
+        status: <CatalogState state={state} locale={locale} />,
+        actions: props.onTabChange ? <Button size="sm" variant="outline" onClick={() => props.onTabChange?.("updates")}>{isZh ? "查看维护" : "View maintenance"}</Button> : null,
+        detail: <section className="opl-dsh-owner-section"><h4>{isZh ? "运行依赖" : "Runtime dependency"}</h4><dl>
+          <div><dt>ID</dt><dd><code>{dependency.dependencyId}</code></dd></div>
+          <div><dt>{isZh ? "用于" : "Used by"}</dt><dd>{component.label}</dd></div>
+          <div><dt>{isZh ? "维护方" : "Maintained by"}</dt><dd>{catalogManagerLabel(dependency.ownership ?? component.lifecycleOwner, locale)}</dd></div>
+          <div><dt>{isZh ? "当前版本" : "In use"}</dt><dd>{managedDependencyVersion(dependency.version)}</dd></div>
+          {dependency.binaryPath ? <div><dt>{isZh ? "安装位置" : "Location"}</dt><dd><code>{dependency.binaryPath}</code></dd></div> : null}
+        </dl>{dependency.note ? <p>{dependency.note}</p> : null}<p>{managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}</p></section>
+      }];
+    })) : [];
   const sortItems = (items: PluginManagerOwnerItem[]) => items.sort((a, b) => a.title.localeCompare(b.title, isZh ? "zh-CN" : "en"));
   const groups = scope === "external"
     ? [
@@ -192,14 +218,14 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
       { id: "codex-skills", label: isZh ? "独立 Skills" : "Independent Skills", items: sortItems(skillItems) },
       { id: "other-sources", label: isZh ? "其他软件与待确认来源" : "Other software and unconfirmed sources", items: sortItems([...visible.filter(item => item.catalogSource?.manager !== "codex_plugin_manager").map(packageItem), ...visibleNative.map(nativeItem)]) }
     ].filter(group => group.items.length)
-    : [{ id: scope === "opl" ? "opl-software" : "runtime-components", label: scope === "opl" ? (isZh ? "OPL 软件" : "OPL software") : (isZh ? "运行组件" : "Runtime components"), items: sortItems([...visible.map(packageItem), ...visibleNative.map(nativeItem)]) }];
+    : [{ id: scope === "opl" ? "opl-software" : "runtime-components", label: scope === "opl" ? (isZh ? "OPL 软件" : "OPL software") : (isZh ? "运行组件" : "Runtime components"), items: sortItems([...visible.map(packageItem), ...visibleNative.map(nativeItem), ...runtimeItems]) }];
   const dict = isZh ? zh : en;
   const translate = ((key: PluginManagerLocaleKey | "back", values?: Record<string, string>) => (key === "crumbRoot" ? isZh ? "软件目录" : "Software catalog" : key === "backToList" || key === "back" ? isZh ? "返回软件目录" : "Back to software catalog" : dict[key as PluginManagerLocaleKey]).replace(/\{([^}]+)\}/g, (_, value: string) => values?.[value] ?? `{${value}}`)) as PluginManagerOwnerPageProps["t"];
   const manifestEnabled = Boolean(props.manifestInstallAction?.dryRunSupported && props.manifestInstallAction.confirmationRequired && props.manifestInstallAction.payloadFields.includes("manifest_url") && props.manifestInstallAction.payloadFields.includes("trust_tier"));
   const changeScope = (value: string) => { setScope(value as SoftwareCatalogScope); setTypeFilter("all"); setStatusFilter("all"); };
   const scopeNote = scope === "opl" ? (isZh ? "我们维护的软件，使用统一目录安装与更新。" : "Software we maintain, installed and updated through one catalog.")
     : scope === "external" ? (isZh ? "外部扩展按原来源管理；插件内的 Skills 随插件维护。" : "External extensions use their original managers; packaged Skills are maintained with their plugin.")
-      : (isZh ? "仅列出明确声明的宿主运行依赖，随所属宿主维护。" : "Declared host runtime dependencies, maintained with their host.");
+      : (isZh ? "组件与依赖由所属产品或原安装器维护。Python、uv 等项目环境按项目锁文件维护，不参与全局更新。" : "Components retain their product or installer. Project environments such as Python and uv follow project lockfiles, not global updates.");
   const filters = <div className="opl-catalog-controls">
     <div className="opl-catalog-scope"><div className="opl-catalog-scope-options" role="group" aria-label={isZh ? "维护归属" : "Maintenance origin"}>{[{ value: "opl", label: isZh ? "OPL 软件" : "OPL software" }, { value: "external", label: isZh ? "其他来源" : "Other sources" }, { value: "components", label: isZh ? "运行组件" : "Runtime components" }].map(option => <Button key={option.value} id={`opl-catalog-scope-${option.value}`} size="sm" variant="outline" aria-pressed={scope === option.value} onClick={() => changeScope(option.value)}>{option.label}</Button>)}</div><p>{scopeNote}</p></div>
     <div className="opl-dsh-owner-filters"><Input type="search" aria-label={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} value={query} placeholder={isZh ? "搜索软件" : "Search software"} onChange={event => setQuery(event.target.value)} />

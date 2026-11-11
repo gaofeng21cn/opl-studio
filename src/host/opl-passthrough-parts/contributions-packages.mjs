@@ -56,11 +56,14 @@ function compactManagedUpdateProjection(value) {
           return compact ? [compact] : [];
         })
         : undefined;
+      const dependencies = Array.isArray(dependencyCatalog?.dependencies) ? dependencyCatalog.dependencies.slice(0, 256).map(dependency => selectedFields(dependency, [
+        "dependency_id", "dependency_kind", "installed", "version", "latest_version", "currentness", "status", "ownership", "update_policy", "update_mode", "activation_policy", "binary_path", "note"
+      ])).filter(Boolean) : undefined;
       return [{
         ...selectedFields(component, ["component_id", "lifecycle_owner", "label", "state", "channel"]),
         current: {
           ...selectedFields(current, ["installed_version", "latest_version", "currentness", "manual_guidance"]),
-          ...(flowDependencies ? { dependency_catalog: { flow_dependencies: flowDependencies } } : {})
+          ...(flowDependencies || dependencies ? { dependency_catalog: { ...(flowDependencies ? { flow_dependencies: flowDependencies } : {}), ...(dependencies ? { dependencies } : {}) } } : {})
         },
         auto_apply: selectedFields(component.auto_apply, ["mode", "eligible", "app_background_safe"]),
         plan: selectedFields(component.plan, ["summary"])
@@ -75,6 +78,7 @@ function compactManagedUpdateProjection(value) {
 
 const packageFields = [
   "package_id", "packageId", "agent_id", "module_id", "id",
+  "management_scope", "deployment_target", "icon_ref", "icon_url", "carrier_source_commit",
   "display_name", "displayName", "package_short_name", "label", "name", "publisher", "description", "tags", "package_role", "software_type", "catalog_scope", "distribution_channel", "release_channel",
   "lifecycle_status", "status", "install_state", "install_status", "health_status",
   "update_state", "update_status", "source_state", "trust_state", "trust_tier",

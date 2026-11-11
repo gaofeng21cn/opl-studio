@@ -46,7 +46,11 @@ export function managedDependencyLabel(dependencyId: string, locale: WorkbenchSe
   const labels: Record<string, [string, string]> = {
     "codex-cli": ["Codex CLI", "Codex CLI"],
     "temporal-runtime": ["Temporal 运行时", "Temporal runtime"],
-    "temporal-system-cli": ["Temporal CLI", "Temporal CLI"]
+    "temporal-system-cli": ["Temporal CLI", "Temporal CLI"],
+    "officecli": ["OfficeCLI", "OfficeCLI"],
+    "mineru-open-api": ["MinerU", "MinerU"],
+    "gh-stack": ["gh-stack", "gh-stack"],
+    "ffmpeg": ["FFmpeg", "FFmpeg"]
   };
   return labels[dependencyId]?.[locale === "zh" ? 0 : 1] ?? dependencyId;
 }
@@ -83,6 +87,17 @@ export function managedDependencyVersion(value: ManagedRuntimeDependencyRef["ver
   if (typeof value === "string") return value;
   const entries = Object.entries(value).filter(([, item]) => item);
   return entries.length ? entries.map(([key, item]) => `${key} ${item}`).join(", ") : "--";
+}
+
+/** A compact version for catalog rows; details retain the complete owner readback. */
+export function managedDependencyVersionSummary(value: ManagedRuntimeDependencyRef["version"] | undefined): string {
+  if (!value) return "—";
+  if (typeof value !== "string") {
+    const versions = [...new Set(Object.values(value).filter((item): item is string => Boolean(item)))];
+    return versions.length === 1 ? managedDependencyVersionSummary(versions[0]) : managedDependencyVersion(value);
+  }
+  const firstLine = value.trim().split(/\r?\n/, 1)[0];
+  return firstLine.match(/(?:^|\b)v?(\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?)/)?.[1] || firstLine || "—";
 }
 
 export function ManagedUpdateGroup({
