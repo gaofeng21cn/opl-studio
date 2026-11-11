@@ -25,13 +25,45 @@ function fixture() {
 test("discovers declared UI tools and opens through the same thread connection", async () => {
   const { host, calls } = fixture();
   assert.equal(MCP_APP_EXTENSION["io.modelcontextprotocol/ui"].mimeTypes[0], MCP_APP_MIME);
-  assert.deepEqual((await host.list({ threadId: "t1" })).apps.map(app => app.tool), ["open", "mutate"]);
-  const view = await host.open({ threadId: "t1", server: "fixture", tool: "open", arguments: { item: "p7" } });
+  const listed = await host.list({ threadId: "t1" });
+  assert.equal(listed.apps.length, 1);
+  assert.deepEqual(listed.apps[0], {
+    miniAppId: "mcp:fixture:ui://fixture/review",
+    server: "fixture",
+    tool: "open",
+    launchTool: "open",
+    tools: ["open", "mutate"],
+    title: "Review",
+    description: "",
+    resourceUri: "ui://fixture/review",
+    inputSchema: {},
+    readOnly: true,
+    readiness: "ready",
+  });
+  const view = await host.open({ threadId: "t1", miniAppId: listed.apps[0].miniAppId, server: "fixture", tool: "open", arguments: { item: "p7" } });
+  assert.equal(view.miniAppId, listed.apps[0].miniAppId);
   assert.equal(view.resource.mimeType, MCP_APP_MIME);
   assert.deepEqual(calls.find(call => call.method === "mcpServer/tool/call").params, { threadId: "t1", server: "fixture", tool: "open", arguments: { item: "p7" } });
   await host.call({ ...view, name: "save", arguments: { revision: 3 } });
   assert.equal(calls.at(-1).params.server, "fixture");
   assert.equal(calls.at(-1).params.threadId, "t1");
+});
+
+test("rejects a stale MiniApp identity even when the transport tuple still exists", async () => {
+  const { host } = fixture();
+  await assert.rejects(
+    host.open({ threadId: "t1", miniAppId: "mcp:fixture:ui://fixture/other", server: "fixture", tool: "open" }),
+    /does not match this MCP App resource/,
+  );
+});
+
+test("uses a declared MiniApp identity from an app-only tool in the grouped resource", async () => {
+  const { host, tools } = fixture();
+  tools.mutate._meta = { ui: { resourceUri: "ui://fixture/review", appId: "review-surface", visibility: ["app"] } };
+  const listed = await host.list({ threadId: "t1" });
+  assert.equal(listed.apps[0].miniAppId, "mcp:fixture:review-surface");
+  const view = await host.open({ threadId: "t1", miniAppId: listed.apps[0].miniAppId, server: "fixture", tool: "open" });
+  assert.equal(view.miniAppId, listed.apps[0].miniAppId);
 });
 
 test("rejects cross-thread, model-only, undeclared and closed view calls", async () => {

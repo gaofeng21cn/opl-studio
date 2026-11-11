@@ -1754,7 +1754,7 @@ export function App({
       if (threadId && item?.type === "mcpToolCall" && item.status === "completed" && typeof item.server === "string" && typeof item.tool === "string" && typeof item.id === "string") {
         const launch = { threadId, server: item.server, tool: item.tool, callId: item.id };
         void bridge.listMcpApps({ threadId }).then(({ apps }) => {
-          const app = apps.find(app => app.server === launch.server && app.tool === launch.tool);
+          const app = apps.find(app => app.server === launch.server && (app.tools?.includes(launch.tool) || app.tool === launch.tool));
           if (app && selectedThreadIdRef.current === threadId) setMcpAppLaunch({ ...launch, title: app.title });
         }).catch(() => {});
       }
@@ -2713,6 +2713,7 @@ export function App({
       bridge,
       task: mcpTaskTarget?.threadId === codexThreadId ? mcpTaskTarget : undefined,
       launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
+      onManage: () => setPrimaryView("applications"),
       onContext: (threadId: string, text: string) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
       onMessage: (threadId: string, text: string) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
     };

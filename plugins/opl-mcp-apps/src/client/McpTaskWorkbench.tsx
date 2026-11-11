@@ -18,9 +18,9 @@ export function McpTaskWorkbench(props: TaskWorkbenchProps) {
     void (async () => {
       const { apps } = await bridge.listMcpApps({ threadId });
       if (!active) return;
-      const matches = apps.filter(app => app.tool === "open_opl_apps" && app.resourceUri === "ui://opl/apps.html" && app.readOnly);
+      const matches = apps.filter(app => app.resourceUri === "ui://opl/apps.html" && app.readOnly);
       if (matches.length !== 1) throw new Error(currentLocale.current === "zh" ? "任务工作台连接不可用，请检查 OPL Apps 连接。" : "The task workbench connection is unavailable. Check OPL Apps.");
-      const result = await bridge.openMcpApp({ threadId, server: matches[0].server, tool: matches[0].tool,
+      const result = await bridge.openMcpApp({ threadId, miniAppId: matches[0].miniAppId, server: matches[0].server, tool: matches[0].launchTool ?? matches[0].tool,
         arguments: { package_id: "opl-runtime", view_id: "opl.runtime.item", input: { item_id: itemId, ...(viewId ? { domain_view_id: viewId } : {}) } } });
       if (!active) { await bridge.closeMcpApp(result); return; }
       opened = result; setSession(result);

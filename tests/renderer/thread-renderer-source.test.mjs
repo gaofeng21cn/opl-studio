@@ -682,8 +682,7 @@ test("search, composer attachments, and Agent permissions route to real renderer
   assert.match(composerPalette, /catalog\.skills/);
   assert.match(composerPalette, /seenSkillNames/);
   assert.match(composerPalette, /if \(!open\) \{\s*setQuery\(""\)/s);
-  assert.match(composerPalette, /catalog\.plugins/);
-  assert.match(composerPalette, /catalog\.apps/);
+  assert.doesNotMatch(composerPalette, /catalog\.(plugins|apps)/);
 });
 
 test("DSH details tools project the current OPL project and a contained read-only workspace", () => {

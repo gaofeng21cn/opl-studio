@@ -1,4 +1,4 @@
-import { Bot, Check, FilePlus2, FolderPlus, Plug, Search, Sparkles, X } from "lucide-react";
+import { Bot, Check, FilePlus2, FolderPlus, Search, Sparkles, X } from "lucide-react";
 import { Button, Input } from "@deepseek-ai/dsh-client-ui-primitives";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
@@ -93,7 +93,7 @@ export function ComposerCapabilityPalette({
   const [query, setQuery] = useState("");
   const copy = locale === "zh" ? {
     title: "添加到对话",
-    search: "搜索文件、智能体、Skill 和连接",
+    search: "搜索文件、智能体和 Skill",
     local: "本地输入",
     files: "添加文件",
     filesHelp: "图片和文件",
@@ -102,13 +102,11 @@ export function ComposerCapabilityPalette({
     agents: "OPL 智能体",
     oplCapabilities: "OPL 能力",
     skills: "Skills",
-    connections: "应用与连接",
-    loaded: "已加载",
     loading: "正在读取能力",
     empty: "没有匹配的能力"
   } : {
     title: "Add to conversation",
-    search: "Search files, Agents, Skills, and connections",
+    search: "Search files, Agents, and Skills",
     local: "Local input",
     files: "Add files",
     filesHelp: "Images and files",
@@ -117,8 +115,6 @@ export function ComposerCapabilityPalette({
     agents: "OPL agents",
     oplCapabilities: "OPL capabilities",
     skills: "Skills",
-    connections: "Apps and connections",
-    loaded: "Loaded",
     loading: "Loading capabilities",
     empty: "No matching capabilities"
   };
@@ -196,9 +192,6 @@ export function ComposerCapabilityPalette({
     [capability.name, capability.description, capability.id]
       .some((value) => value.toLocaleLowerCase().includes(normalizedQuery))
   ), [normalizedQuery, oplCapabilities]);
-  const connections = useMemo(() => [...catalog.plugins, ...catalog.apps]
-    .filter((item, index, items) => item.enabled && items.findIndex((candidate) => candidate.id === item.id) === index)
-    .filter((item) => [item.name, item.description].some((value) => value.toLocaleLowerCase().includes(normalizedQuery))), [catalog.apps, catalog.plugins, normalizedQuery]);
   const localVisible = !normalizedQuery || [copy.files, copy.filesHelp, copy.folder, copy.folderHelp]
     .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
 
@@ -283,18 +276,6 @@ export function ComposerCapabilityPalette({
             })}
           </section>
         ) : null}
-        {connections.length ? (
-          <section>
-            <strong className="composer-palette-group">{copy.connections}</strong>
-            {connections.map((item) => (
-              <div key={item.id} className="composer-palette-row loaded">
-                <span className="composer-palette-icon"><Plug aria-hidden="true" size={16} /></span>
-                <span><strong>{item.name}</strong><small>{item.description}</small></span>
-                <small className="composer-palette-loaded">{copy.loaded}</small>
-              </div>
-            ))}
-          </section>
-        ) : null}
         {contributions ? (
           <section data-testid="opl-composer-contributions">
             <strong className="composer-palette-group">
@@ -304,7 +285,7 @@ export function ComposerCapabilityPalette({
           </section>
         ) : null}
         {status === "error" ? <p className="composer-palette-state error">{error}</p> : null}
-        {status !== "loading" && !localVisible && !agents.length && !visibleOplCapabilities.length && !skills.length && !connections.length ? <p className="composer-palette-state">{copy.empty}</p> : null}
+        {status !== "loading" && !localVisible && !agents.length && !visibleOplCapabilities.length && !skills.length ? <p className="composer-palette-state">{copy.empty}</p> : null}
       </div>
     </div>
   );

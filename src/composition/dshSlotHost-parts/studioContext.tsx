@@ -207,7 +207,7 @@ export function useStudioPanels<T>(selector: (panels: readonly { id: string; ord
     { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
   ];
   if (workspaceEntries(studio.uiContributions.entries).length) {
-    panels.push({ id: "workspace", order: 40, label: zh ? "能力工作台" : "Capability workspace" });
+    panels.push({ id: "workspace", order: 40, label: zh ? "应用工作台" : "App workspace" });
   }
   return selector(panels);
 }

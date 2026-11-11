@@ -6,8 +6,46 @@ const object = value => value && typeof value === "object" && !Array.isArray(val
 const fail = (code, message) => { throw new ThreadAdapterError(code, message, {}, 400); };
 const required = (value, field) => typeof value === "string" && value.trim() ? value : fail("invalid_mcp_app_request", `${field} is required`);
 const appVisible = tool => !Array.isArray(tool?._meta?.ui?.visibility) || tool._meta.ui.visibility.includes("app");
+const modelVisible = tool => !Array.isArray(tool?._meta?.ui?.visibility) || tool._meta.ui.visibility.includes("model");
 const resourceUri = tool => tool?._meta?.ui?.resourceUri ?? tool?._meta?.["ui/resourceUri"] ?? tool?._meta?.["openai/outputTemplate"];
 const MAX_RESOURCE_BYTES = 8 * 1024 * 1024;
+
+function declaredMiniAppId(serverName, uri, primary, tools, resource) {
+  const candidates = [primary, ...tools.filter(tool => tool !== primary)].flatMap(tool => [
+    tool?._meta?.ui?.appId,
+    tool?._meta?.ui?.id,
+  ]).concat([
+    resource?._meta?.ui?.appId,
+    resource?._meta?.ui?.id,
+  ]);
+  const declared = candidates.find(value => typeof value === "string" && value.trim());
+  return declared ? `mcp:${serverName}:${declared}` : `mcp:${serverName}:${uri}`;
+}
+
+function miniAppDescriptor(server, uri, tools) {
+  const resource = (server.resources ?? []).find(item => item.uri === uri);
+  const launch = tools.find(tool => tool.annotations?.readOnlyHint === true);
+  const primary = launch ?? tools[0];
+  return {
+    miniAppId: declaredMiniAppId(server.name, uri, primary, tools, resource),
+    server: server.name,
+    // Keep tool as a compatibility field for callers that still open by the
+    // transport tuple. The product-level identity is miniAppId.
+    tool: primary.name,
+    ...(launch ? { launchTool: launch.name } : {}),
+    tools: tools.map(tool => tool.name),
+    title: launch?.title || primary.title || resource?.name || primary.name,
+    description: launch?.description ?? primary.description ?? resource?.description ?? "",
+    resourceUri: uri,
+    inputSchema: object((launch ?? primary).inputSchema),
+    // A surface without a read-only launcher can only be reached by replaying
+    // an exact completed call; it is not manually openable.
+    readOnly: launch !== undefined,
+    readiness: launch === undefined
+      ? "replay_only"
+      : ((launch.inputSchema?.required ?? []).length ? "input_required" : "ready"),
+  };
+}
 
 function appResource(resource, catalog, uri) {
   const content = resource.contents?.find(item => item.uri === uri && item.mimeType === MCP_APP_MIME);
@@ -55,17 +93,23 @@ export class McpAppHost {
   }
 
   async list({ threadId } = {}) {
-    return { apps: (await this.catalog(threadId)).flatMap(server => Object.values(server.tools ?? {}).flatMap(tool => {
-      const uri = resourceUri(tool);
-      return typeof uri === "string" && uri.startsWith("ui://") && (!Array.isArray(tool._meta?.ui?.visibility) || tool._meta.ui.visibility.includes("model")) ? [{
-        server: server.name, tool: tool.name, title: tool.title || tool.name,
-        description: tool.description ?? "", resourceUri: uri,
-        inputSchema: object(tool.inputSchema), readOnly: tool.annotations?.readOnlyHint === true
-      }] : [];
-    })) };
+    const apps = [];
+    for (const server of await this.catalog(threadId)) {
+      const grouped = new Map();
+      for (const tool of Object.values(server.tools ?? {})) {
+        const uri = resourceUri(tool);
+        if (typeof uri !== "string" || !uri.startsWith("ui://") || (!appVisible(tool) && !modelVisible(tool))) continue;
+        const group = grouped.get(uri) ?? { tools: [], discoverable: false };
+        group.tools.push(tool);
+        group.discoverable ||= modelVisible(tool);
+        grouped.set(uri, group);
+      }
+      for (const [uri, group] of grouped) if (group.discoverable) apps.push(miniAppDescriptor(server, uri, group.tools));
+    }
+    return { apps };
   }
 
-  async open({ threadId, server, tool, arguments: args = {}, callId }) {
+  async open({ threadId, server, tool, miniAppId, arguments: args = {}, callId }) {
     required(threadId, "threadId"); required(server, "server"); required(tool, "tool");
     const generation = this.generation;
     this.requireGeneration(generation);
@@ -75,6 +119,9 @@ export class McpAppHost {
     const declared = Object.values(catalog?.tools ?? {}).find(entry => entry.name === tool);
     const uri = resourceUri(declared);
     if (!declared || typeof uri !== "string" || !uri.startsWith("ui://")) fail("mcp_app_unavailable", "This tool has no available MCP App");
+    const appTools = Object.values(catalog.tools ?? {}).filter(entry => resourceUri(entry) === uri && (appVisible(entry) || modelVisible(entry)));
+    const descriptor = miniAppDescriptor(catalog, uri, appTools.length ? appTools : [declared]);
+    if (miniAppId && miniAppId !== descriptor.miniAppId) fail("mcp_app_identity_mismatch", "The selected MiniApp does not match this MCP App resource");
     let result;
     if (callId) {
       const history = await this.transport.readThread(threadId, true);
@@ -93,7 +140,7 @@ export class McpAppHost {
     const content = appResource(resource, catalog, uri);
     const id = randomUUID();
     this.views.set(id, { threadId, server, tool, uri, callId });
-    return { id, threadId, server, tool, title: declared.title || tool, arguments: object(args), result, resource: content, resources: catalog.resources ?? [] };
+    return { id, threadId, miniAppId: descriptor.miniAppId, server, tool, title: declared.title || descriptor.title || tool, arguments: object(args), result, resource: content, resources: catalog.resources ?? [] };
   }
 
   binding({ id, threadId }) {

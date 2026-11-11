@@ -34,7 +34,7 @@ export type OplStudioSurface = {
     text: string | null;
   }>;
   contributionOwner: OplContributionSlotOwner;
-  mcpApps?: { bridge: McpAppsBridge; launch?: McpAppOpen; task?: { itemId: string; viewId?: string }; onContext(threadId: string, context: string): void; onMessage(threadId: string, text: string): void };
+  mcpApps?: { bridge: McpAppsBridge; launch?: McpAppOpen; task?: { itemId: string; viewId?: string }; onManage?: () => void; onContext(threadId: string, context: string): void; onMessage(threadId: string, text: string): void };
   uiContributions: OplUiContributionsProjection;
   threadProjects: WorkbenchProjectGroup[];
   threadDirectoryStatus: "loading" | "ready" | "error";

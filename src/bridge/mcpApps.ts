@@ -1,12 +1,12 @@
 export type McpAppDescriptor = {
-  server: string; tool: string; title: string; description: string; resourceUri: string;
+  miniAppId: string; server: string; tool: string; launchTool?: string; tools?: string[]; title: string; description: string; resourceUri: string;
   inputSchema: { properties?: Record<string, { type?: string; title?: string; description?: string; default?: unknown }>; required?: string[] };
-  readOnly: boolean;
+  readOnly: boolean; readiness: "ready" | "input_required" | "replay_only";
 };
-export type McpAppOpen = { threadId: string; server: string; tool: string; arguments?: Record<string, unknown>; callId?: string };
+export type McpAppOpen = { threadId: string; server: string; tool: string; miniAppId?: string; arguments?: Record<string, unknown>; callId?: string };
 export type McpAppBinding = { id: string; threadId: string };
 export type McpAppSession = McpAppBinding & {
-  server: string; tool: string; title: string; arguments: Record<string, unknown>;
+  miniAppId: string; server: string; tool: string; title: string; arguments: Record<string, unknown>;
   result: any; resource: { uri: string; mimeType: string; text: string; _meta?: any };
   resources: { uri: string; name: string; mimeType?: string; [key: string]: unknown }[];
 };
