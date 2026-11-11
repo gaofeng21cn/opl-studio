@@ -40,6 +40,16 @@ Package 来自 Framework 目录，原生分发选项来自软件源 `native_item
 尚无本机安装时，`installation_actions` 可提供“安装发布版”，绑定软件 ID、版本和
 当前修订号；创建安装时不伪造实例 ID。集成组件已经安装也不会隐藏此入口。
 
+原生受管安装与 Package 共用“更新”清单。安装 owner 提供的更新目标、状态和精确
+实例动作优先于安装渠道；Homebrew 收据仍由 Homebrew 维护。Framework 受管安装
+不转入合并的 OPL Base 操作。更新暂存后显示“需要重启”，当前使用版本在实际激活
+前保持不变。公共源的 `catalog_refresh_required` 与访问、目录刷新要求共用现有 Host
+检查链路：仅执行 owner 允许且不需确认的 `source_check`，随后回读一次，不递归重试。
+安装模式分别显示“安装版”和“开发版”；是否来自正式发布制品由来源证据说明。
+应用管理的更新页默认呈现这份软件清单；当前桌面宿主和 OPL Base 综合维护收进
+“桌面宿主与运行组件维护”，保留原有动作。开发宿主版本不作为 OPL App 安装版本
+并列展示。Settings 中的维护页继续保留完整控制视图。
+
 原生软件优先显示 owner 提供的 `installed_display_version` 和
 `available_display_version`；机器版本、构建 ID、配方版本和收据放在对应详情，保留
 原更新器的判断。开发类型采用明确 `mode=development` 或

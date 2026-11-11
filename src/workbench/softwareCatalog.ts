@@ -32,7 +32,7 @@ export function packageCatalogState(item: AgentPackageLifecycleRef): SoftwareCat
 }
 
 export function nativeCatalogState(item: NativeSoftwareItemRef): SoftwareCatalogState {
-  if (item.activeInstallationStatus === "conflict") return "attention";
+  if (item.activeInstallationStatus === "conflict" || item.updateStatus === "needs_restart") return "attention";
   return item.updateStatus === "available" && item.installed === true ? "update_available"
     : item.installed === true ? "installed" : item.installed === false ? "not_installed" : "unknown";
 }

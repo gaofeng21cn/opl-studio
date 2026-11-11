@@ -767,6 +767,95 @@ test("application updates tab lists native software with an available update", a
   });
 });
 
+test("managed Framework updates keep the exact installation owner across catalog and updates", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../src/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../src/workbench/ApplicationManagementPage.tsx");
+  const { OplSoftwareUpdates } = await import("../../src/workbench/OplSoftwareUpdates.tsx");
+  const productId = "github:gaofeng21cn/one-person-lab";
+  const payload = { package_id: "opl-framework", installation_id: "framework-runtime", expected_revision: "install-r1", operation: "update", version: "0.3.13" };
+  const installation = {
+    installation_id: payload.installation_id, kind: "managed_runtime", manager: "opl_framework", mode: "installed", active: true,
+    version: "0.3.12", location: "/Applications/OPL/runtime/framework", entrypoint_verified: true, revision: "install-r1",
+    available_actions: [{ action_id: "software_installation_execute", status: "available", payload_fields: Object.keys(payload),
+      payload, confirmation_required: true, dry_run_supported: false }]
+  };
+  const installed = { product_id: productId, item_id: "runtime:framework", name: "opl", display_name: "OPL Framework", catalog_origin: "opl",
+    kind: "managed_runtime", installation_owner: "opl_framework", installed: true, installed_version: "0.3.12", available_version: "0.3.13",
+    update_status: "available", active_installation_id: installation.installation_id, active_installation_status: "active", installations: [installation], available_actions: [] };
+  const state = { app_state: { agent_packages: { surface_kind: "opl_app_agent_packages_projection", directory: { entries: [] }, sources: {
+    surface_kind: "opl_software_sources_projection.v1", status: "available", installed_products: [installed], entries: [{
+      source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", native_items: [{
+        product_id: productId, item_id: "formula:opl", name: "opl", display_name: "OPL Framework", catalog_origin: "opl", kind: "formula",
+        installed: true, installed_version: "0.3.12", homebrew_installed: false, available_version: "9.0.0", selected_for_product: true,
+        update_status: "unknown", revision: "recipe-r1", available_actions: []
+      }]
+    }]
+  } } } };
+  const model = deriveWorkbenchModelFromState(state);
+  const actions: import("../../src/workbench/settingsActions.ts").SettingsActionRequest[] = [];
+  const hostActions: import("../../src/workbench/settingsActions.ts").SettingsHostActionIntent[] = [];
+  const hostCheck: import("../../src/workbench/settingsActions.ts").SettingsHostActionIntent = {
+    transport: "managed_update_host", key: "runtime-check", label: "检查运行组件", operation: "check",
+    componentIds: ["opl_base"], confirmationRequired: false, availability: "ready", sourceRef: "owner:runtime"
+  };
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(ApplicationManagementPage, {
+      model, settings: { ...settingsDefaults, locale: "zh" }, managedUpdate: null,
+      nativeAppUpdate: { schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron", operation: "status",
+        supported: false, state: "unsupported", reasonCode: "desktop_updater_requires_packaged_app", currentVersion: "45.2.3" },
+      actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [{ componentId: "opl_base", actions: [hostCheck] }], additionalMaintenanceActions: [] },
+      actionBusyKey: null, initialTab: "updates", onAction: action => actions.push(action), onHostAction: action => hostActions.push(action), onRefresh() {}
+    }));
+    const runtimeDetails = container.querySelector<HTMLDetailsElement>('[data-testid="opl-runtime-maintenance-details"]')!;
+    assert.equal(runtimeDetails.open, false);
+    assert.match(runtimeDetails.textContent ?? "", /当前桌面宿主.*45\.2\.3/s);
+    assert.equal(runtimeDetails.contains(container.querySelector(`[data-product-id="${productId}"]`)), false);
+    runtimeDetails.open = true;
+    runtimeDetails.querySelector<HTMLButtonElement>("button")!.click();
+    assert.deepEqual(hostActions, [hostCheck], "runtime maintenance remains available in its details");
+    assert.match(container.textContent ?? "", /0\.3\.12 → 0\.3\.13/);
+    assert.doesNotMatch(container.textContent ?? "", /9\.0\.0|当前没有已确认的可用更新/);
+    assert.equal(container.querySelectorAll(`[data-product-id="${productId}"]`).length, 1);
+    container.querySelector<HTMLButtonElement>(`[data-product-id="${productId}"] button`)!.click();
+    assert.deepEqual(actions[0]?.payload, payload);
+    assert.equal(actions[0]?.actionId, "software_installation_execute");
+    assert.equal(actions[0]?.targetLocation, installation.location);
+    assert.equal(actions[0]?.label, "更新此安装 · 0.3.12 → 0.3.13");
+    assert.equal(actions[0]?.confirmationRequired, true);
+
+    render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction: action => actions.push(action) }));
+    const row = container.querySelector(`[data-plugin-owner-package="${productId}"]`)!;
+    assert.match(row.textContent ?? "", /可更新/);
+    assert.doesNotMatch(row.textContent ?? "", /9\.0\.0/);
+    [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "更新此安装")!.click();
+    assert.deepEqual(actions[1], actions[0]);
+
+    for (const [status, currentInstallation] of [
+      ["unknown", installation],
+      ["available", { ...installation, revision: "install-r2" }],
+      ["available", { ...installation, mode: "development" }],
+    ] as const) {
+      const guarded = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
+        ...state.app_state.agent_packages.sources, installed_products: [{ ...installed, update_status: status, installations: [currentInstallation] }]
+      } } } });
+      render(createElement(OplSoftwareUpdates, { model: guarded, locale: "zh", actionBusyKey: null, onAction: action => actions.push(action) }));
+      assert.equal(container.querySelector("button"), null, `${status}/${currentInstallation.mode} must not create an update action`);
+    }
+    const staged = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
+      ...state.app_state.agent_packages.sources, installed_products: [{ ...installed, update_status: "needs_restart", pending_version: "0.3.13", available_version: "0.3.14" }]
+    } } } });
+    render(createElement(OplSoftwareUpdates, { model: staged, locale: "zh", actionBusyKey: null, onAction: action => actions.push(action) }));
+    assert.match(container.textContent ?? "", /需要重启/);
+    assert.match(container.textContent ?? "", /更新已暂存，重启应用后生效/);
+    assert.match(container.textContent ?? "", /0\.3\.12 → 0\.3\.13/);
+    assert.doesNotMatch(container.textContent ?? "", /0\.3\.14/);
+    assert.equal(container.querySelector("button"), null, "staged updates must not be submitted again");
+    assert.equal(actions.length, 2);
+  });
+});
+
 
 test("catalog separates owner-admitted software from host components without inventing maturity", async () => {
   const { flushSync } = await import("react-dom");
@@ -971,6 +1060,7 @@ test("installation details show exact paths and dispatch only the selected insta
     assert.match(container.textContent ?? "", /\/work\/example/);
     assert.equal(container.querySelectorAll('[data-installation-id="release"]').length, 1);
     assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /当前使用/);
+    assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /安装版/);
     const buttons = [...container.querySelectorAll("button")];
     assert.equal(buttons.length, 1);
     assert.equal(buttons[0].textContent, "设为当前使用");

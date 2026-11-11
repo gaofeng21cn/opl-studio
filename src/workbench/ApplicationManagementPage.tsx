@@ -12,7 +12,7 @@ import { agentPackageNeedsAttention, packageAccessNeedsAttention, packageInstall
 import { DshPluginManagerOwner } from "../composition/dshPluginManagerOwner";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { SharedResourcesPage } from "./SharedResourcesPage";
-import { NativeSoftwareCatalog, SoftwareSourcesPage } from "./SoftwareSourcesPage";
+import { SoftwareSourcesPage } from "./SoftwareSourcesPage";
 import { knowledgeSourceNeedsAttention } from "./knowledgeSources";
 import { nativeSoftwareInventory } from "./softwareSources";
 import { softwareCatalogInventory, softwareCatalogPackages } from "./softwareCatalog";
@@ -89,7 +89,7 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
     onHostAction
   };
   const pageTabs = [
-    { id: "updates", label: zh ? "更新" : "Updates", content: <><UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => { setTab("sources"); onTabChange?.("sources"); }} /><NativeSoftwareCatalog catalogOrigin="opl" projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} statusFilter="update:update_available" /></> },
+    { id: "updates", label: zh ? "更新" : "Updates", content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => { setTab("sources"); onTabChange?.("sources"); }} /> },
     { id: "resources", label: zh ? "共享资源" : "Shared resources", content: <SharedResourcesPage model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} onApproveConnectionAccess={onApproveConnectionAccess} onOpenSettings={onOpenSettings} onOpenApplicationTab={(nextTab) => { setTab(nextTab); onTabChange?.(nextTab); }} /> },
     { id: "sources", label: zh ? "软件源" : "Software sources", content: <SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} /> }
   ];

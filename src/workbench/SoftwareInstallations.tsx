@@ -4,7 +4,7 @@ import { actionPayloadComplete, type SettingsActionRequest } from "./settingsAct
 import { activeSoftwareInstallation, catalogManagerLabel, softwareActivationLabel } from "./softwareCatalog";
 import { nativeAvailableDisplayVersion, nativeSoftwareProducts, softwareSourceActionLabel } from "./softwareSources";
 
-function installationActionLabel(action: SoftwareSourceActionRef, locale: "zh" | "en") {
+export function installationActionLabel(action: SoftwareSourceActionRef, locale: "zh" | "en") {
   const operation = String(action.payload.operation ?? action.actionId);
   const names: Record<string, [string, string]> = {
     install: ["安装发布版", "Install release"],
@@ -16,6 +16,22 @@ function installationActionLabel(action: SoftwareSourceActionRef, locale: "zh" |
     inspect: ["检查此安装", "Inspect installation"],
   };
   return names[operation]?.[locale === "zh" ? 0 : 1] ?? softwareSourceActionLabel(action.actionId, locale, action.label);
+}
+
+export function availableInstallationActions(installation: SoftwareInstallationRef) {
+  return installation.availableActions.filter(action => action.status === "available"
+    && action.payload.installation_id === installation.installationId
+    && Boolean(installation.revision) && action.payload.expected_revision === installation.revision
+    && actionPayloadComplete(action.payload, action.payloadFields)
+    && (installation.mode !== "development" || ["activate", "deactivate", "unlink", "inspect"].includes(String(action.payload.operation))));
+}
+
+export function installationActionRequest(installation: SoftwareInstallationRef, action: SoftwareSourceActionRef, locale: "zh" | "en"): SettingsActionRequest {
+  const version = installation.displayVersion ?? installation.version;
+  const target = action.payload.operation === "update" && typeof action.payload.version === "string" ? action.payload.version : undefined;
+  return { key: `installation:${installation.installationId}:${action.actionId}:${String(action.payload.operation ?? "")}`, actionId: action.actionId,
+    label: `${installationActionLabel(action, locale)} · ${version}${target && target !== version ? ` → ${target}` : ""}`, targetLocation: installation.location,
+    payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported };
 }
 
 export function SoftwareInstallations({ installations, activeId, activationStatus, packageId, productActions = [], locale, actionBusyKey, onAction, onUpdates }: {
@@ -44,18 +60,14 @@ export function SoftwareInstallations({ installations, activeId, activationStatu
     {installActions.length ? <div className="opl-software-installation-actions">{installActions.map(action => <Button key={`${action.actionId}:${String(action.payload.version)}`} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${String(action.payload.package_id)}:${action.actionId}:install`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${String(action.payload.version)}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)} · {String(action.payload.version)}</Button>)}</div> : null}
     {!installations.length ? <p>{zh ? "本机没有此软件的安装记录。" : "No installation of this software was found on this device."}</p> : installations.map(installation => {
       const current = active?.installationId === installation.installationId;
-      const actions = installation.availableActions.filter(action => action.status === "available"
-        && action.payload.installation_id === installation.installationId
-        && (!installation.revision || action.payload.expected_revision === installation.revision)
-        && actionPayloadComplete(action.payload, action.payloadFields)
-        && (installation.mode !== "development" || ["activate", "deactivate", "unlink", "inspect"].includes(String(action.payload.operation))));
+      const actions = availableInstallationActions(installation);
       return <div className="opl-software-installation" key={installation.installationId} data-testid="opl-local-installation" data-installation-id={installation.installationId}>
-        <div className="opl-software-installation-heading"><strong>{installation.displayVersion ?? installation.version}</strong><Tag tone="quiet">{installation.mode === "development" ? (zh ? "开发版" : "Development") : (zh ? "发布版" : "Release")}</Tag><span>{current ? (zh ? "当前使用" : "In use") : installation.active ? softwareActivationLabel(activationStatus === "conflict" ? "conflict" : "unknown", locale) : (zh ? "未激活" : "Inactive")}</span></div>
+        <div className="opl-software-installation-heading"><strong>{installation.displayVersion ?? installation.version}</strong><Tag tone="quiet">{installation.mode === "development" ? (zh ? "开发版" : "Development") : (zh ? "安装版" : "Installed")}</Tag><span>{current ? (zh ? "当前使用" : "In use") : installation.active ? softwareActivationLabel(activationStatus === "conflict" ? "conflict" : "unknown", locale) : (zh ? "未激活" : "Inactive")}</span></div>
         <dl><div><dt>{zh ? "安装位置" : "Location"}</dt><dd><code>{installation.location}</code></dd></div><div><dt>{zh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(installation.manager, locale)}</dd></div>{installation.availableVersion ? <div><dt>{zh ? "可用版本" : "Available version"}</dt><dd>{installation.availableVersion}</dd></div> : null}</dl>
         {installation.mode === "development" ? <p>{["app_bundle", "macos_bundle"].includes(installation.kind)
           ? (zh ? "这是本地开发构建，由应用的开发构建流程更新。" : "This local development build is updated through the application's development workflow.")
           : (zh ? "代码由开发工具维护；解除接入会保留源码和数据。" : "Development tools maintain this code. Unlinking preserves source and data.")}</p> : null}
-        {actions.length ? <div className="opl-software-installation-actions">{actions.map(action => <Button key={action.actionId + String(action.payload.operation ?? "")} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${installation.installationId}:${action.actionId}:${String(action.payload.operation ?? "")}`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${installation.displayVersion ?? installation.version}`, targetLocation: installation.location, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)}</Button>)}</div> : installation.ownerSettingsRoute === "updates" && onUpdates ? <Button size="sm" variant="outline" onClick={onUpdates}>{zh ? "管理此安装" : "Manage installation"}</Button> : null}
+        {actions.length ? <div className="opl-software-installation-actions">{actions.map(action => <Button key={action.actionId + String(action.payload.operation ?? "")} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction(installationActionRequest(installation, action, locale))}>{installationActionLabel(action, locale)}</Button>)}</div> : installation.kind !== "managed_runtime" && installation.ownerSettingsRoute === "updates" && onUpdates ? <Button size="sm" variant="outline" onClick={onUpdates}>{zh ? "管理此安装" : "Manage installation"}</Button> : null}
       </div>;
     })}
     {!active && installations.length ? <p role={activationStatus === "conflict" ? "alert" : undefined}>{softwareActivationLabel(activationStatus, locale)}</p> : null}
