@@ -106,7 +106,8 @@ export function ManagedUpdateGroup({
   onHostAction?: (intent: SettingsHostActionIntent) => void;
   unavailableActionLabel?: string;
 }) {
-  const version = nativeUpdate?.currentVersion
+  const unpackagedPreview = nativeUpdate?.reasonCode === "desktop_updater_requires_packaged_app";
+  const version = unpackagedPreview ? (locale === "zh" ? "未发布" : "Unreleased") : nativeUpdate?.currentVersion
     ? nativeUpdate.targetVersion && nativeUpdate.targetVersion !== nativeUpdate.currentVersion
       ? `${nativeUpdate.currentVersion} -> ${nativeUpdate.targetVersion}`
       : nativeUpdate.currentVersion
@@ -146,7 +147,7 @@ export function ManagedUpdateGroup({
     <SettingsGroup title={fallbackLabel}>
       <SettingRow label={locale === "zh" ? "状态" : "Status"}>
         <span className="runtime-setting-control">
-          <StatusValue status={nativeUpdate?.buildKind === "local-development" ? "local_development" : nativeUpdate?.state === "not_available" ? "current" : nativeUpdate?.state ?? component?.state} locale={locale} />
+          <StatusValue status={unpackagedPreview ? "development_preview" : nativeUpdate?.buildKind === "local-development" ? "local_development" : nativeUpdate?.state === "not_available" ? "current" : nativeUpdate?.state ?? component?.state} locale={locale} />
           {renderableActions.length
             ? renderableActions.map((intent) => <SettingsIntentButton key={intent.key} intent={intent} locale={locale} busyKey={busyKey} onAction={onAction} onHostAction={onHostAction} />)
             : null}

@@ -49,6 +49,8 @@ Package 来自 Framework 目录，原生分发选项来自软件源 `native_item
 应用管理的更新页默认呈现这份软件清单；当前桌面宿主和 OPL Base 综合维护收进
 “桌面宿主与运行组件维护”，保留原有动作。开发宿主版本不作为 OPL App 安装版本
 并列展示。Settings 中的维护页继续保留完整控制视图。
+未打包的 Electron 宿主不投影 App 版本，维护详情和“关于”显示“开发预览／未发布”；
+已打包的签名本地构建继续显示真实 App 版本及开发构建身份。
 
 原生软件优先显示 owner 提供的 `installed_display_version` 和
 `available_display_version`；机器版本、构建 ID、配方版本和收据放在对应详情，保留

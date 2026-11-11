@@ -15,7 +15,8 @@ const hostUpdateActions = appUpdate?.actions.filter(
 const updateAction = hostUpdateActions.find((intent) => intent.operation === "restart" && intent.availability === "ready")
       ?? hostUpdateActions.find((intent) => intent.operation === "apply" && intent.availability === "ready")
       ?? hostUpdateActions.find((intent) => intent.operation === "check" && intent.availability === "ready");
-const appVersion = nativeAppUpdate?.currentVersion ?? appUpdateComponent?.installedVersion ?? "--";
+const unpackagedPreview = nativeAppUpdate?.reasonCode === "desktop_updater_requires_packaged_app";
+const appVersion = unpackagedPreview ? (zh ? "未发布" : "Unreleased") : nativeAppUpdate?.currentVersion ?? appUpdateComponent?.installedVersion ?? "--";
 const updateChannel = appUpdateComponent?.channel
       ?? managedUpdate?.channel
       ?? projection?.localEnvironment.releaseChannel
@@ -25,11 +26,11 @@ return (
         <SettingsGroup title="One Person Lab App">
           <div data-testid="settings-about-primary">
             <SettingRow label={settings.locale === "zh" ? "版本" : "Version"}><span>{appVersion}</span></SettingRow>
-            <SettingRow label={zh ? "版本类型" : "Build type"}><span>{nativeAppUpdate?.buildKind === "local-development" ? (zh ? "本地开发版 · 不接收公开自动更新" : "Local development · public updates disabled") : formatUpdateChannel(updateChannel, settings.locale)}</span></SettingRow>
+            <SettingRow label={zh ? "版本类型" : "Build type"}><span>{unpackagedPreview ? (zh ? "开发预览" : "Development preview") : nativeAppUpdate?.buildKind === "local-development" ? (zh ? "本地开发版 · 不接收公开自动更新" : "Local development · public updates disabled") : formatUpdateChannel(updateChannel, settings.locale)}</span></SettingRow>
             <SettingRow label={zh ? "运行平台" : "Platform"}><span>{carrierDiagnostics.application?.systemInfo.platform === "darwin" ? `macOS · ${carrierDiagnostics.application?.systemInfo.arch === "arm64" ? (zh ? "Apple 芯片" : "Apple silicon") : "Intel"}` : carrierDiagnostics.application?.systemInfo.platform ?? (zh ? "网页端" : "Web")}</span></SettingRow>
             <SettingRow label={settings.locale === "zh" ? "更新状态" : "Update status"}>
               <span className="runtime-setting-control">
-                <StatusValue status={nativeAppUpdate?.buildKind === "local-development" ? "local_development" : nativeAppUpdate?.state === "not_available" ? "current" : nativeAppUpdate?.state ?? appUpdateComponent?.state} locale={settings.locale} />
+                <StatusValue status={unpackagedPreview ? "development_preview" : nativeAppUpdate?.buildKind === "local-development" ? "local_development" : nativeAppUpdate?.state === "not_available" ? "current" : nativeAppUpdate?.state ?? appUpdateComponent?.state} locale={settings.locale} />
                 {updateAction && nativeAppUpdate?.supported !== false ? <SettingsIntentButton intent={updateAction} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} onHostAction={onHostAction} /> : null}
               </span>
             </SettingRow>
