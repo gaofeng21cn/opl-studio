@@ -273,6 +273,7 @@ function compactPackageRecord(value) {
     ...(packageAccess ? { package_access: packageAccess } : {}),
     ...(installability ? { installability } : {}),
     ...(Array.isArray(value?.installations) ? { installations: value.installations.slice(0, 32).map(compactSoftwareInstallation) } : {}),
+    ...(Array.isArray(value?.installation_actions) ? { installation_actions: value.installation_actions.slice(0, 16).map(compactSoftwareSourceAction).filter(Boolean) } : {}),
     ...(Array.isArray(value?.local_installations) ? { local_installations: value.local_installations.slice(0, 32).map(installation => selectedFields(installation, ["installation_id", "kind", "version", "mode", "manager", "management_scope", "location_ref", "evidence_ref", "entrypoint_verified", "source_revision"])) } : {}),
     ...(Array.isArray(value?.required_by_package_ids) ? { required_by_package_ids: compactStringArray(value.required_by_package_ids) } : {}),
     ...(availableActions ? { available_actions: availableActions } : {}),

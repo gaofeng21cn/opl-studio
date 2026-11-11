@@ -104,6 +104,13 @@ export function readSoftwareActivationStatus(value: unknown): SoftwareActivation
   return ["active", "inactive", "unknown", "conflict"].includes(String(value)) ? value as SoftwareActivationStatus : undefined;
 }
 
+export function readSoftwareInstallationActions(value: unknown): SoftwareSourceActionRef[] {
+  return asRecordArray(value).flatMap(action => {
+    const projected = readSourceAction(action, "");
+    return projected ? [projected] : [];
+  });
+}
+
 export function readSoftwareInstallations(value: unknown): SoftwareInstallationRef[] {
   return asRecordArray(value).flatMap(item => {
     const installationId = asString(item.installation_id), version = asString(item.version), location = asString(item.location);
@@ -116,10 +123,7 @@ export function readSoftwareInstallations(value: unknown): SoftwareInstallationR
       locationRef: asString(item.location_ref) ?? undefined, evidenceRef: asString(item.evidence_ref) ?? undefined,
       revision: asString(item.revision) ?? undefined, availableVersion: asString(item.available_version) ?? undefined,
       ownerSettingsRoute: asString(item.owner_settings_route) ?? undefined,
-      availableActions: asRecordArray(item.available_actions).flatMap(action => {
-        const projected = readSourceAction(action, "");
-        return projected ? [projected] : [];
-      })
+      availableActions: readSoftwareInstallationActions(item.available_actions)
     }];
   });
 }

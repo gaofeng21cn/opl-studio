@@ -149,6 +149,7 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     font-size: var(--opl-text-sm);
     line-height: var(--opl-leading-normal);
   }
+  .settings-action-target-location { overflow-wrap: anywhere; }
 
   .settings-add-agent-dialog {
     grid-template-columns: 32px minmax(0, 1fr);

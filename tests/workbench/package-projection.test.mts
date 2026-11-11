@@ -674,7 +674,8 @@ test("software installations preserve exact paths and active selection across th
   const { catalogInstalledVersion } = await import("../../src/workbench/softwareCatalog.ts");
   const release = { installation_id: "release", kind: "macos_bundle", mode: "installed", manager: "package_owner", version: "1.0", location: "/Applications/Example.app", active: true, entrypoint_verified: true, revision: "r1", private_token: "must-not-cross" };
   const development = { ...release, installation_id: "development", kind: "developer_checkout", mode: "development", version: "9.0", location: "/work/example", active: false };
-  const entry = { package_id: "example", catalog_origin: "opl", catalog_scope: "software", installed: true, installed_version: "0.9", selected_version: "1.1", active_installation_id: "release", active_installation_status: "active", installations: [release, development] };
+  const installPayload = { package_id: "example", operation: "install", version: "1.1", expected_revision: "catalog-r2" };
+  const entry = { package_id: "example", catalog_origin: "opl", catalog_scope: "software", installed: true, installed_version: "0.9", selected_version: "1.1", active_installation_id: "release", active_installation_status: "active", installations: [release, development], installation_actions: [{ action_id: "software_installation_execute", status: "available", payload: { ...installPayload, private_token: "must-not-cross" }, required_payload_fields: Object.keys(installPayload), confirmation_required: true }] };
   const compact = compactPackageRows([entry]);
   const item = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compact } } } }).packageLifecycle[0];
   assert.equal(item.installations?.length, 2);
@@ -682,6 +683,8 @@ test("software installations preserve exact paths and active selection across th
   assert.equal(item.installations?.[1].mode, "development");
   assert.equal(catalogInstalledVersion(item, "zh"), "1.0");
   assert.equal(item.availableVersion, "1.1");
+  assert.deepEqual(item.installationActions?.[0].payload, installPayload);
+  assert.deepEqual(item.installationActions?.[0].payloadFields, Object.keys(installPayload));
   assert.doesNotMatch(JSON.stringify(item), /must-not-cross/);
   assert.equal(catalogInstalledVersion({ ...item, activeInstallationStatus: "conflict", installations: [item.installations![0], { ...item.installations![1], active: true }] }, "zh"), "—");
   assert.equal(catalogInstalledVersion({ ...item, activeInstallationStatus: "unknown", activeInstallationId: undefined }, "zh"), "—");

@@ -976,5 +976,24 @@ test("installation details show exact paths and dispatch only the selected insta
     assert.equal(buttons[0].textContent, "设为当前使用");
     flushSync(() => buttons[0].click());
     assert.deepEqual((calls[0] as { payload: unknown }).payload, action.payload);
+    assert.equal((calls[0] as { targetLocation: string }).targetLocation, "/work/example");
+  });
+});
+
+test("first installation dispatches the owner version and revision without inventing an installation id", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { SoftwareInstallations } = await import("../../src/workbench/SoftwareInstallations.tsx");
+  const calls: unknown[] = [];
+  const action = { actionId: "software_installation_execute", label: "Install", status: "available", payload: { package_id: "example", expected_revision: "catalog-r2", operation: "install", version: "1.1" }, payloadFields: ["package_id", "expected_revision", "operation", "version"], confirmationRequired: true, dryRunSupported: true, followUpActionIds: [] };
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(SoftwareInstallations, { installations: [], packageId: "example", productActions: [action, { ...action, payload: { ...action.payload, expected_revision: "" } }, { ...action, payload: { ...action.payload, package_id: "another-product" } }], locale: "zh", actionBusyKey: null, onAction: request => calls.push(request) }));
+    assert.match(container.textContent ?? "", /本机没有此软件的安装记录/);
+    const buttons = [...container.querySelectorAll("button")];
+    assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].textContent, "安装发布版 · 1.1");
+    flushSync(() => buttons[0].click());
+    assert.deepEqual((calls[0] as { payload: unknown }).payload, action.payload);
+    assert.equal((calls[0] as { confirmationRequired: boolean }).confirmationRequired, true);
   });
 });

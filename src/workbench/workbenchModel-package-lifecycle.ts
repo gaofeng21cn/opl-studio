@@ -25,7 +25,7 @@ import {
   firstString
 } from "./workbenchModel-primitives";
 import { firstStringField, uniqueStrings } from "./workbenchModel-presentation";
-import { readCatalogProvenance, readSoftwareActivationStatus, readSoftwareInstallations } from "./softwareSources";
+import { readCatalogProvenance, readSoftwareActivationStatus, readSoftwareInstallationActions, readSoftwareInstallations } from "./softwareSources";
 
 function packageIdentity(record: Record<string, unknown>, index: number): string {
   return firstStringField(record, ["package_id", "packageId", "agent_id", "module_id", "id"])
@@ -587,6 +587,7 @@ function packageLifecycleItem(
       ? { releaseChannel: record.release_channel } : {}),
     activeInstallationId: asString(record.active_installation_id) ?? undefined,
     installationManagementReason: asString(record.installation_management_reason) ?? undefined,
+    installationActions: readSoftwareInstallationActions(record.installation_actions),
     activeInstallationStatus: readSoftwareActivationStatus(record.active_installation_status),
     ...(Array.isArray(record.installations) ? { installations: readSoftwareInstallations(record.installations) } : {}),
     localInstallations: asRecordArray(record.local_installations).flatMap(installation => {

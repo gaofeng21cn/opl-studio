@@ -255,6 +255,7 @@ export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   activeInstallationId?: string;
   activeInstallationStatus?: SoftwareActivationStatus;
   installationManagementReason?: string;
+  installationActions?: SoftwareSourceActionRef[];
   distributionChannel?: "release" | "source" | "unknown";
   releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";

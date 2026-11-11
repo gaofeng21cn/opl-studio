@@ -37,6 +37,8 @@ Package 来自 Framework 目录，原生分发选项来自软件源 `native_item
 及必需 payload，之后沿既有 App state/action 链路回读。安装选项和已装实例分别显示；
 缺少 Homebrew 收据不能将有效 Framework runtime 或 App bundle 显示为未安装。
 旧版 `local_installations` 只作为兼容读面，不能反推完整路径或激活选择。
+尚无本机安装时，`installation_actions` 可提供“安装发布版”，绑定软件 ID、版本和
+当前修订号；创建安装时不伪造实例 ID。集成组件已经安装也不会隐藏此入口。
 
 原生软件优先显示 owner 提供的 `installed_display_version` 和
 `available_display_version`；机器版本、构建 ID、配方版本和收据放在对应详情，保留
@@ -102,6 +104,8 @@ Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替
 `src/workbench/settings/packages.tsx` 复用目录与生命周期操作；
 `src/composition/contributionProjection.ts` 消费 App 使用偏好并过滤贡献；
 `src/workbench/App.tsx` 将包详情懒渲染及动作接入既有 bridge。
+`settings.section` 由 DSH root 唯一声明；设置页与软件中心共用该 owner 的 renderer，
+避免重复声明或从其他插槽跨越 DSH 的渲染归属边界。
 
 设置搜索、外观与字号继续复用现有 DSH 客户端能力，来源见[生态客户端](ecosystem-client-plugins.md)。
 源码实现与本地渲染不等于已发布或已安装的 App 版本。

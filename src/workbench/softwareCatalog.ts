@@ -47,7 +47,7 @@ export function catalogTypeLabel(item: Pick<AgentPackageLifecycleRef, "softwareT
 }
 
 export function catalogManagerLabel(manager: string | undefined, locale: "zh" | "en") {
-  return ({ codex_plugin_manager: "Codex", opl_packages: "OPL", homebrew: "Homebrew", opl_framework: "OPL Framework", uv: "uv", package_owner: locale === "zh" ? "软件自身" : "Software installer" })[manager ?? ""] ?? (locale === "zh" ? "管理器待确认" : "Manager not confirmed");
+  return ({ codex_plugin_manager: "Codex", opl_packages: "OPL", homebrew: "Homebrew", opl_framework: "OPL Framework", uv: "uv", application: locale === "zh" ? "应用自身" : "Application", package_owner: locale === "zh" ? "软件自身" : "Software installer" })[manager ?? ""] ?? (locale === "zh" ? "管理器待确认" : "Manager not confirmed");
 }
 
 export function packageInstallationManagers(item: AgentPackageLifecycleRef): string[] {
