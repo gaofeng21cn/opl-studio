@@ -84,7 +84,7 @@ const packageFields = [
   "source_kind", "install_origin",
   "required_skill", "requiredSkill", "skill_id", "skill_ref", "required_skills",
   "source_surface", "installed_version", "selected_version", "stable_version", "projected_version",
-  "installed", "activated", "app_enabled", "codex_visible", "official", "manifest_url", "physical_surface_status"
+  "active_installation_id", "active_installation_status", "installation_management_reason", "installed", "activated", "app_enabled", "codex_visible", "official", "manifest_url", "physical_surface_status"
 ];
 
 function compactHomeShortcut(value) {
@@ -180,8 +180,15 @@ function compactUiContributions(value) {
 function compactPackageActionPayload(value) {
   return selectedFields(value, [
     "package_id", "manifest_url", "registry_url", "trust_tier", "source_kind",
-    "exposure_action", "shortcut_id", "visible", "sort_order", "enabled"
+    "exposure_action", "shortcut_id", "visible", "sort_order", "enabled", "installation_id", "expected_revision", "operation", "version"
   ]);
+}
+
+function compactSoftwareInstallation(value) {
+  return {
+    ...selectedFields(value, ["installation_id", "kind", "version", "display_version", "mode", "manager", "location", "location_ref", "evidence_ref", "entrypoint_verified", "active", "revision", "available_version", "owner_settings_route"]),
+    available_actions: Array.isArray(value?.available_actions) ? value.available_actions.slice(0, 16).map(compactSoftwareSourceAction).filter(Boolean) : []
+  };
 }
 
 function compactPackageRecord(value) {
@@ -265,6 +272,8 @@ function compactPackageRecord(value) {
     ...(packageCurrentness ? { package_currentness: packageCurrentness } : {}),
     ...(packageAccess ? { package_access: packageAccess } : {}),
     ...(installability ? { installability } : {}),
+    ...(Array.isArray(value?.installations) ? { installations: value.installations.slice(0, 32).map(compactSoftwareInstallation) } : {}),
+    ...(Array.isArray(value?.installation_actions) ? { installation_actions: value.installation_actions.slice(0, 16).map(compactSoftwareSourceAction).filter(Boolean) } : {}),
     ...(Array.isArray(value?.local_installations) ? { local_installations: value.local_installations.slice(0, 32).map(installation => selectedFields(installation, ["installation_id", "kind", "version", "mode", "manager", "management_scope", "location_ref", "evidence_ref", "entrypoint_verified", "source_revision"])) } : {}),
     ...(Array.isArray(value?.required_by_package_ids) ? { required_by_package_ids: compactStringArray(value.required_by_package_ids) } : {}),
     ...(availableActions ? { available_actions: availableActions } : {}),
@@ -282,11 +291,11 @@ function compactPackageRows(value, limit = 64) {
 
 function compactSoftwareSourceAction(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision"]);
-  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision"]);
+  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"]);
+  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"]);
   return {
     ...selectedFields(value, [
-      "action_id", "label", "delegated_surface", "payload_fields", "mutates", "dry_run_supported",
+      "action_id", "label", "semantic", "delegated_surface", "payload_fields", "required_payload_fields", "mutates", "dry_run_supported",
       "confirmation_required", "danger_level", "impact", "follow_up_action_ids", "verify_action_id", "status", "reason"
     ]),
     ...(defaultPayload && Object.keys(defaultPayload).length ? { default_payload: defaultPayload } : {}),
@@ -298,7 +307,8 @@ function compactNativeSoftwareItem(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
   return {
     ...compactCatalogProvenance(item),
-    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_display_version", "installed_build_kind", "installed_build_id", "installed_source_revision", "available_version", "available_display_version", "update_status", "revision"]),
+    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_display_version", "installed_build_kind", "installed_build_id", "installed_source_revision", "available_version", "available_display_version", "update_status", "revision", "installation_id", "location", "mode", "active", "active_installation_id", "active_installation_status", "release_channel", "installation_variant", "recommended_for_product", "selected_for_product", "selection_basis"]),
+    ...(Array.isArray(item.installations) ? { installations: item.installations.slice(0, 32).map(compactSoftwareInstallation) } : {}),
     display_name_i18n: compactLocalizedText(item.display_name_i18n),
     description_i18n: compactLocalizedText(item.description_i18n),
     available_actions: Array.isArray(item.available_actions) ? item.available_actions.slice(0, 8).map(compactSoftwareSourceAction).filter(Boolean) : []

@@ -66,6 +66,12 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-dsh-owner-filters input::placeholder { color: var(--dsw-alias-label-secondary); opacity: 1; }
   .opl-dsh-owner-filters select { min-height: 32px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 4px 8px; }
   .opl-dsh-owner-section { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+  .opl-software-installation { padding: 16px 0; border-top: 1px solid var(--dsw-alias-border-l3); }
+  .opl-software-installation-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .opl-software-installation-heading strong { color: var(--dsw-alias-label-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .opl-software-installation-heading > span:last-child { margin-left: auto; }
+  .opl-software-installation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opl-software-installation code { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
   .opl-dsh-owner-section h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
   .opl-dsh-owner-section p { margin: 0 0 12px; }
   .opl-dsh-owner-section dl { display: grid; gap: 10px; margin: 0 0 16px; }

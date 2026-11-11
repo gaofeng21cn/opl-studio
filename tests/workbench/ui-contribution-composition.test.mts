@@ -436,6 +436,8 @@ describe("OPL Studio DSH contribution composition", () => {
   test("registers each static list-slot occupant with a stable id", () => {
     const host = createHost();
     expect(host.core.entries("root")[0]?.children?.["runtime.detail"]).toEqual({ kind: "list", scope: "root" });
+    expect(host.core.entries("root")[0]?.children?.["settings.section"]).toEqual({ kind: "list", scope: "root" });
+    expect(host.core.entries("sidebar.settings")[0]?.children?.["settings.section"]).toBeUndefined();
     expect(host.core.entries("rightbar")[0]?.children?.["runtime.detail"]).toBeUndefined();
     expect(host.core.entries("main").find(entry => entry.registrant === "dsh-ui-conversation")?.children?.["conversation.hero.options"]).toEqual({ kind: "list", scope: "root" });
     expect(host.core.entries("shell.overlay")).toHaveLength(3);

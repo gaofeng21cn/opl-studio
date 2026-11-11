@@ -200,8 +200,8 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
   const sessions = { phase: "ready", current: "opl-current", byId: { "opl-current": { id: "opl-current", blank: onboardingVisible, retainedBy: { mainView: 1 } } } };
   const onboardingSteps = onboardingVisible ? [{ id: "opl-first-run", order: 0 }] : [];
   const renderContribution = useCallback((options?: { only?: string }) => (
-    renderSlot("settings.section", studio.contributionOwner, options)
-  ), [renderSlot, studio.contributionOwner]);
+    studio.renderSettingsContribution(options)
+  ), [studio.renderSettingsContribution]);
   const requestedSettings = studio.settingsNavigation;
   const requestedPrimary = requestedSettings?.destination
     ? settingsDestinations(studio.locale).find(primary => settingsSubDestinations(primary.id, studio.locale).some(item => item.id === requestedSettings.destination))?.id
@@ -221,7 +221,7 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
     const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
     if (primary) actions.select(settingsSectionId(primary.id));
   };
-  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate, mobileView, setMobileView }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={renderSlot} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
+  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate, mobileView, setMobileView }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} reconnect={studio.reloadThreadDirectory} useConnectionState={(selector: any) => selector(studio.threadDirectoryStatus === "ready" ? "connected" : studio.threadDirectoryStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={(slot: string, owner: { close?: () => void }, options?: { only?: string }) => slot === "settings.section" ? studio.renderSettingsContribution(options, owner) : renderSlot(slot, owner, options)} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
 }
 
 export function SettingsTriggerSlot({ wide }: { wide: boolean }) {

@@ -12,6 +12,7 @@ export type SettingsActionRequest = {
   key: string;
   actionId: string;
   label: string;
+  targetLocation?: string;
   payload: Record<string, unknown>;
   confirmationRequired: boolean;
   previewOnly?: boolean;

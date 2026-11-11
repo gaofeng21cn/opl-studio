@@ -15,7 +15,7 @@ export type OplSetupOperationResult = {
 export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
 
 export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace" | "applications";
-export type RenderSettingsContribution = (options?: { only?: string }) => ReactNode;
+export type RenderSettingsContribution = (options?: { only?: string }, owner?: { close?: () => void }) => ReactNode;
 
 export type OplStudioSurface = {
   locale: "zh" | "en";
@@ -69,6 +69,7 @@ export type OplStudioSurface = {
   activeDetailTabId: OplStudioDetailTab["id"];
   openDetailTab(tabId: OplStudioDetailTab["id"]): void;
   renderSettings(destination: SettingsDestinationId, renderContribution?: RenderSettingsContribution, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void): ReactNode;
+  renderSettingsContribution: RenderSettingsContribution;
   settingsNavigation?: { open: boolean; destination?: SettingsDestinationId; revision: number };
   initializationStatus: "loading" | "ready" | "error";
   initialization: OplInitializeReadback | null;

@@ -190,8 +190,8 @@ export function PackageCatalog(props: import("../../composition/dshPluginManager
 }
 
 
-export function packagePresentLocally(item: Pick<AgentPackageLifecycleRef, "installed" | "localInstallations">): boolean {
-  return item.installed === true || Boolean(item.localInstallations?.length);
+export function packagePresentLocally(item: Pick<AgentPackageLifecycleRef, "installed" | "localInstallations" | "installations">): boolean {
+  return item.installed === true || Boolean(item.installations?.length || item.localInstallations?.length);
 }
 
 export function packageLocalVersion(item: Pick<AgentPackageLifecycleRef, "installedVersion" | "localInstallations">): string | undefined {
@@ -203,6 +203,6 @@ export function packageInstalledLocally(item: Pick<AgentPackageLifecycleRef, "in
   return item.installed === true || Boolean(item.localInstallations?.some(installation => installation.mode === "installed"));
 }
 
-export function packageDevelopmentLinked(item: Pick<AgentPackageLifecycleRef, "localInstallations">): boolean {
-  return Boolean(item.localInstallations?.some(installation => installation.mode === "development"));
+export function packageDevelopmentLinked(item: Pick<AgentPackageLifecycleRef, "localInstallations" | "installations">): boolean {
+  return Boolean((item.installations ?? item.localInstallations)?.some(installation => installation.mode === "development"));
 }

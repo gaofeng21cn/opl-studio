@@ -2859,6 +2859,7 @@ export function App({
     activeDetailTabId: activeContextTab,
     openDetailTab: requestDetails,
     renderSettings: renderStudioSettings,
+    renderSettingsContribution: (options, owner) => renderContributionSlot?.("settings.section", { ...contributionOwner, ...owner }, options),
     settingsNavigation,
     initializationStatus: initializeStatus,
     initialization: initializeReadback,

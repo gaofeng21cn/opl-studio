@@ -21,7 +21,7 @@ export function SoftwareCatalogVersions({ installed, installedVersion, available
   const zh = locale === "zh";
   return <span className="software-catalog-versions" data-testid="opl-package-version-summary">
     <span><span>{installedLabel ?? (zh ? "本机版本" : "Local version")}</span>{" "}<strong data-unknown={!installedVersion || undefined}>{installedVersion || (installed === false ? (missingLabel ?? (zh ? "未安装" : "Not installed")) : (zh ? "待确认" : "Not confirmed"))}</strong></span>
-    <span><span>{zh ? "来源版本" : "Source version"}</span>{" "}<strong data-unknown={!availableVersion || undefined}>{availableVersion || (zh ? "待检查" : "Not checked")}</strong></span>
+    <span><span>{zh ? "来源版本" : "Source version"}</span>{" "}<strong data-unknown={!availableVersion || undefined}>{availableVersion || "—"}</strong></span>
   </span>;
 }
 

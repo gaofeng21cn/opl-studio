@@ -1,4 +1,4 @@
-import type { CatalogOriginBasis, CatalogProvenanceRef, CatalogSourceRef, NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection } from "./workbenchModel-package-contracts";
+import type { CatalogOriginBasis, CatalogProvenanceRef, CatalogSourceRef, NativeSoftwareItemRef, SoftwareSourceActionRef, SoftwareSourceRef, SoftwareSourcesProjection, SoftwareInstallationRef, SoftwareActivationStatus } from "./workbenchModel-package-contracts";
 import { asLocalizedText, asOptionalBoolean, asRecord, asRecordArray, asString, asStringArray } from "./workbenchModel-primitives";
 
 const statuses = new Set(["public", "authorized", "signed_out", "forbidden", "expired", "revoked"]);
@@ -24,7 +24,7 @@ function safeActionPayload(value: unknown): Record<string, unknown> {
   if (!input) return {};
   // This projection intentionally admits references only. The installer owns all
   // provider lookup and must never send credentials to the renderer.
-  return Object.fromEntries(["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision"].flatMap((key) => {
+  return Object.fromEntries(["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"].flatMap((key) => {
     const field = input[key];
     return typeof field === "string" || typeof field === "boolean" ? [[key, field]] : [];
   }));
@@ -45,6 +45,18 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
     installationKind: asString(item.installation_kind) ?? undefined,
     installationEvidence: asString(item.installation_evidence) ?? undefined,
     ownerSettingsRoute: asString(item.owner_settings_route) ?? undefined,
+    installationId: asString(item.installation_id) ?? undefined,
+    installationMode: item.mode === "development" || item.mode === "installed" ? item.mode : undefined,
+    location: asString(item.location) ?? undefined,
+    active: typeof item.active === "boolean" ? item.active : undefined,
+    activeInstallationId: asString(item.active_installation_id) ?? undefined,
+    activeInstallationStatus: readSoftwareActivationStatus(item.active_installation_status),
+    ...(Array.isArray(item.installations) ? { installations: readSoftwareInstallations(item.installations) } : {}),
+    releaseChannel: item.release_channel === "stable" || item.release_channel === "nightly" ? item.release_channel : undefined,
+    installationVariant: ["standard", "full", "default"].includes(String(item.installation_variant)) ? item.installation_variant as NativeSoftwareItemRef["installationVariant"] : undefined,
+    recommendedForProduct: typeof item.recommended_for_product === "boolean" ? item.recommended_for_product : undefined,
+    selectedForProduct: typeof item.selected_for_product === "boolean" ? item.selected_for_product : undefined,
+    selectionBasis: asString(item.selection_basis) ?? undefined,
     displayName: asString(item.display_name) ?? name,
     description: asString(item.description) ?? undefined,
     displayNameI18n: asLocalizedText(item.display_name_i18n),
@@ -74,8 +86,8 @@ function readSourceAction(value: Record<string, unknown>, sourceId: string): Sof
     actionId,
     label: asString(value.label) ?? actionId,
     delegatedSurface: asString(value.delegated_surface) ?? undefined,
-    payload: { ...(actionId === "source_list" ? {} : { source_id: sourceId }), ...safeActionPayload(value.default_payload), ...safeActionPayload(value.payload) },
-    payloadFields: asStringArray(value.payload_fields),
+    payload: { ...(actionId === "source_list" || !sourceId ? {} : { source_id: sourceId }), ...safeActionPayload(value.default_payload), ...safeActionPayload(value.payload) },
+    payloadFields: asStringArray(value.payload_fields ?? value.required_payload_fields),
     status: value.status === "unavailable" ? "unavailable" : "available",
     mutates: asString(value.mutates) ?? undefined,
     dryRunSupported: value.dry_run_supported === true,
@@ -86,6 +98,34 @@ function readSourceAction(value: Record<string, unknown>, sourceId: string): Sof
     verifyActionId: asString(value.verify_action_id) ?? undefined,
     reason: asString(value.reason) ?? undefined
   };
+}
+
+export function readSoftwareActivationStatus(value: unknown): SoftwareActivationStatus | undefined {
+  return ["active", "inactive", "unknown", "conflict"].includes(String(value)) ? value as SoftwareActivationStatus : undefined;
+}
+
+export function readSoftwareInstallationActions(value: unknown): SoftwareSourceActionRef[] {
+  return asRecordArray(value).flatMap(action => {
+    const projected = readSourceAction(action, "");
+    return projected ? [projected] : [];
+  });
+}
+
+export function readSoftwareInstallations(value: unknown): SoftwareInstallationRef[] {
+  return asRecordArray(value).flatMap(item => {
+    const installationId = asString(item.installation_id), version = asString(item.version), location = asString(item.location);
+    if (!installationId || !version || !location || item.entrypoint_verified !== true
+      || !["installed", "development"].includes(String(item.mode))) return [];
+    return [{ installationId, version, location,
+      kind: asString(item.kind) ?? "unknown", manager: asString(item.manager) ?? "unknown",
+      mode: item.mode as SoftwareInstallationRef["mode"], active: item.active === true,
+      displayVersion: asString(item.display_version) ?? undefined,
+      locationRef: asString(item.location_ref) ?? undefined, evidenceRef: asString(item.evidence_ref) ?? undefined,
+      revision: asString(item.revision) ?? undefined, availableVersion: asString(item.available_version) ?? undefined,
+      ownerSettingsRoute: asString(item.owner_settings_route) ?? undefined,
+      availableActions: readSoftwareInstallationActions(item.available_actions)
+    }];
+  });
 }
 
 export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesProjection | undefined {
@@ -193,21 +233,42 @@ export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
     groups.set(key, { ...(groups.get(key) ?? { channels: [] }), installed: item });
   }
   return [...groups].map(([productId, { channels, installed }]) => {
-    const ordered = [...channels].sort((a, b) => a.item.name.length - b.item.name.length);
-    const primary = channels.find(({ item }) => item.homebrewInstalled === true)
-      ?? ordered.find(({ item }) => item.installed === true) ?? ordered[0];
+    const selected = channels.filter(({ item }) => item.selectedForProduct === true);
+    // Selection is Framework-owned. A legacy single-source projection has no choice to resolve.
+    const primary = selected.length === 1 ? selected[0]
+      : channels.length === 1 && channels[0].item.selectedForProduct === undefined ? channels[0] : undefined;
+    const observed = installed ?? primary?.item ?? channels[0]?.item;
     const item = installed ? {
       ...primary?.item, ...installed,
       itemId: primary?.item.itemId ?? installed.itemId,
       name: primary?.item.name ?? installed.name,
-      availableVersion: primary?.item.availableVersion ?? installed.availableVersion,
-      availableDisplayVersion: primary?.item.availableDisplayVersion ?? installed.availableDisplayVersion,
+      availableVersion: primary?.item.availableVersion,
+      availableDisplayVersion: primary?.item.availableDisplayVersion,
       availableActions: primary?.item.availableActions ?? [],
       revision: primary?.item.revision,
       homebrewInstalled: primary?.item.homebrewInstalled,
       homebrewInstalledVersion: primary?.item.homebrewInstalledVersion,
-    } : primary!.item;
-    return { source: primary?.source, item, productId, channels };
+      releaseChannel: primary?.item.releaseChannel,
+      installationVariant: primary?.item.installationVariant,
+      selectionBasis: primary?.item.selectionBasis,
+    } : primary?.item ?? { ...observed!, availableVersion: undefined, availableDisplayVersion: undefined, availableActions: [] };
+    const observations = [...channels.map(channel => channel.item), installed].filter((entry): entry is NativeSoftwareItemRef => Boolean(entry));
+    const installations = new Map<string, SoftwareInstallationRef>();
+    for (const observation of observations) {
+      for (const installation of observation.installations ?? []) installations.set(installation.installationId, installation);
+      if (!observation.installations && observation.installed === true && observation.installationId && observation.location) {
+        installations.set(observation.installationId, {
+          installationId: observation.installationId, location: observation.location,
+          kind: observation.installationKind ?? observation.kind,
+          version: observation.installedVersion ?? "—", displayVersion: observation.installedDisplayVersion,
+          mode: observation.installationMode ?? (observation.installedBuildKind === "local-development" || observation.installationKind === "source_link" ? "development" : "installed"),
+          manager: observation.installationOwner ?? "unknown", active: observation.active === true,
+          availableVersion: primary?.item.availableDisplayVersion ?? primary?.item.availableVersion,
+          ownerSettingsRoute: observation.ownerSettingsRoute, availableActions: []
+        });
+      }
+    }
+    return { source: primary?.source, item, productId, channels, installations: [...installations.values()] };
   });
 }
 
@@ -217,8 +278,8 @@ export function nativeSoftwareInventory(projection?: SoftwareSourcesProjection) 
   return {
     total: entries.length,
     installed: entries.filter(({ item }) => item.installed === true).length,
-    installable: entries.filter(({ channels }) => channels.some(({ item }) => item.installed === false && item.availableActions.some(action => action.actionId === "source_install" && action.status === "available"))).length,
-    updatesAvailable: entries.filter(({ channels }) => channels.some(({ item }) => item.updateStatus === "available")).length,
+    installable: entries.filter(({ item }) => item.installed === false && item.availableActions.some(action => action.actionId === "source_install" && action.status === "available")).length,
+    updatesAvailable: entries.filter(({ item }) => item.installed === true && item.updateStatus === "available").length,
     complete: sources.length > 0 && sources.every(source => source.inventoryStatus === "available")
   };
 }
