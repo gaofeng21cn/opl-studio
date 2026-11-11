@@ -782,7 +782,7 @@ test("catalog separates owner-admitted software from host components without inv
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
     const text = container.textContent ?? "";
     assert.match(text, /Kindle Pilot/);
-    assert.equal(container.querySelector('[data-plugin-owner-package="kindle-pilot"] [data-label="已装版本"]')?.textContent, "1.2.0");
+    assert.equal(container.querySelector('[data-plugin-owner-package="kindle-pilot"] [data-label="当前版本"]')?.textContent, "1.2.0");
     assert.equal(container.querySelector('[data-plugin-owner-package="kindle-pilot"] [data-label="可用版本"]')?.textContent, "1.1.0");
     assert.doesNotMatch(text, /preview|预览版|stable|稳定版|Host Browser|Unknown legacy item/);
     const scope = [...container.querySelectorAll("button")].find(button => button.textContent === "运行组件");
@@ -815,11 +815,11 @@ test("nonstandard agents use declared type and local installations never masquer
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
     const rednote = container.querySelector('[data-plugin-owner-package="rednote"]');
-    assert.equal(rednote?.querySelector('[data-label="已装版本"]')?.textContent, "0.2.3");
+    assert.equal(rednote?.querySelector('[data-label="当前版本"]')?.textContent, "0.2.3");
     assert.match(rednote?.textContent ?? "", /已安装/);
     assert.doesNotMatch(rednote?.textContent ?? "", /未安装/);
     const vault = container.querySelector('[data-plugin-owner-package="vault"]');
-    assert.match(vault?.textContent ?? "", /开发接入/);
+    assert.match(vault?.textContent ?? "", /开发版/);
     assert.match(container.textContent ?? "", /智能体/);
     assert.doesNotMatch(rednote?.textContent ?? "", /能力包/);
     render(createElement(presentation.PackageCatalog, { kind: "agents", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
@@ -846,7 +846,7 @@ test("OPL catalog excludes external and undeclared plugins while other sources e
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, capabilityCatalog: catalog, capabilityStatus: "ready", actionBusyKey: null, onAction() {} }));
     assert.match(container.textContent ?? "", /Our App/);
     assert.doesNotMatch(container.textContent ?? "", /PDF|Unconfirmed publisher|Independent skill|Packaged skill/);
-    assert.equal(container.querySelector('[data-plugin-owner-package="our-app"] [data-label="已装版本"]')?.textContent, "2.0");
+    assert.equal(container.querySelector('[data-plugin-owner-package="our-app"] [data-label="当前版本"]')?.textContent, "2.0");
     const external = container.querySelector<HTMLButtonElement>('#opl-catalog-scope-external')!;
     flushSync(() => external.click());
     assert.match(container.textContent ?? "", /PDF/);
@@ -877,7 +877,7 @@ test("catalog state counts development as installed and prioritizes blocked acce
   assert.equal(packageCatalogState(privateItem), "attention");
   const inventory = softwareCatalogInventory(model);
   assert.deepEqual({ total: inventory.total, installed: inventory.installed, updates: inventory.updates, notInstalled: inventory.notInstalled, external: inventory.external }, { total: 4, installed: 2, updates: 0, notInstalled: 2, external: 1 });
-  assert.equal(nativeCatalogAvailableVersion(nativeSoftwareProducts(model.softwareSources)[0], "zh"), "多个渠道");
+  assert.equal(nativeCatalogAvailableVersion(nativeSoftwareProducts(model.softwareSources)[0], "zh"), undefined);
 });
 
 test("native catalog shows owner display versions and identifies development builds separately from channel receipts", async () => {
@@ -900,14 +900,14 @@ test("native catalog shows owner display versions and identifies development bui
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
     const row = container.querySelector('[data-plugin-owner-package="github:owner/app"]')!;
-    assert.equal(row.querySelector('[data-label="已装版本"]')?.textContent, "26.11.10");
+    assert.equal(row.querySelector('[data-label="当前版本"]')?.textContent, "26.11.10");
     assert.equal(row.querySelector('[data-label="可用版本"]')?.textContent, "26.11.9");
     assert.match(row.textContent ?? "", /开发版/);
     assert.doesNotMatch(row.textContent ?? "", /26\.11\.1091|26\.11\.991|local\.src|可更新/);
     render(createElement(NativeSoftwareList, { entries: nativeSoftwareEntries(model.softwareSources), locale: "zh", channelView: true, actionBusyKey: null, onAction() {} }));
     const summary = container.querySelector("summary")!;
-    assert.match(summary.textContent ?? "", /Homebrew 记录\s*无记录/);
-    assert.match(summary.textContent ?? "", /来源版本\s*26\.11\.9/);
+    assert.match(summary.textContent ?? "", /安装选项/);
+    assert.match(summary.textContent ?? "", /可用版本\s*26\.11\.9/);
     assert.doesNotMatch(summary.textContent ?? "", /26\.11\.1091|26\.11\.991|开发版/);
     const details = container.querySelector(".agent-package-details")!;
     assert.match(details.textContent ?? "", /本机版本26\.11\.10 · 开发版/);
@@ -920,7 +920,7 @@ test("native catalog shows owner display versions and identifies development bui
       ...entry.item, homebrewInstalled: true, homebrewInstalledVersion: "26.11.891,26.11.8"
     } }));
     render(createElement(NativeSoftwareList, { entries: withReceipt, locale: "zh", channelView: true, actionBusyKey: null, onAction() {} }));
-    assert.match(container.querySelector("summary")?.textContent ?? "", /Homebrew 记录\s*有记录/);
+    assert.match(container.querySelector("summary")?.textContent ?? "", /安装选项/);
     assert.doesNotMatch(container.querySelector("summary")?.textContent ?? "", /26\.11\.891|26\.11\.1091|26\.11\.991/);
     assert.match(container.querySelector(".agent-package-details")?.textContent ?? "", /Homebrew 安装记录26\.11\.891,26\.11\.8/);
   });
@@ -951,5 +951,30 @@ test("source access attention opens sources and does not repair an installation"
     flushSync(() => container.querySelector<HTMLButtonElement>("button")!.click());
     assert.deepEqual(tabs, ["sources", "sources"]);
     assert.deepEqual(actions, []);
+  });
+});
+
+test("installation details show exact paths and dispatch only the selected instance's owner action", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { SoftwareInstallations } = await import("../../src/workbench/SoftwareInstallations.tsx");
+  const calls: unknown[] = [];
+  const action = { actionId: "software_installation_manage", label: "Activate", status: "available", payload: { package_id: "example", installation_id: "dev", expected_revision: "r2", operation: "activate" }, payloadFields: ["package_id", "installation_id", "expected_revision", "operation"], confirmationRequired: true, dryRunSupported: true, followUpActionIds: [] };
+  const installations = [
+    { installationId: "release", kind: "macos_bundle", version: "1.0", mode: "installed", manager: "package_owner", location: "/Applications/Example.app", active: true, revision: "r1", availableActions: [] },
+    { installationId: "dev", kind: "developer_checkout", version: "9.0", mode: "development", manager: "package_owner", location: "/work/example", active: false, revision: "r2", availableActions: [action, { ...action, actionId: "bad-action", payload: { ...action.payload, installation_id: "release" } }, { ...action, actionId: "unsafe-development-update", payload: { ...action.payload, operation: "update" } }] }
+  ];
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(SoftwareInstallations, { installations, activeId: "release", activationStatus: "active", locale: "zh", actionBusyKey: null, onAction: request => calls.push(request) }));
+    assert.match(container.textContent ?? "", /本机安装/);
+    assert.match(container.textContent ?? "", /\/Applications\/Example.app/);
+    assert.match(container.textContent ?? "", /\/work\/example/);
+    assert.equal(container.querySelectorAll('[data-installation-id="release"]').length, 1);
+    assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /当前使用/);
+    const buttons = [...container.querySelectorAll("button")];
+    assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].textContent, "设为当前使用");
+    flushSync(() => buttons[0].click());
+    assert.deepEqual((calls[0] as { payload: unknown }).payload, action.payload);
   });
 });

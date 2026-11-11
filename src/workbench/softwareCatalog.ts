@@ -1,5 +1,5 @@
 import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
-import type { NativeSoftwareItemRef } from "./workbenchModel-package-contracts";
+import type { NativeSoftwareItemRef, SoftwareActivationStatus, SoftwareInstallationRef } from "./workbenchModel-package-contracts";
 import { nativeAvailableDisplayVersion, nativeSoftwareProducts } from "./softwareSources";
 import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
 
@@ -21,6 +21,7 @@ export function softwareCatalogNativeProducts(model: Pick<WorkbenchModel, "softw
 }
 
 export function packageCatalogState(item: AgentPackageLifecycleRef): SoftwareCatalogState {
+  if (item.activeInstallationStatus === "conflict") return "attention";
   if (packagePresentLocally(item)) {
     // Runtime state for a missing host plugin does not describe a standalone installation.
     if (item.installed === true && (packageAccessNeedsAttention(item) || ["staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(item.currentness) || item.readiness.operationalReady === false || item.readiness.callable === false || item.readiness.launchAllowed === false)) return "attention";
@@ -31,6 +32,7 @@ export function packageCatalogState(item: AgentPackageLifecycleRef): SoftwareCat
 }
 
 export function nativeCatalogState(item: NativeSoftwareItemRef): SoftwareCatalogState {
+  if (item.activeInstallationStatus === "conflict") return "attention";
   return item.updateStatus === "available" && item.installed === true ? "update_available"
     : item.installed === true ? "installed" : item.installed === false ? "not_installed" : "unknown";
 }
@@ -55,12 +57,22 @@ export function packageInstallationManagers(item: AgentPackageLifecycleRef): str
   ])];
 }
 
-export function catalogInstalledVersion(item: AgentPackageLifecycleRef, locale: "zh" | "en") {
+export function activeSoftwareInstallation(installations: SoftwareInstallationRef[] | undefined, activeId?: string, status?: SoftwareActivationStatus) {
+  if (status && status !== "active") return undefined;
+  const active = (installations ?? []).filter(installation => installation.active);
+  return active.length === 1 && (!activeId || active[0].installationId === activeId) ? active[0] : undefined;
+}
+
+export function catalogInstalledVersion(item: AgentPackageLifecycleRef, _locale: "zh" | "en") {
+  if (item.installations !== undefined) return activeSoftwareInstallation(item.installations, item.activeInstallationId, item.activeInstallationStatus)?.displayVersion
+    ?? activeSoftwareInstallation(item.installations, item.activeInstallationId, item.activeInstallationStatus)?.version ?? "—";
   if (item.installed === true && item.installedVersion) return item.installedVersion;
   const versions = [...new Set((item.localInstallations ?? []).map(installation => installation.version).filter(Boolean))];
-  if (versions.length === 1) return versions[0];
-  if (versions.length > 1) return locale === "zh" ? "多个版本" : "Multiple versions";
-  return item.installed === false ? "—" : locale === "zh" ? "待检查" : "Not checked";
+  return versions.length === 1 ? versions[0] : "—";
+}
+
+export function softwareActivationLabel(status: SoftwareActivationStatus | undefined, locale: "zh" | "en") {
+  return ({ active: ["已激活", "Active"], inactive: ["尚未激活", "Not activated"], unknown: ["尚未确认当前使用的安装", "Active installation not confirmed"], conflict: ["激活状态冲突", "Conflicting active installations"] })[status ?? "unknown"][locale === "zh" ? 0 : 1];
 }
 
 export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLifecycle" | "softwareSources">) {
@@ -78,11 +90,7 @@ export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLif
   };
 }
 
-/** Multiple channels need an explicit receipt before one becomes the selected version. */
-export function nativeCatalogAvailableVersion(product: ReturnType<typeof nativeSoftwareProducts>[number], locale: "zh" | "en") {
-  const selected = product.channels.filter(channel => channel.item.homebrewInstalled === true);
-  if (selected.length === 1) return nativeAvailableDisplayVersion(selected[0].item);
-  const versions = [...new Set(product.channels.map(channel => channel.item.availableVersion).filter(Boolean))];
-  return versions.length > 1 ? (locale === "zh" ? "多个渠道" : "Multiple channels")
-    : nativeAvailableDisplayVersion(product.channels.find(channel => channel.item.availableVersion)?.item ?? product.item);
+/** The owner selects one update source independently of installed replicas. */
+export function nativeCatalogAvailableVersion(product: Pick<ReturnType<typeof nativeSoftwareProducts>[number], "item">, _locale: "zh" | "en") {
+  return nativeAvailableDisplayVersion(product.item);
 }

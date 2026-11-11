@@ -168,6 +168,18 @@ export type NativeSoftwareItemRef = CatalogProvenanceRef & {
   installationKind?: string;
   installationEvidence?: string;
   ownerSettingsRoute?: string;
+  installationId?: string;
+  installationMode?: "installed" | "development";
+  location?: string;
+  active?: boolean;
+  activeInstallationId?: string;
+  activeInstallationStatus?: SoftwareActivationStatus;
+  installations?: SoftwareInstallationRef[];
+  releaseChannel?: "stable" | "nightly";
+  installationVariant?: "standard" | "full" | "default";
+  recommendedForProduct?: boolean;
+  selectedForProduct?: boolean;
+  selectionBasis?: string;
   name: string;
   displayName: string;
   description?: string;
@@ -196,6 +208,26 @@ export type SoftwareSourcesProjection = {
   };
 };
 
+export type SoftwareActivationStatus = "active" | "inactive" | "unknown" | "conflict";
+
+/** A physical installation observed by its lifecycle owner; never a distribution recipe. */
+export type SoftwareInstallationRef = {
+  installationId: string;
+  kind: string;
+  version: string;
+  displayVersion?: string;
+  mode: "installed" | "development";
+  manager: string;
+  location: string;
+  locationRef?: string;
+  evidenceRef?: string;
+  active: boolean;
+  revision?: string;
+  availableVersion?: string;
+  ownerSettingsRoute?: string;
+  availableActions: SoftwareSourceActionRef[];
+};
+
 export type PackageLocalInstallation = {
   installationId: string;
   kind: "owner_managed" | "uv_tool";
@@ -219,6 +251,10 @@ export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   softwareType?: "application" | "agent" | "capability" | "unknown";
   catalogScope?: "software" | "host_component" | "unknown";
   localInstallations?: PackageLocalInstallation[];
+  installations?: SoftwareInstallationRef[];
+  activeInstallationId?: string;
+  activeInstallationStatus?: SoftwareActivationStatus;
+  installationManagementReason?: string;
   distributionChannel?: "release" | "source" | "unknown";
   releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";

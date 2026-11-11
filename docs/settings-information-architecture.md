@@ -18,22 +18,30 @@ Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 st
 `development_only`、固定源码分发、`0.x` 版本都不能推导成“预览版”。
 软件源的发行包或固定源码版本在详情显示，来源版本不称为“最新版本”。
 
-Package 来自 Framework 目录，原生分发渠道来自软件源 `native_items`；本机基座安装由根 `installed_products` 独立投影，未安装 Homebrew 或尚未检查软件源时也可读取。原生产品按
-`product_id` 去重；同一 App 的 Standard、Full、Nightly 配方在详情列为安装渠道，
-不重复计算软件数。详情采用 owner 的 `product_display_name` 与安装身份，各渠道
-仍保留原配方名、来源版本和 Homebrew 安装记录。
+Package 来自 Framework 目录，原生分发选项来自软件源 `native_items`；本机基座安装由
+根 `installed_products` 独立投影，未安装 Homebrew 时仍可读取。产品按 `product_id`
+去重；Stable/Nightly 是发布轨道，Standard/Full 是安装规格，均不是额外的软件或安装。
+`selected_for_product` 由 Framework 指定当前更新来源，`recommended_for_product` 标明
+发布者默认推荐。Studio 不按名称长度、版本大小或配方顺序选择更新目标；主列表显示
+一个精确可用版本，目标缺失时用“—”，具体原因在详情解释。外部 Codex 插件未公开版本
+目标时，详情明确由 Codex 维护。
 
-软件版本与安装实例分开读取。`installed` 是当前 Package carrier 的安装状态；未发现该 carrier 时只表述“未在此宿主安装”，不推断整台机器不存在此软件。
-`local_installations` 可补充已验证的独立安装或开发接入，保留各自版本、管理者和
-位置引用。开发接入单独计数，不能计成安装版。插件管理操作只作用于当前宿主副本，
-不能卸载或更新由 uv 或软件自身管理的实例。原生软件的 `installed_version` 来自
-实际检测，`homebrew_installed` 与 `homebrew_installed_version` 只代表渠道收据；
-OPL 受管运行时和 App bundle 已存在时，不能因 Brew 无记录而标成未安装。
-原生软件优先展示 owner 提供的 `installed_display_version` 和
-`available_display_version`；原始机器版本、Homebrew 配方版本与渠道收据保留在详情，
-继续用于原有更新与管理判断。只有 owner 明确报告
-`installed_build_kind=local-development` 时标注“开发版”，不从版本大小推断构建类型，
-也不在界面换算版本号。构建 ID 用于详情辨认本机开发构建。
+详情依次展示“当前使用”“本机安装”和“获取其他版本”。`installations` 是实际安装
+投影，每份包含稳定安装身份、版本、发布或开发模式、管理器和真实绝对路径。
+`active_installation_id` 与 `active_installation_status` 决定当前使用的唯一实例；
+未激活、未知和冲突分别显示，不选择最高版本冒充激活状态。OPL 软件中心不会扫描
+源码目录并自动启用开发版。开发实例只提供 owner 声明的检查、激活、停用和解除接入；
+源码更新继续由开发工具负责，解除接入保留源码和数据。
+
+实例动作只能消费 owner 投影，执行前核对精确 `installation_id`、`expected_revision`
+及必需 payload，之后沿既有 App state/action 链路回读。安装选项和已装实例分别显示；
+缺少 Homebrew 收据不能将有效 Framework runtime 或 App bundle 显示为未安装。
+旧版 `local_installations` 只作为兼容读面，不能反推完整路径或激活选择。
+
+原生软件优先显示 owner 提供的 `installed_display_version` 和
+`available_display_version`；机器版本、构建 ID、配方版本和收据放在对应详情，保留
+原更新器的判断。开发类型采用明确 `mode=development` 或
+`installed_build_kind=local-development`，不从版本大小推断。
 
 搜索与状态筛选共用目录；软件源页展示渠道级记录。“更新”页复用当前管理者的
 动作，Framework 的受管安装从详情进入既有更新页。普通刷新按 owner 的
