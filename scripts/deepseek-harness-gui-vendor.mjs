@@ -54,7 +54,9 @@ function applyPatches(directory, manifest, { reverse = false } = {}) {
     const patchPath = path.resolve(root, patch.path);
     if (!patchPath.startsWith(path.join(root, "src/integrations/deepseek-harness/patches/"))) fail("DSH compatibility patch must have a canonical integration owner");
     if (sha256(patchPath) !== patch.sha256) fail(`DSH compatibility patch hash mismatch: ${patch.path}`);
-    const args = ["apply", "--whitespace=error", ...(reverse ? ["--reverse"] : []), patchPath];
+    // The temporary provenance copy has no .gitattributes. Keep canonical LF
+    // bytes even when the host enables core.autocrlf (as Windows runners do).
+    const args = ["-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply", "--whitespace=error", ...(reverse ? ["--reverse"] : []), patchPath];
     const result = spawnSync("git", args, { cwd: directory, encoding: "utf8" });
     if (result.status !== 0) fail(`DSH compatibility patch failed: ${patch.path}: ${result.stderr.trim()}`);
   }
