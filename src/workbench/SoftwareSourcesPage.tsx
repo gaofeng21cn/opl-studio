@@ -36,7 +36,7 @@ function checkedAt(value: string | undefined, locale: WorkbenchSettings["locale"
 }
 
 function nativeUpdateLabel(item: NativeSoftwareItemRef, zh: boolean): string {
-  return ({ available: zh ? "有更新" : "Update available", current: zh ? "与来源版本一致" : "Matches source version", not_installed: zh ? "未由 Homebrew 安装" : "Not installed through Homebrew", unknown: zh ? "更新状态待确认" : "Update status not confirmed" })[item.updateStatus];
+  return ({ available: zh ? "有更新" : "Update available", current: zh ? "与来源版本一致" : "Matches source version", needs_restart: zh ? "需要重启" : "Restart required", not_installed: zh ? "未由 Homebrew 安装" : "Not installed through Homebrew", unknown: zh ? "更新状态待确认" : "Update status not confirmed" })[item.updateStatus];
 }
 
 type NativeSoftwareListProps = {

@@ -307,7 +307,7 @@ function compactNativeSoftwareItem(item) {
   if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
   return {
     ...compactCatalogProvenance(item),
-    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_display_version", "installed_build_kind", "installed_build_id", "installed_source_revision", "available_version", "available_display_version", "update_status", "revision", "installation_id", "location", "mode", "active", "active_installation_id", "active_installation_status", "release_channel", "installation_variant", "recommended_for_product", "selected_for_product", "selection_basis"]),
+    ...selectedFields(item, ["item_id", "product_id", "product_display_name", "name", "display_name", "description", "kind", "homebrew_installed", "homebrew_installed_version", "installation_owner", "installation_kind", "installation_evidence", "owner_settings_route", "installed", "installed_version", "installed_display_version", "installed_build_kind", "installed_build_id", "installed_source_revision", "available_version", "available_display_version", "pending_version", "update_status", "revision", "installation_id", "location", "mode", "active", "active_installation_id", "active_installation_status", "release_channel", "installation_variant", "recommended_for_product", "selected_for_product", "selection_basis"]),
     ...(Array.isArray(item.installations) ? { installations: item.installations.slice(0, 32).map(compactSoftwareInstallation) } : {}),
     display_name_i18n: compactLocalizedText(item.display_name_i18n),
     description_i18n: compactLocalizedText(item.description_i18n),
@@ -321,7 +321,7 @@ function compactSoftwareSources(value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
     const compact = selectedFields(entry, [
       "source_id", "display_name", "source_kind", "source_ref", "visibility", "provider_id", "status",
-      "enabled", "credential_handle_present", "access_refresh_required", "verified_at", "entry_count",
+      "enabled", "credential_handle_present", "access_refresh_required", "catalog_refresh_required", "verified_at", "entry_count",
       "inventory_status", "inventory_refresh_required", "inventory_reason", "inventory_checked_at", "version_authority", "version_basis", "installation_owner"
     ]) ?? {};
     Object.assign(compact, compactCatalogProvenance(entry));

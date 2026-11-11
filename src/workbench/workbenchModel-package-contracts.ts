@@ -193,7 +193,8 @@ export type NativeSoftwareItemRef = CatalogProvenanceRef & {
   installedBuildId?: string;
   availableVersion?: string;
   availableDisplayVersion?: string;
-  updateStatus: "available" | "current" | "not_installed" | "unknown";
+  pendingVersion?: string;
+  updateStatus: "available" | "current" | "needs_restart" | "not_installed" | "unknown";
   revision?: string;
   availableActions: SoftwareSourceActionRef[];
 };

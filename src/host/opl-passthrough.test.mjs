@@ -43,6 +43,9 @@ console.log(JSON.stringify({app_state:{agent_packages:{
     { sources: [source], profile: "fast", check: true, visible: false, checkFails: true },
     { sources: [{ ...source, access_refresh_required: false }], profile: "fast", check: false },
     { sources: [{ ...source, source_kind: "tap", access_refresh_required: false, inventory_refresh_required: true }], profile: "fast", check: true, visible: true },
+    { sources: [{ ...source, source_id: "public-registry:opl", access_refresh_required: false, catalog_refresh_required: true }], profile: "fast", check: true, visible: true },
+    { sources: [{ ...source, source_id: "public-registry:opl", access_refresh_required: false, catalog_refresh_required: true }], profile: "fast", check: true, visible: false, checkFails: true },
+    { sources: [{ ...source, source_id: "public-registry:opl", access_refresh_required: false, catalog_refresh_required: true, available_actions: [{ action_id: "source_check", confirmation_required: true }] }], profile: "fast", check: false },
     { sources: [], profile: "fast", check: false },
     { sources: [{ ...source, available_actions: [{ action_id: "source_check", status: "unavailable" }] }], profile: "fast", check: false },
     { sources: [source], profile: "full", check: false }
@@ -53,7 +56,7 @@ console.log(JSON.stringify({app_state:{agent_packages:{
     const result = await createOplPassthrough({ command, cwd: directory }).readState(scenario.profile);
     const calls = (await readFile(path.join(directory, "calls.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
     const read = ["app", "state", "--profile", scenario.profile, "--json"];
-    assert.deepEqual(calls, scenario.check ? [read, ["sources", "check", "--source-id", source.source_id, "--json"], read] : [read]);
+    assert.deepEqual(calls, scenario.check ? [read, ["sources", "check", "--source-id", scenario.sources[0].source_id, "--json"], read] : [read]);
     const entries = result.app_state.app_state.agent_packages.directory.entries;
     assert.equal(entries.some(entry => entry.package_id === "private-agent"), scenario.visible === true);
     assert.equal(result.readback.exitCode, 0);
@@ -67,13 +70,14 @@ test("fast state preserves software source access metadata and opaque default re
       surface_kind: "opl_software_sources_projection.v1",
       status: "attention_required",
       authority_boundary: { owner: "opl_framework", credential_values_exposed: false, private_value: "omit" },
-      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false, access_refresh_required: false,
+      entries: [{ source_id: "github-packages", display_name: "GitHub Packages", source_kind: "registry", source_ref: "ghcr.io/example/packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true, credential_handle_present: false, access_refresh_required: false, catalog_refresh_required: true,
         available_actions: [{ action_id: "source_configure", label: "Configure", payload_fields: ["source_id", "provider_id", "credential_handle", "enabled"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli", token: "must-omit" }, status: "available" }] }]
     }
   } } });
   const sources = compact.app_state.agent_packages.sources;
   assert.equal(sources.entries[0].source_id, "github-packages");
   assert.equal(sources.entries[0].access_refresh_required, false);
+  assert.equal(sources.entries[0].catalog_refresh_required, true);
   assert.equal(sources.entries[0].available_actions[0].default_payload.credential_handle, "provider:github_packages:gh-cli");
   assert.equal("token" in sources.entries[0].available_actions[0].default_payload, false);
   assert.equal(sources.authority_boundary.private_value, undefined);

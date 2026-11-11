@@ -69,7 +69,8 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
     installedBuildId: asString(item.installed_build_id) ?? undefined,
     availableVersion: asString(item.available_version) ?? undefined,
     availableDisplayVersion: asString(item.available_display_version) ?? undefined,
-    updateStatus: ["available", "current", "not_installed"].includes(String(item.update_status)) ? item.update_status as NativeSoftwareItemRef["updateStatus"] : "unknown",
+    pendingVersion: asString(item.pending_version) ?? undefined,
+    updateStatus: ["available", "current", "needs_restart", "not_installed"].includes(String(item.update_status)) ? item.update_status as NativeSoftwareItemRef["updateStatus"] : "unknown",
     revision: asString(item.revision) ?? undefined,
     availableActions: asRecordArray(item.available_actions).flatMap((action) => {
       if (!["source_install", "source_update", "source_uninstall"].includes(String(action.action_id))) return [];
@@ -219,6 +220,11 @@ export function nativeSoftwareEntries(projection?: SoftwareSourcesProjection) {
   return projection?.entries.filter(source => source.sourceKind === "tap" && source.inventoryStatus === "available").flatMap(source => (source.nativeItems ?? []).map(item => ({ source, item }))) ?? [];
 }
 
+export function nativeUpdateStatusLabel(status: NativeSoftwareItemRef["updateStatus"], locale: "zh" | "en") {
+  return ({ available: ["有可用更新", "Update available"], current: ["与来源版本一致", "Matches source version"],
+    needs_restart: ["需要重启", "Restart required"], not_installed: ["未安装", "Not installed"], unknown: ["更新状态待确认", "Update status not confirmed"] })[status][locale === "zh" ? 0 : 1];
+}
+
 export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
   type Channels = ReturnType<typeof nativeSoftwareEntries>;
   const groups = new Map<string, { channels: Channels; installed?: NativeSoftwareItemRef }>();
@@ -242,10 +248,10 @@ export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
       ...primary?.item, ...installed,
       itemId: primary?.item.itemId ?? installed.itemId,
       name: primary?.item.name ?? installed.name,
-      availableVersion: primary?.item.availableVersion,
-      availableDisplayVersion: primary?.item.availableDisplayVersion,
-      availableActions: primary?.item.availableActions ?? [],
-      revision: primary?.item.revision,
+      availableVersion: installed.availableVersion ?? primary?.item.availableVersion,
+      availableDisplayVersion: installed.availableDisplayVersion ?? (installed.availableVersion ? undefined : primary?.item.availableDisplayVersion),
+      availableActions: installed.availableActions.length ? installed.availableActions : primary?.item.availableActions ?? [],
+      revision: installed.availableActions.length ? installed.revision : primary?.item.revision,
       homebrewInstalled: primary?.item.homebrewInstalled,
       homebrewInstalledVersion: primary?.item.homebrewInstalledVersion,
       releaseChannel: primary?.item.releaseChannel,
@@ -263,7 +269,7 @@ export function nativeSoftwareProducts(projection?: SoftwareSourcesProjection) {
           version: observation.installedVersion ?? "—", displayVersion: observation.installedDisplayVersion,
           mode: observation.installationMode ?? (observation.installedBuildKind === "local-development" || observation.installationKind === "source_link" ? "development" : "installed"),
           manager: observation.installationOwner ?? "unknown", active: observation.active === true,
-          availableVersion: primary?.item.availableDisplayVersion ?? primary?.item.availableVersion,
+          availableVersion: observation.availableDisplayVersion ?? observation.availableVersion ?? primary?.item.availableDisplayVersion ?? primary?.item.availableVersion,
           ownerSettingsRoute: observation.ownerSettingsRoute, availableActions: []
         });
       }
