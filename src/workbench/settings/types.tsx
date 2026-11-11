@@ -63,6 +63,7 @@ export type SettingsPanelProps = {
   workbenchServices?: WorkbenchServicesClient;
   onClose?: () => void;
   onOpenSchedules?: () => void;
+  onOpenSoftwareCenter?: (section?: "applications" | "updates" | "resources" | "sources") => void;
   model: WorkbenchModel;
   managedUpdate: ManagedUpdateProjection | null;
   actionViewModel?: SettingsActionViewModel;

@@ -7,6 +7,9 @@ Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 st
 ## 统一应用管理
 
 一级“应用管理”与主对话并行，分为“软件目录、更新、共享资源、软件源”。
+它管理本机独立软件；云端、移动端和设备端产品只作为部署协助与状态目标。
+设置中的“能力配置”保留原生 Skills、MCP 和连接配置，并提供软件中心跳转。
+旧智能体设置深链与“更新与修复”设置入口同样转入软件中心，不再重复软件清单或生命周期控件。
 目录以独立软件为对象，按 owner 声明的 `software_type` 分为应用、智能体、能力包；
 非标准智能体同样属于智能体，未知类型单独显示“类型待确认”。技术 `package_role`
 只在详情解释，不替代产品类型。`catalog_scope=host_component` 的宿主组件可切换
@@ -16,7 +19,8 @@ Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 st
 列表保留 DSH Plugin Manager 的官方列表、详情、导航与控件；OPL 的描述插槽展示
 正式名称、稳定 ID、用途、本机版本与来源版本。产品成熟度只接受 owner 声明，
 `development_only`、固定源码分发、`0.x` 版本都不能推导成“预览版”。
-软件源的发行包或固定源码版本在详情显示，来源版本不称为“最新版本”。
+正式 Package 使用不可变 OCI 制品；原生应用与 CLI 复用正式安装器。
+源码 checkout 仅作为用户显式接入的开发实例，不是普通安装、修复或更新来源。
 
 Package 来自 Framework 目录，原生分发选项来自软件源 `native_items`；本机基座安装由
 根 `installed_products` 独立投影，未安装 Homebrew 时仍可读取。产品按 `product_id`
@@ -74,6 +78,17 @@ manifest URL 与 trust tier，复用原有安装通道。
 关闭后安装、原生平台启用状态、Codex Skills 和 MCP 能力保持原状。目录始终
 保留已关闭的包，可筛选并重新启用。已有页面在贡献被撤销时退出到聊天。
 
+## 软件图标与运行组件
+
+软件图标来自 Framework 的 `icon_url`，由 owner 依据发布载荷和精确提交生成。
+公开资产仅接受不可变 GitHub raw URL；私有资产不尝试匿名请求。缺图、离线或加载失败
+使用稳定的名称首字母、类型图标和色调，不维护按 Package ID 编写的图标清单。
+
+“运行组件”接收 `management_scope=local_component` 与既有
+`managed_update.components[].current.dependency_catalog.dependencies`。组件详情保留
+版本、位置、所属产品和维护方，维护入口复用软件中心的更新页。不扫描全机工具目录，
+也不将未被 owner 声明的 Python、uv 等自动纳入。Host 压缩层只传递必要字段。
+
 ## 共用资源的配置
 
 “共享资源”集中提供知识与记忆、账号与连接、模型能力、基础依赖四组。知识来源
@@ -96,9 +111,9 @@ Framework action 与版本校验，成功后重新读取。正文与资料位置
 | 用户任务 | 位置 | 数据与动作归口 |
 | --- | --- | --- |
 | 登录 Gateway、切换账户或 API Key | 账户与访问 | App settings read model 与 action |
-| 查看包安装、版本、升级或 App 开关 | 扩展与应用的包详情 | Framework Package 投影与 action |
+| 查看包安装、版本、升级或 App 开关 | 软件中心的软件详情 | Framework Package 投影与 action |
 | 查看包服务状态、绑定微信或远端设备 | 同一包的展开详情 | 包声明的 `settings.section` typed contribution |
-| 查看 Skills、原生插件及连接能力 | 扩展与应用内的能力目录 | Codex App Server capability catalog |
+| 查看 Skills、原生插件及连接能力 | 软件中心的其他来源；能力设置保留配置 | Codex App Server capability catalog |
 | 查看任务服务、执行进程和定时服务 | 服务状态 | Framework runtime projection |
 | 查看磁盘用量及清理动作 | 数据与存储 | Framework storage lifecycle |
 

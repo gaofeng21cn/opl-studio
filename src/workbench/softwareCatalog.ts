@@ -8,12 +8,12 @@ export type SoftwareCatalogState = "not_installed" | "installed" | "update_avail
 
 /** Maintenance origin is supplied by Framework; technical package roles never select the source. */
 export function packageCatalogScope(item: AgentPackageLifecycleRef): SoftwareCatalogScope {
-  if (item.catalogScope === "host_component") return "components";
+  if (item.managementScope === "local_component" || item.catalogScope === "host_component") return "components";
   return item.catalogOrigin === "opl" ? "opl" : "external";
 }
 
 export function softwareCatalogPackages(model: Pick<WorkbenchModel, "packageLifecycle">, scope: SoftwareCatalogScope) {
-  return model.packageLifecycle.filter(item => !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && packageCatalogScope(item) === scope);
+  return model.packageLifecycle.filter(item => item.managementScope !== "deployment_target" && !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && packageCatalogScope(item) === scope);
 }
 
 export function softwareCatalogNativeProducts(model: Pick<WorkbenchModel, "softwareSources">, scope: SoftwareCatalogScope) {
@@ -47,7 +47,7 @@ export function catalogTypeLabel(item: Pick<AgentPackageLifecycleRef, "softwareT
 }
 
 export function catalogManagerLabel(manager: string | undefined, locale: "zh" | "en") {
-  return ({ codex_plugin_manager: "Codex", opl_packages: "OPL", homebrew: "Homebrew", opl_framework: "OPL Framework", uv: "uv", application: locale === "zh" ? "应用自身" : "Application", package_owner: locale === "zh" ? "软件自身" : "Software installer" })[manager ?? ""] ?? (locale === "zh" ? "管理器待确认" : "Manager not confirmed");
+  return ({ codex_plugin_manager: "Codex", opl_packages: "OPL", homebrew: "Homebrew", homebrew_formula: "Homebrew", opl_managed: "OPL Framework", opl_managed_runtime_generation: "OPL Framework", global_path: locale === "zh" ? "系统环境" : "System environment", user_managed: locale === "zh" ? "用户管理" : "User managed", opl_framework: "OPL Framework", uv: "uv", application: locale === "zh" ? "应用自身" : "Application", package_owner: locale === "zh" ? "软件自身" : "Software installer" })[manager ?? ""] ?? (locale === "zh" ? "管理器待确认" : "Manager not confirmed");
 }
 
 export function packageInstallationManagers(item: AgentPackageLifecycleRef): string[] {

@@ -10,7 +10,7 @@ export const navigationCopy = {
       account_models: "账户与模型",
       connections_deployment: "连接与部署",
       workspace: "工作区",
-      agents_capabilities: "扩展与应用",
+      agents_capabilities: "能力与指令",
       runtime_maintenance: "运行与维护",
       preferences: "偏好"
     },
@@ -22,7 +22,7 @@ export const navigationCopy = {
       workspace: "工作目录",
       storage: "数据与存储",
       agents: "智能体",
-      capabilities: "扩展与应用",
+      capabilities: "能力配置",
       instructions: "指令",
       services: "服务状态",
       updates: "更新与修复",
@@ -37,7 +37,7 @@ export const navigationCopy = {
       account_models: "Account & Models",
       connections_deployment: "Connections & Deployment",
       workspace: "Workspace",
-      agents_capabilities: "Extensions & Apps",
+      agents_capabilities: "Capabilities & Instructions",
       runtime_maintenance: "Runtime & Maintenance",
       preferences: "Preferences"
     },
@@ -49,7 +49,7 @@ export const navigationCopy = {
       workspace: "Working Directory",
       storage: "Data & Storage",
       agents: "Agents",
-      capabilities: "Extensions & Apps",
+      capabilities: "Capability settings",
       instructions: "Instructions",
       services: "Service Status",
       updates: "Updates & Repair",
@@ -89,8 +89,7 @@ export function navigationGroups(locale: WorkbenchSettings["locale"]): Navigatio
       id: "agents_capabilities",
       label: copy.groups.agents_capabilities,
       destinations: [
-        { id: "capabilities", label: locale === "zh" ? "全部扩展" : "All extensions" },
-        { id: "agents", label: copy.destinations.agents },
+        { id: "capabilities", label: copy.destinations.capabilities },
         { id: "instructions", label: locale === "zh" ? "指令与上下文" : "Instructions & Context" }
       ]
     },
@@ -181,12 +180,12 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Workspace · data & storage", description: "Review local storage and choose what to clean up or keep." }
   },
   agents: {
-    zh: { eyebrow: "智能体与能力", description: "查看已安装和可添加的智能体与工作流，管理更新、修复和常用入口。" },
-    en: { eyebrow: "Agents & capabilities", description: "Manage agents, workflows, updates, repairs, and favorite entry points." }
+    zh: { eyebrow: "智能体与能力", description: "在软件中心管理智能体、版本和常用入口。" },
+    en: { eyebrow: "Agents & capabilities", description: "Manage agents, versions and shortcuts in Software Center." }
   },
   capabilities: {
-    zh: { eyebrow: "智能体与能力", description: "安装和管理扩展，选择在 OPL App 中使用的应用。" },
-    en: { eyebrow: "Agents & capabilities", description: "Install and manage extensions, and choose the apps you use in OPL App." }
+    zh: { eyebrow: "智能体与能力", description: "配置技能、MCP 与连接；软件安装和更新集中在软件中心。" },
+    en: { eyebrow: "Agents & capabilities", description: "Configure skills, MCP and connections; manage installation and updates in Software Center." }
   },
   instructions: {
     zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "设置工作习惯与补充说明，管理新会话使用的上下文。" },
