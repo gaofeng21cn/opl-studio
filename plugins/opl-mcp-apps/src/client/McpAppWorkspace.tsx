@@ -34,7 +34,7 @@ function missingRequiredInput(app: McpAppDescriptor | undefined, inputs: Record<
 function readinessLabel(app: McpAppDescriptor, zh: boolean): string {
   if (app.readiness === "replay_only") return zh ? "仅可从会话结果打开" : "Open from a conversation result";
   if (app.readiness === "input_required") return zh ? "需要输入" : "Input required";
-  return zh ? "可启动" : "Ready to start";
+  return zh ? "可打开" : "Ready to open";
 }
 
 export function McpAppFrame({ session, bridge: host, locale, onContext, onMessage }: McpAppProps & { session: McpAppSession }) {
@@ -55,7 +55,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     let disposed = false;
     const requireActive = () => { if (disposed) throw new Error("MCP App is closed"); };
     const binding = { id: session.id, threadId: session.threadId };
-    const initializationTimeout = setTimeout(() => setError(handlers.current.locale === "zh" ? "应用未完成初始化，可关闭后重新打开或使用模块工作台。" : "App initialization timed out; close and reopen it or use the module workbench."), 20_000);
+    const initializationTimeout = setTimeout(() => setError(handlers.current.locale === "zh" ? "界面加载超时，请关闭后重新打开。" : "The UI took too long to load. Close it and open it again."), 20_000);
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const theme = () => resolvedMcpTheme(getComputedStyle(document.documentElement).colorScheme, dark.matches);
     const appBridge = new AppBridge(null, { name: "OPL App", version: "1.0.0" }, {
@@ -209,8 +209,8 @@ export function McpAppWorkspace(props: McpAppProps) {
   const currentSession = session && current && session.miniAppId === descriptorId(current) ? session : null;
   const requiredInputMissing = missingRequiredInput(current, inputs);
   const sessionLabel = (app: McpAppDescriptor) => session?.miniAppId === descriptorId(app)
-    ? (zh ? "已启动" : "Started")
-    : busy && descriptorId(app) === selected ? (zh ? "处理中…" : "Opening…") : (zh ? "未启动" : "Not started");
+    ? (zh ? "界面已打开" : "UI open")
+    : busy && descriptorId(app) === selected ? (zh ? "处理中…" : "Opening…") : (zh ? "界面未打开" : "UI closed");
   function select(app: McpAppDescriptor) {
     if (descriptorId(app) === selected) return;
     setSelected(descriptorId(app)); setInputs(initialInputs(app)); transition();
@@ -228,10 +228,10 @@ export function McpAppWorkspace(props: McpAppProps) {
   }
   return <section className="opl-mcp-app-workspace" aria-label={zh ? "应用" : "Apps"}>
     <header className="opl-mcp-app-header">
-      <div><h3>{zh ? "当前会话的应用" : "Apps in this conversation"}</h3><p>{zh ? "选择应用，启动后在这里使用。" : "Select an app and start it here."}</p></div>
+      <div><h3>{zh ? "MiniApp 工作台" : "MiniApp workspace"}</h3><p>{zh ? "选择应用并打开界面；安装、更新和启停请到应用管理。" : "Select an app and open its UI. Install, update, and enable apps in app management."}</p></div>
       <div className="opl-workspace-commandbar">
         {threadId ? <button type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</button> : null}
-        {props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "管理应用" : "Manage apps"}</button> : null}
+        {props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "应用管理" : "App management"}</button> : null}
       </div>
     </header>
     {!threadId ? <div className="opl-mcp-app-empty"><strong>{zh ? "先打开一个对话" : "Open a conversation first"}</strong><p>{zh ? "应用会使用该对话已有的连接和权限。" : "Apps use that conversation’s connections and permissions."}</p></div> : null}
@@ -253,11 +253,12 @@ export function McpAppWorkspace(props: McpAppProps) {
       <div className="opl-mcp-app-surface" aria-busy={busy}>
         <header className="opl-mcp-app-surface-header"><div><h3>{current.title}</h3>{!currentSession && current.description ? <p>{current.description}</p> : null}</div><span role="status" data-started={Boolean(currentSession)}>{sessionLabel(current)}</span></header>
         <div className="opl-workspace-commandbar">
-          {currentSession ? <button type="button" onClick={() => transition()}>{zh ? "关闭应用" : "Close app"}</button> : <button className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重试启动" : "Retry start") : (zh ? "启动应用" : "Start app")}</button>}
+          {currentSession ? <button type="button" onClick={() => transition()}>{zh ? "关闭界面" : "Close UI"}</button> : <button className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</button>}
           {!currentSession && !busy ? <span className="opl-mcp-app-notice">{readinessLabel(current, zh)}</span> : null}
         </div>
-        {error ? <div className="opl-mcp-app-error"><p role="alert">{zh ? "应用未能启动或关闭，请重试，也可以选择其他应用。" : "The app could not start or close. Retry or select another app."}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{error}</p></details></div> : null}
-        {!currentSession && current.readOnly && Object.keys(current.inputSchema.properties ?? {}).length ? <details className="opl-mcp-app-options" open={requiredInputMissing}><summary>{zh ? "启动选项" : "Start options"}</summary>{Object.entries(current.inputSchema.properties ?? {}).map(([name, field]) => <label key={name}><span>{field.title || name}{current.inputSchema.required?.includes(name) ? (zh ? "（必填）" : " (required)") : ""}</span><input required={current.inputSchema.required?.includes(name)} disabled={busy} value={inputs[name] ?? ""} placeholder={field.description} onChange={event => setInputs(values => ({ ...values, [name]: event.target.value }))}/></label>)}</details> : null}
+        <p className="opl-mcp-app-notice">{zh ? "关闭或切换仅收起界面，后台任务继续运行。" : "Closing or switching only closes the UI. Background tasks continue."}</p>
+        {error ? <div className="opl-mcp-app-error"><p role="alert">{zh ? "界面未能打开或关闭，请重试，也可以选择其他应用。" : "The UI could not open or close. Retry or select another app."}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{error}</p></details></div> : null}
+        {!currentSession && current.readOnly && Object.keys(current.inputSchema.properties ?? {}).length ? <details className="opl-mcp-app-options" open={requiredInputMissing}><summary>{zh ? "打开选项" : "Open options"}</summary>{Object.entries(current.inputSchema.properties ?? {}).map(([name, field]) => <label key={name}><span>{field.title || name}{current.inputSchema.required?.includes(name) ? (zh ? "（必填）" : " (required)") : ""}</span><input required={current.inputSchema.required?.includes(name)} disabled={busy} value={inputs[name] ?? ""} placeholder={field.description} onChange={event => setInputs(values => ({ ...values, [name]: event.target.value }))}/></label>)}</details> : null}
         {!currentSession && !current.readOnly ? <p className="opl-mcp-app-notice">{zh ? "从会话中的已完成工具结果打开这个应用。" : "Open this app from a completed tool result in the conversation."}</p> : null}
         {!currentSession && requiredInputMissing ? <p className="opl-mcp-app-notice" role="status">{zh ? "请先填写必填项。" : "Complete the required fields first."}</p> : null}
         {currentSession ? <McpAppFrame key={currentSession.id} {...props} session={currentSession}/> : null}
