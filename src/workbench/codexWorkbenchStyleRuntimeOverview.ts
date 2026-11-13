@@ -5,6 +5,13 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     line-height: var(--opl-leading-normal);
   }
 
+  .runtime-overview-intro {
+    margin: 8px 0 0;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-body);
+    line-height: var(--opl-leading-normal);
+  }
+
   .opl-recent-session-list > * + * {
     margin-top: 2px;
   }

@@ -2,7 +2,7 @@ async (page) => {
   const assert = (condition, message) => { if (!condition) throw new Error(message); };
   const summary = () => page.locator('.runtime-list-summary').innerText();
   await page.reload();
-  await page.getByRole('heading', { name: '项目运行总览', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '运行状态', exact: true }).waitFor();
   await page.getByRole('button', { name: '打开维护', exact: true }).click();
   assert(await page.evaluate(() => window.runtimeEvidence.maintenance) === 1, 'maintenance route callback');
   await page.getByRole('button', { name: '刷新运行状态', exact: true }).click();
@@ -16,13 +16,13 @@ async (page) => {
   assert(await page.getByRole('combobox', { name: '项目', exact: true }).inputValue() === 'all', 'project resets on agent change');
   assert((await summary()).includes('1 项工作 · 运行中 1 · 需关注 0'), 'no infrastructure in attention count');
   assert(await page.getByRole('button', { name: '归档库 (0)', exact: true }).count() === 1, 'archive count respects agent scope');
-  await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('attention');
+  await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('awaiting_user_decision');
   await page.getByText('没有符合此状态的工作', { exact: true }).waitFor();
   await page.getByRole('button', { name: '清除状态筛选', exact: true }).click();
   assert(await page.locator('.runtime-work-row').count() === 1, 'clear filter restores scoped list');
   await page.getByRole('combobox', { name: '智能体', exact: true }).selectOption('all');
   await page.getByRole('button', { name: '归档库 (1)', exact: true }).click();
-  await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('completed');
+  await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('delivered_auto_paused');
   assert(await page.locator('.runtime-work-row').count() === 1, 'delivered auto-paused item remains under delivered');
   await page.getByRole('combobox', { name: '状态', exact: true }).selectOption('all');
   await page.getByRole('button', { name: '返回当前任务', exact: true }).click();
@@ -30,7 +30,7 @@ async (page) => {
   const layouts = [];
   for (const locale of ['zh', 'en']) {
     await page.evaluate(value => window.setRuntimeLocale(value), locale);
-    await page.getByRole('heading', { name: locale === 'zh' ? '项目运行总览' : 'Project runtime overview', exact: true }).waitFor();
+    await page.getByRole('heading', { name: locale === 'zh' ? '运行状态' : 'Runtime status', exact: true }).waitFor();
     for (const dark of [false, true]) {
       await page.evaluate(value => document.body.toggleAttribute('data-ds-dark-theme', value), dark);
       for (const width of [375, 768, 1024, 1440]) {
@@ -50,7 +50,7 @@ async (page) => {
     }
   }
   await page.evaluate(() => { window.setRuntimeLocale('zh'); document.body.removeAttribute('data-ds-dark-theme'); });
-  await page.getByRole('heading', { name: '项目运行总览', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '运行状态', exact: true }).waitFor();
   await page.setViewportSize({ width: 375, height: 900 });
   await page.getByRole('button', { name: '当前阶段: 数据分析', exact: true }).first().click();
   await page.getByRole('button', { name: '关闭阶段进度', exact: true }).waitFor();

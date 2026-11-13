@@ -35,20 +35,36 @@ type RuntimeOverviewPageProps = {
   mcpApps?: Omit<McpAppProps, "locale">;
 };
 
-type StatusFilter = "all" | "running" | "attention" | "paused" | "completed" | "stopped";
+type StatusFilter =
+  | "all"
+  | "automatically_advancing"
+  | "awaiting_user_decision"
+  | "system_attention"
+  | "delivered_auto_paused"
+  | "paused"
+  | "stopped"
+  | "sync_pending";
 
 type ActiveDomainDetailRoute = {
   itemId: string;
   viewId?: string;
 };
 
-function statusCategory(item: WorkItemRuntimeItem): Exclude<StatusFilter, "all"> | "other" {
-  if (item.executionState === "running" || item.status === "running") return "running";
-  if (item.attentionKind !== "none") return "attention";
-  if (/completed|delivered|success/.test(item.status)) return "completed";
-  if (/paused/.test(item.status)) return "paused";
-  if (/stopped|cancelled|failed/.test(item.status)) return "stopped";
-  return "other";
+function statusTone(status: string): "running" | "attention" | "paused" | "completed" | "stopped" | "other" {
+  switch (status) {
+    case "automatically_advancing": return "running";
+    case "awaiting_user_decision":
+    case "system_attention":
+    case "sync_pending": return "attention";
+    case "delivered_auto_paused": return "completed";
+    case "paused": return "paused";
+    case "stopped": return "stopped";
+    default: return "other";
+  }
+}
+
+function isAttentionStatus(status: string): boolean {
+  return ["awaiting_user_decision", "system_attention", "sync_pending"].includes(status);
 }
 
 function formatTimestamp(value: string | undefined, locale: "zh" | "en"): string {
@@ -106,7 +122,8 @@ export function RuntimeOverviewPage({
   const [openStagesFor, setOpenStagesFor] = useState<string | null>(null);
   const [activeDomainDetailRoute, setActiveDomainDetailRoute] = useState<ActiveDomainDetailRoute | null>(null);
   const copy = locale === "zh" ? {
-    title: "项目运行总览",
+    title: "运行状态",
+    intro: "查看所有智能体的任务；选择一项进入任务工作台。",
     scope: "查看范围",
     agent: "智能体",
     allAgents: "全部智能体",
@@ -127,6 +144,11 @@ export function RuntimeOverviewPage({
     cachedService: "上次服务检查",
     running: "运行中",
     attention: "需关注",
+    automaticallyAdvancing: "自动推进中",
+    awaitingUserDecision: "等待你决定",
+    systemAttention: "系统处理中",
+    deliveredAutoPaused: "已交付自动暂停",
+    syncPending: "状态待同步",
     tasks: "任务",
     workItems: "项工作",
     all: "全部",
@@ -153,7 +175,8 @@ export function RuntimeOverviewPage({
     cached: "显示上次读取的状态",
     stale: "最新读取失败，保留上次状态"
   } : {
-    title: "Project runtime overview",
+    title: "Runtime status",
+    intro: "Review work from every Agent; select an item to open its task workbench.",
     scope: "Scope",
     agent: "Agent",
     allAgents: "All Agents",
@@ -174,6 +197,11 @@ export function RuntimeOverviewPage({
     cachedService: "Last service check",
     running: "Running",
     attention: "Needs attention",
+    automaticallyAdvancing: "Automatically advancing",
+    awaitingUserDecision: "Waiting for your decision",
+    systemAttention: "System attention",
+    deliveredAutoPaused: "Delivered and auto-paused",
+    syncPending: "Sync pending",
     tasks: "Tasks",
     workItems: "work items",
     all: "All",
@@ -208,9 +236,9 @@ export function RuntimeOverviewPage({
     && (projectId === "all" || item.projectId === projectId)
   )), [agentId, projectId, projection?.items]);
   const libraryItems = scopedItems.filter((item) => item.archived === showArchived);
-  const items = libraryItems.filter((item) => status === "all" || (status === "attention" ? item.attentionKind !== "none" : statusCategory(item) === status));
-  const runningCount = libraryItems.filter((item) => statusCategory(item) === "running").length;
-  const attentionCount = libraryItems.filter((item) => item.attentionKind !== "none").length;
+  const items = libraryItems.filter((item) => status === "all" || item.status === status);
+  const runningCount = libraryItems.filter((item) => item.status === "automatically_advancing").length;
+  const attentionCount = libraryItems.filter((item) => isAttentionStatus(item.status)).length;
   const archivedCount = scopedItems.filter((item) => item.archived).length;
   const activeDomainDetailItem = useMemo(() => {
     if (!activeDomainDetailRoute) return undefined;
@@ -253,7 +281,7 @@ export function RuntimeOverviewPage({
               <ArrowLeft aria-hidden="true" size={16} />
             </button>
             <div className="runtime-domain-view-title">
-              <span>{activeDomainDetailItem?.projectDisplayName ?? copy.title}</span>
+              <span>{copy.title} / {activeDomainDetailItem?.projectDisplayName ?? copy.title}</span>
               <h1 id="runtime-domain-view-title">{activeDomainDetailRoute.viewId ? (activeDomainDetailView?.title ?? activeDomainDetailRoute.viewId) : (locale === "zh" ? "任务工作台" : "Task workbench")}</h1>
             </div>
           </div>
@@ -291,6 +319,7 @@ export function RuntimeOverviewPage({
           <span>{stateStatus === "loading" ? copy.loading : (locale === "zh" ? "刷新" : "Refresh")}</span>
         </button>
       </header>
+      <p className="runtime-overview-intro">{copy.intro}</p>
       <p className="runtime-snapshot-note" role="status">
         {snapshotMessage ?? (projection ? copy.readback : stateStatus === "loading" ? copy.loading : copy.noData)}
         {(snapshotCachedAt ?? projection?.generatedAt) ? <> · {copy.loaded} <time dateTime={snapshotCachedAt ?? projection?.generatedAt}>{formatTimestamp(snapshotCachedAt ?? projection?.generatedAt, locale)}</time></> : null}
@@ -335,11 +364,13 @@ export function RuntimeOverviewPage({
         <div className="runtime-list-controls">
           <select aria-label={locale === "zh" ? "状态" : "Status"} value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
             <option value="all">{copy.all}</option>
-            <option value="running">{copy.running}</option>
-            <option value="attention">{copy.attention}</option>
+            <option value="automatically_advancing">{copy.automaticallyAdvancing}</option>
+            <option value="awaiting_user_decision">{copy.awaitingUserDecision}</option>
+            <option value="system_attention">{copy.systemAttention}</option>
+            <option value="delivered_auto_paused">{copy.deliveredAutoPaused}</option>
             <option value="paused">{copy.paused}</option>
-            <option value="completed">{copy.completed}</option>
             <option value="stopped">{copy.stopped}</option>
+            <option value="sync_pending">{copy.syncPending}</option>
           </select>
           <button type="button" className="runtime-archive-button" aria-pressed={showArchived} onClick={() => { setShowArchived((value) => !value); setOpenStagesFor(null); }}>
             <Archive aria-hidden="true" size={15} />
@@ -366,7 +397,7 @@ export function RuntimeOverviewPage({
       {threadError && <p role="alert">{threadError}</p>}
       <div className="runtime-work-list" aria-live="polite">
         {items.map((item) => {
-          const category = statusCategory(item);
+          const category = statusTone(item.status);
           const stageLabel = item.currentStageId
             ? localizedStageName(item, item.currentStageId, locale)
             : item.currentStageName ?? copy.noStage;
