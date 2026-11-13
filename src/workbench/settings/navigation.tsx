@@ -21,7 +21,7 @@ export const navigationCopy = {
       resources: "共享资源与网页访问",
       workspace: "工作目录",
       storage: "数据与存储",
-      agents: "智能体",
+      agents: "软件中心",
       capabilities: "能力配置",
       instructions: "指令",
       services: "服务状态",
@@ -48,7 +48,7 @@ export const navigationCopy = {
       resources: "Shared resources & web access",
       workspace: "Working Directory",
       storage: "Data & Storage",
-      agents: "Agents",
+      agents: "Software Center",
       capabilities: "Capability settings",
       instructions: "Instructions",
       services: "Service Status",
@@ -168,8 +168,8 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Account & models", description: "Choose the model source and reasoning effort. Auto follows the OPL model policy and shows the effective result." }
   },
   resources: {
-    zh: { eyebrow: "连接与部署", description: "连接外部资源和消息通道，管理访问方式。" },
-    en: { eyebrow: "Connections & deployment", description: "Connect external resources and messaging channels, and manage access." }
+    zh: { eyebrow: "连接与部署", description: "打开共享资源，或配置独立网页端的访问方式。" },
+    en: { eyebrow: "Connections & deployment", description: "Open shared resources or configure access to a separate WebUI deployment." }
   },
   workspace: {
     zh: { eyebrow: "工作区", description: "选择工作目录，确定项目文件的保存位置。" },

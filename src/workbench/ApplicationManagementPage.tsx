@@ -65,7 +65,10 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
   const navigate = (next: ApplicationManagementTab) => { setTab(next); onTabChange?.(next); };
   const configureSoftware = (packageId: string) => { setPendingPackageId(packageId); navigate("resources"); };
   const runAction = (request: SettingsActionRequest) => {
-    if (typeof request.payload.package_id === "string" && /install|repair/.test(request.actionId)) setPendingPackageId(request.payload.package_id);
+    const operation = request.payload.operation;
+    const preparing = operation === "install" || operation === "repair"
+      || operation === undefined && /(?:^|_)(?:install|repair)$/.test(request.actionId);
+    if (typeof request.payload.package_id === "string" && preparing) setPendingPackageId(request.payload.package_id);
     onAction(request);
   };
   const issues = softwareAttentionItems(model, settings.locale);
