@@ -173,6 +173,8 @@ try {
     assert.equal(host.views.size,1);
     await run(`async page => { await page.getByRole('button',{name:'Back to previous app',exact:true}).click(); await page.frameLocator('iframe').locator('#title').filter({hasText:'审阅修改'}).waitFor(); await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); }`);
     assert.equal(host.views.size,0);
+    await run(`async page => { await page.getByLabel('Current app',{exact:true}).selectOption('mcp:dedicated:ui://preview/dedicated.html'); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#navigation-target').filter({hasText:'{}'}).waitFor(); await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); }`);
+    assert.equal(host.views.size,0);
     const errors=JSON.parse(await cli('console','error')).result;
     assert.equal(errors.split('\n').filter(line=>line.startsWith('[ERROR]')).length,0,errors);
     const evidence={status:'framework_mcp_apps_browser_passed',host:'Studio source McpAppWorkspace + McpAppHost + official ext-apps',owner:'Framework shared renderer with synthetic read-only owner data',view_types:framework.kinds,view_count:framework.kinds.length,surface_count:1,narrow_and_dark:'passed',source:'passed',browser:'passed',installed:'not_run',release:'not_run',external_mutations:0};

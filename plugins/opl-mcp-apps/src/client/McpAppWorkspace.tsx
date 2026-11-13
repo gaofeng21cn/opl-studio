@@ -174,7 +174,7 @@ export function McpAppWorkspace(props: McpAppProps) {
     setBusy(true); setError(""); setSession(null);
     pending.current = pending.current.catch(() => {}).then(async () => {
       await release();
-      if (!request || ticket !== generation.current) { if (!request && ticket === generation.current && current) setInputs(inputsFor(current)); return; }
+      if (!request || ticket !== generation.current) return;
       const view = await bridge.openMcpApp(request);
       active.current = { view, owner: bridge };
       if (ticket !== generation.current) { await release(); return; }
@@ -275,7 +275,7 @@ export function McpAppWorkspace(props: McpAppProps) {
         <header className="opl-mcp-app-surface-header"><div><h3>{current.title}</h3>{!currentSession && current.description ? <p>{current.description}</p> : null}</div><span role="status" data-started={Boolean(currentSession)}>{sessionLabel(current)}</span></header>
         <div className="opl-workspace-commandbar">
           {returnTo ? <button type="button" disabled={busy} onClick={() => { const target = returnTo; setReturnTo(null); transition(target); }}>{zh ? "返回上一界面" : "Back to previous app"}</button> : null}
-          {currentSession ? <button type="button" onClick={() => transition()}>{zh ? "关闭界面" : "Close UI"}</button> : <button className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</button>}
+          {currentSession ? <button type="button" onClick={() => { setInputs(inputsFor(current)); transition(); }}>{zh ? "关闭界面" : "Close UI"}</button> : <button className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</button>}
           {!currentSession && !busy ? <span className="opl-mcp-app-notice">{readinessLabel(current, zh)}</span> : null}
         </div>
         <p className="opl-mcp-app-notice">{zh ? "关闭或切换仅收起界面，后台任务继续运行。" : "Closing or switching only closes the UI. Background tasks continue."}</p>

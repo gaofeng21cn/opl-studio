@@ -38,7 +38,10 @@ export async function frameworkFixture(frameworkRoot, outputRoot) {
       if (method === 'mcpServer/resource/read') return { contents: [{ uri: params.uri, mimeType: MCP_APP_MIME, text: params.server === 'dedicated' ? targetHtml : html }] };
       if (method === 'mcpServer/tool/call' && params.tool === 'open_opl_apps') return result({ opl_mcp_app_catalog: { views, focus: params.arguments } });
       if (method === 'mcpServer/tool/call' && params.tool === 'opl_app_contribution_read') return result({ result: owner(params.arguments.ref.split('#')[1]) });
-      if (method === 'mcpServer/tool/call' && params.tool === 'open_dedicated') return result(params.arguments);
+      if (method === 'mcpServer/tool/call' && params.tool === 'open_dedicated') {
+        assert.ok(Object.keys(params.arguments ?? {}).every(key => key in targetTool.inputSchema.properties), 'Another app leaked its navigation inputs');
+        return result(params.arguments);
+      }
       throw new Error('Unexpected shared renderer request: ' + method);
     },
   } };
