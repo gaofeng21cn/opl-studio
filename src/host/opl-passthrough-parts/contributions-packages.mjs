@@ -184,7 +184,7 @@ function compactUiContributions(value) {
 function compactPackageActionPayload(value) {
   return selectedFields(value, [
     "package_id", "manifest_url", "registry_url", "trust_tier", "source_kind",
-    "exposure_action", "shortcut_id", "visible", "sort_order", "enabled", "installation_id", "expected_revision", "operation", "version"
+    "exposure_action", "shortcut_id", "visible", "sort_order", "enabled", "installation_id", "expected_revision", "operation", "version", "profile"
   ]);
 }
 
@@ -299,9 +299,10 @@ function compactPackageRows(value, limit = 64) {
 
 function compactSoftwareSourceAction(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"]);
-  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"]);
+  const defaultPayload = selectedFields(value.default_payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version", "profile"]);
+  const payload = selectedFields(value.payload, ["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version", "profile"]);
   return {
+    label_i18n: compactLocalizedText(value.label_i18n),
     ...selectedFields(value, [
       "action_id", "label", "semantic", "delegated_surface", "payload_fields", "required_payload_fields", "mutates", "dry_run_supported",
       "confirmation_required", "danger_level", "impact", "follow_up_action_ids", "verify_action_id", "status", "reason"

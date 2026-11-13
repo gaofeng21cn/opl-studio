@@ -5,6 +5,8 @@ import { activeSoftwareInstallation, catalogManagerLabel, softwareActivationLabe
 import { nativeAvailableDisplayVersion, nativeSoftwareProducts, softwareSourceActionLabel } from "./softwareSources";
 
 export function installationActionLabel(action: SoftwareSourceActionRef, locale: "zh" | "en") {
+  if (action.labelI18n?.[locale]) return action.labelI18n[locale]!;
+  if (action.payload.profile && action.label) return action.label;
   const operation = String(action.payload.operation ?? action.actionId);
   const names: Record<string, [string, string]> = {
     install: ["安装发布版", "Install release"],
@@ -72,7 +74,7 @@ export function SoftwareInstallations({ installations, activeId, activationStatu
   return <section className="opl-dsh-owner-section" data-testid="opl-software-installations">
     <h4>{zh ? "本机安装" : "Installations on this device"}</h4>
     <p>{zh ? "OPL 当前使用下方选定的安装。其他安装可以保留并分别管理。" : "OPL uses the selected installation below. Keep and manage other installations separately."}</p>
-    {installActions.length ? <div className="opl-software-installation-actions">{installActions.map(action => <Button key={`${action.actionId}:${String(action.payload.version)}`} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${String(action.payload.package_id)}:${action.actionId}:install`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${String(action.payload.version)}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)} · {String(action.payload.version)}</Button>)}</div> : null}
+    {installActions.length ? <div className="opl-software-installation-actions">{installActions.map(action => <Button key={`${action.actionId}:${String(action.payload.profile ?? 'default')}:${String(action.payload.version)}`} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${String(action.payload.package_id)}:${action.actionId}:install:${String(action.payload.profile ?? 'default')}`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${String(action.payload.version)}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)} · {String(action.payload.version)}</Button>)}</div> : null}
     {!installations.length ? <p>{zh ? "本机没有此软件的安装记录。" : "No installation was found on this device."}</p> : null}
     {active ? renderInstallation(active) : null}
     {installations.some(item => item !== active) ? <details open={!active} className="opl-resource-details"><summary>{zh ? "其他安装与管理" : "Other installations and management"} · {installations.filter(item => item !== active).length}</summary>{installations.filter(item => item !== active).map(renderInstallation)}</details> : null}

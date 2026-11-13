@@ -1169,3 +1169,31 @@ test("first installation dispatches the owner version and revision without inven
     assert.equal((calls[0] as { confirmationRequired: boolean }).confirmationRequired, true);
   });
 });
+
+
+test("offline media profile survives the Host bridge and dispatches from the existing product", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { compactPackageRows } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { deriveWorkbenchModelFromState } = await import("../../src/workbench/workbenchModel.ts");
+  const { SoftwareInstallations } = await import("../../src/workbench/SoftwareInstallations.tsx");
+  const payload = { package_id: "fixture-media", expected_revision: "catalog-r3", operation: "install", version: "1.2.3", profile: "offline" };
+  const entries = compactPackageRows([{
+    package_id: "fixture-media", catalog_origin: "opl", catalog_scope: "software", installed: true,
+    installations: [{ installation_id: "core", kind: "codex_plugin", mode: "installed", version: "1.2.3", manager: "codex_plugin_manager", location: "/cache/core", active: true, revision: "core-r3", available_actions: [] }],
+    installation_actions: [{ action_id: "software_installation_execute", label: "Install complete offline library", label_i18n: { "zh-CN": "安装离线完整版", "en-US": "Install complete offline library" }, status: "available", confirmation_required: true, dry_run_supported: false, required_payload_fields: Object.keys(payload), payload }]
+  }]);
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries } } } });
+  assert.equal(model.packageLifecycle.length, 1);
+  const product = model.packageLifecycle[0];
+  const calls: unknown[] = [];
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(SoftwareInstallations, { installations: product.installations, packageId: product.packageId, productActions: product.installationActions, locale: "zh", actionBusyKey: null, onAction: request => calls.push(request) }));
+    assert.match(container.textContent ?? "", /安装离线完整版 · 1.2.3/);
+    assert.match(container.textContent ?? "", /当前使用/);
+    const button = [...container.querySelectorAll("button")].find(item => item.textContent?.startsWith("安装离线完整版"))!;
+    assert.ok(button);
+    flushSync(() => button.click());
+    assert.deepEqual((calls[0] as { payload: unknown }).payload, payload);
+  });
+});

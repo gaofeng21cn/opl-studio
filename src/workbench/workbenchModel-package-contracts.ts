@@ -106,6 +106,7 @@ export type AgentPackageAccessRef = {
 export type SoftwareSourceActionRef = {
   actionId: "source_list" | "source_check" | "source_configure" | "source_disconnect" | string;
   label: string;
+  labelI18n?: AgentPackageLocalizedText;
   delegatedSurface?: string;
   payload: Record<string, unknown>;
   payloadFields: string[];

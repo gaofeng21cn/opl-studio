@@ -24,7 +24,7 @@ function safeActionPayload(value: unknown): Record<string, unknown> {
   if (!input) return {};
   // This projection intentionally admits references only. The installer owns all
   // provider lookup and must never send credentials to the renderer.
-  return Object.fromEntries(["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version"].flatMap((key) => {
+  return Object.fromEntries(["source_id", "provider_id", "credential_handle", "enabled", "item_id", "expected_revision", "package_id", "installation_id", "operation", "version", "profile"].flatMap((key) => {
     const field = input[key];
     return typeof field === "string" || typeof field === "boolean" ? [[key, field]] : [];
   }));
@@ -86,6 +86,10 @@ function readSourceAction(value: Record<string, unknown>, sourceId: string): Sof
   return {
     actionId,
     label: asString(value.label) ?? actionId,
+    labelI18n: value.label_i18n && typeof value.label_i18n === 'object' ? {
+      zh: asString((value.label_i18n as Record<string, unknown>)['zh-CN'] ?? (value.label_i18n as Record<string, unknown>).zh) ?? undefined,
+      en: asString((value.label_i18n as Record<string, unknown>)['en-US'] ?? (value.label_i18n as Record<string, unknown>).en) ?? undefined,
+    } : undefined,
     delegatedSurface: asString(value.delegated_surface) ?? undefined,
     payload: { ...(actionId === "source_list" || !sourceId ? {} : { source_id: sourceId }), ...safeActionPayload(value.default_payload), ...safeActionPayload(value.payload) },
     payloadFields: asStringArray(value.payload_fields ?? value.required_payload_fields),
