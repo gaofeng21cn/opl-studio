@@ -77,3 +77,23 @@ test("dedicated links use unique live read-only resources and only declared argu
     expect([...data.values()].join("")).not.toContain("private");
   } finally { Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous }); }
 });
+
+test("legacy runtime navigation cannot replace the shared product home", () => {
+  const app = { miniAppId: "mcp:opl-apps:ui://opl/apps.html", server: "opl-apps", tool: "open_opl_apps", title: "OPL Apps", description: "", resourceUri: "ui://opl/apps.html", readOnly: true, readiness: "ready" as const,
+    inputSchema: { properties: { package_id: { type: "string" }, view_id: { type: "string" }, input: { type: "object" } } } };
+  const runtime = { package_id: "opl-runtime", view_id: "opl.runtime.item", input: { item_id: "task-1" } };
+  const data = new Map([["opl.mcp.navigation.v1", JSON.stringify([{ key: JSON.stringify(["t1", app.server, app.resourceUri]), arguments: runtime }])]]);
+  const previous = globalThis.localStorage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (key: string) => data.get(key), setItem: (key: string, value: string) => data.set(key, value) } });
+  try {
+    expect(readMcpNavigation("t1", app)).toEqual({});
+    const product = { package_id: "opl-persona", view_id: "persona.overview" };
+    rememberMcpNavigation("t1", app, product);
+    rememberMcpNavigation("t1", app, runtime);
+    expect(readMcpNavigation("t1", app)).toEqual(product);
+    expect(resolveMcpNavigation(app.resourceUri + "#" + encodeURIComponent(JSON.stringify(runtime)), [app]).arguments).toEqual(runtime);
+    const thirdParty = { ...app, resourceUri: "ui://third-party/app" };
+    rememberMcpNavigation("t1", thirdParty, runtime);
+    expect(readMcpNavigation("t1", thirdParty)).toEqual(runtime);
+  } finally { Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous }); }
+});

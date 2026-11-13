@@ -89,15 +89,21 @@ export function navigationArguments(app: import("../../../../src/bridge/mcpApps"
 }
 const navigationStorage = "opl.mcp.navigation.v1";
 const navigationKey = (threadId: string, server: string, uri: string) => JSON.stringify([threadId, server, uri]);
+const isContextualTaskNavigation = (app: import("../../../../src/bridge/mcpApps").McpAppDescriptor, args: Record<string, unknown>) =>
+  app.resourceUri === "ui://opl/apps.html" && args.package_id === "opl-runtime";
 export function readMcpNavigation(threadId: string, app: import("../../../../src/bridge/mcpApps").McpAppDescriptor): Record<string, unknown> {
   try {
     const entries = JSON.parse(localStorage.getItem(navigationStorage) || "[]");
     const value = entries.find((entry: any) => entry.key === navigationKey(threadId, app.server, app.resourceUri));
-    return navigationArguments(app, value?.arguments);
+    const args = navigationArguments(app, value?.arguments);
+    // Older builds remembered the global Runtime list as a product. Task
+    // routes now require an explicit contextual entry from the overview.
+    return isContextualTaskNavigation(app, args) ? {} : args;
   } catch { return {}; }
 }
 export function rememberMcpNavigation(threadId: string, app: import("../../../../src/bridge/mcpApps").McpAppDescriptor, value: unknown) {
   const args = navigationArguments(app, value);
+  if (isContextualTaskNavigation(app, args)) return;
   try {
     const key = navigationKey(threadId, app.server, app.resourceUri);
     const previous = JSON.parse(localStorage.getItem(navigationStorage) || "[]");
