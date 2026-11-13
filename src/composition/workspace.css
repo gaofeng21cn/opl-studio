@@ -19,7 +19,7 @@ html[data-opl-host="desktop"] .opl-workspace-page > header { padding-top: 32px; 
 .opl-workspace-body > nav button[aria-current="page"], .opl-workspace-items button[aria-current="true"] { background: var(--opl-soft, #f0f2f2); }
 .opl-workspace-body > nav small { display: block; color: var(--opl-muted, #666); font-size: var(--dsw-font-xxs-12-font-size); }
 .opl-workspace-content { min-width: 0; overflow: auto; padding: 16px 20px; }
-.opl-workspace-app-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.opl-workspace-app-content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .opl-workspace-content .opl-contribution { padding: 0; border: 0; box-shadow: none; }
 .opl-workspace-content .opl-contribution-title { font-size: var(--dsw-font-s-14-font-size); }
 .opl-workspace-content .opl-contribution-result { padding: 0; }

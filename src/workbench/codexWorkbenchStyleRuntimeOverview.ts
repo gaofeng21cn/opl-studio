@@ -80,6 +80,20 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     color: var(--opl-text);
   }
 
+  .runtime-domain-view {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .runtime-domain-view-header {
+    flex: none;
+    padding: var(--opl-space-6) clamp(20px, 3.2vw, 44px) var(--opl-space-3);
+  }
+
   .runtime-domain-view-header > div {
     flex: 1;
   }

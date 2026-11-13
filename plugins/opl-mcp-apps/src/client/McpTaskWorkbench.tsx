@@ -34,5 +34,5 @@ export function McpTaskWorkbench(props: TaskWorkbenchProps) {
     <Button variant="outline" type="button" onClick={() => setRetry(n => n + 1)}>{locale === "zh" ? "重试" : "Retry"}</Button>
     <details><summary>{locale === "zh" ? "错误详情" : "Error details"}</summary><p>{error}</p></details>
   </div>;
-  return session ? <McpAppFrame key={session.id} {...props} session={session}/> : <p role="status">{locale === "zh" ? "正在打开任务工作台…" : "Opening task workbench…"}</p>;
+  return session ? <McpAppFrame key={session.id} {...props} session={session} fillHeight/> : <p role="status">{locale === "zh" ? "正在打开任务工作台…" : "Opening task workbench…"}</p>;
 }
