@@ -108,9 +108,9 @@ function applicationMarkup(model: WorkbenchModel, stateStatus: "loading" | "read
 test("application management does not invent zero entries or health before a catalog read", () => {
   for (const status of ["loading", "error"] as const) {
     const markup = applicationMarkup(initialWorkbenchModel, status);
-    expect(markup).toContain("App catalog has not been read");
-    expect(markup).not.toContain("No known issues");
-    expect(markup).not.toMatch(new RegExp("<strong>0</strong> (catalog entries|installable|installed)"));
+    expect(markup).toContain(status === "loading" ? "Reading software status" : "Some status is not confirmed");
+    expect(markup).not.toContain("No action needed");
+    expect(markup).not.toContain("<strong>0</strong>");
     expect(markup).toContain(status === "loading" ? "Reading apps and shared resources" : "Could not read the current state");
     if (status === "error") expect(markup).toContain(">Retry</button>");
   }
