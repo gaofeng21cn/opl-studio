@@ -109,7 +109,11 @@ test("software selection reaches the requested MiniApp and refresh preserves a l
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("requested");
     expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("software");
     expect(opened).toEqual([]);
-    flushSync(() => [...container.querySelectorAll<HTMLButtonElement>(".opl-mcp-app-directory-items button")].find(button => button.textContent?.includes("first"))!.click());
+    flushSync(() => {
+      const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Current app"]')!;
+      picker.value = "first";
+      picker.dispatchEvent(new window.Event("change", { bubbles: true }));
+    });
     render(createElement(McpAppWorkspace, { ...props, revision: 1 } as any)); await new Promise(resolve => setTimeout(resolve, 30));
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("first");
   });

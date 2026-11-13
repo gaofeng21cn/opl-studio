@@ -159,6 +159,10 @@ URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存�
 不重放原工具；手动打开仅执行声明为只读的工具。目录不维护 Package 名称白名单，
 共享 OPL Apps 与 Relay 独立工作台使用同一宿主。
 
+打开界面时只保留一条应用切换工具栏，iframe 填满剩余主内容区。软件中心、目录刷新、
+模块视图和关闭行为说明放在“更多”菜单，不常驻目录侧栏或重复工作台标题。
+工作台的 iframe 尺寸由可用画布决定；任务详情的行内嵌入继续响应 App 的尺寸请求。
+
 固定 DSH `0.2.1-rc.2`（`687f282e8625c6b8d11ff58211a90524be2e4317`）
 及核对的官方 `dsh-v0.2.2-rc.1` 提供 MCP client/tools/resources，尚无标准
 MCP App UI 宿主。因此使用官方 `@modelcontextprotocol/ext-apps` `2.0.4`
