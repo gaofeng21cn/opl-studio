@@ -13,7 +13,7 @@ import {
   validateMacUpdateFeed,
   validateFinalizedDmgReceipt
 } from "../../scripts/desktop/macos-distribution.mjs";
-import { buildAppUpdateConfig, writeAppUpdateConfig, verifyPackagedHostStartup } from "../../scripts/desktop/write-app-update-config.mjs";
+import { buildAppUpdateConfig, writeAppUpdateConfig, verifyPackagedHostStartup, verifyDesktopUpdaterDependencies } from "../../scripts/desktop/write-app-update-config.mjs";
 import { nextPatchVersion, updaterFixtureBuildArgs } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -91,6 +91,8 @@ test("packaged Host startup rejects a missing peer supplied only by the source c
   const host = path.join(payload, "src", "host");
   await mkdir(peer, { recursive: true });
   await mkdir(host, { recursive: true });
+  await mkdir(path.join(payload, "node_modules", "electron-updater"), { recursive: true });
+  await writeFile(path.join(payload, "node_modules", "electron-updater", "package.json"), JSON.stringify({ name: "electron-updater", version: "1.0.0" }));
   await writeFile(path.join(peer, "package.json"), JSON.stringify({ name: "opl-packaged-peer-fixture", type: "module", exports: "./index.js" }));
   await writeFile(path.join(peer, "index.js"), "export default true;\n");
   await writeFile(path.join(host, "packaged-host-smoke.mjs"), 'import ready from "opl-packaged-peer-fixture";\nif (ready) console.log("OPL_PACKAGED_HOST_READY");\n');
@@ -103,6 +105,26 @@ test("packaged Host startup rejects a missing peer supplied only by the source c
 
   await cp(peer, path.join(payload, "node_modules", "opl-packaged-peer-fixture"), { recursive: true });
   assert.match(verifyPackagedHostStartup({ resourcesDir }), /OPL_PACKAGED_HOST_READY/);
+});
+
+test("packaged desktop updater requires transitive dependencies inside its payload", async (t) => {
+  const checkout = await mkdtemp(path.join(os.tmpdir(), "opl-packaged-updater-test-"));
+  t.after(() => rm(checkout, { recursive: true, force: true }));
+  const payload = path.join(checkout, "out", "app.asar.unpacked");
+  async function dependency(base, name, dependencies = {}) {
+    const directory = path.join(base, "node_modules", name);
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, "package.json"), JSON.stringify({ name, version: "1.0.0", dependencies }));
+  }
+  await dependency(payload, "electron-updater", { "fs-extra": "1.0.0" });
+  await dependency(checkout, "fs-extra");
+  assert.throws(() => verifyDesktopUpdaterDependencies(payload), /outside the payload: fs-extra/);
+  const missingTransitive = path.join(checkout, "missing-transitive");
+  await dependency(missingTransitive, "electron-updater", { "fs-extra": "1.0.0" });
+  await dependency(missingTransitive, "fs-extra", { universalify: "1.0.0" });
+  assert.throws(() => verifyDesktopUpdaterDependencies(missingTransitive), /universalify/);
+  await dependency(missingTransitive, "universalify");
+  assert.doesNotThrow(() => verifyDesktopUpdaterDependencies(missingTransitive));
 });
 
 test("afterPack writes app-update.yml inside the single packaged app", async () => {

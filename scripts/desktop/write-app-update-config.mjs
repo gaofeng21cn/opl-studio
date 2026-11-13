@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { resolveHostNode } from "../../desktop/node-host-runtime.mjs";
 
 const EXPECTED_OWNER = "gaofeng21cn";
@@ -58,6 +59,10 @@ export function verifyPackagedHostStartup({ resourcesDir, nodeExecutable = proce
       dereference: true,
       mode: fs.constants.COPYFILE_FICLONE
     });
+    // The standalone Host does not import the desktop updater. Check its
+    // declared runtime dependencies from the relocated payload too, so a
+    // successful Host boot cannot conceal a broken Electron main process.
+    verifyDesktopUpdaterDependencies(isolatedRoot);
     const smoke = path.join(isolatedRoot, "src", "host", "packaged-host-smoke.mjs");
     const output = execFileSync(nodeExecutable, [smoke], {
       cwd: isolatedRoot,
@@ -71,6 +76,25 @@ export function verifyPackagedHostStartup({ resourcesDir, nodeExecutable = proce
   } finally {
     fs.rmSync(isolatedRoot, { recursive: true, force: true });
   }
+}
+
+export function verifyDesktopUpdaterDependencies(appRoot) {
+  const visited = new Set();
+  const root = fs.realpathSync(appRoot);
+  function visit(name, from) {
+    const require = createRequire(from);
+    const manifestPath = fs.realpathSync(require.resolve(`${name}/package.json`));
+    if (!manifestPath.startsWith(`${root}${path.sep}`)) {
+      throw new Error(`Packaged desktop dependency resolves outside the payload: ${name}`);
+    }
+    if (visited.has(manifestPath)) return;
+    visited.add(manifestPath);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      visit(dependency, manifestPath);
+    }
+  }
+  visit("electron-updater", path.join(root, "desktop", "main.mjs"));
 }
 
 export default async function afterPack(context) {
