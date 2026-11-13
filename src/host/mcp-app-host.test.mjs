@@ -57,6 +57,28 @@ test("rejects a stale MiniApp identity even when the transport tuple still exist
   );
 });
 
+test("chooses the public no-input launcher independently of catalog order and translated titles", async () => {
+  const { host, transport, calls } = fixture();
+  const uri = "ui://fixture/review";
+  const tools = {
+    app_read: { name: "app_read", title: "A read helper", annotations: { readOnlyHint: true }, _meta: { ui: { resourceUri: uri, visibility: ["app"] } } },
+    read_item: { name: "read_item", title: "Read item", annotations: { readOnlyHint: true }, inputSchema: { required: ["item_id"] }, _meta: { ui: { resourceUri: uri } } },
+    open: { name: "open", title: "应用概览", annotations: { readOnlyHint: true }, inputSchema: { properties: {} }, _meta: { ui: { resourceUri: uri } } },
+  };
+  const request = transport.request;
+  for (const entries of [Object.entries(tools), Object.entries(tools).reverse()]) {
+    transport.request = async (method, params) => method === "mcpServerStatus/list"
+      ? { data: [{ name: "fixture", tools: Object.fromEntries(entries) }] } : request(method, params);
+    const [app] = (await host.list({ threadId: "t1" })).apps;
+    assert.equal(app.title, "应用概览");
+    assert.equal(app.launchTool, "open");
+    assert.equal(app.readiness, "ready");
+    const view = await host.open({ threadId: "t1", server: app.server, tool: app.launchTool });
+    assert.deepEqual(calls.findLast(call => call.method === "mcpServer/tool/call").params.arguments, {});
+    host.close(view);
+  }
+});
+
 test("uses a declared MiniApp identity from an app-only tool in the grouped resource", async () => {
   const { host, tools } = fixture();
   tools.mutate._meta = { ui: { resourceUri: "ui://fixture/review", appId: "review-surface", visibility: ["app"] } };

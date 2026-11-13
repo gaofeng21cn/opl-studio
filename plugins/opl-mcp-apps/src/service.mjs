@@ -24,7 +24,12 @@ function declaredMiniAppId(serverName, uri, primary, tools, resource) {
 
 function miniAppDescriptor(server, uri, tools) {
   const resource = (server.resources ?? []).find(item => item.uri === uri);
-  const launch = tools.find(tool => tool.annotations?.readOnlyHint === true);
+  // Catalog order and translated titles do not identify the public launcher.
+  // Prefer a model-visible read entry that can open without object-specific input.
+  const launch = tools.filter(tool => tool.annotations?.readOnlyHint === true).sort((a, b) =>
+    Number(modelVisible(b)) - Number(modelVisible(a))
+    || (a.inputSchema?.required?.length ?? 0) - (b.inputSchema?.required?.length ?? 0)
+    || a.name.localeCompare(b.name))[0];
   const primary = launch ?? tools[0];
   return {
     miniAppId: declaredMiniAppId(server.name, uri, primary, tools, resource),
@@ -96,7 +101,7 @@ export class McpAppHost {
         try { await this.transport.resumeThread(threadId, { excludeTurns: true }); }
         catch (reason) {
           if (reason?.details?.error?.message === `thread ${threadId} already has an active writer`) {
-            fail("mcp_app_thread_busy", "mcp_app_thread_busy: This conversation is running in another window; choose an idle conversation or retry after it finishes");
+            fail("mcp_app_thread_busy", "mcp_app_thread_busy: This conversation's connection is in use by another window; choose another conversation or retry after that window releases it");
           }
           throw reason;
         }
