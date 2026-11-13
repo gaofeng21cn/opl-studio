@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { latestPackageOperations, packageStagePresentation, type PackageOperation } from "../workbench/packageOperations";
 import { softwareCanStart } from "../workbench/softwareExperience";
 import { SoftwareArtwork } from "../workbench/SoftwareArtwork";
 import { managedDependencyLabel, managedDependencyVersion, managedDependencyVersionSummary, managedDependencyPolicyLabel } from "../workbench/settings/maintenance";
@@ -39,6 +40,8 @@ export type DshPluginManagerOwnerProps = {
   onRefresh?: () => void;
   stateStatus?: "loading" | "ready" | "error";
   headerStatus?: ReactNode;
+  packageOperations?: PackageOperation[];
+  operationsReadError?: boolean;
   capabilityCatalog?: CodexCapabilityCatalog;
   capabilityStatus?: "idle" | "loading" | "ready" | "error";
   capabilityError?: string;
@@ -101,8 +104,11 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     && (typeFilter === "all" || typeFilter === "application")
     && (nativeSoftwareMatches(item, source, query, "all") || channels.some(channel => nativeSoftwareMatches(channel.item, channel.source, query, "all"))));
   const run = (item: AgentPackageLifecycleRef, action: PackageLifecycleActionRef, payload = action.payload, key = `${item.packageId}:${action.actionId}`) => onAction({ key, actionId: action.actionId, label: `${packageActionLabel(action, locale)} ${catalogDisplayName(item.label, item.displayNameI18n, locale)}`, payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported });
+  const activeOperations = latestPackageOperations(props.packageOperations ?? []).filter(operation => operation.status === 'running');
+  const operationFor = (item: AgentPackageLifecycleRef) => activeOperations.find(operation => operation.package_id === item.packageId || operation.active_package_id === item.packageId);
   const actionsFor = (item: AgentPackageLifecycleRef) => (item.catalogScope !== "software" ? [] : item.actions).filter(action => action.actionId !== "package_app_set_enabled" && action.kind !== "preferences" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)) && (action.kind !== "update" || item.currentness === "update_available") && (!["update", "repair"].includes(action.kind) || !packageAccessNeedsAttention(item)));
   const buttons = (item: AgentPackageLifecycleRef, all = false) => {
+    if (operationFor(item)) return <Button size="sm" variant="outline" disabled>{isZh ? '进行中' : 'In progress'}</Button>;
     const actions = actionsFor(item);
     if (!all && packageAccessNeedsAttention(item)) return props.onTabChange ? <Button size="sm" variant="outline" onClick={() => props.onTabChange?.("sources")}>{isZh ? "检查软件源" : "Check source"}</Button> : null;
     const primaryKind = item.installed === false && !packagePresentLocally(item) ? "install"
@@ -112,13 +118,13 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     if (!all && !primary && packagePresentLocally(item) && !softwareCanStart(item)) return <Button size="sm" variant="outline" disabled={busy} onClick={() => navigation.actions.setView({ kind: "item", id: item.packageId })}>{isZh ? "查看配置" : "Review setup"}</Button>;
     return (all ? actions : primary ? [primary] : []).map(action => <Button key={action.actionId} size="sm" variant={action.kind === "uninstall" || softwareCanStart(item) ? "outline" : "primary"} disabled={busy} onClick={() => run(item, action)}>{action.kind === "install" && item.localInstallations?.length ? (isZh ? "安装到当前宿主" : "Install in this host") : action.kind === "install" ? (isZh ? "安装" : "Install") : packageActionLabel(action, locale)}</Button>);
   };
-  const useAction = (item: AgentPackageLifecycleRef) => props.onUseSoftware && softwareCanStart(item)
+  const useAction = (item: AgentPackageLifecycleRef) => props.onUseSoftware && softwareCanStart(item) && !operationFor(item)
     ? <Button size="sm" variant="primary" disabled={busy} onClick={() => props.onUseSoftware?.(item.packageId)}>{isZh ? "开始使用" : "Start using"}</Button> : null;
   const toggle = (item: AgentPackageLifecycleRef) => {
     if (item.installed !== true || item.catalogScope !== "software") return null;
     const action = item.actions.find(action => action.actionId === "package_app_set_enabled" && action.status === "available");
     const name = catalogDisplayName(item.label, item.displayNameI18n, locale);
-    return <Switch checked={item.appEnabled} disabled={!action || busy} label={isZh ? `在 OPL App 中启用 ${name}` : `Enable ${name} in OPL App`} onChange={enabled => { if (action) run(item, action, { ...action.payload, package_id: item.packageId, enabled }, `app:${item.packageId}:enabled`); }} />;
+    return <Switch checked={item.appEnabled} disabled={!action || busy || Boolean(operationFor(item))} label={isZh ? `在 OPL App 中启用 ${name}` : `Enable ${name} in OPL App`} onChange={enabled => { if (action) run(item, action, { ...action.payload, package_id: item.packageId, enabled }, `app:${item.packageId}:enabled`); }} />;
   };
   const shortcutOrder = model.packageLifecycle.flatMap(item => item.homeShortcuts.map(shortcut => ({ packageId: item.packageId, ...shortcut }))).sort((a, b) => a.sortOrder - b.sortOrder || a.shortcutId.localeCompare(b.shortcutId));
   const shortcuts = (item: AgentPackageLifecycleRef) => {
@@ -127,7 +133,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     return <section className="opl-dsh-owner-section"><h4>{isZh ? "新任务入口" : "New Task entries"}</h4>{item.homeShortcuts.map(shortcut => {
       const index = shortcutOrder.findIndex(entry => entry.packageId === item.packageId && entry.shortcutId === shortcut.shortcutId), prev = shortcutOrder[index - 1], next = shortcutOrder[index + 1];
       const submit = (visible: boolean, sortOrder: number) => { if (action) run(item, action, { ...action.payload, shortcut_id: shortcut.shortcutId, visible, sort_order: sortOrder }, `home:${item.packageId}:${shortcut.shortcutId}:preferences`); };
-      return <div key={shortcut.shortcutId} className="opl-dsh-owner-shortcut"><Checkbox checked={shortcut.visible} disabled={!action || busy} label={isZh ? "在新任务中显示" : "Show in New Task"} onChange={value => submit(value, shortcut.sortOrder)} /><Button size="sm" disabled={!action || !prev || busy} onClick={() => prev && submit(shortcut.visible, prev.sortOrder - 1)}>{isZh ? "向前移动" : "Move earlier"}</Button><Button size="sm" disabled={!action || !next || busy} onClick={() => next && submit(shortcut.visible, next.sortOrder + 1)}>{isZh ? "向后移动" : "Move later"}</Button></div>;
+      return <div key={shortcut.shortcutId} className="opl-dsh-owner-shortcut"><Checkbox checked={shortcut.visible} disabled={!action || busy || Boolean(operationFor(item))} label={isZh ? "在新任务中显示" : "Show in New Task"} onChange={value => submit(value, shortcut.sortOrder)} /><Button size="sm" disabled={!action || !prev || busy} onClick={() => prev && submit(shortcut.visible, prev.sortOrder - 1)}>{isZh ? "向前移动" : "Move earlier"}</Button><Button size="sm" disabled={!action || !next || busy} onClick={() => next && submit(shortcut.visible, next.sortOrder + 1)}>{isZh ? "向后移动" : "Move later"}</Button></div>;
     })}</section>;
   };
   const packageItem = (item: AgentPackageLifecycleRef): PluginManagerOwnerItem => {
@@ -139,8 +145,9 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     const tags = <>{item.access?.visibility === "authorized_only" ? <Tag tone="quiet">{isZh ? "私有" : "Private"}</Tag> : null}{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}{instanceCount > 1 ? <Tag tone="quiet">{isZh ? `${instanceCount} 份安装` : `${instanceCount} installations`}</Tag> : null}<CatalogRowFacts type={catalogTypeLabel(item, locale)} installedVersion={currentVersion} availableVersion={item.availableVersion} state={state} locale={locale} /></>;
     return { id: item.packageId, title: name, icon: <SoftwareArtwork identity={item.packageId} label={name} kind={item.softwareType} iconUrl={item.iconUrl} privateAsset={item.access?.visibility === "authorized_only"} />,
       description: <span className="opl-catalog-row-description">{localizedPackageDescription(item, locale)}</span>, tags,
-      status: <CatalogState state={state} locale={locale} />,
-      actions: <span className="opl-catalog-row-actions">{props.onUseSoftware && softwareCanStart(item) ? <>{useAction(item)}{state === "update_available" ? buttons(item) : null}</> : buttons(item)}</span>, detailActions: <>{useAction(item)}{toggle(item)}</>,
+      status: <CatalogState state={operationFor(item) ? 'unknown' : state} locale={locale} label={operationFor(item)
+        ? props.operationsReadError ? (isZh ? '进度待确认' : 'Progress unavailable') : packageStagePresentation(operationFor(item)!, locale).label : undefined} />,
+      actions: <span className="opl-catalog-row-actions">{props.onUseSoftware && softwareCanStart(item) && !operationFor(item) ? <>{useAction(item)}{state === "update_available" ? buttons(item) : null}</> : buttons(item)}</span>, detailActions: <>{useAction(item)}{toggle(item)}</>,
       detail: <>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "当前使用" : "Currently in use"}</h4>
           <dl><div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div><div><dt>{isZh ? "类型" : "Type"}</dt><dd>{catalogTypeLabel(item, locale)}</dd></div><div><dt>{isZh ? "当前版本" : "Current version"}</dt><dd>{currentVersion}{development ? ` · ${isZh ? "开发版" : "Development"}` : ""}</dd></div>{item.activeInstallationStatus ? <div><dt>{isZh ? "激活状态" : "Activation"}</dt><dd>{softwareActivationLabel(item.activeInstallationStatus, locale)}</dd></div> : null}<div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{item.availableVersion ?? "—"}</dd></div><div><dt>{isZh ? "更新状态" : "Update status"}</dt><dd>{formatStatus(update, locale)}</dd></div></dl>
@@ -149,7 +156,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
           {item.access?.visibility === "authorized_only" && packageAccessNeedsAttention(item) ? <p data-testid="opl-package-access-gate">{item.access.status === "signed_out" ? (isZh ? "连接软件源账号以检查和更新此私有软件。" : "Connect the source account to check and update this private software.") : item.access.reason ?? packageAccessStatusLabel(item.access, locale)}</p> : null}
           {item.requiredByPackageIds?.length ? <p>{isZh ? `此能力仍被 ${item.requiredByPackageIds.join("、")} 使用；卸载或停用前请先处理这些依赖。` : `Required by ${item.requiredByPackageIds.join(", ")}; resolve dependents before uninstalling or disabling it.`}</p> : null}
         </section>
-        {item.installations !== undefined ? <SoftwareInstallations installations={item.installations} packageId={item.packageId} productActions={item.installationActions} activeId={item.activeInstallationId} activationStatus={item.activeInstallationStatus} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} onOpenLocation={props.onOpenInstallationLocation} onUpdates={props.onTabChange ? () => props.onTabChange?.("updates") : undefined} /> : item.localInstallations?.length ? <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Installations on this device"}</h4>{item.localInstallations.map(installation => <dl key={installation.installationId} data-testid="opl-local-installation"><div><dt>{isZh ? "版本" : "Version"}</dt><dd>{installation.version} · {installation.mode === "development" ? (isZh ? "开发版" : "Development") : (isZh ? "发布版" : "Release")}</dd></div><div><dt>{isZh ? "位置引用" : "Location reference"}</dt><dd><code>{installation.locationRef}</code></dd></div><div><dt>{isZh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(installation.manager, locale)}</dd></div></dl>)}<p>{isZh ? "安装器尚未提供激活状态和完整路径，请更新基座后重新读取。" : "The installer has not provided active state and the full path. Update the foundation and refresh."}</p></section> : null}
+        {item.installations !== undefined ? <SoftwareInstallations installations={item.installations} packageId={item.packageId} productActions={item.installationActions} activeId={item.activeInstallationId} activationStatus={item.activeInstallationStatus} locale={locale} actionBusyKey={operationFor(item) ? "package-operation:running" : actionBusyKey} onAction={onAction} onOpenLocation={props.onOpenInstallationLocation} onUpdates={props.onTabChange ? () => props.onTabChange?.("updates") : undefined} /> : item.localInstallations?.length ? <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Installations on this device"}</h4>{item.localInstallations.map(installation => <dl key={installation.installationId} data-testid="opl-local-installation"><div><dt>{isZh ? "版本" : "Version"}</dt><dd>{installation.version} · {installation.mode === "development" ? (isZh ? "开发版" : "Development") : (isZh ? "发布版" : "Release")}</dd></div><div><dt>{isZh ? "位置引用" : "Location reference"}</dt><dd><code>{installation.locationRef}</code></dd></div><div><dt>{isZh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(installation.manager, locale)}</dd></div></dl>)}<p>{isZh ? "安装器尚未提供激活状态和完整路径，请更新基座后重新读取。" : "The installer has not provided active state and the full path. Update the foundation and refresh."}</p></section> : null}
         {item.installationManagementReason === "installation_helper_update_required" ? <section className="opl-dsh-owner-section"><p>{isZh ? "更新此软件的 OPL 集成后，可在这里管理桌面安装。现有安装位置与版本仍可查看。" : "Update this software's OPL integration to manage desktop installations here. Existing locations and versions remain visible."}{buttons(item)}</p></section> : null}
         <section className="opl-dsh-owner-section"><h4>{isZh ? "软件来源" : "Software source"}</h4><dl><div><dt>{isZh ? "维护者" : "Publisher"}</dt><dd>{item.publisher}</dd></div><div><dt>{isZh ? "软件源" : "Source"}</dt><dd>{item.catalogSource?.marketplaceId ?? (item.catalogOrigin === "opl" ? "OPL" : "—")}{item.catalogSource?.delivery === "host_bundled" ? (isZh ? " · Codex 随附" : " · Bundled with Codex") : ""}</dd></div><div><dt>{isZh ? "安装器" : "Installer"}</dt><dd>{catalogManagerLabel(item.catalogSource?.manager, locale)}</dd></div></dl>{item.installations === undefined ? buttons(item, true) : item.installed === false ? buttons(item) : null}</section>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "使用的共享资源" : "Shared resources in use"}</h4>

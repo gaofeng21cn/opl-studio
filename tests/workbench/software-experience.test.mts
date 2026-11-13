@@ -131,3 +131,38 @@ test("ready software opens its declared read-only launcher once and reports fail
     expect(container.textContent).toContain("launcher unavailable");
   });
 });
+
+test('an active Package task replaces repeat installation controls with its current stage', async () => {
+  await withDom(async (container, render) => {
+    const state = model();
+    const item = state.packageLifecycle.find(item => item.packageId === 'example-1')!;
+    item.access = undefined;
+    item.installed = false;
+    const actions: unknown[] = [];
+    render(createElement(DshPluginManagerOwner, { kind: 'all', model: state, settings: { ...settingsDefaults, locale: 'zh' }, actionBusyKey: null, onAction: action => actions.push(action),
+      packageOperations: [{ operation_id: 'active', package_id: item.packageId, action_id: 'agent_package_install', status: 'running', stage: 'downloading', can_cancel: true }] }));
+    const row = container.querySelector('[data-plugin-owner-package="example-1"]')!;
+    expect(row.textContent).toContain('正在下载');
+    const pending = [...row.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '进行中');
+    expect(pending?.disabled).toBe(true);
+    pending?.click();
+    expect(actions).toEqual([]);
+  });
+});
+
+test('background Package tasks are discovered outside Software Center and completion requests fresh state', async () => {
+  const { usePackageOperations } = await import('../../src/workbench/usePackageOperations');
+  await withDom(async (_container, render) => {
+    let reads = 0, completed = 0;
+    const bridge = { executeAction: async (request: any) => {
+      expect(request).toEqual({ actionId: 'package_operation_status', payload: {}, dryRun: true });
+      reads++;
+      return { stdoutJson: { app_action_execution: { result: { operations: [{ operation_id: 'restored', package_id: 'example-1', action_id: 'agent_package_install', status: reads === 1 ? 'running' : 'completed', stage: reads === 1 ? 'checking' : 'completed', can_cancel: false }] } } } };
+    } };
+    function Probe() { usePackageOperations(bridge as any, () => { completed++; }, false); return null; }
+    render(createElement(Probe));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(completed).toBe(1);
+  });
+});

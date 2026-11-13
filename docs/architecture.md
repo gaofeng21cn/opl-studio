@@ -457,3 +457,18 @@ parses MAS research snapshots or maintains a MAS-specific detail renderer.
 The software center uses Framework `package_operation_start/status/cancel` App actions for background Package installation, update and repair. Framework owns transfer progress and revalidated digest caches; the existing native carrier still owns installation. Studio renders real download bytes and stage names, restores operations after navigation or reload, and never treats worker acceptance as installation success. Older Framework versions retain their existing synchronous action path.
 
 The official DSH plugin manager already streams npm plugin installation state. OPL Packages require owner-verified OCI acquisition before native Codex registration, which that npm lifecycle does not cover. This adapter keeps the existing public App action boundary and DSH primitives; it adds no plugin registry or generic install resolver. Revisit the transport gap when upstream supports the same carrier contract.
+
+The window-level activity link uses the same operation readback as Software Center.
+It discovers existing tasks on renderer startup, polls less frequently when idle
+outside the page, and links back without starting another operation. Failed reads
+retain the previous observation but hide stale transfer metrics. Interrupted work
+requires fresh inspection; terminal success only offers a use entry when the
+current Package projection allows launch. Catalog rows show the same active stage
+and disable duplicate lifecycle controls for the affected Package or component.
+
+The page overview prioritizes unknown reads, actionable issues and active work
+before ordinary updates. Source/resource issues retain explicit owner identities
+and affected software counts. Preflight uses catalog display metadata for names
+and sources, while version, size and path remain the actual action preview.
+History groups attempts by Package and never hides ongoing work behind completed
+items. These are presentation projections, not a durable operation store.

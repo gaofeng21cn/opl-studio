@@ -6,6 +6,7 @@ import type { ResolvedCodexModelOption } from "../workbench/modelPolicy";
 import type { OplInitializeReadback } from "../bridge/oplBridge";
 import type { OplContributionSlotOwner, OplUiContributionsProjection } from "./contributionProjection";
 import type { OplStudioDetailTab } from "./clientCordis";
+import type { PackageActivity } from '../workbench/packageOperations';
 
 export type OplSetupOperationResult = {
   status: "completed" | "cancelled" | "error";
@@ -56,6 +57,8 @@ export type OplStudioSurface = {
   conversationBody: ReactNode;
   primaryView: OplStudioPrimaryView;
   applicationManagement: ReactNode;
+  packageActivity?: PackageActivity;
+  openPackageActivity?(): void;
   runtimeOverview: ReactNode;
   scheduledTasks: ReactNode;
   openPrimaryView(view: OplStudioPrimaryView): void;

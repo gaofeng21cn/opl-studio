@@ -1,5 +1,5 @@
 import { usePackageOperations } from './usePackageOperations';
-import { preparePackageOperationRequest } from './packageOperations';
+import { packageActivity, packageActionVerb, preparePackageOperationRequest } from './packageOperations';
 import { softwareCanStart } from "./softwareExperience";
 import { createComposerAttachmentController, disposeSelectionPreviews } from "./composerAttachments";
 import type { McpAppOpen } from "../bridge/mcpApps";
@@ -893,11 +893,18 @@ export function App({
 
   const packageOperations = usePackageOperations(bridge, () => { void loadState(settings.runtimeProfile); }, primaryView === "applications");
 
+  const packageDisplayInfo = Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, {
+    name: item.displayNameI18n[settings.locale] ?? item.label,
+    source: model.softwareSources?.entries.find(source => source.sourceRef === item.access?.sourceRef)?.displayName,
+    distribution: item.distributionChannel,
+  }]));
+
   function acceptPackageOperation(receipt: OplActionReceipt, request: SettingsActionRequest) {
     if (request.actionId !== 'package_operation_start' || !packageOperations.accept(receipt)) return false;
     setSettingsActionConfirmation(null);
     setSettingsActionReceipt(null);
-    setSettingsActionFeedback({ tone: 'success', message: settings.locale === 'zh' ? '安装已在后台开始，可在软件中心查看进度。' : 'Installation started in the background. View progress in Software Center.' });
+    const verb = packageActionVerb(String(request.payload.action_id), settings.locale);
+    setSettingsActionFeedback({ tone: 'neutral', message: settings.locale === 'zh' ? `${verb}已在后台开始，可在软件中心查看进度。` : `${verb} started in the background. View progress in Software Center.` });
     settleWorkbenchAction(request.key, { status: 'running' });
     return true;
   }
@@ -2742,6 +2749,8 @@ export function App({
     selectedAgentPresetId: selectedAgent?.packageId ?? "opl-daily-work",
     conversationBody: studioConversationBody,
     primaryView,
+    packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
+    openPackageActivity: () => { setApplicationManagementTab('applications'); setPrimaryView('applications'); },
     applicationManagement: <ApplicationManagementPage
       packageOperations={packageOperations}
       model={model}
@@ -2833,7 +2842,7 @@ export function App({
     setupCapabilities,
     chooseWorkspaceRoot,
     installCodex,
-    overlay: <><SettingsActionDialog settings={settings} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={cancelSettingsAction} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={cancelContributionAction} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={cancelContributionAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => void confirmContributionAction()}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>}>{contributionActionConfirmation ? <><h3>{contributionLabel(contributionActionConfirmation.command.label, settings.locale, contributionActionConfirmation.command.commandId)}</h3><WorkspaceReviewPreview value={{...contributionActionConfirmation.preview, ...contributionActionConfirmation.input}} zh={settings.locale === "zh"}/></> : null}</Modal></>,
+    overlay: <><SettingsActionDialog settings={settings} products={packageDisplayInfo} pendingConfirmation={settingsActionConfirmation} actionBusyKey={settingsActionBusyKey} onConfirmAction={() => void confirmSettingsAction()} onCancelAction={cancelSettingsAction} /><style>{codexWorkbenchStyles}</style><ThreadDetailPopover thread={threadDetail} locale={settings.locale} busy={threadActionBusy} onClose={() => setThreadDetail(null)} onResume={(thread) => void resumeThreadAndOpen(thread)} onFork={(thread) => void forkThread(thread)} onRequestArchive={(thread, archived) => { setLifecycleConfirmation({ thread, action: archived ? "archive" : "unarchive" }); setThreadActionError(""); setThreadDetail(null); }} onRequestDelete={(thread) => { setLifecycleConfirmation({ thread, action: "delete" }); setThreadActionError(""); setThreadDetail(null); }} /><ThreadLifecycleConfirmationDialog thread={lifecycleConfirmation?.thread ?? null} action={lifecycleConfirmation?.action ?? "archive"} locale={settings.locale} busy={threadActionBusy} error={threadActionError} onClose={() => setLifecycleConfirmation(null)} onConfirm={() => void confirmThreadLifecycle()} /><Modal closeLabel={settings.locale === "zh" ? "关闭" : "Close"} open={contributionActionConfirmation !== null} onClose={cancelContributionAction} title={settings.locale === "zh" ? "确认执行能力操作" : "Confirm capability action"} description={contributionActionConfirmation ? (settings.locale === "zh" ? `此操作将由 ${contributionActionConfirmation.entry.packageId} 通过 OPL App 执行。` : `This action will be executed by ${contributionActionConfirmation.entry.packageId} through OPL App.`) : ""} footer={<><Button variant="outline" onClick={cancelContributionAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={contributionActionBusy || !contributionActionConfirmation} onClick={() => void confirmContributionAction()}>{settings.locale === "zh" ? "确认执行" : "Confirm"}</Button></>}>{contributionActionConfirmation ? <><h3>{contributionLabel(contributionActionConfirmation.command.label, settings.locale, contributionActionConfirmation.command.commandId)}</h3><WorkspaceReviewPreview value={{...contributionActionConfirmation.preview, ...contributionActionConfirmation.input}} zh={settings.locale === "zh"}/></> : null}</Modal></>,
     detailsRequestRevision,
     startSession: startNewChat,
     startSessionInProject: startNewChatInProject,

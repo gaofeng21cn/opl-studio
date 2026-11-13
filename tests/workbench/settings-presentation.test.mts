@@ -773,7 +773,7 @@ test("official catalog keeps an unknown native installation state as unconfirmed
     const card = container.querySelector('[data-plugin-owner-package="homebrew:cask:studio"]');
     assert.ok(card);
     assert.match(card.textContent ?? "", /Native Studio/);
-    assert.match(card.textContent ?? "", /Not checked/);
+    assert.match(card.textContent ?? "", /Status not confirmed/);
     assert.doesNotMatch(card.textContent ?? "", /Not installed/);
   });
 });
@@ -1112,7 +1112,7 @@ test("source access attention opens sources and does not repair an installation"
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction: action => actions.push(action), onTabChange: tab => tabs.push(tab) }));
     const row = container.querySelector('[data-plugin-owner-package="private"]')!;
-    assert.match(row.textContent ?? "", /需处理/);
+    assert.match(row.textContent ?? "", /需要处理/);
     assert.doesNotMatch(row.textContent ?? "", /修复/);
     const sourceButton = [...row.querySelectorAll("button")].find(button => button.textContent === "检查软件源")!;
     flushSync(() => sourceButton.click());

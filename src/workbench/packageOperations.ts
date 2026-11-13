@@ -11,6 +11,60 @@ export type PackageDownloadPlan = {
   package_id: string; version: string | null; install_location: string | null;
   download_bytes: number | null; cached_bytes: number; available_disk_bytes: number; unpacked_bytes: number | null;
 };
+export type PackageDisplayInfo = { name: string; source?: string; distribution?: 'release' | 'development' | 'unknown' };
+export type PackageActivity = { running: number; attention: number; readError: boolean };
+
+/** Framework returns newest first. A newer attempt supersedes the previous attempt for that software. */
+export function latestPackageOperations(operations: PackageOperation[]): PackageOperation[] {
+  const seen = new Set<string>();
+  return operations.filter(operation => {
+    if (seen.has(operation.package_id)) return false;
+    seen.add(operation.package_id);
+    return true;
+  });
+}
+
+export function packageActivity(operations: PackageOperation[], readError: boolean): PackageActivity {
+  const latest = latestPackageOperations(operations);
+  return {
+    running: latest.filter(operation => operation.status === 'running').length,
+    attention: latest.filter(operation => ['failed', 'interrupted'].includes(operation.status)).length,
+    readError,
+  };
+}
+
+export function packageActionVerb(actionId: string, locale: 'zh' | 'en'): string {
+  const verbs: Record<string, [string, string]> = {
+    agent_package_install: ['安装', 'Install'], agent_package_update: ['更新', 'Update'], agent_package_repair: ['修复', 'Repair'],
+  };
+  return (verbs[actionId] ?? verbs.agent_package_install!)[locale === 'zh' ? 0 : 1];
+}
+
+export function packageRemainingTime(seconds: number, locale: 'zh' | 'en'): string {
+  const value = Math.max(1, Math.ceil(seconds));
+  if (value < 60) return locale === 'zh' ? `约剩 ${value} 秒` : `About ${value} sec remaining`;
+  if (value < 3600) return locale === 'zh' ? `约剩 ${Math.ceil(value / 60)} 分钟` : `About ${Math.ceil(value / 60)} min remaining`;
+  return locale === 'zh' ? `约剩 ${Math.ceil(value / 360) / 10} 小时` : `About ${Math.ceil(value / 360) / 10} hr remaining`;
+}
+
+export function packageStagePresentation(operation: PackageOperation, locale: 'zh' | 'en') {
+  const zh = locale === 'zh';
+  const verb = packageActionVerb(operation.action_id, locale);
+  if (operation.status === 'completed') return { label: zh ? `${verb}完成` : `${verb} complete` };
+  if (operation.status === 'cancelled') return { label: zh ? '已取消' : 'Cancelled' };
+  if (operation.status === 'failed') return { label: zh ? `${verb}失败` : `${verb} failed` };
+  if (operation.status === 'interrupted') return { label: zh ? '结果待确认' : 'Result not confirmed' };
+  const stages: Record<string, [string, string]> = {
+    preparing: [zh ? '准备中' : 'Preparing', zh ? '下载文件' : 'Download files'],
+    downloading: [zh ? '正在下载' : 'Downloading', zh ? '校验文件' : 'Verify files'],
+    verifying: [zh ? '校验文件' : 'Verifying files', zh ? '解压文件' : 'Extract files'],
+    extracting: [zh ? '解压文件' : 'Extracting files', zh ? '安装软件' : 'Install software'],
+    installing: [zh ? '正在安装' : 'Installing', zh ? '检查安装结果' : 'Check installation'],
+    checking: [zh ? '检查安装结果' : 'Checking installation', zh ? '刷新软件状态' : 'Refresh software status'],
+  };
+  const stage = stages[operation.stage];
+  return { label: stage?.[0] ?? (zh ? '进行中' : 'In progress'), next: stage?.[1] };
+}
 export const packageBackgroundActions = new Set(['agent_package_install', 'agent_package_update', 'agent_package_repair']);
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export function packageOperationRequest(request: SettingsActionRequest): SettingsActionRequest {

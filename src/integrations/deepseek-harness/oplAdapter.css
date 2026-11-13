@@ -347,10 +347,7 @@ select {
 }
 
 .opl-context-inspector-trigger-wrap {
-  position: absolute;
-  top: 34px;
-  right: 16px;
-  z-index: 40;
+  flex: 0 0 auto;
 }
 
 .opl-context-inspector-trigger {
@@ -1083,4 +1080,22 @@ select {
 /* App release channel is shown in About, never as an upstream hero badge. */
 .opl-studio-dsh-root [class*="previewBadge"]:empty {
   display: none;
+}
+
+.opl-shell-status-actions {
+  position: absolute;
+  top: 34px;
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 88px);
+}
+.opl-shell-status-actions[data-inspector-open] { right: calc(clamp(340px, 29vw, 420px) + 28px); }
+.opl-shell-package-activity { min-width: 0; }
+.opl-shell-package-activity .opl-package-activity-trigger { max-width: 100%; }
+.opl-shell-package-activity .opl-package-activity-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 680px) {
+  .opl-shell-status-actions[data-inspector-open] { display: none; }
 }

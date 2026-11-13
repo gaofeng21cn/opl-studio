@@ -695,7 +695,7 @@ test("DSH details tools project the current OPL project and a contained read-onl
   assert.match(slotHost, /studio\.openDetailTab\(tab\.id\)/);
   assert.match(slotHost, /function DetailsSlot\(\): null \{ return null; \}/);
   assert.doesNotMatch(slotHost, /DetailToolShortcuts/);
-  assert.match(adapterStyles, /\.opl-context-inspector-trigger-wrap \{[^}]*position: absolute;[^}]*top: 34px;[^}]*right: 16px;/s);
+  assert.match(adapterStyles, /\.opl-shell-status-actions \{[^}]*position: absolute;[^}]*top: 34px;[^}]*right: 16px;[^}]*display: flex;/s);
   assert.match(adapterStyles, /\.opl-context-inspector \{[^}]*position: absolute;[^}]*width: clamp\(340px, 29vw, 420px\);/s);
   assert.match(adapterStyles, /\.opl-context-inspector-tabs > button \{[^}]*height: 36px;/s);
   assert.match(adapterStyles, /\.opl-dsh-thread \{[^}]*flex: 1 0 auto;/s);

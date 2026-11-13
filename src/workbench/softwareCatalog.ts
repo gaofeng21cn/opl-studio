@@ -38,7 +38,7 @@ export function nativeCatalogState(item: NativeSoftwareItemRef): SoftwareCatalog
 }
 
 export function catalogStateLabel(state: SoftwareCatalogState, locale: "zh" | "en") {
-  return ({ not_installed: ["未安装", "Not installed"], installed: ["已安装", "Installed"], update_available: ["可更新", "Update available"], attention: ["需处理", "Needs attention"], unknown: ["待检查", "Not checked"] })[state][locale === "zh" ? 0 : 1];
+  return ({ not_installed: ["未安装", "Not installed"], installed: ["已安装", "Installed"], update_available: ["可更新", "Update available"], attention: ["需要处理", "Needs attention"], unknown: ["状态待确认", "Status not confirmed"] })[state][locale === "zh" ? 0 : 1];
 }
 
 export function catalogTypeLabel(item: Pick<AgentPackageLifecycleRef, "softwareType" | "catalogOrigin" | "catalogSource">, locale: "zh" | "en") {

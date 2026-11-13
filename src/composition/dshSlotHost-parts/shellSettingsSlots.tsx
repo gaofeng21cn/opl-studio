@@ -1,4 +1,5 @@
 import { applySettingsShellNavigation } from "../../workbench/deepLinkNavigation";
+import { PackageActivityButton } from '../../workbench/PackageInstallationProgress';
 import { Activity, Bot, Cable, ChevronDown, CircleHelp, Files, Folder, Gauge, PanelRight, Puzzle, Settings as SettingsIcon, SlidersHorizontal, UserRound, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Menu, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
@@ -46,6 +47,10 @@ export function ShellOverlaySlot() {
   }, [detailsOpen]);
   return <>
     {studio.overlay}
+    <div className="opl-shell-status-actions" data-inspector-open={detailsOpen || undefined}>
+    {studio.packageActivity && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
+      <PackageActivityButton activity={studio.packageActivity} locale={studio.locale} onOpen={() => studio.openPackageActivity ? studio.openPackageActivity() : studio.openPrimaryView('applications')} />
+    </div> : null}
     {studio.primaryView === "conversation" && !detailsOpen ? (
       <div className="opl-context-inspector-trigger-wrap">
         <Menu
@@ -75,6 +80,7 @@ export function ShellOverlaySlot() {
         />
       </div>
     ) : null}
+    </div>
     {detailsOpen ? (
       <section
         ref={detailsDialogRef}

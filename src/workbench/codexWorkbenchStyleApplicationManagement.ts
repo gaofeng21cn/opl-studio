@@ -26,6 +26,22 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     margin-inline: auto;
   }
 
+  .opl-software-primary-status { display: flex; align-items: flex-start; gap: 10px; padding-block: 12px 16px; color: var(--dsw-alias-label-primary); }
+  .opl-software-primary-status > svg { margin-top: 2px; flex: 0 0 auto; }
+  .opl-software-primary-status > div { min-width: 0; flex: 1; }
+  .opl-software-primary-status strong { font-size: var(--dsw-font-s-14-font-size); font-weight: 500; }
+  .opl-software-primary-status p { margin: 5px 0 0; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); max-width: 72ch; }
+  .opl-software-primary-status[data-state="attention"] > svg { color: var(--opl-warning); }
+  .opl-app-management-summary > button { padding: 0; border: 0; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .opl-app-management-summary > button:focus-visible { outline: 2px solid var(--dsw-alias-label-primary); outline-offset: 4px; }
+  .opl-app-management-summary .opl-software-observed { margin-left: auto; }
+  @media (max-width: 680px) {
+    .opl-software-primary-status { flex-wrap: wrap; }
+    .opl-software-primary-status > div { flex-basis: calc(100% - 32px); }
+    .opl-software-primary-status > button { margin-left: 28px; }
+    .opl-app-management-summary .opl-software-observed { margin-left: 0; grid-column: 1 / -1; }
+  }
+
   .opl-app-management-overview .opl-app-management-summary {
     width: 100%;
   }

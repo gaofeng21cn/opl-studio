@@ -13,11 +13,10 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
   const active = operations.some(item => item.status === 'running');
   const refresh = useCallback(() => setRevision(value => value + 1), []);
   useEffect(() => {
-    if (!visible && !active) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      let active = false;
+      let nextActive = active;
       try {
         const receipt = await bridge.executeAction({ actionId: 'package_operation_status', payload: {}, dryRun: true });
         const rows = packageOperationResult(receipt).operations;
@@ -28,10 +27,11 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
           if (observed.current.get(operation.operation_id) === 'running' && operation.status !== 'running') completed.current();
           observed.current.set(operation.operation_id, operation.status);
         }
-        active = next.some(operation => operation.status === 'running');
+        nextActive = next.some(operation => operation.status === 'running');
         setOperations(next); setReadError(false); setSupported(true);
       } catch { if (!disposed) setReadError(true); }
-      if (!disposed) timer = setTimeout(poll, active ? 1500 : 15000);
+      // Discover tasks after reload even when the user starts in a conversation.
+      if (!disposed) timer = setTimeout(poll, nextActive ? 1500 : visible ? 15000 : 30000);
     };
     void poll();
     return () => { disposed = true; clearTimeout(timer); };
