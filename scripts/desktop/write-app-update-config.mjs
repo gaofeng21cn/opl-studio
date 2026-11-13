@@ -48,6 +48,31 @@ export function writeAppUpdateConfig({ appOutDir, builderConfig, platform = proc
   return outputPath;
 }
 
+export function verifyPackagedHostStartup({ resourcesDir, nodeExecutable = process.execPath }) {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), "opl-packaged-host-payload-"));
+  try {
+    // Running under out/ lets missing peers resolve from the source checkout.
+    // Relocate the exact unpacked payload before testing its dependency closure.
+    fs.cpSync(path.join(resourcesDir, "app.asar.unpacked"), isolatedRoot, {
+      recursive: true,
+      dereference: true,
+      mode: fs.constants.COPYFILE_FICLONE
+    });
+    const smoke = path.join(isolatedRoot, "src", "host", "packaged-host-smoke.mjs");
+    const output = execFileSync(nodeExecutable, [smoke], {
+      cwd: isolatedRoot,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "", NODE_PATH: "", NODE_OPTIONS: "" },
+      timeout: 30_000,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    if (!output.includes("OPL_PACKAGED_HOST_READY")) throw new Error("Packaged Host did not become ready");
+    return output;
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
+}
+
 export default async function afterPack(context) {
   const platform = context?.electronPlatformName || process.platform;
   const outputPath = writeAppUpdateConfig({
@@ -58,17 +83,10 @@ export default async function afterPack(context) {
   process.stdout.write(`Studio updater config written: ${outputPath}\n`);
   const appDir = platform === "darwin" ? resolvePackagedAppDir(context.appOutDir) : context.appOutDir;
   const resources = platform === "darwin" ? path.join(appDir, "Contents", "Resources") : path.join(appDir, "resources");
-  const smoke = path.join(resources, "app.asar.unpacked", "src", "host", "packaged-host-smoke.mjs");
   // Cross-architecture packaging is validated on the matching native runner.
   const nativeArchitecture = context.arch === 3 ? "arm64" : context.arch === 1 ? "x64" : null;
   if (platform !== process.platform || (nativeArchitecture && nativeArchitecture !== process.arch)) return;
   const node = resolveHostNode({ nodeExecutable: process.execPath });
-  const output = execFileSync(node.command, [smoke], {
-    cwd: os.tmpdir(),
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "", NODE_PATH: "", NODE_OPTIONS: "" },
-    timeout: 30_000,
-    encoding: "utf8"
-  });
-  if (!output.includes("OPL_PACKAGED_HOST_READY")) throw new Error("Packaged Host did not become ready");
+  verifyPackagedHostStartup({ resourcesDir: resources, nodeExecutable: node.command });
   process.stdout.write("Packaged Host startup verified\n");
 }

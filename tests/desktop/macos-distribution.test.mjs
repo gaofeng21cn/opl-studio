@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, rm, cp } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,7 +13,7 @@ import {
   validateMacUpdateFeed,
   validateFinalizedDmgReceipt
 } from "../../scripts/desktop/macos-distribution.mjs";
-import { buildAppUpdateConfig, writeAppUpdateConfig } from "../../scripts/desktop/write-app-update-config.mjs";
+import { buildAppUpdateConfig, writeAppUpdateConfig, verifyPackagedHostStartup } from "../../scripts/desktop/write-app-update-config.mjs";
 import { nextPatchVersion, updaterFixtureBuildArgs } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -80,6 +80,29 @@ test("Studio afterPack writes the dedicated GitHub updater identity", () => {
     () => buildAppUpdateConfig({ publish: { provider: "github", owner: "other", repo: "other" } }),
     /dedicated identity-bound GitHub feed/
   );
+});
+
+test("packaged Host startup rejects a missing peer supplied only by the source checkout", async (t) => {
+  const checkout = await mkdtemp(path.join(os.tmpdir(), "opl-packaged-peer-test-"));
+  t.after(() => rm(checkout, { recursive: true, force: true }));
+  const peer = path.join(checkout, "node_modules", "opl-packaged-peer-fixture");
+  const resourcesDir = path.join(checkout, "out", "App.app", "Contents", "Resources");
+  const payload = path.join(resourcesDir, "app.asar.unpacked");
+  const host = path.join(payload, "src", "host");
+  await mkdir(peer, { recursive: true });
+  await mkdir(host, { recursive: true });
+  await writeFile(path.join(peer, "package.json"), JSON.stringify({ name: "opl-packaged-peer-fixture", type: "module", exports: "./index.js" }));
+  await writeFile(path.join(peer, "index.js"), "export default true;\n");
+  await writeFile(path.join(host, "packaged-host-smoke.mjs"), 'import ready from "opl-packaged-peer-fixture";\nif (ready) console.log("OPL_PACKAGED_HOST_READY");\n');
+
+  assert.throws(() => verifyPackagedHostStartup({ resourcesDir }), error => {
+    assert.match(String(error.stderr), /ERR_MODULE_NOT_FOUND/);
+    assert.match(String(error.stderr), /opl-packaged-peer-fixture/);
+    return true;
+  });
+
+  await cp(peer, path.join(payload, "node_modules", "opl-packaged-peer-fixture"), { recursive: true });
+  assert.match(verifyPackagedHostStartup({ resourcesDir }), /OPL_PACKAGED_HOST_READY/);
 });
 
 test("afterPack writes app-update.yml inside the single packaged app", async () => {

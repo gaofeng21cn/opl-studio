@@ -203,12 +203,19 @@ Electron process uses a smoke-owned working directory and `DSH_HOME`; the Codex
 test workspace remains the explicitly selected repository path. This prevents
 the package from resolving DSH profile modules through `~/.dsh` or an unrelated
 worktree. The packaged closure must contain the exact direct production
-dependencies required by the pinned Host, including `@deepseek-ai/dsh-llm`,
+dependencies required by the pinned Host, including `@deepseek-ai/dsh-error`, `@deepseek-ai/dsh-llm`,
 `@deepseek-ai/dsh-session`, and `@deepseek-ai/dsh-timeout`; profile fallback
 is not packaging evidence. The smoke output is candidate evidence only. It
 does not establish an installer flow,
 clean-VM behavior, shared Runtime parity, native screen-reader behavior,
 active-shell adoption, or release readiness.
+
+The native `afterPack` Host check copies the unpacked payload into a temporary
+directory outside the source checkout before starting it. This prevents Node
+from satisfying a missing packaged peer through an ancestor `node_modules`.
+DSH runtime peers imported by the active Host must be explicit production
+dependencies in the pinned cohort; an npm development install alone is not
+proof that Electron packaged them.
 
 ## Installed Preview Acceptance
 
