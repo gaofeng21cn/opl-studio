@@ -226,3 +226,27 @@ test("closing between catalog resolution and the caller continuation prevents di
     assert.equal(calls.slice(before).some(call => call.method !== "mcpServerStatus/list"), false);
   }
 });
+
+
+test("unloaded conversation resumes once before reading its own catalog", async () => {
+  const { host, transport, calls } = fixture();
+  const request = transport.request;
+  let loaded = false;
+  transport.request = async (method, params) => {
+    if (!loaded) throw Object.assign(new Error("not loaded"), { details: { error: { code: -32600, message: "thread not found: t1" } } });
+    return request(method, params);
+  };
+  transport.resumeThread = async (id, options) => { assert.equal(id, "t1"); assert.deepEqual(options, { excludeTurns: true }); loaded = true; };
+  assert.equal((await host.list({ threadId: "t1" })).apps.length, 1);
+  assert.deepEqual(calls.map(call => call.method), ["mcpServerStatus/list"]);
+  assert.equal(calls[0].params.threadId, "t1");
+});
+
+test("an active writer elsewhere does not fall back to global permissions", async () => {
+  const { host, transport } = fixture();
+  let requests = 0;
+  transport.request = async () => { requests++; throw Object.assign(new Error("unloaded"), { details: { error: { code: -32600, message: "thread not found: t1" } } }); };
+  transport.resumeThread = async () => { throw Object.assign(new Error("busy"), { details: { error: { message: "thread t1 already has an active writer" } } }); };
+  await assert.rejects(host.list({ threadId: "t1" }), error => error.code === "mcp_app_thread_busy");
+  assert.equal(requests, 1);
+});

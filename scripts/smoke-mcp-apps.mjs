@@ -158,15 +158,21 @@ try {
   await run(`async page => { await page.setViewportSize({width:1280,height:850}); }`);
   await run(`async page => { if(await page.title() !== 'Studio MCP App acceptance') throw new Error('Wrong page'); await page.getByRole('region',{name:'Apps',exact:true}).waitFor(); }`);
   if(frameworkRoot) {
-    await run(`async page => { await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.frameLocator('iframe').locator('.progress-view').waitFor(); }`);
+    await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('.progress-view').waitFor(); }`);
     for(let index=0;index<framework.kinds.length;index++) {
       await run(`async page => { const frame=page.frameLocator('iframe'); await frame.getByRole('button',{name:${JSON.stringify(framework.titles[index])},exact:true}).click(); await frame.locator('#body').filter({hasText:'合成示例'}).waitFor(); if(await frame.locator('#title').textContent()!==${JSON.stringify(framework.titles[index])}) throw new Error('Wrong internal view'); }`);
     }
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-browser.png')}`]:[]));
-    await run(`async page => { await page.setViewportSize({width:390,height:844}); const frame=page.frameLocator('iframe'); await frame.getByLabel('当前视图').selectOption('preview-owner:approval_diff'); await frame.locator('.review-view').waitFor(); if(await frame.locator('body').evaluate(e=>e.scrollWidth>innerWidth)) throw new Error('Shared UI overflows narrow viewport'); if(await frame.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().height>innerHeight*.25)) throw new Error('View navigation takes too much height'); }`);
+    await run(`async page => { await page.setViewportSize({width:390,height:844}); const frame=page.frameLocator('iframe'); await frame.getByLabel('当前功能').selectOption('preview-owner:approval_diff'); await frame.locator('.review-view').waitFor(); if(await frame.locator('body').evaluate(e=>e.scrollWidth>innerWidth)) throw new Error('Shared UI overflows narrow viewport'); if(await frame.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().height>innerHeight*.5)) throw new Error('View navigation takes too much height'); }`);
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-narrow.png')}`]:[]));
-    await run(`async page => { await page.emulateMedia({colorScheme:'dark'}); await page.frameLocator('iframe').locator('html[data-theme="dark"]').waitFor(); if(await page.frameLocator('iframe').getByLabel('当前视图').inputValue()!=='preview-owner:approval_diff') throw new Error('Theme change lost view selection'); }`);
+    await run(`async page => { await page.emulateMedia({colorScheme:'dark'}); await page.frameLocator('iframe').locator('html[data-theme="dark"]').waitFor(); if(await page.frameLocator('iframe').getByLabel('当前功能').inputValue()!=='preview-owner:approval_diff') throw new Error('Theme change lost view selection'); }`);
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-dark.png')}`]:[]));
+    await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#title').filter({hasText:'审阅修改'}).waitFor(); }`);
+    assert.equal(host.views.size,1);
+    await run(`async page => { await page.frameLocator('iframe').getByRole('button',{name:'打开专用界面',exact:true}).click(); await page.frameLocator('iframe').locator('#navigation-target').filter({hasText:'email-store://demo/inbox/1'}).waitFor(); }`);
+    assert.equal(host.views.size,1);
+    await run(`async page => { await page.getByRole('button',{name:'Back to previous app',exact:true}).click(); await page.frameLocator('iframe').locator('#title').filter({hasText:'审阅修改'}).waitFor(); await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); }`);
+    assert.equal(host.views.size,0);
     const errors=JSON.parse(await cli('console','error')).result;
     assert.equal(errors.split('\n').filter(line=>line.startsWith('[ERROR]')).length,0,errors);
     const evidence={status:'framework_mcp_apps_browser_passed',host:'Studio source McpAppWorkspace + McpAppHost + official ext-apps',owner:'Framework shared renderer with synthetic read-only owner data',view_types:framework.kinds,view_count:framework.kinds.length,surface_count:1,narrow_and_dark:'passed',source:'passed',browser:'passed',installed:'not_run',release:'not_run',external_mutations:0};
@@ -184,7 +190,7 @@ try {
     assert.equal(stale.isError,true);
     assert.equal(stale.structuredContent.error.code,'revision_conflict');
     launch.arguments.revision=2;
-    await run(`async page => { await page.getByRole('button',{name:'Close app',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); await page.reload(); await page.frameLocator('iframe').locator('#reply-body').waitFor(); if(await page.frameLocator('iframe').locator('#reply-body').inputValue()!=='Reviewed in Studio opaque iframe.') throw new Error('Reopened the wrong draft'); }`);
+    await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); await page.reload(); await page.frameLocator('iframe').locator('#reply-body').waitFor(); if(await page.frameLocator('iframe').locator('#reply-body').inputValue()!=='Reviewed in Studio opaque iframe.') throw new Error('Reopened the wrong draft'); }`);
     assert.equal(host.views.size,1);
     const consoleOutput=JSON.parse(await cli('console','error')).result;
     assert.equal(consoleOutput.split('\n').filter(line=>line.startsWith('[ERROR]')).length,0,consoleOutput);
@@ -198,13 +204,13 @@ try {
     console.log(JSON.stringify(evidence,null,2));
     return;
   }
-  await run(`async page => { await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Catalog selection launched an app'); await page.getByRole('button',{name:'Manage apps',exact:true}).click(); if(await page.locator('body').getAttribute('data-managed')!=='true') throw new Error('Management entry not invoked'); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Catalog selection launched an app'); await page.getByRole('button',{name:'Manage apps',exact:true}).click(); if(await page.locator('body').getAttribute('data-managed')!=='true') throw new Error('Management entry not invoked'); }`);
   assert.equal(host.views.size,0);
   assert.equal(state.calls.some(call=>call.method==='mcpServer/tool/call'||call.method==='mcpServer/resource/read'),false,'Discovery must not start a UI');
-  await run(`async page => { await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":1'}).waitFor(); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":1'}).waitFor(); }`);
   await run(`async page => { await page.frameLocator('iframe').getByRole('button',{name:'Apply decision',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"status":"applied"'}).waitFor(); }`);
   assert.equal(state.applied,1);
-  await run(`async page => { await page.getByRole('button',{name:'Close app',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Apply stale revision',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'revision conflict'}).waitFor(); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Apply stale revision',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'revision conflict'}).waitFor(); }`);
   assert.equal(state.applied,1);
   state.revoked=true;
   const callsBeforeRevocation=state.calls.filter(item=>item.method==='mcpServer/tool/call').length;
@@ -212,7 +218,7 @@ try {
   assert.equal(state.calls.filter(item=>item.method==='mcpServer/tool/call').length,callsBeforeRevocation,'revoked view must not reach its former owner');
   state.revoked=false; state.unknown=true;
   const writesBeforeUnknown=state.calls.filter(item=>item.method==='mcpServer/tool/call' && item.params.tool==='apply_review').length;
-  await run(`async page => { await page.getByRole('button',{name:'Close app',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Apply decision',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"status":"unknown"'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Read owner',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Apply decision',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"status":"unknown"'}).waitFor(); await page.frameLocator('iframe').getByRole('button',{name:'Read owner',exact:true}).click(); await page.frameLocator('iframe').locator('#owner-result').filter({hasText:'"revision":2'}).waitFor(); }`);
   assert.equal(state.applied,1,'unknown result must not be treated as applied');
   assert.equal(state.calls.filter(item=>item.method==='mcpServer/tool/call' && item.params.tool==='apply_review').length,writesBeforeUnknown+1,'unknown result must not automatically retry mutation');
   assert.equal(host.views.size,1,'reopening must release the earlier ephemeral binding');
@@ -224,22 +230,22 @@ try {
   assert.equal(consoleErrors.length,1,'Only the intentional revocation response may fail in the browser');
   assert.match(consoleErrors[0],/400.*api\/call/);
   await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'mcp-app-browser.png')}`]:[]));
-  await run(`async page => { await page.getByRole('button',{name:'Close app',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Close left a mounted app'); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Close left a mounted app'); }`);
   assert.equal(host.views.size,0);
   state.multiple=true;
-  await run(`async page => { await page.getByRole('button',{name:'Refresh directory',exact:true}).click(); await page.getByRole('button',{name:'Other app Not started',exact:true}).click(); if(!await page.getByRole('button',{name:'Start app',exact:true}).isDisabled()) throw new Error('Missing required input allowed start'); await page.getByLabel('Item (required)').fill('long-item-reference-7'); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Refresh directory',exact:true}).click(); await page.getByRole('button',{name:'Other app UI closed',exact:true}).click(); if(!await page.getByRole('button',{name:'Open UI',exact:true}).isDisabled()) throw new Error('Missing required input allowed start'); await page.getByLabel('Item (required)').fill('long-item-reference-7'); }`);
   state.launchError=true;
-  await run(`async page => { await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.getByRole('button',{name:'Retry start',exact:true}).waitFor(); if(await page.getByLabel('Item (required)').inputValue()!=='long-item-reference-7') throw new Error('Launch error erased input'); await page.getByRole('navigation',{name:'App switcher'}).waitFor(); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.getByRole('button',{name:'Retry opening',exact:true}).waitFor(); if(await page.getByLabel('Item (required)').inputValue()!=='long-item-reference-7') throw new Error('Launch error erased input'); await page.getByRole('navigation',{name:'App switcher'}).waitFor(); }`);
   state.launchError=false;
   state.openDelay=500;
-  await run(`async page => { await page.getByRole('button',{name:'Retry start',exact:true}).click(); await page.getByRole('button',{name:'Review item Not started',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Late launch replaced selection'); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Retry opening',exact:true}).click(); await page.getByRole('button',{name:'Review item UI closed',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); if(await page.locator('iframe').count()) throw new Error('Late launch replaced selection'); }`);
   assert.equal(host.views.size,0,'Late launch must release its binding');
   state.openDelay=0;
-  await run(`async page => { await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.locator('iframe').waitFor(); await page.getByRole('button',{name:'Other app Not started',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); await page.getByLabel('Item (required)').fill('item-8'); await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.locator('iframe').waitFor(); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.locator('iframe').waitFor(); await page.getByRole('button',{name:'Other app UI closed',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); await page.getByLabel('Item (required)').fill('item-8'); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.locator('iframe').waitFor(); }`);
   assert.equal(host.views.size,1,'Switch must release old binding before new start');
-  await run(`async page => { await page.getByRole('button',{name:'Result app Not started',exact:true}).click(); await page.getByText('Open this app from a completed tool result in the conversation.',{exact:true}).waitFor(); if(!await page.getByRole('button',{name:'Start app',exact:true}).isDisabled()) throw new Error('Mutation-only app has manual launcher'); }`);
+  await run(`async page => { await page.getByRole('button',{name:'Result app UI closed',exact:true}).click(); await page.getByText('Open this app from a completed tool result in the conversation.',{exact:true}).waitFor(); if(!await page.getByRole('button',{name:'Open UI',exact:true}).isDisabled()) throw new Error('Mutation-only app has manual launcher'); }`);
   assert.equal(host.views.size,0);
-  await run(`async page => { await page.setViewportSize({width:390,height:844}); await page.getByLabel('Current app',{exact:true}).selectOption('mcp:fixture-owner:ui://fixture/review'); await page.getByRole('button',{name:'Start app',exact:true}).click(); await page.locator('iframe').waitFor(); if(await page.locator('body').evaluate(e=>e.scrollWidth>innerWidth)) throw new Error('App switcher overflows narrow viewport'); await page.getByRole('button',{name:'Close app',exact:true}).click(); await page.getByRole('button',{name:'Start app',exact:true}).waitFor(); await page.setViewportSize({width:1280,height:850}); }`);
+  await run(`async page => { await page.setViewportSize({width:390,height:844}); await page.getByLabel('Current app',{exact:true}).selectOption('mcp:fixture-owner:ui://fixture/review'); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.locator('iframe').waitFor(); if(await page.locator('body').evaluate(e=>e.scrollWidth>innerWidth)) throw new Error('App switcher overflows narrow viewport'); await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).waitFor(); await page.setViewportSize({width:1280,height:850}); }`);
   assert.equal(host.views.size,0);
   state.catalogError=true;
   await run(`async page => { await page.getByRole('button',{name:'Refresh directory',exact:true}).click(); await page.getByRole('button',{name:'Retry directory',exact:true}).waitFor(); }`);

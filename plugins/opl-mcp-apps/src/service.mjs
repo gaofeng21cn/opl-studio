@@ -81,9 +81,27 @@ export class McpAppHost {
   async catalog(threadId, serverName) {
     const servers = [];
     let cursor;
+    let resumed = false;
     const seen = new Set();
     do {
-      const page = await this.transport.request("mcpServerStatus/list", { detail: "full", ...(threadId ? { threadId } : {}), ...(serverName ? { serverName } : {}), ...(cursor ? { cursor } : {}) });
+      const params = { detail: "full", ...(threadId ? { threadId } : {}), ...(serverName ? { serverName } : {}), ...(cursor ? { cursor } : {}) };
+      let page;
+      try { page = await this.transport.request("mcpServerStatus/list", params); }
+      catch (error) {
+        // Reading history does not load a thread's MCP connections. Resume the
+        // exact native thread once, without starting a turn or changing policy.
+        if (resumed || !threadId || error?.details?.error?.code !== -32600
+          || error.details.error.message !== `thread not found: ${threadId}`) throw error;
+        resumed = true;
+        try { await this.transport.resumeThread(threadId, { excludeTurns: true }); }
+        catch (reason) {
+          if (reason?.details?.error?.message === `thread ${threadId} already has an active writer`) {
+            fail("mcp_app_thread_busy", "mcp_app_thread_busy: This conversation is running in another window; choose an idle conversation or retry after it finishes");
+          }
+          throw reason;
+        }
+        page = await this.transport.request("mcpServerStatus/list", params);
+      }
       servers.push(...(page.data ?? []));
       cursor = page.nextCursor;
       if (cursor && seen.has(cursor)) throw new Error("MCP catalog pagination did not advance");

@@ -2714,6 +2714,7 @@ export function App({
       task: mcpTaskTarget?.threadId === codexThreadId ? mcpTaskTarget : undefined,
       launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
       onManage: () => setPrimaryView("applications"),
+      onConversation: () => setPrimaryView("conversation"),
       onContext: (threadId: string, text: string) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
       onMessage: (threadId: string, text: string) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
     };
