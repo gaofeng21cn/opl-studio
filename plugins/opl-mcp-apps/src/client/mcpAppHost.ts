@@ -109,7 +109,7 @@ export function resolveMcpNavigation(url: string, apps: import("../../../../src/
   if (!url.startsWith("ui://") || url.length > 16384) throw new Error("无效的应用入口");
   const [resourceUri, fragment = ""] = url.split("#");
   const matches = apps.filter(app => app.resourceUri === resourceUri && app.readOnly);
-  if (matches.length !== 1) throw new Error(matches.length ? "找到多个同名界面，请从应用列表选择。" : "该专用界面尚未连接，请刷新目录或到应用管理检查连接。");
+  if (matches.length !== 1) throw new Error(matches.length ? "找到多个同名界面，请从应用列表选择。" : "该专用界面尚未连接，请刷新目录或到软件中心检查连接。");
   const app = matches[0]!;
   const input = fragment ? JSON.parse(decodeURIComponent(fragment)) : {};
   return { app, arguments: navigationArguments(app, input) };

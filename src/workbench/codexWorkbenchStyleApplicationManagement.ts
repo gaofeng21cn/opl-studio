@@ -708,4 +708,18 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     .opl-catalog-external-status > span { flex-basis: 100%; }
   }
 
+
+  .opl-software-attention { margin: 16px 0; font-size: var(--opl-text-sm); color: var(--opl-text); }
+  .opl-software-attention > summary { cursor: pointer; width: fit-content; font-weight: var(--opl-weight-medium); }
+  .opl-software-attention-row, .opl-software-continuation { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--opl-border); }
+  .opl-software-attention-row > div:first-child, .opl-software-continuation > div:first-child { min-width: 0; }
+  .opl-software-attention-row p, .opl-software-continuation p { margin: 5px 0; color: var(--opl-muted); line-height: var(--opl-leading-relaxed); max-width: 70ch; }
+  .opl-software-attention-row small { color: var(--opl-muted); overflow-wrap: anywhere; }
+  .opl-software-continuation { font-size: var(--opl-text-sm); margin: 12px 0; }
+  .opl-software-attention summary:focus-visible { outline: 2px solid var(--opl-text); outline-offset: 4px; }
+  .opl-resource-form fieldset > label { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .opl-catalog-row-actions { gap: 8px; flex-wrap: wrap; }
+  @media (max-width: 680px) {
+    .opl-software-attention-row, .opl-software-continuation { align-items: flex-start; flex-direction: column; gap: 10px; }
+  }
 `;

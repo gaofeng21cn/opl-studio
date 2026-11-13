@@ -588,6 +588,10 @@ function packageLifecycleItem(
     ...(record.deployment_target === "cloud" || record.deployment_target === "mobile" || record.deployment_target === "device" || record.deployment_target === "remote_service" || record.deployment_target === "unknown"
       ? { deploymentTarget: record.deployment_target } : {}),
     ...(typeof record.icon_url === "string" ? { iconUrl: record.icon_url } : {}),
+    ...(asRecord(record.miniapp_entry) && /^ui:\/\/[^#]+$/.test(String(asRecord(record.miniapp_entry)?.resource_uri)) ? { miniAppEntry: {
+      resourceUri: String(asRecord(record.miniapp_entry)?.resource_uri),
+      arguments: Object.fromEntries(Object.entries(asRecord(asRecord(record.miniapp_entry)?.arguments) ?? {}).filter(([key, value]) => ["package_id", "view_id"].includes(key) && typeof value === "string")) as Record<string, string>
+    } } : {}),
     ...(typeof record.icon_ref === "string" ? { iconRef: record.icon_ref } : {}),
     ...(typeof record.carrier_source_commit === "string" ? { iconSourceCommit: record.carrier_source_commit } : {}),
     ...(record.release_channel === "preview" || record.release_channel === "stable"

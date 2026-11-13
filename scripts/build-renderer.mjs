@@ -1,3 +1,4 @@
+import { generateSoftwareArtwork } from "./software-artwork.mjs";
 import { readStudioSettingsSearchClient } from "./settings-search-client.mjs";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -11,6 +12,7 @@ import { createDeepLinkPolicy } from "../desktop/deep-links.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const templatePath = path.join(root, "src", "renderer-shell.html");
 const appRepoRoot = resolveAppRepoRoot(root);
+generateSoftwareArtwork(root, appRepoRoot);
 const appProductProfilePath = path.join(appRepoRoot, "contracts", "app-product-profile.json");
 const legacyModelPolicySource = "one-person-lab-app/contracts/app-product-profile.json#gui.home.codex_model_display_options";
 const autoModelPolicySource = "one-person-lab-app/contracts/app-product-profile.json#codex.auto_model_policy";

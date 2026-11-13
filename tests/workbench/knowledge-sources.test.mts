@@ -19,7 +19,7 @@ const { settingsDefaults } = await import("../../src/workbench/settingsModel");
 function ownerProjection() {
   return {
     surface_kind: "opl_knowledge_sources_projection.v1", status: "available",
-    contexts: [{ context_id: "personal", label: "Personal workspace", selected: true, revision: "context-revision-7", available_scope_ids: ["personal.policy", "personal.projects"] }],
+    contexts: [{ context_id: "personal", label: "Personal workspace", selected: true, revision: "context-revision-7", available_scope_ids: ["personal.policy", "personal.projects"], scope_options: [{ id: "personal.policy", label: "Personal policies" }, { id: "personal.projects", label: "Personal projects" }], default_scope_ids: [] }],
     items: [{
       resource_id: "knowledge:personal:notes", source_id: "notes", context_id: "personal", label: "Personal Obsidian library", status: "ready",
       scope_ids: ["personal.policy", "personal.projects"], consumer_domain_ids: ["persona"], consumer_package_ids: ["opl-persona"], write_domain_ids: [], source_writable: false, revision_identity: "source-revision-11",
@@ -116,7 +116,7 @@ test("application management does not invent zero entries or health before a cat
   }
 });
 
-test("shared resource staleness contributes once to application attention", () => {
+test("unused resource staleness is not a user action and read failures stay visible", () => {
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { surface_kind: "opl_app_agent_packages_projection", directory: { entries: [] } } } });
   model.knowledgeSources = projection();
   model.knowledgeSources.entries[0]!.freshnessStatus = "stale";
@@ -124,8 +124,8 @@ test("shared resource staleness contributes once to application attention", () =
     resourceId: "knowledge:personal:notes", resourceKind: "knowledge_source", label: "Personal Obsidian library", status: "ready", sourceRefs: [], consumerPackageIds: ["opl-persona"], relationKind: "configured", freshness: { status: "stale" }
   }] };
   const markup = applicationMarkup(model, "ready");
-  expect(markup).toMatch(new RegExp("<strong>1</strong> shared resources need attention"));
-  expect(markup).not.toContain("No known issues");
+  expect(markup).not.toContain("items need your attention");
+  expect(markup).toContain("Some status is not confirmed");
   expect(markup).not.toMatch(new RegExp("<strong>2</strong> shared resources need attention"));
   const failedRead = applicationMarkup({ ...model, stateGeneratedAt: "2026-11-10T02:00:00Z" }, "error");
   expect(failedRead).toContain("Last read:");
@@ -224,6 +224,7 @@ test("connecting a library uses the selected context revision and an explicit lo
       location.dispatchEvent(new browser.Event("input", { bubbles: true }) as unknown as Event);
       location.dispatchEvent(new browser.KeyboardEvent("keyup", { key: "s", bubbles: true }) as unknown as Event);
     });
+    flushSync(() => container.querySelectorAll<HTMLInputElement>("fieldset:first-of-type input").forEach(input => input.click()));
     const readers = container.querySelectorAll<HTMLInputElement>(".opl-resource-consumers > div:first-child input");
     flushSync(() => readers[0]!.click());
     flushSync(() => readers[1]!.click());

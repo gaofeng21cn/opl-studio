@@ -33,6 +33,7 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
             <div>
               <h2 id="settings-action-dialog-title">{pendingConfirmation.request.label}</h2>
               {pendingConfirmation.request.targetLocation ? <p>{settings.locale === "zh" ? "安装位置" : "Installation location"}<br /><code className="settings-action-target-location">{pendingConfirmation.request.targetLocation}</code></p> : null}
+              {pendingConfirmation.request.targetEffect ? <p>{pendingConfirmation.request.targetEffect}</p> : null}
               <p>{pendingConfirmation.request.actionId === "official_profile_restore"
                 ? (settings.locale === "zh" ? "将安装或修复当前官方组合中缺少的智能体和必需能力，包括此前主动卸载的项目。已有项目、会话和用户文件会保留。" : "Install or repair missing agents and required capabilities in the current official combination, including previously uninstalled items. Existing projects, conversations, and user files are preserved.")
                 : pendingConfirmation.request.actionId === "gateway_account_use_for_model_access"

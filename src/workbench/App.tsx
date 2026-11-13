@@ -1,3 +1,4 @@
+import { softwareCanStart } from "./softwareExperience";
 import { createComposerAttachmentController, disposeSelectionPreviews } from "./composerAttachments";
 import type { McpAppOpen } from "../bridge/mcpApps";
 import { useWorkbenchShortcuts } from "./shortcuts";
@@ -416,6 +417,7 @@ export function App({
   const [artifactPreviewOpen, setArtifactPreviewOpen] = useState(false);
   const [mcpAppLaunch, setMcpAppLaunch] = useState<(McpAppOpen & { title: string }) | undefined>();
   const [mcpTaskTarget, setMcpTaskTarget] = useState<{ itemId: string; viewId?: string; threadId?: string } | undefined>();
+  const [preferredSoftwareEntry, setPreferredSoftwareEntry] = useState<{ resourceUri: string; arguments: Record<string, string> }>();
   const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [applicationManagementTab, setApplicationManagementTab] = useState<ApplicationManagementTab>("applications");
@@ -2288,6 +2290,20 @@ export function App({
     setSelectedAgent(agentPackageSelectionIntent(agent));
   }
 
+  function useSoftware(packageId: string) {
+    const item = model.packageLifecycle.find(candidate => candidate.packageId === packageId);
+    if (!item || !softwareCanStart(item)) return;
+    if (item.miniAppEntry) {
+      setPreferredSoftwareEntry({ ...item.miniAppEntry });
+      setMcpTaskTarget(undefined);
+      setMcpAppSelectedLaunch(undefined);
+      setPrimaryView("workspace");
+    } else {
+      setSelectedAgent(agentPackageSelectionIntent(item));
+      setPrimaryView("conversation");
+    }
+  }
+
   async function loadCapabilities(force = false) {
     if (capabilityStatus === "loading" && !force) return false;
     setCapabilityStatus("loading");
@@ -2667,6 +2683,8 @@ export function App({
   const mcpApps = {
       bridge,
       task: mcpTaskTarget?.threadId === codexThreadId ? mcpTaskTarget : undefined,
+      preferredEntry: preferredSoftwareEntry,
+      onPreferredEntryConsumed: (entry: NonNullable<typeof preferredSoftwareEntry>) => setPreferredSoftwareEntry(current => current === entry ? undefined : current),
       launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
       onManage: () => setPrimaryView("applications"),
       onConversation: () => setPrimaryView("conversation"),
@@ -2741,6 +2759,9 @@ export function App({
       capabilityStatus={capabilityStatus}
       capabilityError={capabilityError}
       onRefreshCapabilities={() => void loadCapabilities(true)}
+      onUseSoftware={(packageId) => void useSoftware(packageId)}
+      onPickKnowledgeDirectory={bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined}
+      onOpenInstallationLocation={bridge.platformCapabilities.nativeWorkspaceFileAccess ? path => { void bridge.revealLocalPath({ path }).catch(error => setSettingsActionFeedback({ tone: "attention", message: String(error) })); } : undefined}
       stateStatus={stateStatus}
       stateError={stateError}
       onApproveConnectionAccess={bridge.platformCapabilities.connectionAccessApproval ? approveConnectionAccess : undefined}

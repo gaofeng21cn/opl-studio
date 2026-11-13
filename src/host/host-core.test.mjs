@@ -837,3 +837,16 @@ test("desktop workspace actions invoke the platform only after canonical path va
   core.platform.accessWorkspacePath = async () => { throw new Error("No associated application"); };
   await assert.rejects(core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "open" }), /No associated application/);
 });
+
+
+test("installation locations are revealed without executing files or accepting relative paths", async (t) => {
+  const calls = [];
+  const core = new OplHostCore({ platform: { accessWorkspacePath: async (request) => calls.push(request) } });
+  t.after(() => core.close());
+  await core.invoke("revealLocalPath", { path: path.resolve("fixture-installation"), action: "open" });
+  assert.deepEqual(calls, [{ path: path.resolve("fixture-installation"), action: "reveal" }]);
+  for (const invalid of ["../app", "", "https://example.com", "/tmp/app\0bad"]) {
+    await assert.rejects(core.invoke("revealLocalPath", { path: invalid }), /absolute local path/);
+  }
+  assert.equal(calls.length, 1);
+});

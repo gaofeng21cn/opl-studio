@@ -110,7 +110,7 @@ export function CapabilityDirectory({
         name: item.name,
         description: item.description,
         status: item.enabled && item.callable ? "available" : item.enabled ? "checking" : "disabled",
-        detail: locale === "zh" ? "扩展已启用不代表外部账户已连接；连接状态请查看“资源与连接”。" : "An enabled extension does not imply a connected account. See Resources & Connections.",
+        detail: locale === "zh" ? "扩展已启用不代表外部账户已连接；连接状态请查看软件中心的“共享资源”。" : "An enabled extension does not imply a connected account. See Shared resources in Software Center.",
         technical: item.id
       }))
     },
@@ -122,7 +122,7 @@ export function CapabilityDirectory({
         name: item.name,
         description: item.description,
         status: item.enabled && item.callable ? "available" : item.enabled ? "checking" : "disabled",
-        detail: locale === "zh" ? "扩展已启用不代表外部账户已连接；连接状态请查看“资源与连接”。" : "An enabled extension does not imply a connected account. See Resources & Connections.",
+        detail: locale === "zh" ? "扩展已启用不代表外部账户已连接；连接状态请查看软件中心的“共享资源”。" : "An enabled extension does not imply a connected account. See Shared resources in Software Center.",
         technical: item.id
       }))
     }

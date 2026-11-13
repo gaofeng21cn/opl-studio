@@ -7,6 +7,8 @@ import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, wo
 
 export type McpAppProps = {
   bridge: McpAppsBridge & Partial<Pick<OplBridge, "readThread" | "listThreadWorkspace" | "readThreadWorkspaceBytes" | "accessThreadWorkspace" | "platformCapabilities">>; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
+  preferredEntry?: { resourceUri: string; arguments: Record<string, string> };
+  onPreferredEntryConsumed?: (entry: NonNullable<McpAppProps["preferredEntry"]>) => void;
   onManage?: () => void;
   onConversation?: () => void;
   onContext(threadId: string, context: string): void;
@@ -157,6 +159,7 @@ export function McpAppWorkspace(props: McpAppProps) {
   const generation = useRef(0);
   const active = useRef<{ view: McpAppSession; owner: McpAppsBridge } | null>(null);
   const pending = useRef<Promise<void>>(Promise.resolve());
+  const consumedEntry = useRef<McpAppProps["preferredEntry"]>(undefined);
   const zh = locale === "zh";
 
   async function release() {
@@ -205,6 +208,21 @@ export function McpAppWorkspace(props: McpAppProps) {
   }, [bridge, threadId, props.launch]);
   useEffect(() => {
     if (loading || catalogError) return;
+    const entry = props.preferredEntry;
+    if (threadId && apps.length && entry && entry !== consumedEntry.current && !props.launch) {
+      consumedEntry.current = entry;
+      try {
+        const target = resolveMcpNavigation(`${entry.resourceUri}#${encodeURIComponent(JSON.stringify(entry.arguments))}`, apps);
+        setSelected(descriptorId(target.app));
+        const values = { ...initialInputs(target.app), ...Object.fromEntries(Object.entries(target.arguments).map(([key, value]) => [key, typeof value === "string" ? value : JSON.stringify(value)])) };
+        setInputs(values);
+        if (target.app.readiness === "ready" && !missingRequiredInput(target.app, values)) {
+          transition({ threadId, server: target.app.server, tool: launchTool(target.app), miniAppId: descriptorId(target.app), arguments: target.arguments });
+        }
+      } catch (reason) { setError(String(reason)); }
+      props.onPreferredEntryConsumed?.(entry);
+      return;
+    }
     if (selected && apps.some(app => descriptorId(app) === selected)) return;
     // A completed call may arrive before the catalog. Match its exact resource
     // when the directory arrives without reopening or replacing that call.
@@ -214,7 +232,7 @@ export function McpAppWorkspace(props: McpAppProps) {
     setSelected(next ? descriptorId(next) : "");
     setInputs(inputsFor(next));
     if (view && !match) transition();
-  }, [apps, loading, catalogError]);
+  }, [apps, loading, catalogError, props.preferredEntry, props.launch, threadId]);
   const current = apps.find(app => descriptorId(app) === selected) ?? apps[0];
   const currentSession = session && current && session.miniAppId === descriptorId(current) ? session : null;
   const requiredInputMissing = missingRequiredInput(current, inputs);
@@ -249,16 +267,16 @@ export function McpAppWorkspace(props: McpAppProps) {
   }
   return <section className="opl-mcp-app-workspace" aria-label={zh ? "应用" : "Apps"}>
     <header className="opl-mcp-app-header">
-      <div><h3>{zh ? "MiniApp 工作台" : "MiniApp workspace"}</h3><p>{zh ? "选择应用并打开界面；安装、更新和启停请到应用管理。" : "Select an app and open its UI. Install, update, and enable apps in app management."}</p></div>
+      <div><h3>{zh ? "MiniApp 工作台" : "MiniApp workspace"}</h3><p>{zh ? "选择应用并打开界面；安装、更新和启停请到软件中心。" : "Select an app and open its UI. Install, update, and enable apps in Software Center."}</p></div>
       <div className="opl-workspace-commandbar">
         {threadId ? <button type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</button> : null}
-        {props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "应用管理" : "App management"}</button> : null}
+        {props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "软件中心" : "Software Center"}</button> : null}
       </div>
     </header>
     {!threadId ? <div className="opl-mcp-app-empty"><strong>{zh ? "先打开一个对话" : "Open a conversation first"}</strong><p>{zh ? "应用会使用该对话已有的连接和权限。回到对话后，从左侧选择已有对话，再打开工作台。" : "Apps use that conversation’s connections and permissions."}</p>{props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</button> : null}</div> : null}
     {threadId && loading ? <p className="opl-mcp-app-notice" role="status">{zh ? "正在加载可用应用…" : "Loading available apps…"}</p> : null}
-    {catalogError ? <div className="opl-mcp-app-error"><p role="alert">{catalogError.includes("mcp_app_thread_busy") ? (zh ? "此对话的连接正在由另一窗口使用。请选择其他对话，或在另一窗口释放连接后重试。" : "This conversation's connection is in use by another window. Choose another conversation or retry after that window releases it.") : (zh ? "应用连接未就绪，请重新连接目录；也可到应用管理检查连接。" : "App connections are not ready. Retry the directory or check app management.")}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{catalogError}</p></details><button type="button" onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "重试目录" : "Retry directory"}</button>{props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</button> : null}</div> : null}
-    {threadId && !loading && !apps.length && !catalogError ? <div className="opl-mcp-app-empty"><strong>{zh ? "当前会话没有可用的 MiniApp" : "No MiniApps are available in this conversation"}</strong><p>{zh ? "前往应用管理检查安装与连接，再返回会话刷新目录。" : "Check installation and connections in app management, then refresh this directory."}</p>{props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "打开应用管理" : "Open app management"}</button> : null}</div> : null}
+    {catalogError ? <div className="opl-mcp-app-error"><p role="alert">{catalogError.includes("mcp_app_thread_busy") ? (zh ? "此对话的连接正在由另一窗口使用。请选择其他对话，或在另一窗口释放连接后重试。" : "This conversation's connection is in use by another window. Choose another conversation or retry after that window releases it.") : (zh ? "应用连接未就绪，请重新连接目录；也可到软件中心检查连接。" : "App connections are not ready. Retry the directory or check Software Center.")}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{catalogError}</p></details><button type="button" onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "重试目录" : "Retry directory"}</button>{props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</button> : null}</div> : null}
+    {threadId && !loading && !apps.length && !catalogError ? <div className="opl-mcp-app-empty"><strong>{zh ? "当前会话没有可用的 MiniApp" : "No MiniApps are available in this conversation"}</strong><p>{zh ? "前往软件中心检查安装与连接，再返回会话刷新目录。" : "Check installation and connections in Software Center, then refresh this directory."}</p>{props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "打开软件中心" : "Open Software Center"}</button> : null}</div> : null}
     {threadId && current ? <div className="opl-mcp-app-layout">
       <label className="opl-mcp-app-compact-switcher"><span>{zh ? "当前应用" : "Current app"}</span>
         <select aria-label={zh ? "当前应用" : "Current app"} value={descriptorId(current)} onChange={event => { const app = apps.find(entry => descriptorId(entry) === event.target.value); if (app) select(app); }}>

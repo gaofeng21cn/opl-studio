@@ -31,10 +31,13 @@ export function installationActionRequest(installation: SoftwareInstallationRef,
   const target = action.payload.operation === "update" && typeof action.payload.version === "string" ? action.payload.version : undefined;
   return { key: `installation:${installation.installationId}:${action.actionId}:${String(action.payload.operation ?? "")}`, actionId: action.actionId,
     label: `${installationActionLabel(action, locale)} · ${version}${target && target !== version ? ` → ${target}` : ""}`, targetLocation: installation.location,
+    targetEffect: action.payload.operation === "unlink" ? (locale === "zh" ? "解除 OPL 接入，保留源码目录与个人资料。" : "Disconnect from OPL and keep the source directory and personal data.")
+      : action.payload.operation === "activate" ? (locale === "zh" ? "将此安装设为后续调用使用的版本，保留其他安装。" : "Use this installation for subsequent calls and retain other installations.")
+      : action.payload.operation === "uninstall" ? (locale === "zh" ? "只移除所选安装。资料保留范围以软件的预检查结果为准。" : "Remove the selected installation. Review the software's preview for data retention.") : undefined,
     payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported };
 }
 
-export function SoftwareInstallations({ installations, activeId, activationStatus, packageId, productActions = [], locale, actionBusyKey, onAction, onUpdates }: {
+export function SoftwareInstallations({ installations, activeId, activationStatus, packageId, productActions = [], locale, actionBusyKey, onAction, onUpdates, onOpenLocation }: {
   installations: SoftwareInstallationRef[];
   activeId?: string;
   activationStatus?: SoftwareActivationStatus;
@@ -44,6 +47,7 @@ export function SoftwareInstallations({ installations, activeId, activationStatu
   actionBusyKey: string | null;
   onAction(request: SettingsActionRequest): void;
   onUpdates?: () => void;
+  onOpenLocation?: (path: string) => void;
 }) {
   const zh = locale === "zh";
   const active = activeSoftwareInstallation(installations, activeId, activationStatus);
@@ -54,22 +58,24 @@ export function SoftwareInstallations({ installations, activeId, activationStatu
     && typeof action.payload.version === "string" && action.payload.version.length > 0
     && typeof action.payload.expected_revision === "string" && action.payload.expected_revision.length > 0
     && actionPayloadComplete(action.payload, action.payloadFields));
-  return <section className="opl-dsh-owner-section" data-testid="opl-software-installations">
-    <h4>{zh ? "本机安装" : "Installations on this device"}</h4>
-    <p>{zh ? "每份安装分别管理；同一环境只使用一个激活实例。" : "Manage each installation separately; one is active in this environment."}</p>
-    {installActions.length ? <div className="opl-software-installation-actions">{installActions.map(action => <Button key={`${action.actionId}:${String(action.payload.version)}`} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${String(action.payload.package_id)}:${action.actionId}:install`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${String(action.payload.version)}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)} · {String(action.payload.version)}</Button>)}</div> : null}
-    {!installations.length ? <p>{zh ? "本机没有此软件的安装记录。" : "No installation of this software was found on this device."}</p> : installations.map(installation => {
+  const renderInstallation = (installation: SoftwareInstallationRef) => {
       const current = active?.installationId === installation.installationId;
       const actions = availableInstallationActions(installation);
       return <div className="opl-software-installation" key={installation.installationId} data-testid="opl-local-installation" data-installation-id={installation.installationId}>
-        <div className="opl-software-installation-heading"><strong>{installation.displayVersion ?? installation.version}</strong><Tag tone="quiet">{installation.mode === "development" ? (zh ? "开发版" : "Development") : (zh ? "安装版" : "Installed")}</Tag><span>{current ? (zh ? "当前使用" : "In use") : installation.active ? softwareActivationLabel(activationStatus === "conflict" ? "conflict" : "unknown", locale) : (zh ? "未激活" : "Inactive")}</span></div>
+        <div className="opl-software-installation-heading"><strong>{installation.displayVersion ?? installation.version}</strong><Tag tone="quiet">{installation.mode === "development" ? (zh ? "开发版" : "Development") : (zh ? "发布版" : "Release")}</Tag><span>{current ? (zh ? "当前使用" : "In use") : (zh ? "未使用" : "Not in use")}</span></div>
         <dl><div><dt>{zh ? "安装位置" : "Location"}</dt><dd><code>{installation.location}</code></dd></div><div><dt>{zh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(installation.manager, locale)}</dd></div>{installation.availableVersion ? <div><dt>{zh ? "可用版本" : "Available version"}</dt><dd>{installation.availableVersion}</dd></div> : null}</dl>
-        {installation.mode === "development" ? <p>{["app_bundle", "macos_bundle"].includes(installation.kind)
-          ? (zh ? "这是本地开发构建，由应用的开发构建流程更新。" : "This local development build is updated through the application's development workflow.")
-          : (zh ? "代码由开发工具维护；解除接入会保留源码和数据。" : "Development tools maintain this code. Unlinking preserves source and data.")}</p> : null}
+        {onOpenLocation ? <Button size="sm" variant="outline" onClick={() => onOpenLocation(installation.location)}>{zh ? "打开位置" : "Show location"}</Button> : null}
+        {installation.mode === "development" ? <p>{["app_bundle", "macos_bundle"].includes(installation.kind) ? (zh ? "此开发构建由本地构建流程更新。" : "Update this development build through the local build workflow.") : (zh ? "由开发工具维护；解除接入会保留源码和资料。" : "Managed by development tools. Unlinking keeps source and data.")}</p> : <p>{zh ? "卸载只移除此安装；个人资料按软件的保留规则处理。" : "Uninstall removes this installation; the software's data-retention rules apply."}</p>}
         {actions.length ? <div className="opl-software-installation-actions">{actions.map(action => <Button key={action.actionId + String(action.payload.operation ?? "")} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction(installationActionRequest(installation, action, locale))}>{installationActionLabel(action, locale)}</Button>)}</div> : installation.kind !== "managed_runtime" && installation.ownerSettingsRoute === "updates" && onUpdates ? <Button size="sm" variant="outline" onClick={onUpdates}>{zh ? "管理此安装" : "Manage installation"}</Button> : null}
       </div>;
-    })}
+  };
+  return <section className="opl-dsh-owner-section" data-testid="opl-software-installations">
+    <h4>{zh ? "本机安装" : "Installations on this device"}</h4>
+    <p>{zh ? "OPL 当前使用下方选定的安装。其他安装可以保留并分别管理。" : "OPL uses the selected installation below. Keep and manage other installations separately."}</p>
+    {installActions.length ? <div className="opl-software-installation-actions">{installActions.map(action => <Button key={`${action.actionId}:${String(action.payload.version)}`} size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `installation:${String(action.payload.package_id)}:${action.actionId}:install`, actionId: action.actionId, label: `${installationActionLabel(action, locale)} · ${String(action.payload.version)}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{installationActionLabel(action, locale)} · {String(action.payload.version)}</Button>)}</div> : null}
+    {!installations.length ? <p>{zh ? "本机没有此软件的安装记录。" : "No installation was found on this device."}</p> : null}
+    {active ? renderInstallation(active) : null}
+    {installations.some(item => item !== active) ? <details open={!active} className="opl-resource-details"><summary>{zh ? "其他安装与管理" : "Other installations and management"} · {installations.filter(item => item !== active).length}</summary>{installations.filter(item => item !== active).map(renderInstallation)}</details> : null}
     {!active && installations.length ? <p role={activationStatus === "conflict" ? "alert" : undefined}>{softwareActivationLabel(activationStatus, locale)}</p> : null}
   </section>;
 }
@@ -82,8 +88,8 @@ export function SoftwareReleaseOptions({ product, locale, actionBusyKey, onActio
 }) {
   const zh = locale === "zh";
   if (!product.channels.length) return null;
-  return <section className="opl-dsh-owner-section" data-testid="opl-software-releases">
-    <h4>{zh ? "获取其他版本" : "Available releases"}</h4>
+  return <details className="opl-dsh-owner-section opl-resource-details" data-testid="opl-software-releases">
+    <summary>{zh ? "获取其他版本" : "Available releases"}</summary>
     <p>{zh ? "以下是安装选项；安装位置和激活状态见“本机安装”。" : "These are installation options. Locations and active state are listed under installations."}</p>
     {product.channels.map(({ source, item }) => {
       const install = item.availableActions.find(action => action.actionId === "source_install" && action.status === "available"
@@ -95,5 +101,5 @@ export function SoftwareReleaseOptions({ product, locale, actionBusyKey, onActio
         {install ? <Button size="sm" variant="outline" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `source:${source.sourceId}:${item.itemId}:${install.actionId}`, actionId: install.actionId, label: `${zh ? "安装" : "Install"} ${item.displayName} ${nativeAvailableDisplayVersion(item) ?? ""}`, payload: install.payload, confirmationRequired: install.confirmationRequired, dryRunSupported: install.dryRunSupported })}>{zh ? "安装此版本" : "Install this version"}</Button> : null}
       </div>;
     })}
-  </section>;
+  </details>;
 }

@@ -1,7 +1,7 @@
 import type { SoftwareSourceActionRef } from "./workbenchModel-package-contracts";
 import { asOptionalBoolean, asRecord, asRecordArray, asString, asStringArray } from "./workbenchModel-primitives";
 
-export type KnowledgeSourceContext = { contextId: string; label: string; selected: boolean; revision?: string; availableScopeIds: string[] };
+export type KnowledgeSourceContext = { contextId: string; label: string; selected: boolean; revision?: string; availableScopeIds: string[]; scopeOptions?: Array<{ id: string; label: string }>; defaultScopeIds?: string[] };
 export type KnowledgeSourceConsumer = { domainId: string; label: string; packageId?: string };
 export type KnowledgeSourceHealth = {
   currentCount: number; reviewDueCount: number; inactiveCount: number; unavailableCount: number; checkedCount: number; truncated: boolean;
@@ -53,7 +53,9 @@ export function readKnowledgeSourcesProjection(value: unknown): KnowledgeSources
     contexts: asRecordArray(input.contexts).flatMap(context => {
       const contextId = asString(context.context_id); if (!contextId) return [];
       return [{ contextId, label: asString(context.label) ?? contextId, selected: context.selected === true,
-        revision: asString(context.revision) ?? undefined, availableScopeIds: asStringArray(context.available_scope_ids) }];
+        revision: asString(context.revision) ?? undefined, availableScopeIds: asStringArray(context.available_scope_ids),
+        scopeOptions: asRecordArray(context.scope_options).flatMap(option => { const id = asString(option.id); return id ? [{ id, label: asString(option.label) ?? id }] : []; }),
+        defaultScopeIds: asStringArray(context.default_scope_ids) }];
     }),
     entries: asRecordArray(input.items).flatMap(item => {
       const resourceId = asString(item.resource_id); const sourceId = asString(item.source_id); const contextId = asString(item.context_id);

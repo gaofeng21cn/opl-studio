@@ -12,13 +12,14 @@ import {
 import { publicSoftwareIconUrl, SoftwareArtwork } from "../../src/workbench/SoftwareArtwork.tsx";
 
 test("every managed OPL catalog identity has bundled PNG artwork", () => {
-  assert.equal(softwareArtworkCatalogIds.length, 24);
+  assert.ok(softwareArtworkCatalogIds.length > 0);
+  assert.equal(new Set(softwareArtworkCatalogIds).size, softwareArtworkCatalogIds.length);
   for (const id of softwareArtworkCatalogIds) {
     const icon = localSoftwareIconUrl(id);
     assert.ok(icon, `${id} must resolve to bundled artwork`);
     assert.match(icon, /\.png$/i, `${id} must use PNG artwork`);
   }
-  assert.equal(new Set(softwareArtworkCatalogIds.map(id => softwareArtworkById[id])).size, 24, "catalog entries should remain visually distinct");
+  assert.equal(new Set(softwareArtworkCatalogIds.map(id => softwareArtworkById[id])).size, softwareArtworkCatalogIds.length, "catalog entries should remain visually distinct");
   assert.match(genericSoftwareIconUrl, /\.png$/i);
 });
 

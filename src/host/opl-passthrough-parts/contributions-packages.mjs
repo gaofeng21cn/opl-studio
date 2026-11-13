@@ -197,6 +197,10 @@ function compactSoftwareInstallation(value) {
 
 function compactPackageRecord(value) {
   const record = selectedFields(value, packageFields) ?? {};
+  if (typeof value?.miniapp_entry?.resource_uri === "string" && /^ui:\/\/[^#]+$/.test(value.miniapp_entry.resource_uri)) {
+    record.miniapp_entry = { resource_uri: value.miniapp_entry.resource_uri,
+      arguments: Object.fromEntries(Object.entries(selectedFields(value.miniapp_entry.arguments, ["package_id", "view_id"]) ?? {}).filter(([, value]) => typeof value === "string")) };
+  }
   const sourcePolicy = selectedFields(value?.source_policy, [
     "effective_install_update_source", "desired_source_kind", "package_channel_auto_update"
   ]);

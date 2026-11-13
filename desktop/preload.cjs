@@ -100,6 +100,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   respondToServerRequest: (request) => invoke("respondToServerRequest", request),
   pickFiles: () => invoke("pickFiles"),
   pickDirectory: () => invoke("pickDirectory"),
+  revealLocalPath: (request) => invoke("revealLocalPath", request),
   resolveDroppedInputs: (files) => invoke("classifyInputPaths", {
     paths: Array.from(files ?? []).map((file) => webUtils.getPathForFile(file)).filter(Boolean)
   }),

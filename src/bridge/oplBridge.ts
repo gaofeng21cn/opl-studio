@@ -166,6 +166,10 @@ export function createBrowserBridge(): OplBridge {
       const promise = candidate?.pickDirectory?.() ?? Promise.resolve([]);
       return Promise.resolve(promise).then(normalizePickedInputs);
     },
+    revealLocalPath(request) {
+      if (!candidate?.revealLocalPath) return Promise.reject(new Error("Showing local locations is unavailable in this host"));
+      return Promise.resolve(candidate.revealLocalPath(request));
+    },
     resolveDroppedInputs(files) {
       const promise = candidate?.resolveDroppedInputs?.(files) ?? Promise.resolve([]);
       return Promise.resolve(promise).then(normalizePickedInputs);

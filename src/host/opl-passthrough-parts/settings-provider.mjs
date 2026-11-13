@@ -102,7 +102,9 @@ function compactKnowledgeSources(value) {
     ...selectedFields(value, ["surface_kind", "status"]),
     contexts: records(value.contexts).map(item => ({
       ...selectedFields(item, ["context_id", "label", "selected", "revision", "status"]),
-      available_scope_ids: strings(item.available_scope_ids)
+      available_scope_ids: strings(item.available_scope_ids),
+      scope_options: records(item.scope_options).map(option => selectedFields(option, ["id", "label"])),
+      default_scope_ids: strings(item.default_scope_ids)
     })),
     items: records(value.items).map(item => ({
       ...selectedFields(item, ["resource_id", "source_id", "label", "context_id", "status", "connected", "source_writable", "revision_identity", "knowledge_count", "reason", "owner_settings_route", "access_editable", "access_edit_reason", "scope_expansion_allowed"]),

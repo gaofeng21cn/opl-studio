@@ -74,10 +74,12 @@ type SharedResourcesPageProps = {
   onAction: (request: SettingsActionRequest) => void; onRefresh: () => void;
   onOpenSettings?: (destination: SettingsDestinationId) => void;
   onOpenApplicationTab: (tab: ApplicationManagementTab) => void;
+  onPickKnowledgeDirectory?: () => Promise<string | undefined>;
+  selectedPackageId?: string;
   onApproveConnectionAccess?: (requestId: string) => Promise<boolean>;
 };
 
-export function SharedResourcesPage({ model, settings, actionBusyKey, onAction, onRefresh, onOpenSettings, onOpenApplicationTab, onApproveConnectionAccess }: SharedResourcesPageProps) {
+export function SharedResourcesPage({ model, settings, actionBusyKey, onAction, onRefresh, onOpenSettings, onOpenApplicationTab, onApproveConnectionAccess, onPickKnowledgeDirectory, selectedPackageId }: SharedResourcesPageProps) {
   const zh = settings.locale === "zh";
   const resources = model.applicationManagement?.sharedResources ?? [];
   const packageLabel = (id: string) => { const item = model.packageLifecycle.find(candidate => candidate.packageId === id); return item?.displayNameI18n[settings.locale] ?? item?.label ?? id; };
@@ -89,7 +91,10 @@ export function SharedResourcesPage({ model, settings, actionBusyKey, onAction, 
   const dependencies = model.packageLifecycle.filter(item => item.installed === true && item.dependencies.length > 0);
   return <div className="opl-app-management-resources" data-testid="opl-app-management-resources">
     <p className="opl-resource-intro">{zh ? "在这里管理应用共用的资料库、账号连接、模型和基础依赖。为新应用授权后，即可复用已有资源。" : "Manage the libraries, account connections, models and dependencies shared by your apps. Grant a new app access to reuse an existing resource."}</p>
-    <KnowledgeSourcesSection projection={model.knowledgeSources} locale={settings.locale} actionBusyKey={actionBusyKey} onAction={onAction} onRefresh={onRefresh} />
+    <KnowledgeSourcesSection projection={model.knowledgeSources ? { ...model.knowledgeSources, consumers: model.knowledgeSources.consumers.map(consumer => {
+      const product = model.packageLifecycle.find(item => item.packageId === consumer.packageId);
+      return { ...consumer, label: product?.displayNameI18n[settings.locale] ?? product?.label ?? consumer.label };
+    }) } : undefined} locale={settings.locale} actionBusyKey={actionBusyKey} onAction={onAction} onRefresh={onRefresh} onPickDirectory={onPickKnowledgeDirectory} selectedPackageId={selectedPackageId} />
     <section className="opl-resource-section" aria-label={zh ? "账号与连接" : "Accounts & connections"}>
       <div className="opl-resource-section-heading"><h2>{zh ? "账号与连接" : "Accounts & connections"}</h2><p>{zh ? "已连接的邮箱和外部服务可分别授权给各应用。登录信息由对应服务保管。" : "Share connected mailboxes and services with individual apps. Each service manages its sign-in."}</p></div>
       <ConnectionsSection projection={model.settingsProjection} locale={settings.locale} actionBusyKey={actionBusyKey} onAction={onAction} onApproveConnectionAccess={onApproveConnectionAccess} />
@@ -101,10 +106,10 @@ export function SharedResourcesPage({ model, settings, actionBusyKey, onAction, 
       <SettingRow label={zh ? "模型与执行" : "Models & execution"} detail={zh ? "选择默认模型及执行偏好。" : "Choose the default model and execution preferences."}>{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("models")}>{zh ? "管理" : "Manage"}</button> : null}</SettingRow>
       <SettingRow label={zh ? "模型账号与访问" : "Model account & access"} detail={zh ? "管理 Gateway 账户或已保存的 API Key。" : "Manage a Gateway account or saved API key."}>{onOpenSettings ? <button type="button" className="settings-inline-command" onClick={() => onOpenSettings("account")}>{zh ? "管理" : "Manage"}</button> : null}</SettingRow>
     </SettingsGroup>
-    <SettingsGroup title={zh ? "基础依赖" : "Shared dependencies"}>
+    <details className="opl-resource-details"><summary>{zh ? "运行组件与依赖" : "Runtime components and dependencies"}</summary><SettingsGroup title={zh ? "基础依赖" : "Shared dependencies"}>
       {baseResources.length ? baseResources : <p className="settings-inline-note">{zh ? "基础依赖状态尚未返回。" : "Dependency status has not been returned."}</p>}
       <SettingRow label={zh ? "基础服务更新" : "Foundation updates"}><button type="button" className="settings-inline-command" onClick={() => onOpenApplicationTab("updates")}>{zh ? "查看更新" : "View updates"}</button></SettingRow>
       {dependencies.length ? <details className="opl-resource-details"><summary>{zh ? "查看应用依赖关系" : "View application dependencies"}</summary>{dependencies.map(item => <SettingRow key={item.packageId} label={packageLabel(item.packageId)} detail={item.dependencies.map(dependency => packageLabel(dependency.packageId)).join(zh ? "、" : ", ")}><StatusValue status={dependencyStatus(item)} locale={settings.locale} /></SettingRow>)}</details> : null}
-    </SettingsGroup>
+    </SettingsGroup></details>
   </div>;
 }

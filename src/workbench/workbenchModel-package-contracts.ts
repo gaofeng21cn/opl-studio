@@ -262,6 +262,7 @@ export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   deploymentTarget?: "cloud" | "mobile" | "device" | "remote_service" | "unknown";
   iconRef?: string;
   iconUrl?: string;
+  miniAppEntry?: { resourceUri: string; arguments: Record<string, string> };
   iconSourceCommit?: string;
   releaseChannel?: "preview" | "stable" | "unknown";
   roleGroup: "agent" | "workflow" | "supporting" | "other";

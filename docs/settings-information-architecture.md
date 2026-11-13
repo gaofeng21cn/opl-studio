@@ -4,9 +4,9 @@
 Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 state/action bridge
 展示和操作，不维护第二套安装目录或生命周期。
 
-## 统一应用管理
+## 统一软件中心
 
-一级“应用管理”与主对话并行，分为“软件目录、更新、共享资源、软件源”。
+一级“软件中心”与主对话并行，分为“软件目录、更新、共享资源、软件源”。
 它管理本机独立软件；云端、移动端和设备端产品只作为部署协助与状态目标。
 设置中的“能力配置”保留原生 Skills、MCP 和连接配置，并提供软件中心跳转。
 旧智能体设置深链与“更新与修复”设置入口同样转入软件中心，不再重复软件清单或生命周期控件。
@@ -50,7 +50,7 @@ Package 来自 Framework 目录，原生分发选项来自软件源 `native_item
 前保持不变。公共源的 `catalog_refresh_required` 与访问、目录刷新要求共用现有 Host
 检查链路：仅执行 owner 允许且不需确认的 `source_check`，随后回读一次，不递归重试。
 安装模式分别显示“安装版”和“开发版”；是否来自正式发布制品由来源证据说明。
-应用管理的更新页默认呈现这份软件清单；当前桌面宿主和 OPL Base 综合维护收进
+软件中心的更新页默认呈现这份软件清单；当前桌面宿主和 OPL Base 综合维护收进
 “桌面宿主与运行组件维护”，保留原有动作。开发宿主版本不作为 OPL App 安装版本
 并列展示。Settings 中的维护页继续保留完整控制视图。
 未打包的 Electron 宿主不投影 App 版本，维护详情和“关于”显示“开发预览／未发布”；
@@ -82,7 +82,7 @@ manifest URL 与 trust tier，复用原有安装通道。
 
 软件图标来自 Framework 的 `icon_url`，由 owner 依据发布载荷和精确提交生成。
 公开资产仅接受不可变 GitHub raw URL；私有资产不尝试匿名请求。缺图、离线或加载失败
-使用稳定的名称首字母、类型图标和色调，不维护按 Package ID 编写的图标清单。
+使用 App 资产清单生成的本地 PNG 投影，缺失时使用中性 PNG 占位。产品清单、授权与版本仍来自 Framework。
 
 “运行组件”接收 `management_scope=local_component` 与既有
 `managed_update.components[].current.dependency_catalog.dependencies`。组件详情保留
@@ -136,3 +136,13 @@ Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替
 
 设置搜索、外观与字号继续复用现有 DSH 客户端能力，来源见[生态客户端](ecosystem-client-plugins.md)。
 源码实现与本地渲染不等于已发布或已安装的 App 版本。
+
+## 连续使用
+
+软件中心的主要分区为软件、更新、共享资源。软件源和运行组件经管理入口进入。已安装且 owner 允许使用的软件提供“开始使用”，导航到同一产品声明的任务或 MiniApp，业务操作仍通过原有任务/界面执行。安装、配置过程中保留产品上下文，fresh 回读后提供“继续使用”。
+
+设置中的共享资源入口跳转到同一软件中心页面；ConnectionsSection 仅在共享资源页实例化。知识接入复用桌面目录选择器，WebUI 只接受服务端资料库位置，不把上传目录当资料源。Framework 提供知识范围选项与明确默认值，授权仍经原 revision/confirmation 合同。
+
+需要用户介入的事项按明确 source/resource identity 合并并列出受影响的软件；独立安装冲突单独保留。未检查、未使用的可选资源和普通更新不制造失败告警。当前安装首先显示，其他安装与发行选项折叠；位置回读与操作仍来自 owner。
+
+图标来自 App 的 `contracts/software-artwork-assets.json` 资产清单，由 renderer build 校验 PNG 与 digest 并生成 `softwareArtwork.generated.ts`。该文件只投影离线资产，不参与软件纳管、版本或授权判定。缺图不使用首字母或 SVG 字母拼接。

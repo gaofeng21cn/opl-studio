@@ -197,6 +197,7 @@ export function installWebTransport(): void {
     listPendingServerRequests: () => requestJson("/api/codex/pending-requests"),
     respondToServerRequest: (request) => postJson("/api/codex/respond-request", request),
     pickFiles: () => chooseBrowserFiles(false).then((files) => stageBrowserFiles(files, "files")),
+    revealLocalPath: () => Promise.reject(new Error("Local installation locations can be opened in the desktop app.")),
     pickDirectory: () => chooseBrowserFiles(true).then((files) => stageBrowserFiles(files, "directory")),
     resolveDroppedInputs: (files) => stageBrowserFiles(files, "files"),
     releaseInputs: async (cleanupTokens) => {

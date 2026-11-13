@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createSettingsSearchLog } from "../../../src/host/settings-search-log.mjs";
 import { McpAppHost } from "../../opl-mcp-apps/src/service.mjs";
 import { EventEmitter } from "node:events";
@@ -268,6 +269,11 @@ export class OplHostCore extends EventEmitter {
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
       case "pickFiles": return this.platform.pickFiles(payload);
       case "pickDirectory": return this.platform.pickDirectory(payload);
+      case "revealLocalPath": {
+        if (typeof payload?.path !== "string" || !path.isAbsolute(payload.path) || payload.path.includes("\0")) throw new Error("An absolute local path is required");
+        await this.platform.accessWorkspacePath({ path: payload.path, action: "reveal" });
+        return;
+      }
       case "classifyInputPaths": return this.platform.classifyInputPaths(payload);
       case "releaseInputs": return this.platform.releaseInputs(payload);
       case "notifyCompletion": return this.platform.notifyCompletion(payload);

@@ -202,7 +202,7 @@ export function useStudioPanels<T>(selector: (panels: readonly { id: string; ord
   const studio = useStudio();
   const zh = studio.locale === "zh";
   const panels = [
-    { id: "applications", order: 10, label: zh ? "应用管理" : "Application management" },
+    { id: "applications", order: 10, label: zh ? "软件中心" : "Software Center" },
     { id: "runtime", order: 20, label: zh ? "运行状态" : "Runtime status" },
     { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
   ];

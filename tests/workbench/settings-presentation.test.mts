@@ -74,8 +74,8 @@ test("settings navigation exposes primary categories with related destinations g
   assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "schedules" || destination.id === "memory"), false);
   assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.label, "连接与部署");
   assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.label, "Connections & Deployment");
-  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "资源与连接");
-  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Resources & Connections");
+  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "共享资源与网页访问");
+  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Shared resources & web access");
   assert.match(settingsSource, /role="tablist"/);
   assert.match(settingsSource, /role=\{usesDestinationTabs \? "tabpanel" : "region"\}/);
   assert.match(settingsSource, /ArrowRight|ArrowLeft/);
@@ -702,13 +702,13 @@ test("runtime dependencies stay outside software counts and preserve owner maint
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(DshPluginManagerOwner, { kind: "all", model, managedUpdate, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}, onTabChange: tab => tabs.push(tab) }));
     assert.equal(container.querySelector('[data-plugin-owner-package="runtime:opl_base:codex-cli"]'), null);
-    flushSync(() => container.querySelector<HTMLButtonElement>("#opl-catalog-scope-components")!.click());
+    flushSync(() => [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行组件")!.click());
     const row = container.querySelector('[data-plugin-owner-package="runtime:opl_base:codex-cli"]')!;
     assert.match(row.textContent ?? "", /Codex CLI/);
     assert.match(row.textContent ?? "", /1\.2\.3/);
     assert.match(row.textContent ?? "", /1\.2\.4/);
     flushSync(() => [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看维护")!.click());
-    assert.deepEqual(tabs, ["updates"]);
+    assert.deepEqual(tabs, ["installed", "updates"]);
   });
 });
 
@@ -1142,7 +1142,7 @@ test("installation details show exact paths and dispatch only the selected insta
     assert.match(container.textContent ?? "", /\/work\/example/);
     assert.equal(container.querySelectorAll('[data-installation-id="release"]').length, 1);
     assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /当前使用/);
-    assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /安装版/);
+    assert.match(container.querySelector('[data-installation-id="release"]')?.textContent ?? "", /发布版/);
     const buttons = [...container.querySelectorAll("button")];
     assert.equal(buttons.length, 1);
     assert.equal(buttons[0].textContent, "设为当前使用");
