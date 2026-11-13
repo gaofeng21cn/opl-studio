@@ -451,3 +451,9 @@ Runtime task and research routes use the same Framework MCP App resource as
 Codex. Studio keeps cross-Agent summaries, while stage timelines, research paths,
 evidence and human decisions live in the shared workbench. Studio no longer
 parses MAS research snapshots or maintains a MAS-specific detail renderer.
+
+## Package installation progress
+
+The software center uses Framework `package_operation_start/status/cancel` App actions for background Package installation, update and repair. Framework owns transfer progress and revalidated digest caches; the existing native carrier still owns installation. Studio renders real download bytes and stage names, restores operations after navigation or reload, and never treats worker acceptance as installation success. Older Framework versions retain their existing synchronous action path.
+
+The official DSH plugin manager already streams npm plugin installation state. OPL Packages require owner-verified OCI acquisition before native Codex registration, which that npm lifecycle does not cover. This adapter keeps the existing public App action boundary and DSH primitives; it adds no plugin registry or generic install resolver. Revisit the transport gap when upstream supports the same carrier contract.

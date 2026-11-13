@@ -1,0 +1,14 @@
+.opl-package-operations { margin-block: 16px; font-size: var(--dsw-font-size-sm, 13px); }
+.opl-package-operation-heading, .opl-package-operation-title, .opl-package-download-metrics, .opl-package-operation-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.opl-package-operation-heading { justify-content: space-between; padding-bottom: 8px; }
+.opl-package-operation { padding-block: 16px; border-top: 1px solid var(--dsw-alias-border-l3); }
+.opl-package-operation-title > span { margin-left: auto; }
+.opl-package-operation p, .opl-package-download-preview p { margin-block: 8px; }
+.opl-package-operation progress { display: block; width: 100%; height: 6px; margin-block: 12px 8px; accent-color: var(--dsw-alias-state-business-primary); }
+.opl-package-download-metrics { justify-content: space-between; font-variant-numeric: tabular-nums; }
+.opl-package-operation-actions { margin-top: 10px; }
+.opl-package-location { overflow-wrap: anywhere; font-size: var(--dsw-font-size-xs, 12px); }
+.opl-package-download-preview dl { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr); gap: 8px 16px; }
+.opl-package-download-preview dd { margin: 0; font-variant-numeric: tabular-nums; }
+.opl-package-download-preview > div + div { margin-top: 16px; }
+@media (max-width: 520px) { .opl-package-operation-title > span { margin-left: 0; } .opl-package-download-metrics { align-items: flex-start; flex-direction: column; gap: 4px; } }

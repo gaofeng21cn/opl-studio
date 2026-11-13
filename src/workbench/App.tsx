@@ -1,3 +1,5 @@
+import { usePackageOperations } from './usePackageOperations';
+import { preparePackageOperationRequest } from './packageOperations';
 import { softwareCanStart } from "./softwareExperience";
 import { createComposerAttachmentController, disposeSelectionPreviews } from "./composerAttachments";
 import type { McpAppOpen } from "../bridge/mcpApps";
@@ -889,6 +891,17 @@ export function App({
     };
   }
 
+  const packageOperations = usePackageOperations(bridge, () => { void loadState(settings.runtimeProfile); }, primaryView === "applications");
+
+  function acceptPackageOperation(receipt: OplActionReceipt, request: SettingsActionRequest) {
+    if (request.actionId !== 'package_operation_start' || !packageOperations.accept(receipt)) return false;
+    setSettingsActionConfirmation(null);
+    setSettingsActionReceipt(null);
+    setSettingsActionFeedback({ tone: 'success', message: settings.locale === 'zh' ? '安装已在后台开始，可在软件中心查看进度。' : 'Installation started in the background. View progress in Software Center.' });
+    settleWorkbenchAction(request.key, { status: 'running' });
+    return true;
+  }
+
   function settleWorkbenchAction(key: string, result: { status: string; [key: string]: unknown }) {
     const pending = workbenchActionResolver.current;
     if (!pending || pending.key !== key) return;
@@ -919,6 +932,7 @@ export function App({
     setSettingsActionFeedback(null);
     setSettingsActionReceipt(null);
     try {
+      request = await preparePackageOperationRequest(request, packageOperations.supported, bridge.executeAction);
       if (request.previewOnly) {
         const preview = await bridge.executeAction({ actionId: request.actionId, payload: request.payload, dryRun: true });
         setSettingsActionReceipt(actionReceiptView(preview));
@@ -945,6 +959,7 @@ export function App({
         payload: { ...request.payload, confirmed: true },
         dryRun: false
       });
+      if (acceptPackageOperation(receipt, request)) return;
       const diagnostic = request.actionId === "settings_diagnose_docker_webui"
         ? dockerDiagnosticFromReceipt(receipt)
         : null;
@@ -991,6 +1006,7 @@ export function App({
         payload: { ...confirmation.request.payload, confirmed: true, ...(confirmation.confirmationId ? { confirmationId: confirmation.confirmationId } : {}), ...(confirmation.receiptId ? { receiptId: confirmation.receiptId } : {}) },
         dryRun: false
       });
+      if (acceptPackageOperation(receipt, confirmation.request)) return;
       let stateReadFailed = false;
       if (receipt.status === "executed" || /^(source_|knowledge_source_)/.test(receipt.actionId) && receipt.status !== "blocked_read_only") {
         captureManagedUpdateReceipt(receipt);
@@ -2727,6 +2743,7 @@ export function App({
     conversationBody: studioConversationBody,
     primaryView,
     applicationManagement: <ApplicationManagementPage
+      packageOperations={packageOperations}
       model={model}
       capabilityCatalog={capabilityCatalog}
       capabilityStatus={capabilityStatus}

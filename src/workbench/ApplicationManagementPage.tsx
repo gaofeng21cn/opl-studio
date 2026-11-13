@@ -1,3 +1,5 @@
+import { PackageOperations } from './PackageInstallationProgress';
+import type { usePackageOperations } from './usePackageOperations';
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { softwareAttentionItems, softwareCanStart } from "./softwareExperience";
 import { CircleAlert, RefreshCw, ShieldCheck } from "lucide-react";
@@ -22,6 +24,7 @@ export type ApplicationManagementTab = "applications" | "updates" | "resources" 
 type UpdatesPageProps = Parameters<typeof UpdatesSettingsPage>[0];
 
 type ApplicationManagementPageProps = {
+  packageOperations?: ReturnType<typeof usePackageOperations>;
   model: WorkbenchModel;
   stateStatus?: "loading" | "ready" | "error";
   stateError?: string | null;
@@ -55,7 +58,7 @@ type ApplicationManagementPageProps = {
   onOpenInstallationLocation?: (path: string) => void;
 };
 
-export function ApplicationManagementPage({ model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, renderPackageContributions, onOpenSettings, initialTab = "applications", onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, renderPackageContributions, onOpenSettings, initialTab = "applications", onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
@@ -113,6 +116,7 @@ export function ApplicationManagementPage({ model, stateStatus = "ready", stateE
       {stateStatus === "error" ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={onRefresh}><RefreshCw size={14} aria-hidden="true" />{zh ? "重新读取" : "Retry"}</button> : null}
       {stateStatus === "error" && stateError ? <details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{stateError}</p></details> : null}
     </div> : null}
+    {packageOperations ? <PackageOperations operations={packageOperations.operations} locale={settings.locale} labels={Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n[settings.locale] ?? item.label]))} readError={packageOperations.readError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)} onRetry={onAction} onRefresh={packageOperations.refresh} /> : null}
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}</div>;
   return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} renderPackageContributions={renderPackageContributions} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "找到需要的软件，开始使用，并管理更新与共享资源。" : "Find software, start using it, and manage updates and shared resources."} onRefresh={onRefresh} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;

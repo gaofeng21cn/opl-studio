@@ -522,7 +522,7 @@ export function createOplPassthrough({
         : !dryRun && !confirmed
         ? { exitCode: -1, stdout: "", stderr: "confirmation_required", timedOut: false }
         : await run(command, args.slice(1), { cwd, env,
-          timeoutMs: nativeSourceAction || ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "install_from_manifest_url"].includes(actionId)
+          timeoutMs: nativeSourceAction || ["package_operation_start", "settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "install_from_manifest_url"].includes(actionId)
             ? 20 * 60_000 : actionId === "codex_install" ? 120_000 : 45_000 });
       const ownerJson = jsonValue(result.stdout);
       const ownerExecution = ownerJson?.app_action_execution ?? ownerJson;

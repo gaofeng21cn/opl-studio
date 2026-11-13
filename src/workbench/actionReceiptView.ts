@@ -1,6 +1,8 @@
+import type { PackageDownloadPlan } from './packageOperations';
 import type { OplActionReceipt } from '../bridge/oplBridge';
 
 export type ActionReceiptView = {
+  downloadPlan?: PackageDownloadPlan[];
   actionId: string;
   status: string;
   receiptId?: string;
@@ -30,7 +32,7 @@ export function actionReceiptView(receipt: OplActionReceipt): ActionReceiptView 
   const terminalReadback = record(result.terminal_readback);
   const readbackInventory = record(terminalReadback.inventory);
   const impact = record(result.impact);
-  return { actionId: receipt.actionId, status: receipt.status, receiptId: safeText(receipt.receiptId),
+  return { downloadPlan: Array.isArray(result.download_plan) ? result.download_plan as PackageDownloadPlan[] : undefined, actionId: receipt.actionId, status: receipt.status, receiptId: safeText(receipt.receiptId),
     owner: safeText(result.owner ?? execution.owner), summary: safeText(result.summary), nextStep: safeText(result.next_visible_step),
     affectedFiles: Array.isArray(result.files) ? result.files.slice(0, 2000).flatMap(value => { const row = record(value); const name = safeText(row.name); return name && typeof row.bytes === 'number' ? [{ name, bytes: row.bytes }] : []; }) : undefined,
     affectedCategories: Array.isArray(result.affected_categories) ? result.affected_categories.flatMap(value => safeText(value) ?? []) : [],
