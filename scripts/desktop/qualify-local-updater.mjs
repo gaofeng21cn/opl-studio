@@ -42,9 +42,7 @@ async function run(executable, args, label) {
   invariant(exitCode === 0, `${label} failed with ${exitCode}`);
 }
 
-async function buildApp({ output, version, bundleIdentifier, zip, builderConfig = "electron-builder.yml" }) {
-  const builder = path.join(repositoryRoot, "node_modules", ".bin", "electron-builder");
-  const architecture = process.arch;
+export function updaterFixtureBuildArgs({ output, version, bundleIdentifier, zip, builderConfig = 'electron-builder.yml', architecture = process.arch }) {
   invariant(architecture === "arm64" || architecture === "x64", `unsupported macOS architecture ${architecture}`);
   const args = [
     ...(zip ? ["--mac", "zip"] : ["--dir", "--mac"]),
@@ -55,8 +53,20 @@ async function buildApp({ output, version, bundleIdentifier, zip, builderConfig 
     path.join(repositoryRoot, builderConfig),
     `--config.directories.output=${output}`,
     `--config.extraMetadata.version=${version}`,
-    `--config.appId=${bundleIdentifier}`
+    `--config.appId=${bundleIdentifier}`,
+    // These targets are temporary updater fixtures, served only on loopback.
+    // Keep Developer ID signing; public DMG/ZIP compression and notarization
+    // remain owned by the real release builder and exact artifact finalizer.
+    '--config.compression=store',
+    '--config.mac.notarize=false'
   ];
+  return args;
+}
+
+async function buildApp(options) {
+  const builder = path.join(repositoryRoot, 'node_modules', '.bin', 'electron-builder');
+  const args = updaterFixtureBuildArgs(options);
+  const { zip } = options;
   await run(builder, args, `${zip ? "updater ZIP" : "directory App"} build`);
 }
 

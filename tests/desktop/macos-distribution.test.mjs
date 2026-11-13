@@ -10,12 +10,48 @@ import { parse } from "yaml";
 import {
   prepareMacUpdateFeed,
   validateMacPublicUpdateFeed,
-  validateMacUpdateFeed
+  validateMacUpdateFeed,
+  validateFinalizedDmgReceipt
 } from "../../scripts/desktop/macos-distribution.mjs";
 import { buildAppUpdateConfig, writeAppUpdateConfig } from "../../scripts/desktop/write-app-update-config.mjs";
-import { nextPatchVersion } from "../../scripts/desktop/qualify-local-updater.mjs";
+import { nextPatchVersion, updaterFixtureBuildArgs } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+test('finalizer reuse requires exact final bytes and accepted publisher trust', () => {
+  const artifact = { name: 'app.dmg', sha256: 'a'.repeat(64), size: 123 };
+  const signature = { team_identifier: 'SVVC4TA784', authorities: ['Developer ID Application: OPL'], hardened_runtime: true };
+  const receipt = {
+    schema: 'opl_apple_notarized_dmg_receipt.v1', status: 'passed', artifact: artifact.name,
+    final_stapled_dmg_sha256: artifact.sha256, final_stapled_dmg_size_bytes: artifact.size,
+    team_identifier: 'SVVC4TA784', notarization: { status: 'Accepted' }, stapler_validate_status: 'passed',
+    dmg_spctl_status: 'passed', app_spctl_status: 'passed',
+    app_signature: signature, mounted_app_signature: signature, dmg_signature: signature,
+  };
+  assert.equal(validateFinalizedDmgReceipt(receipt, artifact), receipt);
+  for (const change of [{ sha256: 'b'.repeat(64) }, { size: 124 }, { name: 'other.dmg' }]) {
+    assert.throws(() => validateFinalizedDmgReceipt(receipt, { ...artifact, ...change }), /exact bytes/);
+  }
+  for (const change of [
+    { notarization: { status: 'Invalid' } }, { team_identifier: 'other' }, { stapler_validate_status: 'failed' },
+    { mounted_app_signature: { ...signature, hardened_runtime: false } },
+    { dmg_signature: { ...signature, team_identifier: 'other' } },
+  ]) assert.throws(() => validateFinalizedDmgReceipt({ ...receipt, ...change }, artifact));
+});
+
+test('loopback updater fixtures keep signing while avoiding distribution compression and notarization', async () => {
+  const args = updaterFixtureBuildArgs({ output: '/tmp/fixture', version: '1.0.1', bundleIdentifier: 'test.opl', zip: true, architecture: 'arm64' });
+  assert.deepEqual(args.slice(0, 3), ['--mac', 'zip', '--arm64']);
+  assert.ok(args.includes('--config.compression=store'));
+  assert.ok(args.includes('--config.mac.notarize=false'));
+  assert.ok(!args.some((arg) => /identity=|sign=false/.test(arg)));
+  const { createYargs, configureBuildCommand, normalizeOptions } = await import('electron-builder/out/builder.js');
+  const { validateSchema } = await import('app-builder-lib/out/util/config/schemaValidator.js');
+  const parsed = normalizeOptions(configureBuildCommand(createYargs()).parse(args));
+  validateSchema(JSON.parse(await readFile(path.join(root, 'node_modules/app-builder-lib/scheme.json'), 'utf8')), parsed.config);
+  assert.equal(parsed.config.compression, 'store');
+  assert.equal(parsed.config.mac.notarize, false);
+});
 
 test("local updater qualification derives exactly one patch-newer target", () => {
   assert.equal(nextPatchVersion("0.1.0"), "0.1.1");

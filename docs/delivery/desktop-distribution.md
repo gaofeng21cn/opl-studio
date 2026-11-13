@@ -62,6 +62,21 @@ shared Electron toolchain, artifact/update policy, signing/notarization stages, 
 this repository owns only the Studio bundle, builder configuration, renderer payload, and Studio qualification
 commands. A local package or updater smoke does not create a second release owner.
 
+`build:desktop` reuses a renderer only when its source/plugin bytes, dependency
+lock, App contracts, Node/platform/architecture and Vite environment match and
+every output file matches the recorded SHA-256 and size. A miss or damaged
+output rebuilds normally; `build-release.mjs --skip-vite` explicitly requires a
+verified hit. This cache never substitutes for signing, packaging or acceptance.
+The App workflow uses one cache transport path for Standard and Full.
+
+Distribution qualification can consume `OPL_DESKTOP_NOTARIZATION_RECEIPT` from
+the App finalizer. It must bind the final DMG name, SHA-256, size, publisher and
+accepted Apple trust before reusing DMG verification/stapling. ZIP App trust
+and real updater replacement still run. The synthetic successor served over
+loopback keeps Developer ID signing and uses store ZIP compression without
+another Apple notarization; public package compression and notarization are
+unchanged.
+
 `npm run dist:mac` builds the shared Electron renderer/host, emits the Developer ID signed updater ZIP and
 ULFO DMG, creates byte-identical `latest-mac.yml` and `latest-arm64-mac.yml`, and validates every feed
 size/hash against the final artifacts. The extracted updater App must have the package version, a Developer

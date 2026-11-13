@@ -11,11 +11,12 @@ import { fullBuildEnvironment } from './full-payload.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export function resolveStableBuildPlan(argv, env = process.env, host = { platform: process.platform, arch: process.arch }) {
-  let arch = host.arch, platform = host.platform, directoryOnly = false;
+  let arch = host.arch, platform = host.platform, directoryOnly = false, reuseRenderer = false;
   const builderOptions = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--dir-only') directoryOnly = true;
+    else if (argument === '--skip-vite') reuseRenderer = true;
     else if (argument === '--platform') platform = argv[++index];
     else if (argument === '--arch') arch = argv[++index];
     else if (['x64', 'arm64', 'universal'].includes(argument)) arch = argument;
@@ -37,7 +38,7 @@ export function resolveStableBuildPlan(argv, env = process.env, host = { platfor
     `--config.extraMetadata.version=${machine}`, `--config.extraMetadata.oplReleaseVersion=${display}`, '--publish', 'never', ...builderOptions];
   // Preserve the existing Linux installer namespace (x64, rather than Debian's amd64).
   if (platform === 'linux') args.push(`--config.linux.artifactName=One-Person-Lab-${display}-linux-${arch}.` + "${ext}");
-  return { platform, arch, directoryOnly, display, machine, args, env: commandEnvironment };
+  return { platform, arch, directoryOnly, reuseRenderer, display, machine, args, env: commandEnvironment };
 }
 
 export function finalizeStableMetadata({ outputRoot, plan }) {
@@ -72,7 +73,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', env: plan.env, releaseIdentity: plan });
     if (result.status !== 0) throw new Error(`${path.basename(command)} failed (${result.status})`);
   };
-  run(process.execPath, ['scripts/build-desktop.mjs']);
+  run(process.execPath, ['scripts/build-desktop.mjs', ...(plan.reuseRenderer ? ['--reuse-required'] : [])]);
   const builderEntry = path.join(root, 'node_modules/electron-builder/cli.js');
   run(process.execPath, [builderEntry, ...plan.args]);
   finalizeStableMetadata({ outputRoot: path.join(root, 'out'), plan });

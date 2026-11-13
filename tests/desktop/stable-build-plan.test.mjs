@@ -80,7 +80,8 @@ test('Stable build routes each platform with calendar assets and monotonic machi
 });
 
 test('Stable build rejects unknown arguments and missing required macOS notarization', () => {
-  assert.throws(() => resolveStableBuildPlan(['--skip-vite'], env), /Unsupported/);
+  assert.throws(() => resolveStableBuildPlan(['--unknown'], env), /Unsupported/);
+  assert.equal(resolveStableBuildPlan(['--skip-vite'], env).reuseRenderer, true);
   assert.throws(() => resolveStableBuildPlan(['--platform', 'darwin'], { ...env, OPL_REQUIRE_MACOS_GATEKEEPER: 'true' }), /credentials/);
   const plan = resolveStableBuildPlan(['arm64', '--dir-only'], env, { platform: 'darwin', arch: 'arm64' });
   assert.equal(plan.directoryOnly, true);

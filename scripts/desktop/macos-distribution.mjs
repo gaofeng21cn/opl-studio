@@ -245,10 +245,27 @@ function signatureDetails(appPath) {
   };
 }
 
-function trustResult(appPath, dmgPath) {
+export function validateFinalizedDmgReceipt(receipt, artifact, expectedTeamId = 'SVVC4TA784') {
+  invariant(receipt?.schema === 'opl_apple_notarized_dmg_receipt.v1' && receipt.status === 'passed', 'Invalid finalized DMG receipt');
+  invariant(receipt.artifact === artifact.name && receipt.final_stapled_dmg_sha256 === artifact.sha256
+    && receipt.final_stapled_dmg_size_bytes === artifact.size, 'Finalized DMG receipt does not bind the exact bytes');
+  invariant(receipt.team_identifier === expectedTeamId && receipt.notarization?.status === 'Accepted'
+    && receipt.stapler_validate_status === 'passed' && receipt.dmg_spctl_status === 'passed'
+    && receipt.app_spctl_status === 'passed', 'Finalized DMG receipt lacks accepted distribution trust');
+  for (const field of ['app_signature', 'mounted_app_signature', 'dmg_signature']) {
+    const signature = receipt[field];
+    invariant(signature?.team_identifier === expectedTeamId
+      && signature.authorities?.some((authority) => authority.startsWith('Developer ID Application:'))
+      && (field === 'dmg_signature' || signature.hardened_runtime === true), 'Finalized DMG publisher or hardened runtime mismatch');
+  }
+  return receipt;
+}
+
+function trustResult(appPath, dmgPath, finalizedDmgReceipt) {
   const gatekeeper = command("/usr/sbin/spctl", ["-a", "-vv", "--type", "execute", appPath], { allowFailure: true });
   const appStaple = command("/usr/bin/xcrun", ["stapler", "validate", appPath], { allowFailure: true });
-  const dmgStaple = command("/usr/bin/xcrun", ["stapler", "validate", dmgPath], { allowFailure: true });
+  const dmgStaple = finalizedDmgReceipt ? { status: 0 }
+    : command("/usr/bin/xcrun", ["stapler", "validate", dmgPath], { allowFailure: true });
   return {
     gatekeeperAccepted: gatekeeper.status === 0,
     appStapled: appStaple.status === 0,
@@ -292,6 +309,7 @@ export async function qualifyMacDistribution({
   expectedVersion = process.env.OPL_UPDATER_VERSION,
   publicFeedUrl = process.env.OPL_DESKTOP_PUBLIC_UPDATE_FEED_URL,
   previewUpgradeVmReceipt = process.env.OPL_PREVIEW_UPGRADE_VM_RECEIPT,
+  notarizationReceipt = process.env.OPL_DESKTOP_NOTARIZATION_RECEIPT,
   fetchImpl = globalThis.fetch
 } = {}) {
   invariant(process.platform === "darwin", "macOS distribution qualification requires macOS");
@@ -305,7 +323,9 @@ export async function qualifyMacDistribution({
   const dmg = feed.artifacts.find((entry) => entry.name.endsWith(".dmg"));
   invariant(zip && dmg, "qualified feed must bind one ZIP and one DMG");
   invariant(await stat(path.join(outRoot, `${zip.name}.blockmap`)), "updater ZIP blockmap is missing");
-  command("/usr/bin/hdiutil", ["verify", path.join(outRoot, dmg.name)]);
+  const finalizedDmgReceipt = notarizationReceipt
+    ? validateFinalizedDmgReceipt(JSON.parse(await readFile(notarizationReceipt, 'utf8')), dmg) : null;
+  if (!finalizedDmgReceipt) command("/usr/bin/hdiutil", ["verify", path.join(outRoot, dmg.name)]);
   const format = dmgFormat(path.join(outRoot, dmg.name));
   invariant(format === "ULFO", `macOS DMG must use ULFO, observed ${format}`);
 
@@ -331,7 +351,7 @@ export async function qualifyMacDistribution({
     invariant(appUpdate?.provider === "github", "App update provider must be GitHub");
     invariant(appUpdate?.owner === "gaofeng21cn" && appUpdate?.repo === (identity === "stable" ? "one-person-lab-app" : "opl-studio"), "App must use its identity-bound updater feed");
 
-    const trust = trustResult(appPath, path.join(outRoot, dmg.name));
+    const trust = trustResult(appPath, path.join(outRoot, dmg.name), finalizedDmgReceipt);
     const releaseTrustAccepted = trust.gatekeeperAccepted && trust.appStapled && trust.dmgStapled;
     const handoffPlanPath = path.join(appPath, "Contents", "Resources", "preview-handoff.json");
     const handoffPlan = identity === "preview"
@@ -384,7 +404,8 @@ export async function qualifyMacDistribution({
       buildVersion,
       architecture: process.arch,
       feed,
-      dmg: { name: dmg.name, format, verified: true },
+      dmg: { name: dmg.name, format, verified: true,
+        verificationSource: finalizedDmgReceipt ? 'exact_notarization_receipt' : 'direct_commands' },
       updaterZip: { name: zip.name, blockmapPresent: true },
       signature,
       trust,
