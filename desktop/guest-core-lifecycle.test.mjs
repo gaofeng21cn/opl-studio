@@ -70,3 +70,37 @@ test("parent-owned native restart can close the Host inside its idle lease", asy
   assert.equal(entered, true);
   assert.deepEqual(result, { status: "completed" });
 });
+
+test("a MiniApp read arriving during maintenance does not prevent lease release", async context => {
+  const fx = fixture();
+  let unblock;
+  const transportReleased = new Promise(resolve => { unblock = resolve; });
+  fx.core.transport.runWhenIdle = async operation => {
+    try { return { status: "completed", result: await operation() }; }
+    finally { unblock(); }
+  };
+  fx.core.mcpApps = { async list() { await transportReleased; return { apps: [] }; } };
+  const rpc = createGuestRpc({ input: fx.child.stdout, output: fx.child.stdin, onRequest: async () => ({}) });
+  context.after(async () => { unblock(); await fx.worker.close(); rpc.close(); });
+  await rpc.request("initialize");
+  assert.deepEqual(await rpc.request("leaseAcquire"), { status: "held" });
+  const read = rpc.request("invoke", { method: "listMcpApps", payload: {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await rpc.request("leaseRelease"), { released: true });
+  assert.deepEqual(await read, { apps: [] });
+});
+
+test("closing the Host rejects a read queued behind its maintenance lease", async context => {
+  const fx = fixture();
+  let invoked = false;
+  fx.core.mcpApps = { async list() { invoked = true; return { apps: [] }; } };
+  const rpc = createGuestRpc({ input: fx.child.stdout, output: fx.child.stdin, onRequest: async () => ({}) });
+  context.after(async () => { await fx.worker.close(); rpc.close(); });
+  await rpc.request("initialize");
+  await rpc.request("leaseAcquire");
+  const read = assert.rejects(rpc.request("invoke", { method: "listMcpApps", payload: {} }), { code: "guest_host_closing" });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await rpc.request("close"), { closed: true });
+  await read;
+  assert.equal(invoked, false);
+});

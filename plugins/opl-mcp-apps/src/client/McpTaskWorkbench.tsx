@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { McpAppSession } from "../../../../src/bridge/mcpApps";
+import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
 import { McpAppFrame, type McpAppProps } from "./McpAppWorkspace";
 
 export type TaskWorkbenchProps = McpAppProps & { itemId: string; viewId?: string };
@@ -28,6 +29,10 @@ export function McpTaskWorkbench(props: TaskWorkbenchProps) {
     return () => { active = false; if (opened) void bridge.closeMcpApp(opened).catch(() => {}); };
   }, [bridge, threadId, itemId, viewId, revision, retry]);
   if (!threadId) return <p role="status">{locale === "zh" ? "先打开一个对话，任务工作台将使用该对话的连接和权限。" : "Open a conversation to use its connections and permissions."}</p>;
-  if (error) return <div role="alert"><p>{error}</p><button onClick={() => setRetry(n => n + 1)}>{locale === "zh" ? "重试" : "Retry"}</button></div>;
+  if (error) return <div className="opl-mcp-app-error">
+    <p role="alert">{locale === "zh" ? "任务工作台暂时无法连接，请重试。" : "The task workbench could not connect. Try again."}</p>
+    <Button variant="outline" type="button" onClick={() => setRetry(n => n + 1)}>{locale === "zh" ? "重试" : "Retry"}</Button>
+    <details><summary>{locale === "zh" ? "错误详情" : "Error details"}</summary><p>{error}</p></details>
+  </div>;
   return session ? <McpAppFrame key={session.id} {...props} session={session}/> : <p role="status">{locale === "zh" ? "正在打开任务工作台…" : "Opening task workbench…"}</p>;
 }

@@ -12,7 +12,7 @@ export function nativeHostOptions(native) {
 
 // One Host and one admission lease. The parent retains native desktop services.
 export function startGuestHostCore({ input = process.stdin, output = process.stdout, createCore, prepare }) {
-  let core, booting, closing, lease, afterInvoke;
+  let core, booting, closing, lease, leaseReleased, afterInvoke;
   let activeOperations = 0, releaseRequested = false, drain;
   const releaseLease = () => {
     if (activeOperations !== 0) return false;
@@ -52,6 +52,11 @@ export function startGuestHostCore({ input = process.stdin, output = process.std
     if (!core) throw Object.assign(new Error("Guest Host has not initialized"), { code: "guest_host_not_ready" });
     if (closing && method !== "close") throw Object.assign(new Error("Guest Host is closing"), { code: "guest_host_closing" });
     if (method === "invoke") {
+      // A caller waiting for the parent's lease has not entered the owner yet.
+      // Counting it as active would make leaseRelease wait for the same caller
+      // that is blocked by that lease inside the Codex transport.
+      while (lease) await leaseReleased;
+      if (closing) throw Object.assign(new Error("Guest Host is closing"), { code: "guest_host_closing" });
       return runOwnerOperation(async () => {
         const result = await core.invoke(payload.method, payload.payload ?? {});
         await afterInvoke?.(payload.method, result, core);
@@ -67,6 +72,7 @@ export function startGuestHostCore({ input = process.stdin, output = process.std
       return new Promise((resolve, reject) => {
         const operation = core.transport.runWhenIdle(async () => {
           const held = new Promise(release => { lease = release; });
+          leaseReleased = held;
           resolve({ status: "held" });
           await held;
         });
