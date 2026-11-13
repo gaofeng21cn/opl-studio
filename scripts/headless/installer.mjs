@@ -2,6 +2,7 @@ import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveCurrentNodeEntrypoint } from "../../desktop/node-host-runtime.mjs";
 import { createHeadlessServiceManager } from "./service-manager.mjs";
 import { createHeadlessUpdateRunner, installHeadlessPayload } from "./update-runner.mjs";
 
@@ -90,7 +91,7 @@ export function createHeadlessInstaller({
   homeDirectory = os.homedir(),
   sourceRoot = repositoryRoot,
   installRoot = defaultInstallRoot(platform, homeDirectory),
-  nodeExecutable = process.execPath,
+  nodeExecutable,
   env = process.env,
   fetch = globalThis.fetch,
   sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
@@ -101,6 +102,7 @@ export function createHeadlessInstaller({
 } = {}) {
   const source = path.resolve(sourceRoot);
   const root = path.resolve(installRoot);
+  const nodeEntrypoint = nodeExecutable ?? resolveCurrentNodeEntrypoint({ env });
   const address = (env.OPL_HEADLESS_HOST ?? "127.0.0.1").trim();
   if (!address) throw new Error("OPL_HEADLESS_HOST must not be empty");
   assertLoopbackAddress(address);
@@ -131,7 +133,7 @@ export function createHeadlessInstaller({
       OPL_STUDIO_CODEX_CWD: path.resolve(env.OPL_HEADLESS_WORKSPACE_ROOT ?? homeDirectory),
       OPL_WEBUI_ROOT: path.join(current, "dist", "webui"),
       OPL_NATIVE_APP_UPDATE_CARRIER: "standalone_headless_webui",
-      OPL_NATIVE_APP_UPDATE_EXECUTABLE: path.resolve(nodeExecutable),
+      OPL_NATIVE_APP_UPDATE_EXECUTABLE: path.resolve(nodeEntrypoint),
       OPL_NATIVE_APP_UPDATE_STATUS_ARGS_JSON: updateArguments(updateRunner, root, "status"),
       OPL_NATIVE_APP_UPDATE_CHECK_ARGS_JSON: updateArguments(updateRunner, root, "check"),
       OPL_NATIVE_APP_UPDATE_APPLY_ARGS_JSON: updateArguments(updateRunner, root, "apply"),
@@ -141,7 +143,7 @@ export function createHeadlessInstaller({
       manager: createServiceManager({
         platform,
         homeDirectory,
-        nodeExecutable: path.resolve(nodeExecutable),
+        nodeExecutable: path.resolve(nodeEntrypoint),
         headlessEntry,
         serviceEnvironment
       }),

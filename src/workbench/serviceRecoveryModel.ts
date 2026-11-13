@@ -149,6 +149,12 @@ function statusActionId(component: ServiceRecoveryComponent): string {
 }
 
 function recoveryDetail(reasonCode: string, rawStatus: string, component: ServiceRecoveryComponent): { zh: string; en: string } {
+  if (reasonCode.endsWith("readback_missing")) {
+    if (component === "worker") return { zh: "后台任务状态尚未读取", en: "Background worker status has not been read" };
+    if (component === "scheduler") return { zh: "定时任务状态尚未读取", en: "Scheduled task status has not been read" };
+    return { zh: "后台服务状态尚未读取", en: "Background service status has not been read" };
+  }
+  if (reasonCode === "all_components_ready") return { zh: "后台服务已就绪", en: "Background services are ready" };
   if (reasonCode === "worker_not_ready" && rawStatus === "worker_source_stale") {
     return { zh: "后台任务代码版本落后，需要重新加载", en: "Worker source is stale and must be reloaded" };
   }

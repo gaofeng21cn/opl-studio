@@ -233,7 +233,7 @@ chmod +x "$HOME/.opl/toolchain/node-v22.23.4/bin/node"
 ` });
   const actual = await ensureDesktopHostNode({ resourcesPath, homeDir, env: { PATH: [systemBin, "/usr/bin", "/bin"].join(path.delimiter) }, platform: "linux" });
   assert.equal(actual.version, "22.23.4");
-  assert.equal(actual.command, fs.realpathSync(path.join(homeDir, ".opl/toolchain/node-v22.23.4/bin/node")));
+  assert.equal(actual.command, path.join(homeDir, ".opl/toolchain/node-v22.23.4/bin/node"));
   assert.equal(fs.readFileSync(identity, "utf8"), original);
   assert.equal(fs.readFileSync(custom, "utf8"), "preserved");
   assert.equal(fs.readFileSync(unsafe, "utf8"), unsafeBytes);
@@ -253,7 +253,7 @@ test("an unsafe Full Node cannot win over an already verified Framework toolchai
   const runtime = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: "linux" });
   const actual = await ensureDesktopHostNode({ runtime, homeDir, env: {} });
   assert.equal(actual.version, "22.23.4");
-  assert.equal(actual.command, fs.realpathSync(safe));
+  assert.equal(actual.command, path.resolve(safe));
 });
 
 test("packaged Standard preserves a newer managed Framework identity across App starts", async (t) => {
@@ -324,7 +324,7 @@ chmod +x "$HOME/.opl/toolchain/node-v22/bin/node"
   assert.equal(result.source, "packaged_standard_bootstrap");
   assert.equal(result.version, frameworkRef);
   assert.equal(result.env.OPL_APP_OPL_BIN, path.join(homeDir, ".local", "bin", "opl"));
-  assert.equal(result.nodeExecutable, fs.realpathSync(path.join(homeDir, ".opl", "toolchain", "node-v22", "bin", "node")));
+  assert.equal(result.nodeExecutable, path.join(homeDir, ".opl", "toolchain", "node-v22", "bin", "node"));
 });
 
 test("Stable macOS captures Official Profile intent before the Standard installer creates Framework state", async (t) => {

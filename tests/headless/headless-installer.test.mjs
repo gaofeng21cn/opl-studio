@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { createHeadlessInstaller } from "../../scripts/headless/installer.mjs";
+import { createHeadlessServiceManager } from "../../scripts/headless/service-manager.mjs";
 
 async function sourceFixture(version = "1.0.0") {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-headless-source-"));
@@ -33,6 +35,48 @@ async function sourceFixture(version = "1.0.0") {
 function response(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
+
+test("default Headless service and updater retain the installing Node's stable entrypoint", async context => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-headless-node-entrypoint-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const bin = path.join(root, "bin");
+  await mkdir(bin);
+  const entrypoint = path.join(bin, path.basename(process.execPath));
+  await symlink(process.execPath, entrypoint);
+  for (const platform of ["darwin", "linux"]) {
+    const installRoot = path.join(root, platform);
+    const files = [];
+    let serviceOptions;
+    const installer = createHeadlessInstaller({
+      platform, homeDirectory: root, installRoot, env: { PATH: bin },
+      installPayload: async () => {
+        await mkdir(installRoot);
+        await writeFile(path.join(installRoot, "installation.json"), JSON.stringify({ version: "1.0.0" }));
+        return { version: "1.0.0" };
+      },
+      createServiceManager: options => {
+        serviceOptions = options;
+        return createHeadlessServiceManager({ ...options, uid: 1001,
+          execute: async () => ({ exitCode: 0, stdout: "active", stderr: "" }),
+          fileSystem: { mkdir: async () => {}, rm: async () => {}, writeFile: async (_file, text) => files.push(text) }
+        });
+      },
+      fetch: async url => url.endsWith("/readyz")
+        ? response(200, { status: "ready", appServerAvailable: true })
+        : response(200, { readback: { exitCode: 0 }, app_state: {} })
+    });
+    await installer.run("install");
+    assert.equal(serviceOptions.nodeExecutable, entrypoint);
+    assert.equal(serviceOptions.serviceEnvironment.OPL_NATIVE_APP_UPDATE_EXECUTABLE, entrypoint);
+    assert.ok(files[0].includes(entrypoint));
+    assert.ok(!files[0].includes(process.execPath));
+  }
+  const upgraded = path.join(root, "upgraded-node");
+  await writeFile(upgraded, "#!/bin/sh\nprintf upgraded", { mode: 0o755 });
+  await rm(entrypoint);
+  await symlink(upgraded, entrypoint);
+  assert.equal(execFileSync(entrypoint, [], { encoding: "utf8" }), "upgraded");
+});
 
 test("installer binds the installed runtime, fixed updater argv, and fresh host/App-state readback", async () => {
   const sourceRoot = await sourceFixture();

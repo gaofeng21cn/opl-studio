@@ -3,8 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { createLocalNodeHost } from "./local-node-host.mjs";
-import { assertPatchedHostNode, resolveHostNode } from "./node-host-runtime.mjs";
+import { assertPatchedHostNode, resolveHostNode, resolveCurrentNodeEntrypoint } from "./node-host-runtime.mjs";
 
 test("Node Host admission rejects the compromised TLS cohorts and prereleases", () => {
   for (const version of ["22.23.4", "22.24.0", "24.22.1", "26.12.1", "28.0.0"]) assert.doesNotThrow(() => assertPatchedHostNode(version));
@@ -21,6 +22,34 @@ test("Node Host refuses Electron and unsafe selected Node before starting a Host
   const probe = value => () => ({ status: 0, stdout: JSON.stringify(value) });
   assert.throws(() => resolveHostNode({ nodeExecutable: command, probe: probe({ node: "26.12.1", electron: "44.9.1" }) }), { code: "node_host_runtime_unavailable" });
   assert.throws(() => resolveHostNode({ nodeExecutable: command, probe: probe({ node: "26.10.0", electron: null }) }), { code: "node_host_security_update_required" });
+});
+
+test("Node entrypoints follow carrier upgrades while preserving identity and runtime selection", context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-node-upgrade-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const directory of ["v1", "v2", "bin", "other"]) fs.mkdirSync(path.join(root, directory));
+  const oldNode = path.join(root, "v1", "node");
+  const newNode = path.join(root, "v2", "node");
+  fs.writeFileSync(oldNode, "#!/bin/sh\nprintf old", { mode: 0o755 });
+  fs.writeFileSync(newNode, "#!/bin/sh\nprintf new", { mode: 0o755 });
+  fs.symlinkSync(newNode, path.join(root, "other", "node"));
+  const command = path.join(root, "bin", "node");
+  fs.symlinkSync(oldNode, command);
+  const env = { PATH: [path.join(root, "other"), path.join(root, "bin")].join(path.delimiter) };
+  assert.equal(resolveCurrentNodeEntrypoint({ env, executable: oldNode }), command);
+  assert.equal(resolveCurrentNodeEntrypoint({ env: { PATH: path.join(root, "other") }, executable: oldNode }), oldNode);
+  const probe = () => ({ status: 0, stdout: JSON.stringify({ node: "26.12.1", electron: null }) });
+  const before = resolveHostNode({ nodeExecutable: command, probe });
+  assert.equal(before.command, command);
+  fs.unlinkSync(command);
+  fs.symlinkSync(newNode, command);
+  fs.rmSync(oldNode);
+  assert.equal(execFileSync(before.command, [], { encoding: "utf8" }), "new");
+  const after = resolveHostNode({ nodeExecutable: command, probe });
+  assert.equal(after.command, command);
+  assert.notEqual(after.sha256, before.sha256);
+  fs.rmSync(newNode);
+  assert.throws(() => resolveHostNode({ nodeExecutable: command, probe }), { code: "node_host_runtime_unavailable" });
 });
 
 test("real standalone Node Host preserves profile loading, callbacks, buffers, update lease and close", async context => {

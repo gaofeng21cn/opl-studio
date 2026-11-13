@@ -150,11 +150,11 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
   assert.match(runtimePage, /value === null/);
   assert.match(runtimePage, /aria-expanded=\{stagesOpen\}/);
   assert.match(runtimePage, /showArchived/);
-  assert.match(runtimePage, /runtime-recovery-band/);
-  assert.match(runtimePage, /recoveryStatusLabel/);
+  assert.match(runtimePage, /runtime-service-notice/);
+  assert.match(runtimePage, /onClick=\{onOpenMaintenance\}/);
+  assert.doesNotMatch(runtimePage, /onRunServiceRecovery|pendingRecoveryAction/);
   assert.doesNotMatch(runtimePage, /causalRoot\.reasonCode|causalRoot\.rawStatus|mutationGuard\.status/);
-  assert.match(app, /const refreshedModel = await loadState\(settings\.runtimeProfile\)/);
-  assert.match(app, /refreshedRecovery\.primaryAction\?\.actionId !== action\.actionId/);
+  assert.match(app, /onOpenMaintenance=\{\(\) => setSettingsNavigation\(current => \(\{ open: true, destination: "services"/);
   assert.match(app, /await bridge\.executeAction/);
   assert.match(app, /await loadState\(settings\.runtimeProfile\)/);
   assert.match(app, /writeRuntimeOverviewCache/);

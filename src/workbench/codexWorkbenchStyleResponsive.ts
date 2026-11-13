@@ -8,45 +8,6 @@ export const codexWorkbenchStyleResponsive = `  @media (max-width: 980px) {
       width: min(340px, calc(100vw - 24px));
     }
 
-    .runtime-scope-band {
-      grid-template-columns: auto repeat(2, minmax(130px, 1fr));
-    }
-
-    .runtime-loaded-at {
-      grid-column: 2 / -1;
-      justify-self: start;
-    }
-
-    .runtime-recovery-band {
-      grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
-    }
-
-    .runtime-recovery-action {
-      grid-column: 1 / -1;
-      justify-content: flex-start;
-    }
-
-    .runtime-recovery-action p {
-      text-align: left;
-    }
-
-    .runtime-work-row {
-      grid-template-columns: minmax(180px, 1fr) minmax(90px, .5fr) minmax(230px, 1.35fr);
-    }
-
-    .runtime-work-usage {
-      grid-column: 1 / -1;
-      grid-template-columns: repeat(2, minmax(120px, 180px)) minmax(140px, 1fr);
-      align-items: center;
-    }
-
-    .runtime-work-time {
-      grid-column: auto;
-    }
-
-    .runtime-stage-popover {
-      right: 14px;
-    }
   }
 
   @media (max-width: 760px) {
@@ -108,28 +69,6 @@ export const codexWorkbenchStyleResponsive = `  @media (max-width: 980px) {
       padding: 18px 14px 28px;
     }
 
-    .runtime-scope-band {
-      grid-template-columns: 1fr;
-    }
-
-    .runtime-scope-band > strong,
-    .runtime-loaded-at {
-      grid-column: 1;
-      justify-self: start;
-    }
-
-    .runtime-summary-band > div + div {
-      padding-left: 12px;
-    }
-
-    .runtime-recovery-band {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .runtime-recovery-action {
-      grid-column: auto;
-    }
-
     .runtime-list-heading {
       align-items: flex-start;
       flex-direction: column;
@@ -143,24 +82,6 @@ export const codexWorkbenchStyleResponsive = `  @media (max-width: 980px) {
     .runtime-list-controls select,
     .runtime-archive-button {
       flex: 1 1 150px;
-    }
-
-    .runtime-work-row {
-      grid-template-columns: 1fr;
-      gap: 11px;
-    }
-
-    .runtime-work-status {
-      justify-items: start;
-    }
-
-    .runtime-work-usage {
-      grid-column: 1;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .runtime-work-time {
-      grid-column: 1 / -1;
     }
 
     .runtime-stage-popover {

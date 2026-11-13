@@ -18,8 +18,26 @@ export function assertPatchedHostNode(version) {
 
 export function readHostNodeIdentity(command = process.execPath, version = process.versions.node, source = "framework_runtime") {
   assertPatchedHostNode(version);
-  const executable = fs.realpathSync(command);
+  const executable = path.resolve(command);
+  fs.accessSync(executable, fs.constants.X_OK);
+  if (!fs.statSync(executable).isFile()) throw new Error("Node Host executable must be a regular file");
   return { command: executable, version, source, sha256: crypto.createHash("sha256").update(fs.readFileSync(executable)).digest("hex") };
+}
+
+// Keep the current runtime selection, but persist its carrier's PATH entry when
+// available. process.execPath has already dereferenced a package-manager link.
+export function resolveCurrentNodeEntrypoint({ env = process.env, executable = process.execPath } = {}) {
+  const current = fs.realpathSync(executable);
+  for (const directory of (env.PATH ?? "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.resolve(directory, path.basename(executable));
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      if (candidate !== current && fs.statSync(candidate).isFile()
+        && fs.realpathSync(candidate) === current) return candidate;
+    } catch { /* Continue past unavailable PATH entries. */ }
+  }
+  return path.resolve(executable);
 }
 
 // Framework selects/installs Node. This adapter admits its existing binary or

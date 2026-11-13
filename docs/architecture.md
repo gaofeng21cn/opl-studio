@@ -220,6 +220,13 @@ smoke before activating the new directory; installed dependencies resolve within
 that directory rather than through the source checkout. Update and rollback retain
 the same atomic current/previous payload boundary.
 
+Desktop Node admission retains the discovered absolute executable entrypoint while
+checking its current target's version and digest. Headless service definitions and
+updater commands share a stable PATH entry resolving to the installing Node when
+one exists; they otherwise retain the selected executable. Explicit Node paths
+remain authoritative. Carrier symlink updates therefore apply on the next process
+start without pinning the service to a removed package-version directory.
+
 Readiness does not claim OPL package currentness, domain readiness, release
 readiness, or production readiness. Framework state remains an on-demand
 owner-authoritative `opl app state` read through the existing bridge.

@@ -4,6 +4,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveCurrentNodeEntrypoint } from "../../desktop/node-host-runtime.mjs";
 
 const serviceIds = {
   darwin: "com.onepersonlab.headless",
@@ -192,7 +193,7 @@ export function createHeadlessServiceManager({
   homeDirectory = os.homedir(),
   localAppData = process.env.LOCALAPPDATA,
   uid = typeof process.getuid === "function" ? process.getuid() : undefined,
-  nodeExecutable = process.execPath,
+  nodeExecutable = resolveCurrentNodeEntrypoint(),
   headlessEntry = path.join(repositoryRoot, "scripts", "headless", "run.mjs"),
   serviceEnvironment = {},
   execute = executeProcess,

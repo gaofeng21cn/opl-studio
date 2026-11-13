@@ -8,12 +8,13 @@ import {
   Clock3,
   CircleAlert,
   RefreshCw,
-  RotateCcw,
+  Info,
+  ArrowUpRight,
   UserRound,
   X
 } from "lucide-react";
 import type { WorkItemRuntimeItem, WorkItemRuntimeProjection } from "./workbenchModel";
-import type { ServiceRecoveryAction, ServiceRecoveryModel } from "./serviceRecoveryModel";
+import type { ServiceRecoveryModel } from "./serviceRecoveryModel";
 import {
   DomainDetailViewEntryList,
   DomainDetailViews
@@ -23,15 +24,12 @@ type RuntimeOverviewPageProps = {
   locale: "zh" | "en";
   projection?: WorkItemRuntimeProjection;
   serviceRecovery?: ServiceRecoveryModel;
-  serviceRecoveryBusy: boolean;
-  serviceRecoveryFeedback: { tone: "success" | "attention"; message: string } | null;
   selectedWorkItemId?: string;
   stateStatus: "loading" | "ready" | "error";
-  stateError: string;
   snapshotSource: "live" | "cached" | "none";
   snapshotCachedAt?: string;
   onRefresh(): void;
-  onRunServiceRecovery(action: ServiceRecoveryAction): void;
+  onOpenMaintenance(): void;
   onOpenWorkItem(item: WorkItemRuntimeItem): void;
   onOpenThread?(threadId: string): Promise<string | null>;
   mcpApps?: Omit<McpAppProps, "locale">;
@@ -47,8 +45,8 @@ type ActiveDomainDetailRoute = {
 function statusCategory(item: WorkItemRuntimeItem): Exclude<StatusFilter, "all"> | "other" {
   if (item.executionState === "running" || item.status === "running") return "running";
   if (item.attentionKind !== "none") return "attention";
-  if (/paused/.test(item.status)) return "paused";
   if (/completed|delivered|success/.test(item.status)) return "completed";
+  if (/paused/.test(item.status)) return "paused";
   if (/stopped|cancelled|failed/.test(item.status)) return "stopped";
   return "other";
 }
@@ -65,7 +63,7 @@ function formatTimestamp(value: string | undefined, locale: "zh" | "en"): string
 }
 
 function formatDuration(value: number | null, locale: "zh" | "en"): string {
-  if (value === null) return locale === "zh" ? "当前没有运行" : "Not currently running";
+  if (value === null) return locale === "zh" ? "用时未记录" : "Elapsed time not recorded";
   const seconds = Math.max(0, Math.round(value / 1000));
   if (seconds < 60) return locale === "zh" ? `${seconds} 秒` : `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
@@ -85,53 +83,16 @@ function localizedStageName(item: WorkItemRuntimeItem, stageId: string, locale: 
   return (locale === "zh" ? stage?.displayNameI18n.zh : stage?.displayNameI18n.en) ?? stage?.displayName ?? stageId;
 }
 
-function recoveryComponentLabel(component: ServiceRecoveryModel["causalRoot"]["component"], locale: "zh" | "en"): string {
-  if (locale === "zh") {
-    return component === "service" ? "后台服务" : component === "worker" ? "后台任务" : component === "scheduler" ? "定时任务" : "运行状态";
-  }
-  return component === "service" ? "Background service" : component === "worker" ? "Background worker" : component === "scheduler" ? "Scheduled tasks" : "Runtime";
-}
-
-function recoveryStatusLabel(model: ServiceRecoveryModel, locale: "zh" | "en"): string {
-  if (locale === "zh") {
-    if (model.causalRoot.status === "blocked" || model.mutationGuard.allowed === false) return "当前环境暂不能自动修复";
-    if (model.causalRoot.status === "unknown") return "需要先刷新状态";
-    return model.primaryAction ? "可以尝试恢复" : "暂无可安全执行的操作";
-  }
-  if (model.causalRoot.status === "blocked" || model.mutationGuard.allowed === false) return "Automatic repair is unavailable in this environment";
-  if (model.causalRoot.status === "unknown") return "Refresh status before continuing";
-  return model.primaryAction ? "Recovery can be attempted" : "No safe recovery action is available";
-}
-
-function recoveryReadinessLabel(model: ServiceRecoveryModel, locale: "zh" | "en"): string {
-  return model.causalRoot.detail[locale];
-}
-
-function recoveryActionLabel(model: ServiceRecoveryModel, locale: "zh" | "en"): string {
-  const kind = model.primaryAction?.kind ?? "status";
-  if (locale === "zh") {
-    if (model.causalRoot.component === "worker") return kind === "restart" ? "重新加载后台任务" : kind === "start" ? "启动后台任务" : "检查后台任务";
-    if (model.causalRoot.component === "scheduler") return kind === "restart" ? "重新加载定时任务" : kind === "start" || kind === "repair" ? "启动定时任务" : "检查定时任务";
-    return kind === "restart" ? "重新加载后台服务" : kind === "start" || kind === "repair" ? "启动后台服务" : "检查后台服务";
-  }
-  if (model.causalRoot.component === "worker") return kind === "restart" ? "Reload background worker" : kind === "start" ? "Start background worker" : "Check background worker";
-  if (model.causalRoot.component === "scheduler") return kind === "restart" ? "Reload scheduled tasks" : kind === "start" || kind === "repair" ? "Start scheduled tasks" : "Check scheduled tasks";
-  return kind === "restart" ? "Reload background service" : kind === "start" || kind === "repair" ? "Start background service" : "Check background service";
-}
-
 export function RuntimeOverviewPage({
   locale,
   projection,
   serviceRecovery,
-  serviceRecoveryBusy,
-  serviceRecoveryFeedback,
   selectedWorkItemId,
   stateStatus,
-  stateError,
   snapshotSource,
   snapshotCachedAt,
   onRefresh,
-  onRunServiceRecovery,
+  onOpenMaintenance,
   onOpenWorkItem,
   onOpenThread,
   mcpApps
@@ -143,7 +104,6 @@ export function RuntimeOverviewPage({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [openStagesFor, setOpenStagesFor] = useState<string | null>(null);
-  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<ServiceRecoveryAction | null>(null);
   const [activeDomainDetailRoute, setActiveDomainDetailRoute] = useState<ActiveDomainDetailRoute | null>(null);
   const copy = locale === "zh" ? {
     title: "项目运行总览",
@@ -152,15 +112,22 @@ export function RuntimeOverviewPage({
     allAgents: "全部智能体",
     project: "项目",
     allProjects: "全部项目",
-    loaded: "加载时间",
-    availability: "整体状态",
-    available: "可用",
-    partial: "部分可用",
-    unavailable: "不可用",
+    loaded: "更新于",
+    readback: "任务列表已更新",
+    loading: "正在读取任务…",
+    openMaintenance: "打开维护",
+    retry: "重试",
+    clearFilter: "清除状态筛选",
+    noMatch: "没有符合此状态的工作",
+    noArchived: "当前范围没有归档工作",
+    emptyHint: "智能体提供项目任务后，会显示在这里。",
+    unavailableHint: "重新读取任务列表，或打开维护查看连接状态。",
+    serviceHint: "后台自动执行可能受影响。打开维护查看服务详情与恢复操作。",
+    unknownHint: "刷新后确认服务状态，或在维护中查看详情。",
+    cachedService: "上次服务检查",
     running: "运行中",
     attention: "需关注",
     tasks: "任务",
-    currentCount: "当前范围",
     workItems: "项工作",
     all: "全部",
     paused: "已暂停",
@@ -182,12 +149,6 @@ export function RuntimeOverviewPage({
     stageMap: "阶段进度",
     close: "关闭阶段进度",
     openDetails: "查看详情",
-    serviceRecovery: "运行状态需要检查",
-    causalRoot: "影响范围",
-    mutationGuard: "自动修复",
-    noRecoveryAction: "当前没有可安全执行的恢复操作",
-    confirmRecovery: "确认执行",
-    cancelRecovery: "取消",
     refreshing: "正在更新，页面先显示上次状态",
     cached: "显示上次读取的状态",
     stale: "最新读取失败，保留上次状态"
@@ -198,15 +159,22 @@ export function RuntimeOverviewPage({
     allAgents: "All Agents",
     project: "Project",
     allProjects: "All projects",
-    loaded: "Loaded",
-    availability: "Overall status",
-    available: "Available",
-    partial: "Partially available",
-    unavailable: "Unavailable",
+    loaded: "Updated",
+    readback: "Task list updated",
+    loading: "Reading tasks…",
+    openMaintenance: "Open maintenance",
+    retry: "Retry",
+    clearFilter: "Clear status filter",
+    noMatch: "No work matches this status",
+    noArchived: "No archived work in this scope",
+    emptyHint: "Project work will appear here when an agent provides it.",
+    unavailableHint: "Read the task list again, or open maintenance to check the connection.",
+    serviceHint: "Background execution may be affected. Open maintenance for service details and recovery.",
+    unknownHint: "Refresh to check service status, or view details in maintenance.",
+    cachedService: "Last service check",
     running: "Running",
     attention: "Needs attention",
     tasks: "Tasks",
-    currentCount: "Current scope",
     workItems: "work items",
     all: "All",
     paused: "Paused",
@@ -228,12 +196,6 @@ export function RuntimeOverviewPage({
     stageMap: "Stage progress",
     close: "Close stage progress",
     openDetails: "Open details",
-    serviceRecovery: "Runtime status needs attention",
-    causalRoot: "Affected area",
-    mutationGuard: "Automatic recovery",
-    noRecoveryAction: "No safe recovery action is currently available",
-    confirmRecovery: "Confirm",
-    cancelRecovery: "Cancel",
     refreshing: "Updating; showing the last known state",
     cached: "Showing the last known state",
     stale: "Latest read failed; keeping the last known state"
@@ -241,12 +203,15 @@ export function RuntimeOverviewPage({
   const projects = useMemo(() => (projection?.projects ?? []).filter((project) => (
     agentId === "all" || project.agentId === agentId
   )), [agentId, projection?.projects]);
-  const items = useMemo(() => (projection?.items ?? []).filter((item) => (
-    item.archived === showArchived
-    && (agentId === "all" || item.agentId === agentId)
+  const scopedItems = useMemo(() => (projection?.items ?? []).filter((item) => (
+    (agentId === "all" || item.agentId === agentId)
     && (projectId === "all" || item.projectId === projectId)
-    && (status === "all" || statusCategory(item) === status)
-  )), [agentId, projectId, projection?.items, showArchived, status]);
+  )), [agentId, projectId, projection?.items]);
+  const libraryItems = scopedItems.filter((item) => item.archived === showArchived);
+  const items = libraryItems.filter((item) => status === "all" || (status === "attention" ? item.attentionKind !== "none" : statusCategory(item) === status));
+  const runningCount = libraryItems.filter((item) => statusCategory(item) === "running").length;
+  const attentionCount = libraryItems.filter((item) => item.attentionKind !== "none").length;
+  const archivedCount = scopedItems.filter((item) => item.archived).length;
   const activeDomainDetailItem = useMemo(() => {
     if (!activeDomainDetailRoute) return undefined;
     const item = projection?.items.find((candidate) => candidate.id === activeDomainDetailRoute.itemId);
@@ -258,14 +223,8 @@ export function RuntimeOverviewPage({
   }, [activeDomainDetailRoute, projection?.items]);
   const activeDomainDetailView = activeDomainDetailItem?.domainDetailViews?.[0];
   const recoveryNeedsAttention = serviceRecovery !== undefined && serviceRecovery.causalRoot.status !== "ready";
-  const attentionCount = projection
-    ? projection.summary.userAttentionCount + projection.summary.systemAttentionCount + (recoveryNeedsAttention ? 1 : 0)
-    : 0;
-  const overallStatus = !projection
-    ? { label: copy.unavailable, tone: "muted" as const }
-    : recoveryNeedsAttention
-      ? { label: copy.partial, tone: "attention" as const }
-      : { label: copy.available, tone: "success" as const };
+  const serviceSnapshotIsCurrent = stateStatus === "ready" && snapshotSource === "live";
+  const serviceNoticeTone = !serviceSnapshotIsCurrent || serviceRecovery?.causalRoot.status === "unknown" ? "unknown" : "attention";
   const snapshotMessage = stateStatus === "error" && snapshotSource !== "none"
     ? copy.stale
     : stateStatus === "loading" && snapshotSource !== "none"
@@ -322,16 +281,33 @@ export function RuntimeOverviewPage({
         </div>
         <button
           type="button"
-          className="runtime-icon-button"
+          className="runtime-refresh-button"
           aria-label={copy.refresh}
           title={copy.refresh}
           disabled={stateStatus === "loading"}
           onClick={onRefresh}
         >
           <RefreshCw className={stateStatus === "loading" ? "spin" : undefined} aria-hidden="true" size={16} />
+          <span>{stateStatus === "loading" ? copy.loading : (locale === "zh" ? "刷新" : "Refresh")}</span>
         </button>
       </header>
-      {snapshotMessage ? <p className="runtime-snapshot-note" data-source={snapshotSource} role={stateStatus === "error" ? "alert" : "status"}>{snapshotMessage}{snapshotCachedAt ? ` · ${formatTimestamp(snapshotCachedAt, locale)}` : ""}</p> : null}
+      <p className="runtime-snapshot-note" role="status">
+        {snapshotMessage ?? (projection ? copy.readback : stateStatus === "loading" ? copy.loading : copy.noData)}
+        {(snapshotCachedAt ?? projection?.generatedAt) ? <> · {copy.loaded} <time dateTime={snapshotCachedAt ?? projection?.generatedAt}>{formatTimestamp(snapshotCachedAt ?? projection?.generatedAt, locale)}</time></> : null}
+      </p>
+
+      {projection && recoveryNeedsAttention && serviceRecovery ? (
+        <section className="runtime-service-notice" aria-labelledby="runtime-service-title" data-tone={serviceNoticeTone}>
+          {serviceNoticeTone === "unknown" ? <Info aria-hidden="true" size={18} /> : <CircleAlert aria-hidden="true" size={18} />}
+          <div>
+            <h2 id="runtime-service-title">{!serviceSnapshotIsCurrent ? `${copy.cachedService} · ` : ""}{serviceRecovery.causalRoot.detail[locale]}</h2>
+            <p>{serviceNoticeTone === "unknown" ? copy.unknownHint : copy.serviceHint}</p>
+          </div>
+          <button type="button" className="runtime-maintenance-button" onClick={onOpenMaintenance}>
+            {copy.openMaintenance}<ArrowUpRight aria-hidden="true" size={15} />
+          </button>
+        </section>
+      ) : null}
 
       <div className="runtime-scope-band">
         <strong>{copy.scope}</strong>
@@ -349,57 +325,13 @@ export function RuntimeOverviewPage({
             {projects.map((project) => <option key={project.id} value={project.id}>{project.label}</option>)}
           </select>
         </label>
-        <span className="runtime-loaded-at">{copy.loaded}: {formatTimestamp(projection?.generatedAt, locale)}</span>
       </div>
 
-      <dl className="runtime-summary-band">
-        <div><dt>{copy.availability}</dt><dd data-tone={overallStatus.tone}>{overallStatus.label}</dd></div>
-        <div><dt>{copy.running}</dt><dd data-tone={projection?.summary.runningCount ? "active" : "muted"}>{projection?.summary.runningCount ?? "-"}</dd></div>
-        <div><dt>{copy.attention}</dt><dd data-tone={attentionCount ? "attention" : "muted"}>{projection ? attentionCount : "-"}</dd></div>
-      </dl>
-
-      {recoveryNeedsAttention && serviceRecovery ? (
-        <section className="runtime-recovery-band" aria-labelledby="runtime-recovery-title" data-status={serviceRecovery.causalRoot.status}>
-          <div className="runtime-recovery-heading">
-            <CircleAlert aria-hidden="true" size={17} />
-            <div>
-              <h2 id="runtime-recovery-title">{copy.serviceRecovery}</h2>
-              <p>{copy.causalRoot}: {recoveryComponentLabel(serviceRecovery.causalRoot.component, locale)}</p>
-            </div>
-          </div>
-          <dl>
-            <div><dt>{copy.mutationGuard}</dt><dd>{recoveryStatusLabel(serviceRecovery, locale)}</dd></div>
-            <div><dt>{locale === "zh" ? "状态" : "Status"}</dt><dd>{recoveryReadinessLabel(serviceRecovery, locale)}</dd></div>
-          </dl>
-          <div className="runtime-recovery-action">
-            {serviceRecovery.primaryAction ? (
-              pendingRecoveryAction?.actionId === serviceRecovery.primaryAction.actionId ? (
-                <div className="runtime-recovery-confirmation" role="group" aria-label={copy.confirmRecovery}>
-                  <span>{recoveryActionLabel(serviceRecovery, locale)}</span>
-                  <button type="button" disabled={serviceRecoveryBusy} onClick={() => setPendingRecoveryAction(null)}>{copy.cancelRecovery}</button>
-                  <button type="button" className="primary" disabled={serviceRecoveryBusy} onClick={() => {
-                    const action = pendingRecoveryAction;
-                    setPendingRecoveryAction(null);
-                    if (action) onRunServiceRecovery(action);
-                  }}>{copy.confirmRecovery}</button>
-                </div>
-              ) : (
-                <button type="button" disabled={serviceRecoveryBusy} onClick={() => {
-                  if (serviceRecovery.primaryAction?.confirmationRequired) setPendingRecoveryAction(serviceRecovery.primaryAction);
-                  else if (serviceRecovery.primaryAction) onRunServiceRecovery(serviceRecovery.primaryAction);
-                }}>
-                  <RotateCcw className={serviceRecoveryBusy ? "spin" : undefined} aria-hidden="true" size={15} />
-                  {recoveryActionLabel(serviceRecovery, locale)}
-                </button>
-              )
-            ) : <span>{copy.noRecoveryAction}</span>}
-            {serviceRecoveryFeedback ? <p role={serviceRecoveryFeedback.tone === "attention" ? "alert" : "status"} data-tone={serviceRecoveryFeedback.tone}>{serviceRecoveryFeedback.message}</p> : null}
-          </div>
-        </section>
-      ) : null}
-
       <div className="runtime-list-heading">
-        <div><h2>{copy.tasks}</h2><span>{copy.currentCount} {items.length} {copy.workItems}</span></div>
+        <div className="runtime-list-summary">
+          <h2>{showArchived ? copy.archive : copy.tasks}</h2>
+          {projection ? <span>{libraryItems.length} {copy.workItems} · {copy.running} {runningCount} · {copy.attention} {attentionCount}</span> : null}
+        </div>
         <div className="runtime-list-controls">
           <select aria-label={locale === "zh" ? "状态" : "Status"} value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
             <option value="all">{copy.all}</option>
@@ -411,14 +343,25 @@ export function RuntimeOverviewPage({
           </select>
           <button type="button" className="runtime-archive-button" aria-pressed={showArchived} onClick={() => { setShowArchived((value) => !value); setOpenStagesFor(null); }}>
             <Archive aria-hidden="true" size={15} />
-            {showArchived ? copy.backToCurrent : `${copy.archive} (${projection?.summary.archivedWorkItemCount ?? 0})`}
+            {showArchived ? copy.backToCurrent : `${copy.archive} (${archivedCount})`}
           </button>
         </div>
       </div>
 
-      {stateStatus === "error" ? <p className="runtime-overview-error" role="alert">{stateError || copy.noData}</p> : null}
-      {stateStatus === "ready" && !projection ? <p className="runtime-overview-empty">{copy.noData}</p> : null}
-      {projection && items.length === 0 ? <p className="runtime-overview-empty">{copy.noItems}</p> : null}
+      {!projection ? (
+        <div className="runtime-empty-state" role={stateStatus === "error" ? "alert" : "status"}>
+          <h3>{stateStatus === "loading" ? copy.loading : copy.noData}</h3>
+          {stateStatus !== "loading" ? <><p>{copy.unavailableHint}</p><div>
+            <button type="button" className="runtime-refresh-button" onClick={onRefresh}>{copy.retry}</button>
+            <button type="button" className="runtime-maintenance-button" onClick={onOpenMaintenance}>{copy.openMaintenance}</button>
+          </div></> : <div className="runtime-loading-placeholder" aria-hidden="true"><span /><span /><span /></div>}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="runtime-empty-state" role="status">
+          <h3>{status !== "all" && libraryItems.length ? copy.noMatch : showArchived ? copy.noArchived : copy.noItems}</h3>
+          {status !== "all" ? <button type="button" className="runtime-refresh-button" onClick={() => setStatus("all")}>{copy.clearFilter}</button> : <p>{copy.emptyHint}</p>}
+        </div>
+      ) : null}
 
       {threadError && <p role="alert">{threadError}</p>}
       <div className="runtime-work-list" aria-live="polite">
@@ -437,12 +380,12 @@ export function RuntimeOverviewPage({
                   <h3>{item.title}</h3>
                   <span><UserRound aria-hidden="true" size={13} />{item.agentDisplayName}</span>
                 </button>
-              </div>
-              <div className="runtime-thread-links">
-                {item.canonicalThreadIds?.length && onOpenThread ? item.canonicalThreadIds.map(threadId => <button key={threadId} type="button" disabled={openingThread} onClick={async () => {
-                  setOpeningThread(true); setThreadError("");
-                  try { setThreadError(await onOpenThread(threadId) ?? ""); } catch (error) { setThreadError(String(error)); } finally { setOpeningThread(false); }
-                }}>{locale === "zh" ? "打开会话" : "Open thread"} · {threadId.slice(0, 8)}</button>) : <small>{locale === "zh" ? "Owner 未提供可打开的会话引用" : "No canonical thread ref projected"}</small>}
+                {item.canonicalThreadIds?.length && onOpenThread ? <div className="runtime-thread-links">
+                  {item.canonicalThreadIds.map((threadId, index) => <button key={threadId} type="button" disabled={openingThread} onClick={async () => {
+                    setOpeningThread(true); setThreadError("");
+                    try { setThreadError(await onOpenThread(threadId) ?? ""); } catch (error) { setThreadError(String(error)); } finally { setOpeningThread(false); }
+                  }}>{locale === "zh" ? "打开会话" : "Open thread"}{item.canonicalThreadIds!.length > 1 ? ` ${index + 1}` : ""}</button>)}
+                </div> : null}
               </div>
               <div className="runtime-work-status"><span>{item.statusLabel}</span>{item.activeSessionCount ? <small>{item.activeSessionCount} {locale === "zh" ? "个活跃会话" : "active sessions"}</small> : null}</div>
               <div className="runtime-work-progress">

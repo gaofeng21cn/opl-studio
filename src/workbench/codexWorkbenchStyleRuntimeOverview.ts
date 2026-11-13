@@ -5,27 +5,12 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     line-height: var(--opl-leading-normal);
   }
 
-  .runtime-snapshot-note[data-source="cached"] {
-    color: var(--opl-muted);
-  }
-
-  .runtime-snapshot-note[data-source="live"]::before,
-  .runtime-snapshot-note[data-source="cached"]::before {
-    content: "";
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    margin-right: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    vertical-align: 1px;
-  }
-
   .opl-recent-session-list > * + * {
     margin-top: 2px;
   }
 
   .opl-runtime-overview {
+    container: runtime-page / inline-size;
     min-width: 0;
     min-height: 100%;
     overflow: auto;
@@ -192,7 +177,7 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
   .runtime-scope-band {
     min-width: 0;
     display: grid;
-    grid-template-columns: auto minmax(150px, 220px) minmax(150px, 240px) minmax(120px, 1fr);
+    grid-template-columns: max-content minmax(0, 240px) minmax(0, 280px);
     align-items: end;
     gap: var(--opl-space-4);
     margin-top: var(--opl-space-5);
@@ -213,7 +198,6 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
   }
 
   .runtime-scope-band label > span,
-  .runtime-loaded-at,
   .runtime-list-heading span,
   .runtime-work-identity > span,
   .runtime-work-status small,
@@ -236,162 +220,136 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     color: var(--opl-text);
   }
 
-  .runtime-loaded-at {
-    justify-self: end;
-    align-self: center;
-    white-space: nowrap;
-  }
-
-  .runtime-summary-band {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    border-bottom: 1px solid var(--opl-border);
-  }
-
-  .runtime-summary-band > div {
-    min-width: 0;
-    padding: 14px 0;
-  }
-
-  .runtime-summary-band > div + div {
-    padding-left: 20px;
-    border-left: 1px solid var(--opl-border);
-  }
-
-  .runtime-summary-band dt {
-    color: var(--opl-muted);
-    font-size: var(--opl-text-xs);
-  }
-
-  .runtime-summary-band dd {
-    margin: var(--opl-space-1) 0 0;
-    font-size: var(--opl-text-lg);
-    font-weight: var(--opl-weight-semibold);
-  }
-
-  .runtime-summary-band dd[data-tone="success"] { color: var(--opl-success); }
-  .runtime-summary-band dd[data-tone="active"] { color: var(--opl-accent); }
-  .runtime-summary-band dd[data-tone="attention"] { color: var(--opl-warning); }
-  .runtime-summary-band dd[data-tone="muted"] { color: var(--opl-muted); }
-
-  .runtime-recovery-band {
-    min-width: 0;
-    display: grid;
-    grid-template-columns: minmax(220px, 1.1fr) minmax(240px, 1fr) minmax(220px, auto);
-    align-items: center;
-    gap: var(--opl-space-4);
-    padding: 14px 0;
-    border-bottom: 1px solid var(--opl-border);
-  }
-
-  .runtime-recovery-heading,
-  .runtime-recovery-action,
-  .runtime-recovery-confirmation {
-    min-width: 0;
+  .runtime-service-notice {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    gap: var(--opl-space-3);
+    margin-top: var(--opl-space-5);
+    padding: var(--opl-space-4);
+    border-radius: var(--opl-radius-surface);
+    background: var(--opl-surface-secondary);
   }
 
-  .runtime-recovery-heading {
-    gap: 9px;
-  }
-
-  .runtime-recovery-heading > svg {
-    flex: 0 0 auto;
+  .runtime-service-notice > svg {
+    flex-shrink: 0;
+    margin-top: 2px;
     color: var(--opl-muted);
   }
 
-  .runtime-recovery-band[data-status="attention"] .runtime-recovery-heading > svg,
-  .runtime-recovery-band[data-status="blocked"] .runtime-recovery-heading > svg {
+  .runtime-service-notice[data-tone="attention"] > svg {
     color: var(--opl-warning);
   }
 
-  .runtime-recovery-heading h2,
-  .runtime-recovery-heading p,
-  .runtime-recovery-action p {
-    margin: 0;
-  }
-
-  .runtime-recovery-heading h2 {
-    font-size: var(--opl-text-md);
-    font-weight: var(--opl-weight-semibold);
-  }
-
-  .runtime-recovery-heading p,
-  .runtime-recovery-band dt,
-  .runtime-recovery-action > span,
-  .runtime-recovery-action p {
-    color: var(--opl-muted);
-    font-size: var(--opl-text-xs);
-    line-height: var(--opl-leading-normal);
-  }
-
-  .runtime-recovery-band dl {
+  .runtime-service-notice > div {
+    flex: 1;
     min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  }
+
+  .runtime-service-notice h2 {
     margin: 0;
-  }
-
-  .runtime-recovery-band dd {
-    margin: 3px 0 0;
-    overflow-wrap: anywhere;
-    font-size: var(--opl-text-xs);
+    font-size: var(--opl-text-md);
     font-weight: var(--opl-weight-medium);
+    overflow-wrap: anywhere;
   }
 
-  .runtime-recovery-action {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 7px;
+  .runtime-service-notice p {
+    margin: var(--opl-space-1) 0 0;
+    max-width: 72ch;
+    color: var(--opl-muted);
+    font-size: var(--opl-text-sm);
   }
 
-  .runtime-recovery-action button,
-  .runtime-recovery-confirmation button {
-    min-height: var(--opl-control-md);
+  .runtime-refresh-button,
+  .runtime-maintenance-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    padding: 0 10px;
+    gap: var(--opl-space-2);
+    min-height: var(--opl-control-md);
+    padding: 0 var(--opl-space-3);
     border: 1px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
     font-size: var(--opl-text-sm);
+    white-space: nowrap;
   }
 
-  .runtime-recovery-action button:hover:not(:disabled),
-  .runtime-recovery-confirmation button:hover:not(:disabled) {
+  .runtime-refresh-button:hover:not(:disabled),
+  .runtime-maintenance-button:hover:not(:disabled) {
     background: var(--opl-hover);
   }
 
-  .runtime-recovery-confirmation {
-    justify-content: flex-end;
+  .opl-runtime-overview :is(button, select, summary):focus-visible {
+    outline: 2px solid var(--opl-accent);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .runtime-list-summary {
     flex-wrap: wrap;
-    gap: 7px;
+    font-variant-numeric: tabular-nums;
   }
 
-  .runtime-recovery-confirmation > span {
+  .runtime-empty-state {
+    padding: 48px var(--opl-space-4);
+    text-align: center;
     color: var(--opl-muted);
-    font-size: var(--opl-text-xs);
   }
 
-  .runtime-recovery-confirmation button.primary {
-    border-color: var(--opl-text);
-    background: var(--opl-text);
-    color: var(--opl-canvas);
+  .runtime-empty-state h3 {
+    margin: 0;
+    color: var(--opl-text);
+    font-size: var(--opl-text-md);
+    font-weight: var(--opl-weight-medium);
   }
 
-  .runtime-recovery-action p {
-    flex-basis: 100%;
-    text-align: right;
+  .runtime-empty-state p {
+    margin: var(--opl-space-2) 0 var(--opl-space-4);
   }
 
-  .runtime-recovery-action p[data-tone="attention"] {
-    color: var(--opl-warning);
+  .runtime-empty-state > button {
+    margin-top: var(--opl-space-4);
+  }
+
+  .runtime-empty-state > div:not(.runtime-loading-placeholder) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--opl-space-2);
+  }
+
+  .runtime-loading-placeholder {
+    display: grid;
+    gap: var(--opl-space-3);
+    margin-top: var(--opl-space-5);
+  }
+
+  .runtime-loading-placeholder span {
+    height: var(--opl-control-md);
+    background: var(--opl-surface-secondary);
+    border-radius: var(--opl-radius-control);
+  }
+
+  @container runtime-page (max-width: 640px) {
+    .runtime-service-notice {
+      flex-wrap: wrap;
+    }
+    .runtime-service-notice > div {
+      flex-basis: calc(100% - 32px);
+    }
+    .runtime-service-notice > button {
+      margin-left: 30px;
+    }
+    .runtime-scope-band {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .runtime-scope-band > strong {
+      grid-column: 1 / -1;
+    }
+    .runtime-list-heading {
+      flex-wrap: wrap;
+    }
   }
 
   .runtime-list-heading {
@@ -447,8 +405,8 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
 
   .runtime-work-list {
     display: grid;
-    gap: var(--opl-space-3);
     margin-top: var(--opl-space-3);
+    border-top: 1px solid var(--opl-border);
   }
 
   .runtime-work-row {
@@ -458,18 +416,54 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     grid-template-columns: minmax(190px, 1.15fr) minmax(92px, .55fr) minmax(260px, 1.5fr) minmax(150px, .8fr);
     align-items: center;
     gap: var(--opl-space-4);
-    padding: var(--opl-space-4);
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-surface);
-    background: var(--opl-surface-elevated);
+    padding: var(--opl-space-5) var(--opl-space-2);
+    border-bottom: 1px solid var(--opl-border);
+    background: var(--opl-canvas);
   }
 
   .runtime-work-row:hover {
-    border-color: var(--opl-border-heavy);
+    background: var(--opl-hover);
   }
 
   .runtime-work-row[data-selected="true"] {
-    border-color: var(--opl-accent);
+    background: var(--opl-selected);
+  }
+
+  .opl-runtime-overview .runtime-thread-links button {
+    margin: var(--opl-space-2) var(--opl-space-2) 0 0;
+    min-height: var(--opl-control-sm);
+    border: 1px solid var(--opl-border);
+    border-radius: var(--opl-radius-control);
+    color: var(--opl-text);
+    background: var(--opl-canvas);
+  }
+
+  @container runtime-page (max-width: 1040px) {
+    .runtime-work-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+    .runtime-work-status {
+      justify-self: end;
+    }
+    .runtime-stage-popover {
+      right: var(--opl-space-3);
+    }
+  }
+
+  @container runtime-page (max-width: 600px) {
+    .runtime-work-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .runtime-work-status {
+      justify-self: start;
+    }
+    .runtime-overview-header > div > svg {
+      display: none;
+    }
+    .runtime-overview-header .runtime-refresh-button {
+      flex-shrink: 0;
+    }
   }
 
   .runtime-work-identity,
@@ -541,7 +535,7 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
 
   .runtime-work-row[data-status="attention"] .runtime-work-status > span {
     background: var(--opl-warning-soft);
-    color: var(--opl-warning);
+    color: var(--opl-text);
   }
 
   .runtime-stage-button {

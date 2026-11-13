@@ -90,7 +90,6 @@ import {
   runtimeOverviewModelFromCache,
   writeRuntimeOverviewCache
 } from "./runtimeOverviewCache";
-import type { ServiceRecoveryAction } from "./serviceRecoveryModel";
 import {
   codexModelPolicy,
   resolveCodexModelOptions,
@@ -408,11 +407,6 @@ export function App({
     createComposerAttachmentController({ bridge, locale: settings.locale, setComposerSelections });
   const [selectedAgent, setSelectedAgent] = useState<AgentPackageSelectionIntent | null>(null);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
-  const [serviceRecoveryBusy, setServiceRecoveryBusy] = useState(false);
-  const [serviceRecoveryFeedback, setServiceRecoveryFeedback] = useState<{
-    tone: "success" | "attention";
-    message: string;
-  } | null>(null);
   const [ephemeralQueue, setEphemeralQueue] = useState<EphemeralQueueItem[]>([]);
   const [composerSubmissionError, setComposerSubmissionError] = useState("");
   const [threadInputFiles, setThreadInputFiles] = useState<Record<string, WorkbenchArtifactRef[]>>({});
@@ -1468,45 +1462,6 @@ export function App({
     // ID comes only from an owner-projected ref or a canonical child event.
     return openThread(known ?? { id: threadId, title: threadId, status: "unknown", preview: "", archived: false,
       isTemporaryWorkspace: false, currentWorkspace: false });
-  }
-
-  async function runServiceRecoveryAction(action: ServiceRecoveryAction) {
-    setServiceRecoveryBusy(true);
-    setServiceRecoveryFeedback(null);
-    try {
-      const refreshedModel = await loadState(settings.runtimeProfile);
-      const refreshedRecovery = refreshedModel?.serviceRecovery;
-      if (
-        !refreshedRecovery
-        || refreshedRecovery.primaryAction?.actionId !== action.actionId
-        || refreshedRecovery.primaryAction.mutates !== action.mutates
-        || (action.mutates && refreshedRecovery.mutationGuard.allowed === false)
-      ) {
-        setServiceRecoveryFeedback({
-          tone: "attention",
-          message: settings.locale === "zh"
-            ? "服务状态已经变化，请查看刷新后的恢复建议。"
-            : "Service state changed; review the refreshed recovery action."
-        });
-        return;
-      }
-      const receipt = await bridge.executeAction({
-        actionId: action.actionId,
-        payload: { confirmed: true },
-        dryRun: false
-      });
-      await loadState(settings.runtimeProfile);
-      setServiceRecoveryFeedback({
-        tone: receipt.status === "executed" ? "success" : "attention",
-        message: receipt.status === "executed"
-          ? (settings.locale === "zh" ? "恢复操作已完成，服务状态已重新读取。" : "Recovery completed and service state was re-read.")
-          : (receipt.blockedReason ?? (settings.locale === "zh" ? "恢复操作未执行。" : "Recovery was not executed."))
-      });
-    } catch (error) {
-      setServiceRecoveryFeedback({ tone: "attention", message: String(error) });
-    } finally {
-      setServiceRecoveryBusy(false);
-    }
   }
 
   async function resumeThreadAndOpen(thread: WorkbenchThreadItem) {
@@ -2813,15 +2768,12 @@ export function App({
       locale={settings.locale}
       projection={model.workItemRuntime}
       serviceRecovery={model.serviceRecovery}
-      serviceRecoveryBusy={serviceRecoveryBusy}
-      serviceRecoveryFeedback={serviceRecoveryFeedback}
       selectedWorkItemId={detailWorkItemId}
       stateStatus={stateStatus}
-      stateError={stateError}
       snapshotSource={runtimeSnapshotSource}
       snapshotCachedAt={runtimeSnapshotCachedAt}
       onRefresh={() => { void loadState(settings.runtimeProfile); }}
-      onRunServiceRecovery={(action) => { void runServiceRecoveryAction(action); }}
+      onOpenMaintenance={() => setSettingsNavigation(current => ({ open: true, destination: "services", revision: (current?.revision ?? 0) + 1 }))}
       onOpenWorkItem={(item) => {
         setSelectedRuntimeWorkItemId(item.workItemId);
         requestDetails("opl-project-progress-panel");

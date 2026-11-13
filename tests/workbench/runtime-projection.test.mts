@@ -833,3 +833,49 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
   assert.deepEqual(capabilities.skills.map((item) => item.name), ["MinerU"]);
   assert.deepEqual(capabilities.plugins.map((item) => item.id), ["github"]);
 });
+
+// The overview must preserve the distinction between task data and service health.
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { RuntimeOverviewPage } from "../../src/workbench/RuntimeOverviewPage";
+import { deriveServiceRecoveryModel } from "../../src/workbench/serviceRecoveryModel";
+import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
+
+function renderOverview(overrides: Record<string, unknown> = {}) {
+  const model = runtimeOverviewFixture();
+  return renderToStaticMarkup(createElement(RuntimeOverviewPage, {
+    locale: "zh", projection: model.workItemRuntime, serviceRecovery: model.serviceRecovery,
+    stateStatus: "ready", snapshotSource: "live", onRefresh() {}, onOpenMaintenance() {}, onOpenWorkItem() {}, ...overrides
+  }));
+}
+
+test("overview reports a concrete service cause without degrading the task list or counting service issues as tasks", () => {
+  const html = renderOverview();
+  assert.match(html, /后台服务配置已变化，需要重新加载/);
+  assert.match(html, /打开维护/);
+  assert.doesNotMatch(html, /部分可用|整体状态|确认执行/);
+  const summary = html.match(/<div class="runtime-list-summary">(.*?)<\/div>/)?.[1] ?? "";
+  assert.match(summary, /2 项工作 · 运行中 1 · 需关注 1/);
+  assert.doesNotMatch(summary, /99/);
+});
+
+test("unknown and cached service observations are neutral instead of confirmed failures", () => {
+  const html = renderOverview({ serviceRecovery: deriveServiceRecoveryModel({}) });
+  assert.match(html, /data-tone="unknown"/);
+  assert.match(html, /后台服务状态尚未读取/);
+  assert.doesNotMatch(html, /尚未就绪/);
+  const cached = renderOverview({ stateStatus: "error", snapshotSource: "cached" });
+  assert.match(cached, /上次服务检查/);
+  assert.match(cached, /data-tone="unknown"/);
+  assert.match(cached, /最新读取失败/);
+});
+
+test("initial loading and a failed read without a snapshot have distinct recovery states", () => {
+  const loading = renderOverview({ projection: undefined, stateStatus: "loading", snapshotSource: "none" });
+  assert.match(loading, /正在读取任务/);
+  assert.doesNotMatch(loading, /当前范围没有工作|后台服务配置已变化/);
+  const failed = renderOverview({ projection: undefined, stateStatus: "error", snapshotSource: "none" });
+  assert.match(failed, /重试/);
+  assert.match(failed, /打开维护/);
+  assert.doesNotMatch(failed, /当前范围没有工作|后台服务配置已变化/);
+});
