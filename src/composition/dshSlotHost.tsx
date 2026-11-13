@@ -5,6 +5,7 @@ import { installIconSprite } from "../integrations/deepseek-harness/iconSprite.m
 import { SlotRegistry } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { PanelIcon } from "../integrations/deepseek-harness/sidebarComponents.mjs";
 import { createSettingsShellStore } from "../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
+import { createComposerFileIntake } from "@opl-vendor/dsh-file-intake";
 import { CodexThreadScope } from "./codexThreadScope";
 import type { OplStudioSurface } from "./oplStudioSurface";
 import { createSlotRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx";
@@ -122,6 +123,7 @@ export class OplStudioDshSlotHost {
   }
 
   private registerStaticSlots() {
+    const fileIntake = createComposerFileIntake();
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
     const registerFactory = (spec: Record<string, unknown>, component: unknown) => this.core.registerFactory(spec as any, component as any);
     register({ name: "root", registrant: "opl-studio", inject: () => ({ slotHost: this, contributions: this.contributions }), children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" }, "settings.section": { kind: "list", scope: "root" } } }, OplStudioRoot);
@@ -163,7 +165,7 @@ export class OplStudioDshSlotHost {
     register({ name: "conversation.hero.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "conversation.header", registrant: "opl-studio" }, ConversationHeaderSlot);
     register({ name: "conversation.session", registrant: "opl-studio" }, ConversationBodySlot);
-    register({ name: "conversation.composer.bar", registrant: "dsh-ui-conversation", children: { "conversation.input.attachments": { kind: "single", scope: "root" }, "conversation.input.permission": { kind: "single", scope: "root" }, "conversation.input.plan": { kind: "single", scope: "root" }, "conversation.input.model": { kind: "single", scope: "root" }, "conversation.input.activity": { kind: "single", scope: "root" }, "conversation.input.overlay": { kind: "single", scope: "root" }, "conversation.input.left": { kind: "list", scope: "root" }, "conversation.input.right": { kind: "list", scope: "root" }, "conversation.composer.dock": { kind: "list", scope: "root" } } }, InputBarSlot);
+    register({ name: "conversation.composer.bar", registrant: "dsh-ui-conversation", inject: () => ({ registerFileIntake: fileIntake }), children: { "conversation.input.attachments": { kind: "single", scope: "root" }, "conversation.input.permission": { kind: "single", scope: "root" }, "conversation.input.plan": { kind: "single", scope: "root" }, "conversation.input.model": { kind: "single", scope: "root" }, "conversation.input.activity": { kind: "single", scope: "root" }, "conversation.input.overlay": { kind: "single", scope: "root" }, "conversation.input.left": { kind: "list", scope: "root" }, "conversation.input.right": { kind: "list", scope: "root" }, "conversation.composer.dock": { kind: "list", scope: "root" } } }, InputBarSlot);
     register({ name: "conversation.input.attachments", registrant: "opl-studio" }, EmptyAttachmentSlot);
     register({ name: "conversation.input.overlay", registrant: "opl-studio" }, ComposerOverlaySlot);
     register({ name: "conversation.input.model", registrant: "opl-studio" }, ComposerModelSlot);

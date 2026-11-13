@@ -10,7 +10,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 | --- | --- | --- |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | 直接使用官方 `createClientModuleSystem` 装载客户端 factory，React 由 Studio 单实例提供 |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
-| DSH `ui-sidebar-documentpreview` | npm `0.2.2-rc.1`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |
+| DSH `ui-sidebar-documentpreview` | npm `0.2.2-rc.2`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |
 | [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | 保留官方本地设置搜索、索引、快捷键与日志；经 Studio 既有桥接访问日志 |
 
 设置搜索使用 1.14.0，功能范围仍是本地设置检索。该版本没有公开的客户端 transport 或 feature-policy 扩展点，却默认提供独立模型、API Key 和直连推理界面。Studio 在构建时应用明确记录的 `settings-search-studio.patch`：保留官方搜索、索引、快捷键与日志，关闭第二套模型与凭据读写，并将固定日志请求交给既有 WebUI/桌面桥。补丁清单同时核对包版本、原始载荷、补丁及结果的 SHA-256；不修改安装的 npm 包，输入漂移会阻止构建。日志沿用官方 `createLogStore` 和 `createLogRoute`，存储在当前 DSH home 的独立日志目录，WebUI 保留认证与请求上限，打开目录仅允许本机桌面。App/Codex 继续持有模型和凭据。原许可证、上游源码来源与兼容补丁随源码和载体保留。
@@ -164,7 +164,7 @@ URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存�
 工作台的 iframe 尺寸由可用画布决定；任务详情的行内嵌入继续响应 App 的尺寸请求。
 
 固定 DSH `0.2.1-rc.2`（`687f282e8625c6b8d11ff58211a90524be2e4317`）
-及核对的官方 `dsh-v0.2.2-rc.1` 提供 MCP client/tools/resources，尚无标准
+及核对的官方 `dsh-v0.2.2-rc.2` 提供 MCP client/tools/resources，尚无标准
 MCP App UI 宿主。因此使用官方 `@modelcontextprotocol/ext-apps` `2.0.4`
 的 `AppBridge` 和 `PostMessageTransport`，放入现有 DSH 工作台 slot；后续
 DSH 升级需重新评估这个缺口。`opl-codex-native` 继续持有 MCP 连接、凭据、

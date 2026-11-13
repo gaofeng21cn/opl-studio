@@ -10,7 +10,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     position: relative;
     padding: 7px 9px 6px;
     border: 1px solid var(--opl-border-heavy);
-    border-radius: 17px;
+    border-radius: var(--dsw-radius-xl);
     background: var(--opl-canvas);
     box-shadow: 0 0 0 0.5px var(--opl-border-heavy), 0 3px 7.5px rgba(0, 0, 0, 0.04), 0 0 20px rgba(0, 0, 0, 0.05);
   }
@@ -53,7 +53,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     gap: 6px;
     padding: 0 4px 0 8px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-sidebar);
     color: var(--opl-text);
     font-size: var(--opl-text-sm);
@@ -75,7 +75,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }
@@ -97,7 +97,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--opl-border-heavy);
-    border-radius: 10px;
+    border-radius: var(--dsw-radius-md);
     background: var(--opl-canvas);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.13), 0 2px 8px rgba(0, 0, 0, 0.07);
   }
@@ -124,7 +124,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     margin: 0 9px 7px;
     padding: 0 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
   }
 
@@ -173,7 +173,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     gap: 7px;
     padding: 5px 7px;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-text);
     text-align: left;
@@ -190,7 +190,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     display: inline-grid;
     place-items: center;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
   }
 
@@ -250,7 +250,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     overflow: hidden;
     transform: translateX(-50%);
     border: 1px solid var(--opl-border-heavy);
-    border-radius: 12px;
+    border-radius: var(--dsw-radius-md);
     outline: 0;
     background: var(--opl-canvas);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.17), 0 3px 10px rgba(0, 0, 0, 0.08);
@@ -284,7 +284,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }
@@ -316,7 +316,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     gap: 12px;
     padding: 6px 8px;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-text);
     text-align: left;
@@ -408,7 +408,7 @@ export const codexWorkbenchStyleComposer = `  .composer {
     gap: 5px;
     padding: 0 8px;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);

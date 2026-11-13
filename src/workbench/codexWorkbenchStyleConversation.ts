@@ -42,7 +42,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
   .thread-read-error {
     margin: 0;
     padding: 9px 11px;
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: color-mix(in oklab, var(--opl-danger) 7%, transparent);
     color: var(--opl-danger);
     font-size: var(--opl-text-sm);
@@ -84,7 +84,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     min-height: 32px;
     padding: 0 11px;
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-muted);
   }
@@ -123,7 +123,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     max-width: 86%;
     justify-self: end;
     padding: 9px 12px;
-    border-radius: 12px;
+    border-radius: var(--dsw-radius-md);
     background: var(--opl-surface-secondary);
   }
 
@@ -159,7 +159,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     width: fit-content;
     min-height: 32px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
     font: inherit;
@@ -186,7 +186,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     outline-offset: 3px;
   }
 
-  .execution-status { font-size: 12px; }
+  .execution-status { font-size: var(--dsw-font-xxs-12-font-size); }
   .execution-failure { color: var(--opl-danger); overflow-wrap: anywhere; }
   .conversation-progress { margin: 12px 0; }
   .conversation-progress p { margin: 4px 0; overflow-wrap: anywhere; }
@@ -226,7 +226,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
 
   .message.assistant .message-frame :where([data-streamdown="inline-code"]) {
     padding: 1px 3px;
-    border-radius: 4px;
+    border-radius: var(--dsw-radius-sm);
     background: color-mix(in srgb, var(--opl-text) 6%, transparent);
     font-family: var(--opl-font-mono);
     font-size: 0.9em;
@@ -261,7 +261,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     overflow: hidden;
     margin: 14px 0;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
   }
 
@@ -293,7 +293,7 @@ export const codexWorkbenchStyleConversation = `  .conversation {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }

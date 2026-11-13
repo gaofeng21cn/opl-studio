@@ -12,7 +12,6 @@ export const codexWorkbenchStyleNavigation = `  .opl-studio {
     font-size: var(--opl-text-body);
     font-weight: var(--opl-weight-regular);
     line-height: var(--opl-leading-normal);
-    letter-spacing: 0;
   }
 
   .opl-studio.sidebar-closed {
@@ -107,7 +106,7 @@ export const codexWorkbenchStyleNavigation = `  .opl-studio {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }
@@ -189,7 +188,7 @@ export const codexWorkbenchStyleNavigation = `  .opl-studio {
     gap: 9px;
     padding: 0 8px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-text);
     text-align: left;
@@ -244,7 +243,7 @@ export const codexWorkbenchStyleNavigation = `  .opl-studio {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }

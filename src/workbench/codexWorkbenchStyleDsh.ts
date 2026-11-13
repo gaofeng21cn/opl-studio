@@ -15,7 +15,7 @@ export const codexWorkbenchStyleDsh = `
     color: var(--dsw-alias-label-tertiary);
     font-size: var(--opl-text-body);
     font-weight: var(--opl-weight-regular);
-    line-height: 20px;
+    line-height: var(--dsw-font-s-14-line-height);
   }
 
 `;

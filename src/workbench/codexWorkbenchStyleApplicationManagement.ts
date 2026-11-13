@@ -45,13 +45,13 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-dsh-owner-section > button + h4 { margin-top: 24px; }
   .opl-dsh-owner-section .agent-package-row { background: transparent; border-radius: 0; border: 0; border-bottom: 1px solid var(--dsw-alias-border-l3); }
   .opl-catalog-summary { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-  .opl-catalog-id { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+  .opl-catalog-id { font-size: var(--dsw-font-xxs-12-font-size); line-height: var(--dsw-font-xxs-12-line-height); color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
   .opl-catalog-id > span { margin-right: 4px; }
   .opl-catalog-id code { font-size: inherit; font-variant-numeric: tabular-nums; }
-  .opl-catalog-description { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
-  .opl-catalog-summary .software-catalog-versions { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 3px 0 0; font-size: 12px; line-height: 18px; }
+  .opl-catalog-description { font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
+  .opl-catalog-summary .software-catalog-versions { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 3px 0 0; font-size: var(--dsw-font-xxs-12-font-size); line-height: var(--dsw-font-xxs-12-line-height); }
   .opl-catalog-summary .software-catalog-versions > span { display: inline-flex; gap: 7px; align-items: baseline; }
-  .opl-catalog-summary .software-catalog-versions strong { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary); }
+  .opl-catalog-summary .software-catalog-versions strong { font-size: var(--dsw-font-xxs-12-font-size); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-primary); }
   .opl-catalog-summary .software-catalog-versions strong[data-unknown] { font-weight: 400; color: var(--dsw-alias-label-secondary); }
 
   .opl-dsh-owner-filters {
@@ -65,14 +65,14 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-dsh-owner-filters input { width: 100%; }
   .opl-dsh-owner-filters input::placeholder { color: var(--dsw-alias-label-secondary); opacity: 1; }
   .opl-dsh-owner-filters select { min-height: 32px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 4px 8px; }
-  .opl-dsh-owner-section { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+  .opl-dsh-owner-section { min-width: 0; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
   .opl-software-installation { padding: 16px 0; border-top: 1px solid var(--dsw-alias-border-l3); }
   .opl-software-installation-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
   .opl-software-installation-heading strong { color: var(--dsw-alias-label-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
   .opl-software-installation-heading > span:last-child { margin-left: auto; }
   .opl-software-installation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .opl-software-installation code { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-  .opl-dsh-owner-section h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+  .opl-dsh-owner-section h4 { margin: 0 0 12px; font-size: var(--dsw-font-xs-13-font-size); font-weight: 500; color: var(--dsw-alias-label-primary); }
   .opl-dsh-owner-section p { margin: 0 0 12px; }
   .opl-dsh-owner-section dl { display: grid; gap: 10px; margin: 0 0 16px; }
   .opl-dsh-owner-section dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
@@ -600,7 +600,7 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-resource-form-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
   .opl-resource-form h3 { margin: 0; font-size: var(--opl-text-sm); font-weight: var(--opl-weight-semibold); }
   .opl-resource-form > label, .opl-resource-form .opl-resource-details > label { display: grid; gap: 7px; margin: 14px 0; }
-  .opl-resource-form input:not([type="checkbox"]), .opl-resource-form select { min-width: 0; width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--opl-border); border-radius: 6px; background: var(--opl-canvas); color: var(--opl-text); font: inherit; }
+  .opl-resource-form input:not([type="checkbox"]), .opl-resource-form select { min-width: 0; width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--opl-border); border-radius: var(--dsw-radius-sm); background: var(--opl-canvas); color: var(--opl-text); font: inherit; }
   .opl-resource-form input::placeholder { color: var(--opl-muted); }
   .opl-resource-form :is(input, select, button, summary):focus-visible, .opl-resource-details summary:focus-visible { outline: 2px solid color-mix(in srgb, var(--opl-text) 55%, transparent); outline-offset: 2px; }
   .opl-resource-form input[type="checkbox"] { accent-color: var(--opl-text); width: 16px; height: 16px; }
@@ -681,26 +681,26 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-catalog-scope-options { display: flex; gap: 2px; padding: 4px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-interactive-bg-hover); }
   .opl-catalog-scope-options button { background: transparent; border-color: transparent; color: var(--dsw-alias-label-secondary); }
   .opl-catalog-scope-options button[aria-pressed="true"] { background: var(--dsw-alias-bg-layer-1); border-color: var(--dsw-alias-border-l3); color: var(--dsw-alias-label-primary); }
-  .opl-catalog-scope p { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 18px; }
-  .opl-catalog-external-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary); font-size: 13px; }
+  .opl-catalog-scope p { margin: 0; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); }
+  .opl-catalog-external-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); }
   .opl-catalog-external-status > span { flex: 1; }
-  .opl-catalog-row-facts { flex-basis: 100%; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+  .opl-catalog-row-facts { flex-basis: 100%; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); line-height: var(--dsw-font-xxs-12-line-height); font-variant-numeric: tabular-nums; }
   .opl-catalog-cell-version { white-space: nowrap; }
   .opl-catalog-cell-version::before { content: attr(data-label) " "; color: var(--dsw-alias-label-tertiary); }
-  .opl-catalog-state { display: inline-flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-secondary); font-size: 12px; white-space: nowrap; }
+  .opl-catalog-state { display: inline-flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); white-space: nowrap; }
   .opl-catalog-row-actions { display: inline-flex; align-items: center; }
   .opl-software-center:has([data-plugin-owner-detail]) .opl-catalog-controls { display: none; }
   .opl-software-source-group + .opl-software-source-group { margin-top: 32px; }
   .opl-software-source-group-heading { margin-bottom: 16px; }
-  .opl-software-source-group-heading h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-  .opl-software-source-group-heading p { max-width: 72ch; margin: 7px 0 0; font-size: 13px; line-height: 21px; color: var(--dsw-alias-label-secondary); }
+  .opl-software-source-group-heading h2 { margin: 0; font-size: var(--dsw-font-s-14-font-size); font-weight: 600; color: var(--dsw-alias-label-primary); }
+  .opl-software-source-group-heading p { max-width: 72ch; margin: 7px 0 0; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
   .opl-package-updates { margin-top: 28px; }
-  .opl-package-updates h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
-  .opl-package-updates > p { margin: 0 0 16px; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
-  .opl-package-update-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 14px 0; border-top: 1px solid var(--dsw-alias-border-l3); font-size: 13px; }
+  .opl-package-updates h2 { margin: 0 0 8px; font-size: var(--dsw-font-s-14-font-size); font-weight: 600; }
+  .opl-package-updates > p { margin: 0 0 16px; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
+  .opl-package-update-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 14px 0; border-top: 1px solid var(--dsw-alias-border-l3); font-size: var(--dsw-font-xs-13-font-size); }
   .opl-package-update-row > div { display: grid; gap: 5px; flex: 1; min-width: 180px; }
-  .opl-package-update-row > div > span { color: var(--dsw-alias-label-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .opl-update-owner-note { max-width: 30ch; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+  .opl-package-update-row > div > span { color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); font-variant-numeric: tabular-nums; }
+  .opl-update-owner-note { max-width: 30ch; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); }
   @media (max-width: 680px) {
     .opl-catalog-scope { align-items: flex-start; }
     .opl-dsh-owner-filters { gap: 8px; }

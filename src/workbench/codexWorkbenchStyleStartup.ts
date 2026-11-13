@@ -33,7 +33,6 @@ export const codexWorkbenchStyleStartup = `  .startup-readiness {
     font-size: var(--opl-text-display-sm);
     font-weight: var(--opl-weight-semibold);
     line-height: var(--opl-leading-tight);
-    letter-spacing: 0;
   }
 
   .startup-readiness-count {
@@ -132,7 +131,7 @@ export const codexWorkbenchStyleStartup = `  .startup-readiness {
     min-height: 38px;
     padding: 8px 13px;
     border: 1px solid var(--opl-border, rgba(0, 0, 0, 0.12));
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: inherit;
     font-size: var(--opl-text-md);

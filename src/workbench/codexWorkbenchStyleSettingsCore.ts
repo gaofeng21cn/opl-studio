@@ -12,7 +12,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
   }
 
   .settings-detail::-webkit-scrollbar-thumb {
-    border-radius: 3px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-border);
   }
 
@@ -31,9 +31,9 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
 
   .settings-detail-header h1 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--dsw-font-base-16-font-size);
     font-weight: 500;
-    line-height: 24px;
+    line-height: var(--dsw-font-base-16-line-height);
   }
 
   .settings-detail-title-row {
@@ -105,9 +105,9 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
   .settings-group h2 {
     margin: 0 0 var(--opl-space-2);
     color: var(--opl-text);
-    font-size: 14px;
+    font-size: var(--dsw-font-s-14-font-size);
     font-weight: 500;
-    line-height: 22px;
+    line-height: var(--dsw-font-s-14-line-height);
   }
 
   .settings-rows {
@@ -136,16 +136,16 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
   }
 
   .settings-row-label > span {
-    font-size: 14px;
+    font-size: var(--dsw-font-s-14-font-size);
     font-weight: 400;
-    line-height: 22px;
+    line-height: var(--dsw-font-s-14-line-height);
   }
 
   .settings-page small {
     color: var(--dsw-alias-label-tertiary);
-    font-size: 12px;
+    font-size: var(--dsw-font-xxs-12-font-size);
     font-weight: 400;
-    line-height: 18px;
+    line-height: var(--dsw-font-xxs-12-line-height);
   }
 
   .settings-row-value {
@@ -154,8 +154,8 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     align-items: center;
     justify-content: flex-end;
     color: var(--opl-muted);
-    font-size: 14px;
-    line-height: 22px;
+    font-size: var(--dsw-font-s-14-font-size);
+    line-height: var(--dsw-font-s-14-line-height);
     text-align: right;
   }
 
@@ -445,7 +445,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     display: grid;
     place-items: center;
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
   }
 
@@ -479,7 +479,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     height: 18px;
     position: relative;
     display: inline-block;
-    border-radius: 9px;
+    border-radius: var(--dsw-radius-md);
     background: var(--opl-faint);
     transition: background 160ms ease;
   }
@@ -518,7 +518,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     min-height: 27px;
     padding: 0 9px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }

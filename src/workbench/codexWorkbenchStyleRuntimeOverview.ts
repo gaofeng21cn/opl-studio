@@ -51,7 +51,6 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     font-size: var(--opl-text-xl);
     line-height: var(--opl-leading-tight);
     font-weight: var(--opl-weight-semibold);
-    letter-spacing: 0;
   }
 
   .runtime-icon-button,
@@ -127,7 +126,7 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     gap: 7px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
     overflow-wrap: anywhere;
@@ -163,7 +162,7 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     justify-content: center;
     margin-top: 12px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-muted);
   }
@@ -502,7 +501,6 @@ export const codexWorkbenchStyleRuntimeOverview = `  .runtime-snapshot-note {
     font-size: var(--opl-text-md);
     line-height: var(--opl-leading-normal);
     font-weight: var(--opl-weight-semibold);
-    letter-spacing: 0;
   }
 
   .runtime-work-identity > span,

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { AppBridge, PostMessageTransport, type McpUiStyles } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../../../../src/bridge/mcpApps";
 import type { OplBridge } from "../../../../src/bridge/oplBridge";
+import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
+import { Input } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Input";
+import buttonCss from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button.module.css";
+import inputCss from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Input.module.css";
 import { EcosystemFilePreview } from "../../../../src/integrations/deepseek-harness/EcosystemFilePreview";
 import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, workspaceArtifactLink, workspaceArtifactPath, type WorkspaceArtifact, readMcpNavigation, rememberMcpNavigation, resolveMcpNavigation } from "./mcpAppHost";
 
@@ -62,9 +66,35 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     const initializationTimeout = setTimeout(() => setError(handlers.current.locale === "zh" ? "界面加载超时，请关闭后重新打开。" : "The UI took too long to load. Close it and open it again."), 20_000);
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const theme = () => resolvedMcpTheme(getComputedStyle(document.documentElement).colorScheme, dark.matches);
+    const styles = () => {
+      const body = getComputedStyle(document.body);
+      const token = (name: string) => body.getPropertyValue(name).trim() || undefined;
+      // The SDK permits subsets; its generated Record type requires a cast for omitted keys.
+      return { variables: {
+        "--font-sans": body.fontFamily,
+        "--font-mono": token("--ds-font-family-code") || "monospace",
+        "--color-background-primary": token("--dsw-alias-bg-base"),
+        "--color-background-secondary": token("--dsw-alias-bg-layer-1"),
+        "--color-background-tertiary": token("--dsw-alias-bg-module-platform"),
+        "--color-text-primary": token("--dsw-alias-label-primary"),
+        "--color-text-secondary": token("--dsw-alias-label-secondary"),
+        "--color-text-inverse": token("--dsw-alias-label-primary-foreground"),
+        "--color-text-info": token("--dsw-alias-state-business-primary"),
+        "--color-text-danger": token("--dsw-alias-state-error-primary"),
+        "--color-text-warning": token("--dsw-alias-state-warn-label"),
+        "--color-text-success": token("--dsw-alias-state-success-primary"),
+        "--color-border-primary": token("--dsw-alias-border-l2"),
+        "--color-ring-primary": token("--dsw-alias-state-business-primary"),
+        "--border-radius-sm": token("--dsw-radius-sm"),
+        "--border-radius-md": token("--dsw-radius-md"),
+        "--border-radius-lg": token("--dsw-radius-lg"),
+        "--font-text-md-size": token("--dsw-font-s-14-font-size"),
+        "--font-text-md-line-height": token("--dsw-font-s-14-line-height")
+      } as McpUiStyles };
+    };
     const appBridge = new AppBridge(null, { name: "OPL App", version: "1.0.0" }, {
       serverTools: {}, serverResources: {}, openLinks: {}, updateModelContext: { text: {} }, message: { text: {} }
-    }, { hostContext: { theme: theme(), locale: handlers.current.locale === "zh" ? "zh-CN" : "en", displayMode: "inline", availableDisplayModes: ["inline", "fullscreen"], containerDimensions: { width: iframe.clientWidth, maxHeight: fillHeight ? iframe.clientHeight : 1400 } } });
+    }, { hostContext: { theme: theme(), styles: styles(), locale: handlers.current.locale === "zh" ? "zh-CN" : "en", displayMode: "inline", availableDisplayModes: ["inline", "fullscreen"], containerDimensions: { width: iframe.clientWidth, maxHeight: fillHeight ? iframe.clientHeight : 1400 } } });
     activeBridge.current = appBridge;
     appBridge.oncalltool = async params => {
       requireActive();
@@ -110,17 +140,19 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
       void appBridge.sendToolInput({ arguments: session.arguments }).catch(() => {});
       void appBridge.sendToolResult(session.result).catch(() => {});
     });
-    const updateTheme = () => appBridge.setHostContext({ theme: theme() });
-    dark.addEventListener("change", updateTheme);
-    const themeObserver = new MutationObserver(updateTheme);
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class", "data-ds-theme-source"] });
+    const updateAppearance = () => appBridge.setHostContext({ theme: theme(), styles: styles() });
+    dark.addEventListener("change", updateAppearance);
+    const appearanceObserver = new MutationObserver(updateAppearance);
+    const appearanceAttributes = { attributes: true, attributeFilter: ["style", "class", "data-ds-theme-source", "data-ds-dark-theme"] };
+    appearanceObserver.observe(document.documentElement, appearanceAttributes);
+    appearanceObserver.observe(document.body, appearanceAttributes);
     const resize = new ResizeObserver(() => appBridge.setHostContext({ containerDimensions: { width: iframe.clientWidth, maxHeight: fillHeight ? iframe.clientHeight : 1400 } }));
     resize.observe(iframe);
     void appBridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!)).then(() => {
       if (!disposed) iframe.srcdoc = sandboxDocument(session.resource);
     }).catch(reason => { if (!disposed) setError(String(reason)); });
     return () => {
-      disposed = true; activeBridge.current = null; clearTimeout(initializationTimeout); resize.disconnect(); themeObserver.disconnect(); dark.removeEventListener("change", updateTheme);
+      disposed = true; activeBridge.current = null; clearTimeout(initializationTimeout); resize.disconnect(); appearanceObserver.disconnect(); dark.removeEventListener("change", updateAppearance);
       void appBridge.teardownResource({}, { timeout: 1000 }).catch(() => {}).finally(() => appBridge.close());
     };
   }, [session.id, host, fillHeight]);
@@ -136,7 +168,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
       accessWorkspace={(request) => host.accessThreadWorkspace!({ ...request, threadId: session.threadId })}
       onClose={() => setArtifact(null)} /> : null}
     {link ? <p><a href={link} target="_blank" rel="noopener noreferrer">{locale === "zh" ? "打开外部链接" : "Open external link"}</a></p> : null}
-    {expanded ? <button onClick={() => setExpanded(false)}>{locale === "zh" ? "退出展开" : "Exit expanded view"}</button> : null}
+    {expanded ? <Button variant="outline" onClick={() => setExpanded(false)}>{locale === "zh" ? "退出展开" : "Exit expanded view"}</Button> : null}
     <iframe ref={frame} title={session.title} sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer" style={{ display: artifact ? "none" : undefined, width: "100%", height: fillHeight ? "100%" : expanded ? "80vh" : height, border: 0, background: "transparent" }}/>
   </div>;
 }
@@ -268,39 +300,39 @@ export function McpAppWorkspace(props: McpAppProps) {
   }
   return <section className="opl-mcp-app-workspace" aria-label={zh ? "应用" : "Apps"}>
     <header className="opl-mcp-app-header">
-      {returnTo ? <button type="button" disabled={busy} onClick={() => { const target = returnTo; setReturnTo(null); transition(target); }}>{zh ? "返回上一界面" : "Back to previous app"}</button> : null}
+      {returnTo ? <Button variant="outline" type="button" disabled={busy} onClick={() => { const target = returnTo; setReturnTo(null); transition(target); }}>{zh ? "返回上一界面" : "Back to previous app"}</Button> : null}
       <label className="opl-mcp-app-switcher"><span>{zh ? "应用" : "App"}</span>
-        <select aria-label={zh ? "当前应用" : "Current app"} disabled={!apps.length} value={current ? descriptorId(current) : ""} onChange={event => { const app = apps.find(entry => descriptorId(entry) === event.target.value); if (app) select(app); }}>
+        <span className={`${inputCss.wrap} opl-mcp-app-select`}><select className={inputCss.input} aria-label={zh ? "当前应用" : "Current app"} disabled={!apps.length} value={current ? descriptorId(current) : ""} onChange={event => { const app = apps.find(entry => descriptorId(entry) === event.target.value); if (app) select(app); }}>
           {!apps.length ? <option value="">{zh ? "选择应用" : "Choose an app"}</option> : apps.map(app => <option key={descriptorId(app)} value={descriptorId(app)}>{app.title}</option>)}
-        </select>
+        </select></span>
       </label>
       {current ? <>
         <span className="opl-mcp-app-session-state" role="status" data-started={Boolean(currentSession)}>{sessionLabel(current)}</span>
-        {currentSession ? <button type="button" onClick={() => { setInputs(inputsFor(current)); transition(); }}>{zh ? "关闭界面" : "Close UI"}</button> : <button className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</button>}
+        {currentSession ? <Button variant="outline" type="button" onClick={() => { setInputs(inputsFor(current)); transition(); }}>{zh ? "关闭界面" : "Close UI"}</Button> : <Button variant="primary" className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</Button>}
       </> : null}
       <details className="opl-mcp-app-menu">
-        <summary>{zh ? "更多" : "More"}</summary>
+        <summary className={`${buttonCss.button} ${buttonCss.md} ${buttonCss.outline}`}>{zh ? "更多" : "More"}</summary>
         <div onClick={event => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
-          {threadId ? <button type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</button> : null}
-          {props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "软件中心" : "Software Center"}</button> : null}
-          {props.onModules ? <button type="button" onClick={props.onModules}>{zh ? "模块视图" : "Module views"}</button> : null}
+          {threadId ? <Button variant="outline" type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</Button> : null}
+          {props.onManage ? <Button variant="outline" type="button" onClick={props.onManage}>{zh ? "软件中心" : "Software Center"}</Button> : null}
+          {props.onModules ? <Button variant="outline" type="button" onClick={props.onModules}>{zh ? "模块视图" : "Module views"}</Button> : null}
           <p>{zh ? "关闭或切换仅收起界面，后台任务继续运行。安装、更新和启停请到软件中心。" : "Closing or switching only closes the UI. Background tasks continue. Install, update, and enable apps in Software Center."}</p>
         </div>
       </details>
-      {props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "返回对话" : "Back to chat"}</button> : null}
+      {props.onConversation ? <Button variant="outline" type="button" onClick={props.onConversation}>{zh ? "返回对话" : "Back to chat"}</Button> : null}
     </header>
-    {!threadId ? <div className="opl-mcp-app-empty"><strong>{zh ? "先打开一个对话" : "Open a conversation first"}</strong><p>{zh ? "应用会使用该对话已有的连接和权限。回到对话后，从左侧选择已有对话，再打开工作台。" : "Apps use that conversation’s connections and permissions."}</p>{props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</button> : null}</div> : null}
+    {!threadId ? <div className="opl-mcp-app-empty"><strong>{zh ? "先打开一个对话" : "Open a conversation first"}</strong><p>{zh ? "应用会使用该对话已有的连接和权限。回到对话后，从左侧选择已有对话，再打开工作台。" : "Apps use that conversation’s connections and permissions."}</p>{props.onConversation ? <Button variant="outline" type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</Button> : null}</div> : null}
     {threadId && loading ? <p className="opl-mcp-app-notice" role="status">{zh ? "正在加载可用应用…" : "Loading available apps…"}</p> : null}
-    {catalogError ? <div className="opl-mcp-app-error"><p role="alert">{catalogError.includes("mcp_app_thread_busy") ? (zh ? "此对话的连接正在由另一窗口使用。请选择其他对话，或在另一窗口释放连接后重试。" : "This conversation's connection is in use by another window. Choose another conversation or retry after that window releases it.") : (zh ? "应用连接未就绪，请重新连接目录；也可到软件中心检查连接。" : "App connections are not ready. Retry the directory or check Software Center.")}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{catalogError}</p></details><button type="button" onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "重试目录" : "Retry directory"}</button>{props.onConversation ? <button type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</button> : null}</div> : null}
-    {threadId && !loading && !apps.length && !catalogError ? <div className="opl-mcp-app-empty"><strong>{zh ? "当前会话没有可用的 MiniApp" : "No MiniApps are available in this conversation"}</strong><p>{zh ? "前往软件中心检查安装与连接，再返回会话刷新目录。" : "Check installation and connections in Software Center, then refresh this directory."}</p>{props.onManage ? <button type="button" onClick={props.onManage}>{zh ? "打开软件中心" : "Open Software Center"}</button> : null}</div> : null}
+    {catalogError ? <div className="opl-mcp-app-error"><p role="alert">{catalogError.includes("mcp_app_thread_busy") ? (zh ? "此对话的连接正在由另一窗口使用。请选择其他对话，或在另一窗口释放连接后重试。" : "This conversation's connection is in use by another window. Choose another conversation or retry after that window releases it.") : (zh ? "应用连接未就绪，请重新连接目录；也可到软件中心检查连接。" : "App connections are not ready. Retry the directory or check Software Center.")}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{catalogError}</p></details><Button variant="outline" type="button" onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "重试目录" : "Retry directory"}</Button>{props.onConversation ? <Button variant="outline" type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</Button> : null}</div> : null}
+    {threadId && !loading && !apps.length && !catalogError ? <div className="opl-mcp-app-empty"><strong>{zh ? "当前会话没有可用的 MiniApp" : "No MiniApps are available in this conversation"}</strong><p>{zh ? "前往软件中心检查安装与连接，再返回会话刷新目录。" : "Check installation and connections in Software Center, then refresh this directory."}</p>{props.onManage ? <Button variant="outline" type="button" onClick={props.onManage}>{zh ? "打开软件中心" : "Open Software Center"}</Button> : null}</div> : null}
     {threadId && current ? <div className="opl-mcp-app-surface" aria-busy={busy}>
         {!currentSession ? <div className="opl-mcp-app-launch">
           <h3>{current.title}</h3>
           {current.description ? <p>{current.description}</p> : null}
           <p className="opl-mcp-app-notice">{readinessLabel(current, zh)}</p>
         </div> : null}
-        {error ? <div className="opl-mcp-app-error">{current.readOnly && threadId && !current.inputSchema.required?.length ? <button type="button" disabled={busy} onClick={() => { rememberMcpNavigation(threadId, current, {}); setInputs(initialInputs(current)); transition({threadId, server: current.server, tool: launchTool(current), miniAppId: descriptorId(current), arguments: {}}); }}>{zh ? "从首页打开" : "Open from home"}</button> : null}<p role="alert">{zh ? "界面未能打开或关闭，请重试，也可以选择其他应用。" : "The UI could not open or close. Retry or select another app."}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{error}</p></details></div> : null}
-        {!currentSession && current.readOnly && Object.keys(current.inputSchema.properties ?? {}).length ? <details className="opl-mcp-app-options" open={requiredInputMissing}><summary>{zh ? "打开选项" : "Open options"}</summary>{Object.entries(current.inputSchema.properties ?? {}).map(([name, field]) => <label key={name}><span>{field.title || name}{current.inputSchema.required?.includes(name) ? (zh ? "（必填）" : " (required)") : ""}</span><input required={current.inputSchema.required?.includes(name)} disabled={busy} value={inputs[name] ?? ""} placeholder={field.description} onChange={event => setInputs(values => ({ ...values, [name]: event.target.value }))}/></label>)}</details> : null}
+        {error ? <div className="opl-mcp-app-error">{current.readOnly && threadId && !current.inputSchema.required?.length ? <Button variant="outline" type="button" disabled={busy} onClick={() => { rememberMcpNavigation(threadId, current, {}); setInputs(initialInputs(current)); transition({threadId, server: current.server, tool: launchTool(current), miniAppId: descriptorId(current), arguments: {}}); }}>{zh ? "从首页打开" : "Open from home"}</Button> : null}<p role="alert">{zh ? "界面未能打开或关闭，请重试，也可以选择其他应用。" : "The UI could not open or close. Retry or select another app."}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{error}</p></details></div> : null}
+        {!currentSession && current.readOnly && Object.keys(current.inputSchema.properties ?? {}).length ? <details className="opl-mcp-app-options" open={requiredInputMissing}><summary>{zh ? "打开选项" : "Open options"}</summary>{Object.entries(current.inputSchema.properties ?? {}).map(([name, field]) => <label key={name}><span>{field.title || name}{current.inputSchema.required?.includes(name) ? (zh ? "（必填）" : " (required)") : ""}</span><Input required={current.inputSchema.required?.includes(name)} disabled={busy} value={inputs[name] ?? ""} placeholder={field.description} onChange={event => setInputs(values => ({ ...values, [name]: event.target.value }))}/></label>)}</details> : null}
         {!currentSession && !current.readOnly ? <p className="opl-mcp-app-notice">{zh ? "从会话中的已完成工具结果打开这个应用。" : "Open this app from a completed tool result in the conversation."}</p> : null}
         {!currentSession && requiredInputMissing ? <p className="opl-mcp-app-notice" role="status">{zh ? "请先填写必填项。" : "Complete the required fields first."}</p> : null}
         {currentSession ? <McpAppFrame key={currentSession.id} {...props} session={currentSession} fillHeight onNavigate={navigate} onNavigation={value => { if (current && threadId) rememberMcpNavigation(threadId, current, value); }}/> : null}

@@ -786,33 +786,6 @@ export function App({
     updateDrafts((current) => ({ ...current, prompts: { ...current.prompts, [key]: value } }));
   }
 
-  useEffect(() => {
-    const paste = (event: ClipboardEvent) => {
-      const files = Array.from(event.clipboardData?.files ?? []);
-      if (!files.length) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      stageComposerFiles(files, "paste");
-    };
-    const dragover = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
-    };
-    const drop = (event: DragEvent) => {
-      const files = Array.from(event.dataTransfer?.files ?? []);
-      if (!files.length) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      stageComposerFiles(files, "drop");
-    };
-    document.addEventListener("paste", paste, true);
-    document.addEventListener("dragover", dragover, true);
-    document.addEventListener("drop", drop, true);
-    return () => {
-      document.removeEventListener("paste", paste, true);
-      document.removeEventListener("dragover", dragover, true);
-      document.removeEventListener("drop", drop, true);
-    };
-  }, [bridge]);
 
   const stateReadSequence = useRef(0);
   function loadState(profile = settings.runtimeProfile, recoverStartup = false) {

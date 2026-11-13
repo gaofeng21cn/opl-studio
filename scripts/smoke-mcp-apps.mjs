@@ -125,8 +125,9 @@ const bridge={listMcpApps:args=>rpc('list',args),openMcpApp:args=>rpc('open',arg
 const surface={locale:'en',workspacePath:'/synthetic',currentThreadId:config.threadId,uiContributions:{entries:[]},contributionOwner:{},openPrimaryView:()=>{},mcpApps:{bridge,launch:launch??undefined,onManage:()=>{document.body.dataset.managed='true'},onContext:()=>{},onMessage:()=>{}}};
 let Page; installWorkspaceClientPlugin({register:(slot,component)=>{if(slot.name==='main')Page=component;return ()=>{}}},()=>surface);
 createRoot(document.querySelector('#root')).render(<McpAppsClientContext.Provider value={{Workspace:McpAppWorkspace}}><Page/></McpAppsClientContext.Provider>);`);
-const workspaceCss = await readFile(path.join(root, 'src/composition/workspace.css'), 'utf8');
-const pageHtml = '<!doctype html><html data-opl-host="desktop"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Studio MCP App acceptance</title><link rel="stylesheet" href="/workspace.css"><style>body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,sans-serif}#root{height:100dvh}</style></head><body><div id="root"></div><script type="module" src="/renderer.js"></script></body></html>';
+const officialTheme = await Promise.all(['base.css', 'design-platform.css', 'gradient-shadow-text.css', 'focus.css'].map(name => readFile(path.join(root, 'src/vendor/deepseek-harness/packages/client/ui-theme/src/styles', name), 'utf8')));
+const workspaceCss = officialTheme.join('\n') + '\n' + await readFile(path.join(temporaryRoot, 'renderer-bundle/renderer.css'), 'utf8') + '\n' + await readFile(path.join(root, 'src/composition/workspace.css'), 'utf8');
+const pageHtml = '<!doctype html><html data-opl-host="desktop"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Studio MCP App acceptance</title><link rel="stylesheet" href="/workspace.css"><style>body{margin:0;font:var(--dsw-font-s-14)}#root{height:100dvh}</style></head><body><div id="root"></div><script type="module" src="/renderer.js"></script></body></html>';
 const server = http.createServer(async (request, response) => {
   const send = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
   try {
@@ -163,6 +164,25 @@ try {
   await run(`async page => { if(await page.title() !== 'Studio MCP App acceptance') throw new Error('Wrong page'); await page.getByRole('region',{name:'Apps',exact:true}).waitFor(); }`);
   if(frameworkRoot) {
     await run(`async page => { await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('.progress-view').waitFor(); }`);
+    const typography = await run(`async page => {
+      const frame=page.frames().find(item=>item!==page.mainFrame());
+      const fonts=()=>page.evaluate(()=>{const body=getComputedStyle(document.body);return {sans:body.fontFamily,mono:body.getPropertyValue('--ds-font-family-code').trim()||'monospace'}});
+      const check=async()=>{const expected=await fonts();await frame.waitForFunction(value=>getComputedStyle(document.body).fontFamily===value.sans&&getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim()===value.mono,expected);return expected};
+      const initial=await check();
+      const button=await page.frameLocator('iframe').locator('#refresh').evaluate(e=>({height:e.getBoundingClientRect().height,radius:getComputedStyle(e).borderRadius,font:getComputedStyle(e).fontSize}));
+      const hostButton=await page.getByRole('button',{name:'Close UI',exact:true}).evaluate(e=>({height:e.getBoundingClientRect().height,radius:getComputedStyle(e).borderRadius,font:getComputedStyle(e).fontSize}));
+      if(JSON.stringify(button)!==JSON.stringify(hostButton)||button.height!==36)throw new Error('MiniApp does not reuse the official DSH button: '+JSON.stringify({button,hostButton}));
+      if(await page.frameLocator('iframe').locator('#product-select').evaluate(e=>e.getBoundingClientRect().height)!==32)throw new Error('MiniApp input height differs from DSH');
+      await page.evaluate(()=>{document.body.style.fontFamily='Georgia, serif';document.body.style.setProperty('--ds-font-family-code','Courier, monospace')});
+      const bodyChange=await check();
+      await page.evaluate(()=>{document.body.style.fontFamily='var(--acceptance-font)';document.documentElement.style.setProperty('--acceptance-font','Arial, sans-serif')});
+      await check();
+      await page.evaluate(()=>document.documentElement.style.setProperty('--acceptance-font','Verdana, sans-serif'));
+      const rootChange=await check();
+      await page.evaluate(()=>{document.body.style.removeProperty('font-family');document.body.style.removeProperty('--ds-font-family-code');document.documentElement.style.removeProperty('--acceptance-font')});
+      await check();
+      return {initial,button,bodyChange,rootChange,restored:true};
+    }`);
     const canvas = await run(`async page => { const area=await page.locator('.opl-workspace-page').boundingBox(); const frame=await page.locator('iframe').boundingBox(); const chrome=frame.y-area.y; if(frame.width/area.width<.98 || frame.height/area.height<.84 || chrome>80) throw new Error('MiniApp canvas is crowded: '+JSON.stringify({area,frame,chrome})); const nav=await page.frameLocator('iframe').locator('.app-navigation').boundingBox(); const content=await page.frameLocator('iframe').locator('.content').boundingBox(); if(content.width/frame.width<.98 || nav.height>80) throw new Error('Shared navigation crowds the content'); return {host:area,frame,chrome,width_ratio:frame.width/area.width,height_ratio:frame.height/area.height}; }`);
     for(let index=0;index<framework.kinds.length;index++) {
       await run(`async page => { const frame=page.frameLocator('iframe'); await frame.getByLabel('当前功能').selectOption('preview-owner:'+${JSON.stringify(framework.kinds[index])}); await frame.locator('#body').filter({hasText:'合成示例'}).waitFor(); if(await frame.locator('#title').textContent()!==${JSON.stringify(framework.titles[index])}) throw new Error('Wrong internal view'); }`);
@@ -171,7 +191,7 @@ try {
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-browser.png')}`]:[]));
     await run(`async page => { await page.setViewportSize({width:390,height:844}); const frame=page.frameLocator('iframe'); await frame.getByLabel('当前功能').selectOption('preview-owner:approval_diff'); await frame.locator('.review-view').waitFor(); if(await frame.locator('body').evaluate(e=>e.scrollWidth>innerWidth)) throw new Error('Shared UI overflows narrow viewport'); if(await frame.locator('.app-navigation').evaluate(e=>e.getBoundingClientRect().height>innerHeight*.5)) throw new Error('View navigation takes too much height'); }`);
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-narrow.png')}`]:[]));
-    await run(`async page => { await page.emulateMedia({colorScheme:'dark'}); await page.frameLocator('iframe').locator('html[data-theme="dark"]').waitFor(); if(await page.frameLocator('iframe').getByLabel('当前功能').inputValue()!=='preview-owner:approval_diff') throw new Error('Theme change lost view selection'); }`);
+    await run(`async page => { await page.emulateMedia({colorScheme:'dark'}); await page.frameLocator('iframe').locator('html[data-theme="dark"]').waitFor(); if(await page.frameLocator('iframe').getByLabel('当前功能').inputValue()!=='preview-owner:approval_diff') throw new Error('Theme change lost view selection'); const hostFont=await page.locator('body').evaluate(e=>getComputedStyle(e).fontFamily); if(await page.frameLocator('iframe').locator('body').evaluate(e=>getComputedStyle(e).fontFamily)!==hostFont) throw new Error('Theme change lost host font'); }`);
     await cli('screenshot',...(outputRoot?[`--filename=${path.join(outputRoot,'framework-mcp-app-dark.png')}`]:[]));
     await run(`async page => { await page.getByRole('button',{name:'Close UI',exact:true}).click(); await page.getByRole('button',{name:'Open UI',exact:true}).click(); await page.frameLocator('iframe').locator('#title').filter({hasText:'审阅修改'}).waitFor(); }`);
     assert.equal(host.views.size,1);
@@ -183,7 +203,7 @@ try {
     assert.equal(host.views.size,0);
     const errors=JSON.parse(await cli('console','error')).result;
     assert.equal(errors.split('\n').filter(line=>line.startsWith('[ERROR]')).length,0,errors);
-    const evidence={status:'framework_mcp_apps_browser_passed',host:'Studio workspace page + McpAppWorkspace + McpAppHost + official ext-apps',owner:'Framework shared renderer with synthetic read-only owner data',view_types:framework.kinds,view_count:framework.kinds.length,surface_count:1,canvas,narrow_and_dark:'passed',source:'passed',browser:'passed',installed:'not_run',release:'not_run',external_mutations:0};
+    const evidence={status:'framework_mcp_apps_browser_passed',host:'Studio workspace page + McpAppWorkspace + McpAppHost + official ext-apps',owner:'Framework shared renderer with synthetic read-only owner data',view_types:framework.kinds,view_count:framework.kinds.length,surface_count:1,canvas,typography,narrow_and_dark:'passed',source:'passed',browser:'passed',installed:'not_run',release:'not_run',external_mutations:0};
     if(outputRoot) await writeFile(path.join(outputRoot,'framework-mcp-app-browser.json'),JSON.stringify(evidence,null,2)+'\n');
     console.log(JSON.stringify(evidence,null,2));
     return;

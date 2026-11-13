@@ -18,6 +18,9 @@
       "@opl-vendor/dsh-conversation-root": [
         "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx"
       ],
+      "@opl-vendor/dsh-file-intake": [
+        "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/input/file-intake.ts"
+      ],
       "@opl-vendor/dsh-input-bar": [
         "./src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx"
       ],

@@ -62,6 +62,15 @@ declare module "@opl-vendor/dsh-input-bar" {
   }) => ReactNode;
 }
 
+declare module "@opl-vendor/dsh-file-intake" {
+  export function createComposerFileIntake(): (target: {
+    card: HTMLElement;
+    occurrence: "main" | "embedded";
+    accepts(): boolean;
+    add(files: readonly File[], directories?: ReadonlySet<File>): void;
+  }) => () => void;
+}
+
 declare module "@opl-vendor/dsh-queue-dock" {
   export const QueueDock: (props: any) => JSX.Element;
 }

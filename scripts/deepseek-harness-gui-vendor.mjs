@@ -130,8 +130,16 @@ function sync(sourceRoot) {
     if (!upstreamDigest) fail(`DSH patch introduced an unowned source file: ${relativePath}`);
     return { path: relativePath, sha256: digest, ...(digest === upstreamDigest ? {} : { upstream_sha256: upstreamDigest }) };
   });
+  const buttonCss = fs.readFileSync(path.join(resolvedSource, "packages/client/ui-primitives/src/Button.module.css"), "utf8");
+  const inputCss = fs.readFileSync(path.join(resolvedSource, "packages/client/ui-primitives/src/Input.module.css"), "utf8");
+  const height = (css, selector) => {
+    const value = css.match(new RegExp(`\\.${selector}\\s*\\{[^}]*?\\bheight:\\s*(\\d+px)`))?.[1];
+    if (!value) fail(`Missing official DSH primitive height: ${selector}`);
+    return value;
+  };
   const manifest = {
     schema_version: 1,
+    primitive_metrics: { button_md_height: height(buttonCss, "md"), button_sm_height: height(buttonCss, "sm"), input_height: height(inputCss, "wrap") },
     upstream: {
       repo: binding.repo,
       ref: binding.ref,

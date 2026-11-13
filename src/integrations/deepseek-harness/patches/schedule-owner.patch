@@ -6,7 +6,7 @@
 +  readonly edit: (request: ScheduleEditRequest, ownerValues?: Readonly<Record<string, unknown>>) => Promise<'saved' | { readonly failed: HostEditFailure }>
    /**
 @@ -57,4 +57,20 @@
- 
+
 +/** Optional owner extension while the upstream task view assumes the Schedule service. */
 +export interface TaskOwnerView {
 +  readonly values: (task: ScheduleCatalogEntry | undefined) => Readonly<Record<string, unknown>>
@@ -49,8 +49,8 @@
 -  const valid = issue === undefined
 +  const issue = dirty ? taskDraftIssue(draft, changes, props.ownerView?.titleMaxLength) : undefined
 +  const valid = issue === undefined && (props.ownerView?.validate(draft.ownerValues ?? {}) ?? true)
-   const [actionPending, setPending] = useState(false)
-@@ -273,5 +292,5 @@
+   const [actionPending, setPending] = useState<'toggle' | 'run' | 'delete' | null>(null)
+@@ -276,5 +295,5 @@
        ? await props.onCreateTask({ title: draft.title.trim(), prompt: draft.prompt.trim(),
 -        timing: timingFromDraft(draft, true), target: draftTarget(draft) })
 -      : await hostActions.edit({ id: task.id, action: 'update', patch: taskDraftPatch(draft, existingBase, true),
@@ -59,8 +59,8 @@
 +      : await hostActions.edit({ id: task.id, action: 'update', patch: { ...taskDraftPatch(draft, existingBase, true), ...(changes?.timing === undefined ? {} : { timing: props.ownerView?.timing(draft) ?? timingFromDraft(draft, true) }) },
 +        expectedUpdatedAt: existingBase.updatedAt ?? null }, draft.ownerValues)
      if (outcome === 'saved' || 'created' in outcome) {
-@@ -383,4 +402,6 @@
-             disabled={pending || executionActive || deletingTask}
+@@ -391,4 +410,6 @@
+             disabled={pending || executionActive || deletingTask} held={actionHold}
 -            projects={projects} original={base} t={t} />
 -          {draft.target === 'new'
 +            projects={projects} original={base} t={t} policy={props.ownerView} />
@@ -68,7 +68,7 @@
 +            onChange: ownerValues => setDraft({ ...draft, ownerValues }) })}
 +          {draft.target === 'new' && props.ownerView === undefined
              && <NewSessionLimit load={hostActions.loadNewSessionInterval} t={t} />}
-@@ -389,6 +410,6 @@
+@@ -397,6 +418,6 @@
          </>}
 -        {tab === 'records' && task !== undefined && <DeliveryHistory id={task.id} latestMessageId={task.lastDelivery?.messageId}
 +        {tab === 'records' && task !== undefined && (props.ownerView !== undefined ? props.ownerView.renderHistory(task) : <DeliveryHistory id={task.id} latestMessageId={task.lastDelivery?.messageId}
@@ -96,12 +96,12 @@
      ...(changes.target === undefined ? { target: latestTarget, sessionId: latestSessionId, cwd: latestCwd } : { target, sessionId, cwd }),
 +    ...(draft.ownerValues === undefined ? {} : { ownerValues: draft.ownerValues }),
    }
-@@ -124,3 +127,3 @@
- /** Render manual creation and inline edits with the existing task rule controls. */
--export function TaskEditorFields({ draft, onChange, projects, disabled, original, t }: {
-+export function TaskEditorFields({ draft, onChange, projects, disabled, original, t, policy }: {
+@@ -128,3 +131,3 @@
+  */
+-export function TaskEditorFields({ draft, onChange, projects, disabled, held, original, t }: {
++export function TaskEditorFields({ draft, onChange, projects, disabled, held, original, t, policy }: {
    readonly draft: TaskEditorDraft
-@@ -131,2 +134,10 @@
+@@ -136,2 +139,10 @@
    readonly t: PropsLocale<'schedule.manager'>['t']
 +  readonly policy?: {
 +    readonly targets?: readonly TaskEditorDraft['target'][]
@@ -112,14 +112,14 @@
 +    readonly minutePrecisionRecurrence?: boolean
 +  }
  }): ReactNode {
-@@ -152,4 +163,4 @@
+@@ -157,4 +168,4 @@
      { id: 'once', label: t('rule.once') }, { id: 'advanced', label: t('host.frequency.advanced') },
 -  ]
 -  const frequencyValue = weekdays ? 'weekdays' : draft.frequency
 +  ].filter(item => policy?.frequencies === undefined || policy.frequencies.includes(item.id))
 +  const frequencyValue = weekdays && frequencyItems.some(item => item.id === 'weekdays') ? 'weekdays' : draft.frequency
    // The directory line tells which folder a Workspace title such as Default workspace stands for.
-@@ -165,6 +176,6 @@
+@@ -170,6 +181,6 @@
    }}>
 -    <label className={css.editorField}>{t('detail.name')}<Input value={draft.title} maxLength={120} aria-required placeholder={t('detail.namePlaceholder')}
 +    <label className={css.editorField}>{t('detail.name')}<Input value={draft.title} maxLength={policy?.titleMaxLength ?? 120} aria-required placeholder={t('detail.namePlaceholder')}
@@ -128,12 +128,12 @@
 -      value={draft.prompt} onChange={(event) => { change({ prompt: event.target.value }) }} /></label>
 +      maxLength={policy?.promptMaxLength} value={draft.prompt} onChange={(event) => { change({ prompt: event.target.value }) }} /></label>
      <div className={css.ruleRows}>
-@@ -177,3 +188,3 @@
+@@ -182,3 +193,3 @@
            })),
 -        ]}
 +        ].filter(item => policy?.targets === undefined || policy.targets.includes(item.id as TaskEditorDraft['target']))}
          onChange={(value) => { change({ target: value as TaskEditorDraft['target'],
-@@ -181,6 +192,8 @@
+@@ -186,6 +197,8 @@
            cwd: value === 'session' ? '' : draft.target === 'session' ? projects.defaultCwd : draft.cwd }) }} />
 -      {draft.target !== 'session' && <RuleSelectRow label={t('host.project')} value={draft.cwd} disabled={disabled}
 +      {draft.target !== 'session' && (policy?.cwdInput === true ? <label className={css.editorField}>{t('host.project')}
@@ -144,7 +144,7 @@
 -          : workspaceItems} onChange={(cwd) => { change({ cwd }) }} />}
 +          : workspaceItems} onChange={(cwd) => { change({ cwd }) }} />)}
      </div>
-@@ -188,8 +201,9 @@
+@@ -193,8 +206,9 @@
        <RuleSelectRow label={t('rule.repeat')} value={frequencyValue} disabled={disabled} items={frequencyItems}
 -        current={(frequencyItems.find(item => item.id === frequencyValue) as { label: string }).label} onChange={(value) => {
 +        current={frequencyItems.find(item => item.id === frequencyValue)?.label ?? frequencyValue} onChange={(value) => {
@@ -156,7 +156,7 @@
 -      {draft.frequency !== 'once' && draft.frequency !== 'advanced' && <div className={css.ruleRow}>
 +      {draft.frequency !== 'once' && draft.frequency !== 'advanced' && (policy?.frequencies === undefined || draft.frequency === 'minutely' || draft.frequency === 'hourly') && <div className={css.ruleRow}>
          <label className={css.ruleLabel} htmlFor={rowId('interval')}>{t('host.interval')}</label>
-@@ -226,3 +240,4 @@
+@@ -231,3 +245,4 @@
          </button>
 -        <ClockPicker open={clockOpen && !disabled} anchorRef={clockAnchor} anchorName={clockAnchorName} value={clock} seconds={draft.frequency !== 'daily'}
 +        <ClockPicker open={clockOpen && !disabled} anchorRef={clockAnchor} anchorName={clockAnchorName} value={clock}

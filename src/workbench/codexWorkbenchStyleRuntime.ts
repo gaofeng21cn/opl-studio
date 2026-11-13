@@ -14,7 +14,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--opl-border);
-    border-radius: 10px;
+    border-radius: var(--dsw-radius-md);
     background: rgba(255, 255, 255, 0.98);
     box-shadow: 0 10px 32px rgba(0, 0, 0, 0.10);
   }
@@ -58,7 +58,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
   }
 
@@ -117,7 +117,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     gap: 7px;
     padding: 5px 8px;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-text);
     text-align: left;
@@ -238,7 +238,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     min-width: 0;
     padding: 10px;
     border: 1px solid var(--opl-border) !important;
-    border-radius: 9px !important;
+    border-radius: var(--dsw-radius-md) !important;
     background: var(--opl-canvas) !important;
   }
 
@@ -270,7 +270,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     min-height: 29px;
     padding: 0 8px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
     font-size: var(--opl-text-xs);
@@ -402,7 +402,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     width: 100%;
     padding: 7px 8px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
   }
 
@@ -418,7 +418,7 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     align-items: center;
     min-height: 20px;
     padding: 0 6px;
-    border-radius: 5px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-accent-soft);
     color: var(--opl-text);
     font-size: var(--opl-text-xs);

@@ -160,7 +160,7 @@ these behavioral seams.
 
 Every direct `@deepseek-ai/dsh-*` runtime dependency must appear in the cohort;
 the binding check rejects omissions as well as package/lock version drift.
-For `0.2.2-rc.1`, the keyed `main` slot uses `conversation` as its fallback
+For `0.2.2-rc.2`, the keyed `main` slot uses `conversation` as its fallback
 entry, while `activePanelId: null` denotes the current conversation. A non-null
 panel id suppresses the workspace tree's current-session selection.
 

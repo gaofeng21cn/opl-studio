@@ -23,6 +23,6 @@
   "description": "OPL renderer integration for the DSH client module system.",
   "engines": {
     "node": ">=20",
-    "dsh": "0.2.2-rc.1"
+    "dsh": "0.2.2-rc.2"
   }
 }

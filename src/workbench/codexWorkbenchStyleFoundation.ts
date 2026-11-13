@@ -1,3 +1,5 @@
+import dshSource from "../composition/deepseekHarnessSourceManifest.json";
+
 export const codexWorkbenchStyleFoundation = `
   /* OPL-only content tokens consume the pinned DSH theme; shell geometry,
      glyphs and palette remain owned by the imported upstream styles. */
@@ -5,36 +7,7 @@ export const codexWorkbenchStyleFoundation = `
     color-scheme: light;
     --opl-native-titlebar-inset: 0px;
     --opl-sidebar-width: 236px;
-    --opl-font-sans: var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-    --opl-font-mono: var(--dsh-font-family-code, ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
-    /* OPL uses one compact desktop scale for host-owned
-       pages. Components may opt into a larger title, but should not invent a
-       new base size or weight. */
-    --opl-text-xs: 11px;
-    --opl-text-sm: 12px;
-    --opl-text-md: 13px;
-    --opl-text-body: 14px;
-    --opl-text-lg: 16px;
-    --opl-text-xl: 20px;
-    --opl-text-2xl: 24px;
-    --opl-text-display-sm: 28px;
-    --opl-text-display: 32px;
-    --opl-leading-tight: 1.25;
-    --opl-leading-normal: 1.45;
-    --opl-leading-relaxed: 1.6;
-    --opl-weight-regular: 400;
-    --opl-weight-medium: 500;
-    --opl-weight-semibold: 600;
-    --opl-space-1: 4px;
-    --opl-space-2: 8px;
-    --opl-space-3: 12px;
-    --opl-space-4: 16px;
-    --opl-space-5: 20px;
-    --opl-space-6: 24px;
-    --opl-control-sm: 30px;
-    --opl-control-md: 34px;
-    --opl-radius-control: 7px;
-    --opl-radius-surface: 10px;
+
   }
 
   :root[data-opl-host="native"] {
@@ -42,7 +15,37 @@ export const codexWorkbenchStyleFoundation = `
   }
 
   body {
+    /* Compatibility aliases for OPL content; all visual values come from DSH. */
+    --opl-font-sans: var(--dsw-font-family);
+    --opl-font-mono: var(--ds-font-family-code);
+    --opl-text-xs: var(--dsw-font-xxs-12-font-size);
+    --opl-text-sm: var(--dsw-font-xxs-12-font-size);
+    --opl-text-md: var(--dsw-font-xs-13-font-size);
+    --opl-text-body: var(--dsw-font-s-14-font-size);
+    --opl-text-lg: var(--dsw-font-base-16-font-size);
+    --opl-text-xl: var(--dsw-font-l-20-font-size);
+    --opl-text-2xl: var(--dsw-font-xl-24-font-size);
+    --opl-text-display-sm: var(--dsw-font-xl-24-font-size);
+    --opl-text-display: var(--dsw-font-xl-24-font-size);
+    --opl-leading-tight: var(--dsw-font-xs-13-line-height);
+    --opl-leading-normal: var(--dsw-font-s-14-line-height);
+    --opl-leading-relaxed: var(--dsw-font-markdown-base-line-height);
+    --opl-weight-regular: var(--dsw-font-s-14-font-weight);
+    --opl-weight-medium: var(--dsw-font-s-strong-14-font-weight);
+    --opl-weight-semibold: var(--dsw-font-xl-24-font-weight);
+    --opl-space-1: 4px;
+    --opl-space-2: 8px;
+    --opl-space-3: 12px;
+    --opl-space-4: 16px;
+    --opl-space-5: 20px;
+    --opl-space-6: 24px;
+    --opl-control-sm: ${dshSource.primitive_metrics.button_sm_height};
+    --opl-control-md: ${dshSource.primitive_metrics.button_md_height};
+    --opl-radius-control: var(--dsw-radius-md);
+    --opl-radius-surface: var(--dsw-radius-md);
+
     --opl-canvas: var(--dsw-alias-bg-base);
+    --opl-bg: var(--dsw-alias-bg-base);
     --opl-sidebar: var(--dsw-specific-sidebar-fill);
     --opl-surface-secondary: var(--dsw-alias-bg-module-platform);
     --opl-text: var(--dsw-alias-label-primary);
@@ -57,13 +60,10 @@ export const codexWorkbenchStyleFoundation = `
     --opl-accent-soft: var(--opl-hover);
     --opl-success: var(--dsw-alias-state-success-primary);
     --opl-warning: var(--dsw-alias-state-warn-primary);
-    --opl-warning-soft: color-mix(in oklab, var(--opl-warning) 16%, transparent);
+    --opl-warning-soft: var(--dsw-alias-state-warn-tertiary);
     --opl-danger: var(--dsw-alias-state-error-primary);
-    --opl-surface-elevated: color-mix(in srgb, var(--opl-canvas) 94%, var(--opl-text));
-    --opl-focus-ring: 0 0 0 3px color-mix(in srgb, var(--opl-accent) 22%, transparent);
-    font-family: var(--opl-font-sans);
-    font-size: var(--opl-text-body);
-    line-height: var(--opl-leading-normal);
+    --opl-surface-elevated: var(--dsw-alias-bg-layer-2);
+    font: var(--dsw-font-s-14);
   }
 
   :root[data-opl-sidebar-resizing="true"],
@@ -92,13 +92,13 @@ export const codexWorkbenchStyleFoundation = `
   }
 
   :where(button, input, textarea, select, summary):focus-visible {
-    outline: 0;
-    box-shadow: var(--opl-focus-ring);
+    outline: var(--dsw-focus-ring-width) solid var(--dsw-alias-state-business-primary);
+    outline-offset: 2px;
   }
 
   button:disabled {
     cursor: default;
-    opacity: 0.45;
+    opacity: 0.4;
   }
 
 `;

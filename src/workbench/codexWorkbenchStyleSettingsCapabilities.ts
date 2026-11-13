@@ -208,7 +208,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     resize: vertical;
     padding: 11px 12px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     outline: 0;
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -268,7 +268,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     margin: 10px 0 0;
     padding: 11px 12px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-hover);
     color: var(--opl-muted);
     font-family: var(--opl-font-mono);
@@ -318,7 +318,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     display: grid;
     place-items: center;
     border: 1px solid var(--opl-border-strong);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     font-size: var(--opl-text-sm);
     font-weight: var(--opl-weight-semibold);
   }
@@ -338,7 +338,6 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   .opl-first-run header h1 {
     font-size: var(--opl-text-2xl);
     font-weight: var(--opl-weight-semibold);
-    letter-spacing: 0;
   }
 
   .opl-first-run header div > span {
@@ -419,7 +418,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     margin-top: -10px;
     padding: 8px 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);
     line-height: var(--opl-leading-normal);
@@ -463,7 +462,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     min-height: 29px;
     padding: 0 8px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);
@@ -788,7 +787,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     gap: 10px;
     padding: 7px 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
   }
 
   .home-shortcut-preference > label,
@@ -835,7 +834,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
   }

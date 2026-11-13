@@ -173,7 +173,7 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     width: 100%;
     padding: 0 9px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
     font: inherit;

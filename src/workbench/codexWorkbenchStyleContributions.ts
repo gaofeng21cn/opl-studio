@@ -87,7 +87,6 @@ export const codexWorkbenchStyleContributions = `  .opl-contribution-slot {
     margin: 0 0 6px;
     font-size: var(--opl-text-sm);
     font-weight: var(--opl-weight-semibold);
-    letter-spacing: 0;
   }
 
   .opl-runtime-detail-result .opl-structured-list > li > strong {
@@ -176,7 +175,6 @@ export const codexWorkbenchStyleContributions = `  .opl-contribution-slot {
     font-size: var(--opl-text-md);
     font-weight: var(--opl-weight-semibold);
     line-height: var(--opl-leading-tight);
-    letter-spacing: 0;
   }
 
   .opl-contribution :where(p) {

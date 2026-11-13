@@ -117,7 +117,7 @@ test("upgrade target derives independent package versions and rejects a claimed 
   const target = readUpgradeTarget(binding, source);
   assert.equal(target.version, "0.2.1-rc.2");
   assert.deepEqual(target.package_cohort, ["@deepseek-ai/dsh-app-boot@0.2.1-rc.2", "@deepseek-ai/cordis@4.0.5"]);
-  assert.throws(() => readUpgradeTarget(binding, source, { version: "0.2.2-rc.1" }), /not 0.2.2-rc.1/);
+  assert.throws(() => readUpgradeTarget(binding, source, { version: "0.2.2-rc.2" }), /not 0.2.2-rc.2/);
   assert.throws(() => readUpgradeTarget(binding, source, { branch: "missing-tag" }));
   assertReplayTarget(binding, target);
   assert.throws(() => assertReplayTarget({ ...binding, ref: "0".repeat(40) }, target), /differs from the pinned binding/);

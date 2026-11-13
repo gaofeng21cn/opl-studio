@@ -160,7 +160,7 @@ try {
 
   const sidebarPanels = await evaluate(`async () => {
     const nav = document.querySelector('nav[aria-label="主页面"]');
-    const labels = ['应用管理', '运行状态', '计划任务'];
+    const labels = ['软件中心', '运行状态', '计划任务'];
     const icons = labels.map(label => Boolean(nav?.querySelector('button[aria-label="' + label + '"] svg use')));
     nav.querySelector('button[aria-label="更多"]').click();
     await new Promise(requestAnimationFrame);
@@ -179,7 +179,7 @@ try {
   assert.deepEqual(sidebarPanels, { icons: [true, true, true], initialMenu: [], unpinned: true, menuIcon: true, repinned: true });
 
   const primaryPanels = [];
-  for (const [label, testid] of [['应用管理', 'opl-app-management'], ['计划任务', 'opl-scheduled-tasks']]) {
+  for (const [label, testid] of [['软件中心', 'opl-app-management'], ['计划任务', 'opl-scheduled-tasks']]) {
     const result = await evaluate(`async () => {
       document.querySelector('nav[aria-label="主页面"] button[aria-label=${JSON.stringify(label)}]').click();
       await new Promise(requestAnimationFrame);
@@ -239,7 +239,16 @@ try {
   }`, cliRoot);
   assert.equal(settingsOpen.open, true);
   assert.equal(settingsOpen.activeLabel, "概览");
-  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "连接与部署", "工作区", "扩展与应用", "运行与维护", "偏好", "关于"]);
+  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "连接与部署", "工作区", "能力与指令", "运行与维护", "偏好", "关于"]);
+  const modalPaste = await evaluate(`async () => {
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(new File(['modal fixture'], 'modal-paste.txt', { type: 'text/plain' }));
+    const event = new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    await new Promise(requestAnimationFrame);
+    return { consumed: event.defaultPrevented, attachments: document.querySelectorAll('.composer-selection').length };
+  }`, cliRoot);
+  assert.deepEqual(modalPaste, { consumed: false, attachments: 0 }, "a foreground settings dialog must block document paste into the composer");
 
   const focusBounds = await evaluate(`() => {
     const dialog = document.querySelector('[role="dialog"]');
@@ -297,6 +306,20 @@ try {
   await evaluate(`() => { document.activeElement?.blur(); return true; }`, cliRoot);
   await cli(["screenshot"], cliRoot);
   const narrowScreenshot = await latestScreenshot(cliRoot);
+
+  const filePaste = await evaluate(`async () => {
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(new File(['composer fixture'], 'composer-paste.txt', { type: 'text/plain' }));
+    const event = new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    const deadline = Date.now() + 5000;
+    while (!document.querySelector('.composer-selection[data-status="ready"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    const attachments = Array.from(document.querySelectorAll('.composer-selection'));
+    const result = { consumed: event.defaultPrevented, count: attachments.length, ready: attachments[0]?.dataset.status, label: attachments[0]?.textContent.trim() };
+    attachments[0]?.querySelector('button').click();
+    return result;
+  }`, cliRoot);
+  assert.deepEqual(filePaste, { consumed: true, count: 1, ready: "ready", label: "composer-paste.txt" }, "official paste routing must stage exactly one attachment through the OPL owner");
 
   await evaluate(`() => { document.querySelector('[data-composer-input]').focus(); return true; }`, cliRoot);
   await cli(["type", "DSH 中文输入 regression"], cliRoot);
@@ -511,7 +534,7 @@ try {
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },
-    assertions: { consoleReadback, wide, iconSprite, contextMenu, sidebarRecent, sidebarPanels, primaryPanels, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, trapped, restored, narrow, narrowNavigation, themeVariants, composerText, undone, redone, submitted, selection, busySubmission },
+    assertions: { consoleReadback, wide, iconSprite, contextMenu, sidebarRecent, sidebarPanels, primaryPanels, recentMenu, renameDialog, renamedRecent, sessionMenu, sessionMenuActions, settingsOpen, modalPaste, filePaste, trapped, restored, narrow, narrowNavigation, themeVariants, composerText, undone, redone, submitted, selection, busySubmission },
     screenshots: [
       { viewport: "1440x900", path: path.relative(repositoryRoot, wideOutput), sha256: await digestFile(wideOutput) },
       { viewport: "400x800", path: path.relative(repositoryRoot, narrowOutput), sha256: await digestFile(narrowOutput) }

@@ -11,7 +11,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     margin: 0 0 7px;
     padding: 2px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-surface-secondary);
   }
 
@@ -25,7 +25,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     padding: 0 5px;
     overflow: hidden;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--dsw-radius-sm);
     background: transparent;
     color: var(--opl-muted);
     text-overflow: ellipsis;
@@ -154,7 +154,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     min-width: 0;
     overflow: auto;
     border: 1px solid var(--opl-border);
-    border-radius: 8px;
+    border-radius: var(--dsw-radius-sm);
     outline: 0;
     background: var(--opl-canvas);
     box-shadow: 0 18px 52px rgba(0, 0, 0, 0.18);
@@ -261,7 +261,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     gap: 6px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 7px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
@@ -333,7 +333,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--opl-border);
-    border-radius: 5px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
     padding: 0 8px;
@@ -352,7 +352,7 @@ export const codexWorkbenchStyleThreads = `  .project-directory {
     gap: 6px;
     padding: 0 10px;
     border: 1px solid var(--opl-border);
-    border-radius: 6px;
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
   }
