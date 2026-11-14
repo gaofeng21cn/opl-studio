@@ -23,7 +23,11 @@ const defaultGuestUser = process.env.OPL_STUDIO_CLEAN_VM_USER || "admin";
 const defaultSshKey = process.env.OPL_STUDIO_CLEAN_VM_SSH_KEY || path.join(os.homedir(), ".ssh", "opl_first_run_tart_ed25519");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export const FULL_OFFLINE_NETWORK_POLICY = '(version 1)(allow default)(deny network*)(allow network-inbound (local ip "localhost:*"))(allow network-outbound (remote ip "localhost:*"))(allow network* (local unix-socket) (remote unix-socket))';
+export const FULL_OFFLINE_NETWORK_POLICY = 'Tart host-only network (--net-host); Electron sandbox unchanged';
+
+export function buildVmRunArgs(vmName, offlineNetwork = false) {
+  return ['run', '--no-graphics', ...(offlineNetwork ? ['--net-host'] : []), vmName];
+}
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -217,8 +221,7 @@ export function buildGuestLaunchCommand({
   frameworkRef = null,
   caBundle = null,
   publicMetadataBin = null,
-  allowActions = false,
-  offlineNetwork = false
+  allowActions = false
 }) {
   return [
     publicMetadataBin ? `PATH=${shellQuote(publicMetadataBin)}:"$PATH"` : null,
@@ -229,7 +232,6 @@ export function buildGuestLaunchCommand({
     frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
     allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
     "nohup",
-    ...(offlineNetwork ? ["/usr/bin/sandbox-exec", "-p", shellQuote(FULL_OFFLINE_NETWORK_POLICY)] : []),
     shellQuote(appExecutable),
     "--disable-gpu",
     "--remote-debugging-port=9222",
@@ -454,7 +456,7 @@ export async function qualifyCleanVm(options) {
       progress({ phase: "clone_vm", status: "started", vm_name: options.vmName });
       if (!options.skipClone) run("tart", ["clone", options.sourceVm, options.vmName]);
       progress({ phase: "start_vm", status: "started", vm_name: options.vmName });
-      tartProcess = spawn("tart", ["run", "--no-graphics", options.vmName], { stdio: ["ignore", "ignore", "pipe"] });
+      tartProcess = spawn("tart", buildVmRunArgs(options.vmName, fullRuntime), { stdio: ["ignore", "ignore", "pipe"] });
       ip = await waitForVmIp(options.vmName, { vmProcess: tartProcess });
       progress({ phase: "wait_for_ip", status: "passed", vm_name: options.vmName, guest_ip: ip });
       checks.vm = { source: options.sourceVm, clone: options.vmName, ip, started: true };
@@ -579,7 +581,7 @@ export async function qualifyCleanVm(options) {
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
       };
-      const launch = buildGuestLaunchCommand({ ...launchOptions, offlineNetwork: fullRuntime });
+      const launch = buildGuestLaunchCommand(launchOptions);
       progress({ phase: "guest-launch", status: "started" });
       guestAppProcessId = Number(guestRun(options, ip, launch).stdout.trim());
       invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest App launch did not return its process ID");
@@ -599,7 +601,28 @@ export async function qualifyCleanVm(options) {
         progress({ phase: "full-offline-first-launch", status: "passed", version });
         // Continue the existing online Gateway qualification with the same
         // installed bytes and owner state after proving the clean offline start.
-        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
+        // Restart the same VM with normal networking for online acceptance.
+        // Applying sandbox-exec to Electron prevents its child sandboxes from
+        // initializing; isolate networking at the VM boundary instead.
+        tunnel.kill('SIGTERM');
+        run('tart', ['stop', options.vmName]);
+        if (tartProcess.exitCode === null) {
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Offline Tart process did not stop')), 30_000);
+            tartProcess.once('exit', () => { clearTimeout(timer); resolve(); });
+          });
+        }
+        progress({ phase: 'start_vm_online', status: 'started', vm_name: options.vmName });
+        tartProcess = spawn('tart', buildVmRunArgs(options.vmName), { stdio: ['ignore', 'ignore', 'pipe'] });
+        ip = await waitForVmIp(options.vmName, { vmProcess: tartProcess });
+        checks.vm.onlineRelaunch = { ip, sameInstalledDisk: true };
+        // DHCP can report a retained lease before SSH is accepting connections.
+        const sshDeadline = Date.now() + 60_000;
+        while (guestRun(options, ip, 'true', { allowFailure: true }).status !== 0) {
+          if (Date.now() >= sshDeadline) throw new Error('Online VM SSH did not become ready');
+          await delay(1000);
+        }
+        tunnel = spawn('ssh', ['-N', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'IdentitiesOnly=yes', '-i', options.sshKey, '-L', `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: 'ignore' });
         guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
         invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest online relaunch did not return its process ID");
       }

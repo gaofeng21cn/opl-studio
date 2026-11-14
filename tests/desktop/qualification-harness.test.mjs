@@ -8,6 +8,7 @@ import test from "node:test";
 import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
 import {
   waitForVmIp,
+  buildVmRunArgs,
   buildGuestLaunchCommand,
   prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
@@ -94,11 +95,11 @@ test("clean VM accepts an optional exact external Codex platform package", () =>
   assert.equal(options.codexVersion, "0.147.0");
 });
 
-test("Full offline launch denies external network and does not inject an external Codex", () => {
-  const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log", offlineNetwork: true });
-  assert.match(launch, /sandbox-exec/);
-  assert.match(launch, /deny network\*/);
-  assert.match(launch, /localhost/);
+test("Full offline launch isolates VM networking and preserves the Electron sandbox", () => {
+  assert.deepEqual(buildVmRunArgs('full-offline', true), ['run', '--no-graphics', '--net-host', 'full-offline']);
+  assert.deepEqual(buildVmRunArgs('full-offline'), ['run', '--no-graphics', 'full-offline']);
+  const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log" });
+  assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
 });
 
