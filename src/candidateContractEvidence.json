@@ -1018,8 +1018,8 @@
     "external_cohort": {
       "framework_commit": "ab2fadf5056133a978f3cfae7ec3c37751f83f40",
       "framework_tree": "578a271eb43d05a3e88988a93ac0cf77a5731f73",
-      "app_commit": "2bfdf76528fd89c251052f7d8bb49e115c998e21",
-      "app_tree": "a5a1709a9231b34b1d3c16509589b66f4b41bc07"
+      "app_commit": "f75c861d98f27558d1fb459430969b3c50c804d5",
+      "app_tree": "e56367cbbd68ad1d871d412acebf7ac1bc9e3a06"
     },
     "framework_producer": "src/read-models/operator/app-state-ui-contributions.ts#buildAppUiContributionsProjection",
     "host_app_studio_e2e": true,
