@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
+import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode, desktopBootstrapFailure } from "./runtime-bootstrap.mjs";
 
 function createPayload(root, overrides = {}) {
   const resourcesPath = path.join(root, "Resources");
@@ -378,4 +378,49 @@ test("packaged Standard rejects installer byte drift before execution", async (t
     }),
     /does not match its App-owned manifest/
   );
+});
+
+
+test("failed Standard installer preserves a bounded redacted reason for the existing VM App log", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-bootstrap-failure-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const env = { PATH: process.env.PATH, OPL_TEST_API_KEY: "private-key-value" };
+  const resourcesPath = createStandardBootstrap(root, { installerBody: `#!/bin/bash
+printf 'dependency digest mismatch: %s\nregistry: https://user:password@registry.invalid/archive\n' "$OPL_TEST_API_KEY" >&2
+exit 17
+` });
+  await assert.rejects(ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath,
+    homeDir: path.join(root, "home"), identity: "stable", env }), (error) => {
+    const diagnostic = desktopBootstrapFailure(error, env);
+    assert.equal(diagnostic.status, "framework_bootstrap_failed");
+    assert.equal(diagnostic.error.exitCode, 17);
+    assert.match(diagnostic.error.message, /dependency digest mismatch/);
+    assert.match(diagnostic.error.stderr, /registry: \[REDACTED_URL\]/);
+    const guestLog = `[OPL:bootstrap] ${JSON.stringify(diagnostic)}`;
+    assert.doesNotMatch(guestLog, /private-key-value|user:password|registry\.invalid/);
+    assert.match(guestLog, /dependency digest mismatch/);
+    return true;
+  });
+});
+
+test("bootstrap diagnostics handle nested, circular, Buffer and non-Error failures without leaking secrets", () => {
+  const env = { AUTH_TOKEN: "private-token-value", ACCOUNT_PASSWORD: "private-password-value" };
+  const cause = Object.assign(new Error("download failed: private-password-value"), {
+    code: "EACCES", stderr: Buffer.from("network denied\nBearer private-token-value")
+  });
+  const error = new Error("bootstrap failed\n" + "x".repeat(20_000), { cause });
+  cause.cause = error;
+  const diagnostic = desktopBootstrapFailure(error, env);
+  assert.equal(diagnostic.error.cause.code, "EACCES");
+  assert.match(diagnostic.error.cause.stderr, /network denied/);
+  assert.equal(diagnostic.error.cause.cause.message, "[Circular cause]");
+  assert.ok(JSON.stringify(diagnostic).length < 8_000);
+  assert.doesNotMatch(JSON.stringify(diagnostic), /private-token-value|private-password-value/);
+  for (const value of [null, undefined, "plain failure", Buffer.from("buffer failure"),
+    { message: "object failure", stderr: Buffer.from("private-token-value") },
+    { get message() { throw new Error("unreadable"); }, toString() { throw new Error("unreadable"); } }]) {
+    const result = desktopBootstrapFailure(value, env);
+    assert.equal(result.status, "framework_bootstrap_failed");
+    assert.doesNotMatch(JSON.stringify(result), /private-token-value/);
+  }
 });
