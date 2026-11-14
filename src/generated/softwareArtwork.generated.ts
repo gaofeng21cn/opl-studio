@@ -24,6 +24,7 @@ import artwork21 from "../assets/software-icons/opl-relay.png";
 import artwork22 from "../assets/software-icons/photo-steward.png";
 import artwork23 from "../assets/software-icons/redcube-ai.png";
 import artwork24 from "../assets/software-icons/rednote-steward.png";
+import artwork25 from "../assets/software-icons/opl-image.png";
 
 export const softwareArtworkById: Readonly<Record<string, string>> = Object.freeze({
   "agent-old-photo-workflow": artwork0,
@@ -74,6 +75,8 @@ export const softwareArtworkById: Readonly<Record<string, string>> = Object.free
   "rca": artwork23,
   "redcube-ai": artwork23,
   "rednote-steward": artwork24,
+  "opl-image": artwork25,
+  "opl-image-lab": artwork25,
 });
-export const softwareArtworkCatalogIds = Object.freeze(["agent-old-photo-workflow","agent-session-vault","github:gaofeng21cn/opl-codex-models","glkvm-native","iphone-steward","travel-passport","kindle-pilot","mac-media-assets","med-autocast","mag","med-autopractice","mas","mas-scholar-skills","github:gaofeng21cn/one-person-lab-app","obf","occ","github:gaofeng21cn/opl-fleet-agent","opl-flow","github:gaofeng21cn/one-person-lab","oma","opl-persona","opl-relay","photo-steward","rca","rednote-steward"]);
+export const softwareArtworkCatalogIds = Object.freeze(["agent-old-photo-workflow","agent-session-vault","github:gaofeng21cn/opl-codex-models","glkvm-native","iphone-steward","travel-passport","kindle-pilot","mac-media-assets","med-autocast","mag","med-autopractice","mas","mas-scholar-skills","github:gaofeng21cn/one-person-lab-app","obf","occ","github:gaofeng21cn/opl-fleet-agent","opl-flow","github:gaofeng21cn/one-person-lab","oma","opl-persona","opl-relay","photo-steward","rca","rednote-steward","opl-image"]);
 export const genericSoftwareIconUrl = artwork18;
