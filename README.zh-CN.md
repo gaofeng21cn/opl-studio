@@ -61,11 +61,9 @@ Standard 和 Full 是同一版本的两种载荷规格，不是两个产品版�
 更新通道。Studio 按照 App 管理的启动与验收合同，定位外部或 Framework 托管的
 Codex 可执行程序。
 
-> **既有 Preview 安装：**保留的 macOS arm64
-> [Preview 发布](https://github.com/gaofeng21cn/opl-studio/releases/latest) 使用
-> `cn.onepersonlab.opl.studio.preview` 和独立更新源。终结桥校验并安装一个准确的
-> Stable 目标，保留允许迁移的设置、草稿和规范线程引用。固定目标及历史路线的
-> 验收不自动证明后续版本，详见[桌面分发](./docs/delivery/desktop-distribution.md)。
+> **既有 Preview 安装：**OPL Studio 独立桌面版已停止发布。最终 Preview 更新源只作为迁移桥，
+> 将既有安装转入[正式 One Person Lab App](https://github.com/gaofeng21cn/one-person-lab-app/releases/latest)。
+> 新安装与稳定版更新统一使用 App 仓库。详见[桌面分发](./docs/delivery/desktop-distribution.md)。
 
 Windows、Linux Desktop 通过 App 同 tag 平台入口发布资产，实际安装验收按平台独立进行。
 Studio 同时实现独立 WebUI 和 App 的独立 Docker WebUI 产品线。OCI Preview 使用独立发布

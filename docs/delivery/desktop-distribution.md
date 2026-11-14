@@ -1,7 +1,7 @@
 # macOS Desktop Distribution Evidence
 
 `opl-studio` implements the current One Person Lab App carrier and the retained
-Preview identity. macOS Stable has used Studio since 26.9.25. Source selection,
+Preview migration identity. Standalone Preview publication is retired. macOS Stable has used Studio since 26.9.25. Source selection,
 public assets and a completed installed upgrade are separate facts; exact release
 and installed-state receipts prove the corresponding route.
 
