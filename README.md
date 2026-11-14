@@ -66,12 +66,11 @@ Standard and Full are two payloads of one version, not separate product
 versions or update channels. Studio resolves the external or Framework-managed
 Codex executable through the App-owned launch and qualification contract.
 
-> **Existing Preview installations:** the retained macOS arm64
-> [Preview release](https://github.com/gaofeng21cn/opl-studio/releases/latest) uses
-> `cn.onepersonlab.opl.studio.preview` and its own update feed. A terminal handoff
-> verifies and installs one exact Stable target, preserving allowlisted settings,
-> drafts and canonical thread references. Its fixed target and historical route
-> evidence do not qualify every later release. See [Desktop distribution](./docs/delivery/desktop-distribution.md).
+> **Existing Preview installations:** standalone OPL Studio desktop releases are
+> retired. The final Preview feed remains only as a migration bridge to the
+> [One Person Lab App](https://github.com/gaofeng21cn/one-person-lab-app/releases/latest).
+> New installations and Stable updates use the App repository. See [Desktop
+> distribution](./docs/delivery/desktop-distribution.md).
 
 Windows and Linux Desktop assets are published through the App's same-tag
 platform routes; installed acceptance remains platform-specific. Studio also
