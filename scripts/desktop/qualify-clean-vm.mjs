@@ -23,6 +23,8 @@ const defaultGuestUser = process.env.OPL_STUDIO_CLEAN_VM_USER || "admin";
 const defaultSshKey = process.env.OPL_STUDIO_CLEAN_VM_SSH_KEY || path.join(os.homedir(), ".ssh", "opl_first_run_tart_ed25519");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+export const FULL_OFFLINE_NETWORK_POLICY = '(version 1)(allow default)(deny network*)(allow network-inbound (local ip "localhost:*"))(allow network-outbound (remote ip "localhost:*"))(allow network* (local unix-socket) (remote unix-socket))';
+
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -215,7 +217,8 @@ export function buildGuestLaunchCommand({
   frameworkRef = null,
   caBundle = null,
   publicMetadataBin = null,
-  allowActions = false
+  allowActions = false,
+  offlineNetwork = false
 }) {
   return [
     publicMetadataBin ? `PATH=${shellQuote(publicMetadataBin)}:"$PATH"` : null,
@@ -226,6 +229,7 @@ export function buildGuestLaunchCommand({
     frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
     allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
     "nohup",
+    ...(offlineNetwork ? ["/usr/bin/sandbox-exec", "-p", shellQuote(FULL_OFFLINE_NETWORK_POLICY)] : []),
     shellQuote(appExecutable),
     "--disable-gpu",
     "--remote-debugging-port=9222",
@@ -378,6 +382,7 @@ export async function qualifyCleanVm(options) {
   const productName = options.productName || PREVIEW_PRODUCT.productName;
   const bundleId = options.bundleId || PREVIEW_PRODUCT.bundleId;
   const fullRuntime = options.runtimeProfiles?.includes("full") === true;
+  const externalCodex = !fullRuntime && options.codexPlatformPackageTarball;
   const guestDmg = `/tmp/opl-studio-clean-${process.pid}.dmg`;
   const guestCodexTarball = `/tmp/opl-studio-clean-${process.pid}-codex.tgz`;
   const guestCodexRoot = `/tmp/opl-studio-clean-${process.pid}-codex`;
@@ -517,7 +522,7 @@ export async function qualifyCleanVm(options) {
         };
       }
 
-      if (options.codexPlatformPackageTarball) {
+      if (externalCodex) {
         scpToGuest(options, ip, options.codexPlatformPackageTarball, guestCodexTarball);
         const expectedVersion = `codex-cli ${options.codexVersion}`;
         const verifyCodex = guestRun(options, ip, [
@@ -564,20 +569,40 @@ export async function qualifyCleanVm(options) {
         checks.publicDependencyMetadata = { ...receipt, guestCopyVerified: true };
         progress({ phase: "public-dependency-metadata", status: "passed", endpoints: metadata.endpoints });
       }
-      const launch = buildGuestLaunchCommand({
+      const launchOptions = {
         appExecutable: `${guestApp}/Contents/MacOS/${productName}`,
         logPath: guestLog,
-        codexBinary: options.codexPlatformPackageTarball ? guestCodexBinary : null,
+        codexBinary: externalCodex ? guestCodexBinary : null,
         frameworkSourceArchive: !fullRuntime && options.frameworkSourceArchive ? guestFrameworkArchive : null,
         frameworkRef: fullRuntime ? null : options.frameworkRef,
         caBundle: trust ? guestCaBundle : null,
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
-      });
+      };
+      const launch = buildGuestLaunchCommand({ ...launchOptions, offlineNetwork: fullRuntime });
       progress({ phase: "guest-launch", status: "started" });
       guestAppProcessId = Number(guestRun(options, ip, launch).stdout.trim());
       invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest App launch did not return its process ID");
       tunnel = spawn("ssh", ["-N", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: "ignore" });
+      if (fullRuntime) {
+        progress({ phase: "full-offline-first-launch", status: "started" });
+        await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
+        const protocol = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
+          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
+        invariant(protocol?.threadListValid === true && protocol.simulated === false, "Full offline App Server handshake failed");
+        const version = guestRun(options, ip, '"$HOME/Library/Application Support/OPL/runtime/current/bin/codex" --version').stdout.trim();
+        invariant(!options.codexVersion || version === `codex-cli ${options.codexVersion}`, "Full offline Codex differs from its resolved release identity");
+        checks.codex = { status: "passed", expectedVersion: options.codexVersion, verifiedVersion: version,
+          source: "packaged_full_offline_seed", bundleIncluded: true, injectedVia: null,
+          offlineFirstLaunch: { status: "passed", networkPolicy: FULL_OFFLINE_NETWORK_POLICY,
+            gatewayConfigured: false, protocolCalls: ["thread/list"], generationRequested: false } };
+        progress({ phase: "full-offline-first-launch", status: "passed", version });
+        // Continue the existing online Gateway qualification with the same
+        // installed bytes and owner state after proving the clean offline start.
+        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
+        guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
+        invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest online relaunch did not return its process ID");
+      }
     }
     progress({ phase: "page-ready", status: "started" });
     await waitForPageReady({ port: options.cdpPort, timeoutMs: 45_000 });

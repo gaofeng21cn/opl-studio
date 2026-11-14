@@ -94,6 +94,14 @@ test("clean VM accepts an optional exact external Codex platform package", () =>
   assert.equal(options.codexVersion, "0.147.0");
 });
 
+test("Full offline launch denies external network and does not inject an external Codex", () => {
+  const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log", offlineNetwork: true });
+  assert.match(launch, /sandbox-exec/);
+  assert.match(launch, /deny network\*/);
+  assert.match(launch, /localhost/);
+  assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
+});
+
 test("clean VM keeps external Codex preparation optional for legacy invocations", () => {
   const options = parseCleanVmArgs(["--attach"]);
   assert.equal(options.codexPlatformPackageTarball, null);

@@ -23,6 +23,7 @@
     "aionui_runtime_required": false,
     "aioncore_runtime_required": false,
     "framework_managed_codex_payload_in_app_bundle_allowed": false,
+    "first_install_codex_seed_policy_ref": "one-person-lab-app/contracts/app-release-qualification-input-manifest.json#runtime_payloads.codex_cli.full_offline_seed",
     "studio_carrier_payload": ["renderer", "host", "app_state_action_bridge"]
   },
   "handoff": {

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { resolveHostNode } from "./node-host-runtime.mjs";
+import { codexOfflineSeedEnvironment } from "./codex-offline-seed.mjs";
 
 const FULL_RUNTIME_RESOURCE_DIR = "opl-studio-full-runtime";
 const FULL_RUNTIME_MANIFEST = "full-package-manifest.json";
@@ -260,7 +261,7 @@ function buildRuntimeEnvironment(runtime, env) {
   }
   const hermes = path.join(runtime, "bin", "hermes");
   if (fs.existsSync(hermes)) result.OPL_HERMES_BIN = hermes;
-  return result;
+  return codexOfflineSeedEnvironment(runtime, result);
 }
 
 function installedFrameworkRoot(homeDir) {

@@ -69,6 +69,15 @@ output rebuilds normally; `build-release.mjs --skip-vite` explicitly requires a
 verified hit. This cache never substitutes for signing, packaging or acceptance.
 The App workflow uses one cache transport path for Standard and Full.
 
+Full provides operation-resolved Codex npm/platform archives as a first-install
+seed. Studio validates their manifest digests and delegates installation and
+activation to Framework before creating the persistent App Server. A usable
+existing Codex takes precedence; the seed never pins subsequent managed updates.
+Full clean-VM qualification first launches the actual App under a network policy
+that permits loopback only, without an external Codex injection or Gateway setup,
+and verifies the local App Server. It then restarts the same installation for
+the existing online Gateway and Package qualification.
+
 Distribution qualification can consume `OPL_DESKTOP_NOTARIZATION_RECEIPT` from
 the App finalizer. It must bind the final DMG name, SHA-256, size, publisher and
 accepted Apple trust before reusing DMG verification/stapling. ZIP App trust

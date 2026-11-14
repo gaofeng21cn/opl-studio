@@ -11,6 +11,7 @@ import { createManagedUpdateMaintenance } from "../src/host/managed-update-maint
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
+import { ensureFullCodexFirstInstall } from "./codex-offline-seed.mjs";
 import { ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 import { createShutdownController } from "./shutdown.mjs";
@@ -320,6 +321,10 @@ async function createDesktopHost(appLogDirectory) {
       activationStatus = activation.runtime_activation?.status ?? "unknown";
       const binary = activation.runtime_activation?.codex?.runtime_binary_path;
       if (typeof binary === "string" && path.isAbsolute(binary) && fs.existsSync(binary)) activatedCodexPath = binary;
+      if (!activatedCodexPath) {
+        activatedCodexPath = await ensureFullCodexFirstInstall({ env: activationEnvironment,
+          opl: createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] }) }) ?? undefined;
+      }
     } catch (error) {
       activationStatus = error.code ?? "failed";
     }
