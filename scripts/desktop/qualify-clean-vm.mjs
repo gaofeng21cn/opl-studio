@@ -23,10 +23,16 @@ const defaultGuestUser = process.env.OPL_STUDIO_CLEAN_VM_USER || "admin";
 const defaultSshKey = process.env.OPL_STUDIO_CLEAN_VM_SSH_KEY || path.join(os.homedir(), ".ssh", "opl_first_run_tart_ed25519");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export const FULL_OFFLINE_NETWORK_POLICY = 'Tart host-only network (--net-host); Electron sandbox unchanged';
+export const FULL_OFFLINE_NETWORK_POLICY = 'VM IPv4 and IPv6 public routes rejected; host SSH, loopback, and Electron sandbox preserved';
 
-export function buildVmRunArgs(vmName, offlineNetwork = false) {
-  return ['run', '--no-graphics', ...(offlineNetwork ? ['--net-host'] : []), vmName];
+export function buildGuestNetworkCommand(isolate) {
+  const verb = isolate ? 'add' : 'delete';
+  const routes = [['-inet', '0.0.0.0/1', '127.0.0.1'], ['-inet', '128.0.0.0/1', '127.0.0.1'],
+    ['-inet6', '::/1', '::1'], ['-inet6', '8000::/1', '::1']];
+  return ['set -eu', ...routes.map(([family, network, gateway]) =>
+    `sudo -n /sbin/route -n ${verb} ${family} -net ${network}${isolate ? ` ${gateway} -reject` : ''} >/dev/null`),
+    ...(isolate ? ['if /usr/bin/nc -G 3 -z 1.1.1.1 443; then exit 1; fi'] : []),
+  ].join(' && ');
 }
 
 export function buildGuestDmgAdmissionCommand(guestDmg) {
@@ -399,6 +405,7 @@ export async function qualifyCleanVm(options) {
   const guestMetadataRoot = `/tmp/opl-studio-clean-${process.pid}-public-metadata`;
   const guestApp = `/Applications/${productName}.app`;
   const guestLog = `/tmp/opl-studio-clean-${process.pid}.log`;
+  let networkIsolated = false;
   let tartProcess;
   let tunnel;
   let ip = null;
@@ -461,17 +468,22 @@ export async function qualifyCleanVm(options) {
       progress({ phase: "clone_vm", status: "started", vm_name: options.vmName });
       if (!options.skipClone) run("tart", ["clone", options.sourceVm, options.vmName]);
       progress({ phase: "start_vm", status: "started", vm_name: options.vmName });
-      tartProcess = spawn("tart", buildVmRunArgs(options.vmName, fullRuntime), { stdio: ["ignore", "ignore", "pipe"] });
+      tartProcess = spawn("tart", ["run", "--no-graphics", options.vmName], { stdio: ["ignore", "ignore", "pipe"] });
       ip = await waitForVmIp(options.vmName, { vmProcess: tartProcess });
       progress({ phase: "wait_for_ip", status: "passed", vm_name: options.vmName, guest_ip: ip });
       checks.vm = { source: options.sourceVm, clone: options.vmName, ip, started: true };
 
       scpToGuest(options, ip, options.dmg, guestDmg);
+      if (fullRuntime) {
+        guestRun(options, ip, buildGuestNetworkCommand(true));
+        networkIsolated = true;
+        checks.offlineNetwork = { status: 'passed', policy: FULL_OFFLINE_NETWORK_POLICY, publicIpv4Probe: 'blocked' };
+      }
       if (fullRuntime && options.requireGatekeeper) {
         // Consume the stapled DMG ticket as a downloaded disk image would.
         // Quarantining only the copied App omits the carrier's offline ticket.
         guestRun(options, ip, buildGuestDmgAdmissionCommand(guestDmg));
-        checks.offlineDmgAdmission = { status: 'passed', network: 'host_only', quarantinePreserved: true };
+        checks.offlineDmgAdmission = { status: 'passed', network: 'public_routes_rejected', quarantinePreserved: true };
       }
       const install = guestRun(options, ip, [
         "set -e",
@@ -612,28 +624,10 @@ export async function qualifyCleanVm(options) {
         progress({ phase: "full-offline-first-launch", status: "passed", version });
         // Continue the existing online Gateway qualification with the same
         // installed bytes and owner state after proving the clean offline start.
-        // Restart the same VM with normal networking for online acceptance.
-        // Applying sandbox-exec to Electron prevents its child sandboxes from
-        // initializing; isolate networking at the VM boundary instead.
-        tunnel.kill('SIGTERM');
-        run('tart', ['stop', options.vmName]);
-        if (tartProcess.exitCode === null) {
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('Offline Tart process did not stop')), 30_000);
-            tartProcess.once('exit', () => { clearTimeout(timer); resolve(); });
-          });
-        }
-        progress({ phase: 'start_vm_online', status: 'started', vm_name: options.vmName });
-        tartProcess = spawn('tart', buildVmRunArgs(options.vmName), { stdio: ['ignore', 'ignore', 'pipe'] });
-        ip = await waitForVmIp(options.vmName, { vmProcess: tartProcess });
-        checks.vm.onlineRelaunch = { ip, sameInstalledDisk: true };
-        // DHCP can report a retained lease before SSH is accepting connections.
-        const sshDeadline = Date.now() + 60_000;
-        while (guestRun(options, ip, 'true', { allowFailure: true }).status !== 0) {
-          if (Date.now() >= sshDeadline) throw new Error('Online VM SSH did not become ready');
-          await delay(1000);
-        }
-        tunnel = spawn('ssh', ['-N', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'IdentitiesOnly=yes', '-i', options.sshKey, '-L', `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: 'ignore' });
+        guestRun(options, ip, buildGuestNetworkCommand(false));
+        networkIsolated = false;
+        progress({ phase: 'restore_vm_network', status: 'passed', vm_name: options.vmName });
+        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
         guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
         invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest online relaunch did not return its process ID");
       }
@@ -733,6 +727,7 @@ export async function qualifyCleanVm(options) {
         checks.officialProfileDiagnosticsUnavailable = true;
       }
     }
+    if (networkIsolated && ip) guestRun(options, ip, buildGuestNetworkCommand(false), { allowFailure: true });
     if (tunnel && tunnel.exitCode === null) tunnel.kill("SIGTERM");
     if (!options.keepVm && tartProcess && tartProcess.exitCode === null) tartProcess.kill("SIGTERM");
     if (!options.attach && !options.keepVm) run("tart", ["stop", options.vmName], { allowFailure: true });

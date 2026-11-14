@@ -8,7 +8,7 @@ import test from "node:test";
 import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
 import {
   waitForVmIp,
-  buildVmRunArgs,
+  buildGuestNetworkCommand,
   buildGuestDmgAdmissionCommand,
   buildGuestLaunchCommand,
   prepareRunnerTrustBundle,
@@ -97,8 +97,12 @@ test("clean VM accepts an optional exact external Codex platform package", () =>
 });
 
 test("Full offline launch isolates VM networking and preserves the Electron sandbox", () => {
-  assert.deepEqual(buildVmRunArgs('full-offline', true), ['run', '--no-graphics', '--net-host', 'full-offline']);
-  assert.deepEqual(buildVmRunArgs('full-offline'), ['run', '--no-graphics', 'full-offline']);
+  const isolate = buildGuestNetworkCommand(true);
+  assert.match(isolate, /add -inet -net 0.0.0.0\/1 127.0.0.1 -reject/);
+  assert.match(isolate, /add -inet6 -net ::\/1 ::1 -reject/);
+  const restore = buildGuestNetworkCommand(false);
+  assert.match(restore, /delete -inet -net 128.0.0.0\/1/);
+  assert.match(restore, /delete -inet6 -net 8000::\/1/);
   const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log" });
   assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
@@ -111,6 +115,8 @@ test('Full offline installation consumes the quarantined DMG notarization ticket
   assert.match(command, /'\/tmp\/Full package.dmg'/);
   assert.doesNotMatch(command, /xattr -[rd]|--disable|--no-sandbox/);
 });
+
+
 
 test("clean VM keeps external Codex preparation optional for legacy invocations", () => {
   const options = parseCleanVmArgs(["--attach"]);
