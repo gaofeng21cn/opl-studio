@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { resolveHostNode } from "./node-host-runtime.mjs";
 import { codexOfflineSeedEnvironment } from "./codex-offline-seed.mjs";
+import { safeDesktopErrorMessage } from "./official-profile.mjs";
 
 const FULL_RUNTIME_RESOURCE_DIR = "opl-studio-full-runtime";
 const FULL_RUNTIME_MANIFEST = "full-package-manifest.json";
@@ -364,6 +365,33 @@ async function supportsRuntimeActivation(env) {
   });
 }
 
+/** Ephemeral App diagnostics; installation and retry authority remain with Framework. */
+export function desktopBootstrapFailure(error, env = process.env) {
+  const seen = new Set();
+  const describe = (value, depth = 0) => {
+    if (value && typeof value === "object") {
+      if (seen.has(value)) return { message: "[Circular cause]" };
+      seen.add(value);
+    }
+    const read = (key) => { try { return value?.[key]; } catch { return undefined; } };
+    const text = (item) => { try { return Buffer.isBuffer(item) ? item.toString("utf8") : String(item); } catch { return "Unavailable error detail"; } };
+    const safe = (item, maxLength = 1024) => safeDesktopErrorMessage(text(item), env, { maxLines: 8, maxLength });
+    const detail = { message: safe(read("message") ?? value) };
+    const code = read("code");
+    if (typeof code === "string" && /^[a-z_][a-z0-9_]{0,79}$/i.test(code)) detail.code = safe(code, 80);
+    const exitCode = read("exitCode");
+    if (Number.isInteger(exitCode)) detail.exitCode = exitCode;
+    const signal = read("signal");
+    if (typeof signal === "string" && /^SIG[A-Z0-9]{1,16}$/.test(signal)) detail.signal = signal;
+    const stderr = read("stderr");
+    if (typeof stderr === "string" || Buffer.isBuffer(stderr)) detail.stderr = safe(stderr, depth ? 1024 : 2048);
+    const cause = read("cause");
+    if (cause !== undefined && depth < 2) detail.cause = describe(cause, depth + 1);
+    return detail;
+  };
+  return { status: "framework_bootstrap_failed", error: describe(error) };
+}
+
 function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip-packages"]) {
   return new Promise((resolve, reject) => {
     const child = spawn("/bin/bash", [installerPath, ...args], {
@@ -377,10 +405,12 @@ function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip
     child.stdout.on("data", (chunk) => { stdout = `${stdout}${chunk}`.slice(-24_000); });
     child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-24_000); });
     child.once("error", reject);
-    child.once("exit", (code, signal) => {
+    child.once("close", (code, signal) => {
       if (code === 0) return resolve({ stdout, stderr });
       const detail = stderr.trim() || stdout.trim() || `exit ${signal ?? code ?? "unknown"}`;
-      reject(new Error(`Studio Standard Framework bootstrap failed: ${detail}`));
+      reject(Object.assign(new Error(`Studio Standard Framework bootstrap failed: ${detail}`), {
+        exitCode: code, signal, stderr
+      }));
     });
   });
 }

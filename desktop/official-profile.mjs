@@ -15,11 +15,13 @@ function exists(file) { try { fs.lstatSync(file); return true; } catch (error) {
 function regular(file) { const info = fs.lstatSync(file); invariant(info.isFile() && !info.isSymbolicLink(), `Official Profile resource or receipt is not a regular file: ${path.basename(file)}`); }
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function privateJson(file, value, flag = "wx") { fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag }); }
-function safeMessage(error, env) {
+function safeMessage(error, env, { maxLines = 1, maxLength = 1024 } = {}) {
   let message = error instanceof Error ? error.message : String(error);
   for (const [key, value] of Object.entries(env)) if (/token|secret|password|credential|api.?key|cookie/i.test(key) && typeof value === "string" && value.length >= 4) message = message.replaceAll(value, "[REDACTED]");
-  return message.replace(/\b(?:Bearer|Basic)\s+[^\s,;]+/gi, "[REDACTED]").replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"']+/gi, "[REDACTED_URL]").split(/\r?\n/, 1)[0].slice(0, 1024);
+  return message.replace(/\b(?:Bearer|Basic)\s+[^\s,;]+/gi, "[REDACTED]").replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"']+/gi, "[REDACTED_URL]").split(/\r?\n/).slice(0, maxLines).join("\n").slice(0, maxLength);
 }
+
+export { safeMessage as safeDesktopErrorMessage };
 
 function frameworkCoreReady(result) {
   const exitCode = result?.readback?.exitCode ?? result?.readback?.status;

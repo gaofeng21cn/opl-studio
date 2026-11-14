@@ -12,7 +12,7 @@ import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
 import { ensureFullCodexFirstInstall } from "./codex-offline-seed.mjs";
-import { ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
+import { ensureStudioDesktopRuntime, ensureDesktopHostNode, desktopBootstrapFailure } from "./runtime-bootstrap.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 import { createShutdownController } from "./shutdown.mjs";
 import { createDesktopTray } from "./tray.mjs";
@@ -296,8 +296,10 @@ async function createDesktopHost(appLogDirectory) {
     homeDir,
     identity: stableIdentity ? "stable" : "preview",
     env: process.env
-  }).catch(() => {
+  }).catch(error => {
     bootstrapStatus = "framework_bootstrap_failed";
+    // The VM harness already captures this App log; keep recovery reachable.
+    console.warn("[OPL:bootstrap] " + JSON.stringify(desktopBootstrapFailure(error)));
     return null;
   });
   const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
