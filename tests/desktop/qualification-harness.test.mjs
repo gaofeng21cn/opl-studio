@@ -9,6 +9,7 @@ import { verifyPreviewIdentity } from "../../scripts/desktop/preview-smoke.mjs";
 import {
   waitForVmIp,
   buildVmRunArgs,
+  buildGuestDmgAdmissionCommand,
   buildGuestLaunchCommand,
   prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
@@ -101,6 +102,14 @@ test("Full offline launch isolates VM networking and preserves the Electron sand
   const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log" });
   assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
+});
+
+test('Full offline installation consumes the quarantined DMG notarization ticket', () => {
+  const command = buildGuestDmgAdmissionCommand('/tmp/Full package.dmg');
+  assert.match(command, /xattr -w com.apple.quarantine/);
+  assert.match(command, /spctl --assess --type open --context context:primary-signature/);
+  assert.match(command, /'\/tmp\/Full package.dmg'/);
+  assert.doesNotMatch(command, /xattr -[rd]|--disable|--no-sandbox/);
 });
 
 test("clean VM keeps external Codex preparation optional for legacy invocations", () => {

@@ -29,6 +29,11 @@ export function buildVmRunArgs(vmName, offlineNetwork = false) {
   return ['run', '--no-graphics', ...(offlineNetwork ? ['--net-host'] : []), vmName];
 }
 
+export function buildGuestDmgAdmissionCommand(guestDmg) {
+  const dmg = shellQuote(guestDmg);
+  return `/usr/bin/xattr -w com.apple.quarantine '0083;00000000;OPL-Release-Qualification;' ${dmg} && /usr/sbin/spctl --assess --type open --context context:primary-signature --verbose=2 ${dmg}`;
+}
+
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -462,6 +467,12 @@ export async function qualifyCleanVm(options) {
       checks.vm = { source: options.sourceVm, clone: options.vmName, ip, started: true };
 
       scpToGuest(options, ip, options.dmg, guestDmg);
+      if (fullRuntime && options.requireGatekeeper) {
+        // Consume the stapled DMG ticket as a downloaded disk image would.
+        // Quarantining only the copied App omits the carrier's offline ticket.
+        guestRun(options, ip, buildGuestDmgAdmissionCommand(guestDmg));
+        checks.offlineDmgAdmission = { status: 'passed', network: 'host_only', quarantinePreserved: true };
+      }
       const install = guestRun(options, ip, [
         "set -e",
         `test ! -e ${JSON.stringify(guestApp)}`,
