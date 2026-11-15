@@ -160,6 +160,7 @@ export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesPr
         status: rawStatus && statuses.has(rawStatus) ? rawStatus as SoftwareSourceRef["status"] : "unknown",
         enabled: asOptionalBoolean(entry.enabled),
         credentialHandlePresent: entry.credential_handle_present === true,
+        accessRefreshRequired: entry.access_refresh_required === true,
         verifiedAt: asString(entry.verified_at) ?? undefined,
         ...(typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? { entryCount: count } : {}),
         ...(entry.source_kind === "tap" ? {
@@ -184,6 +185,18 @@ export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesPr
       credentialValuesExposed: asOptionalBoolean(authority.credential_values_exposed) ?? undefined
     } } : {})
   };
+}
+
+/** Only the source owner can request an automatic access check. */
+export function pendingSoftwareSourceAccessCheck(projection: SoftwareSourcesProjection | undefined, attempted: ReadonlySet<string>) {
+  for (const source of projection?.entries ?? []) {
+    if (!source.accessRefreshRequired || source.enabled === false || !source.credentialHandlePresent || attempted.has(source.sourceId)) continue;
+    const action = source.availableActions.find(action => action.actionId === "source_check"
+      && action.status === "available" && !action.confirmationRequired
+      && action.payload.source_id === source.sourceId);
+    if (action) return { source, action };
+  }
+  return undefined;
 }
 
 export function softwareSourceStatusLabel(source: SoftwareSourceRef, locale: "zh" | "en"): string {

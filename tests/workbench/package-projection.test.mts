@@ -91,6 +91,28 @@ test("software sources project public and authorized entries without exposing cr
   assert.equal(model.softwareSources?.authorityBoundary?.credentialValuesExposed, false);
 });
 
+test("owner-requested access refresh checks a source once without granting software access", async () => {
+  const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, pendingSoftwareSourceAccessCheck } = await import("../../src/workbench/softwareSources.ts");
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
+      source_id: "private-source", display_name: "Authorized software", source_kind: "registry", visibility: "authorized_only",
+      status: "authorized", enabled: true, credential_handle_present: true, access_refresh_required: true,
+      available_actions: [{ action_id: "source_check", label: "Check", payload_fields: ["source_id"], confirmation_required: false }]
+    }]
+  }))!;
+  const source = projection.entries[0]!;
+  assert.equal(source.accessRefreshRequired, true);
+  assert.deepEqual(pendingSoftwareSourceAccessCheck(projection, new Set())?.action.payload, { source_id: "private-source" });
+  assert.equal(pendingSoftwareSourceAccessCheck(projection, new Set([source.sourceId])), undefined);
+  for (const patch of [{ accessRefreshRequired: false }, { enabled: false }, { credentialHandlePresent: false },
+    { availableActions: [] }, { availableActions: [{ ...source.availableActions[0]!, confirmationRequired: true }] },
+    { availableActions: [{ ...source.availableActions[0]!, status: "unavailable" as const }] },
+    { availableActions: [{ ...source.availableActions[0]!, payload: { source_id: "another-source" } }] }]) {
+    assert.equal(pendingSoftwareSourceAccessCheck({ ...projection, entries: [{ ...source, ...patch }] }, new Set()), undefined);
+  }
+});
+
 test("native source inventory preserves unknown state and version-bound owner actions", async () => {
   const { compactSoftwareSources } = await import("../../src/host/opl-passthrough-parts/contributions-packages.mjs");
   const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareMatches, softwareSourceStatusLabel } = await import("../../src/workbench/softwareSources.ts");
