@@ -122,10 +122,20 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 export type SettingsSearchLogRequest = { method: "GET" | "POST"; count?: boolean; body?: string };
 export type SettingsSearchLogResponse = { status: number; body: string };
 
+export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
+export type LinkDeviceReadback = { schema: "opl_link_studio_wire.v2"; host?: { id: string; name: string }; endpoint?: string | null; devices: LinkPairedDevice[]; unavailable?: boolean };
+export type LinkPairing = { schema: "opl_link_studio_wire.v2"; endpoint: string; code: string; expiresAt: string; pairingURL: string };
+export type LinkCompanionManagement = {
+  readDevices(): Promise<LinkDeviceReadback>;
+  createPairing(request: { endpoint: string }): Promise<LinkPairing>;
+  revokeDevice(request: { id: string }): Promise<{ id: string; revoked: boolean }>;
+};
+
 export type OplStudioSurface = Pick<
   OplBridge,
   keyof McpAppsBridge | "readSuperagent" | "executeSuperagent" | "readTeamBots" | "executeTeamBot" | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "revealLocalPath" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
+  linkCompanion?: LinkCompanionManagement;
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;

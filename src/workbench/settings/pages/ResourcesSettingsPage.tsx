@@ -1,3 +1,4 @@
+import { LinkCompanionSection } from "../LinkCompanionSection";
 import { actionPayloadComplete } from "../../settingsActions";
 import { SoftwareCenterSettingsLink } from "../SoftwareCenterSettingsLink";
 
@@ -22,6 +23,7 @@ export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnos
       ));
       return (
         <>
+          <LinkCompanionSection locale={settings.locale} />
           <SoftwareCenterSettingsLink locale={settings.locale} section="resources" onOpen={onOpenSoftwareCenter} />
           <SettingsGroup title={settings.locale === "zh" ? "网页访问" : "Web access"}>
             <SettingRow label={zh ? "部署网页端" : "Deploy WebUI"} detail={zh ? "网页端独立部署。指南包含安装、访问认证、数据目录和启动步骤。" : "WebUI is a separate deployment. The guide covers installation, authentication, data directories and startup."}><a className="settings-support-link" target="_blank" rel="noreferrer" href="https://github.com/gaofeng21cn/opl-studio/blob/main/docs/oci-distribution.md">{zh ? "配置指南" : "Setup guide"}</a></SettingRow>

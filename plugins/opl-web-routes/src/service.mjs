@@ -24,13 +24,13 @@ function errorResponse(res, error) {
   });
 }
 
-async function body(req) {
+async function body(req, limit = 1_048_576) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 1_048_576) {
-      throw new ThreadAdapterError("invalid_request", "Request body exceeds 1 MiB", {}, 413);
+    if (size > limit) {
+      throw new ThreadAdapterError("invalid_request", "Request body exceeds its upload limit", {}, 413);
     }
     chunks.push(chunk);
   }
@@ -73,6 +73,9 @@ async function dispatchApi(req, res, hostCore) {
     res.end(result.body);
     return;
   }
+  if (req.method === "GET" && url.pathname === "/api/link-management/devices") { json(res, 200, await hostCore.invoke("readLinkDevices")); return; }
+  if (req.method === "POST" && url.pathname === "/api/link-management/pair") { json(res, 200, await hostCore.invoke("createLinkPairing", await body(req, 16 * 1024))); return; }
+  if (req.method === "POST" && url.pathname === "/api/link-management/revoke") { json(res, 200, await hostCore.invoke("revokeLinkDevice", await body(req, 16 * 1024))); return; }
   if (req.method === "GET" && url.pathname === "/api/capabilities") {
     json(res, 200, hostCore.capabilities());
     return;
@@ -280,7 +283,11 @@ export function registerOplHttpRoutes(webServer, hostCore, {
         if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
         try {
           const value = await body(req);
-          if (!webAuth.enabled) return json(res, 200, { authenticated: true, username: "opl", csrfToken: null });
+          if (!webAuth.enabled) {
+            const local = webAuth.requireSession(req);
+            if (!local.ok) return authError(res, local);
+            return json(res, 200, { authenticated: true, username: local.session.username, csrfToken: null });
+          }
           const result = webAuth.checkLogin(req, value.username, value.password);
           if (!result.ok) return authError(res, result);
           json(res, 200, { authenticated: true, ...webAuth.issueSession(res, req) });
@@ -336,6 +343,9 @@ export function registerOplHttpRoutes(webServer, hostCore, {
       path: "/api",
       async handler(req, res) {
         try {
+          const linkPath = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+          if (linkPath.startsWith("/api/link/") && hostCore.linkCompanion) return hostCore.linkCompanion.handle(req, res);
+          if (req.headers.authorization?.startsWith("Bearer ")) return json(res, 403, { error: { code: "companion_scope_rejected", message: "Device credentials are restricted to companion routes", details: {} } });
           const auth = webAuth.requireSession(req, { csrf: !new Set(["GET", "HEAD"]).has(req.method ?? "") });
           if (!auth.ok) return authError(res, auth);
           const url = new URL(req.url ?? "/", "http://127.0.0.1");

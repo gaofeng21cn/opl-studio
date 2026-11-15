@@ -1,3 +1,4 @@
+import { LinkCompanionSection } from "./settings/LinkCompanionSection";
 import type { ApplicationManagementResource, WorkbenchModel } from "./workbenchModel";
 import type { WorkbenchSettings } from "./settingsModel";
 import type { SettingsDestinationId } from "./settings/types";
@@ -91,6 +92,7 @@ export function SharedResourcesPage({ model, settings, actionBusyKey, onAction, 
   const dependencies = model.packageLifecycle.filter(item => item.installed === true && item.dependencies.length > 0);
   return <div className="opl-app-management-resources" data-testid="opl-app-management-resources">
     <p className="opl-resource-intro">{zh ? "在这里管理应用共用的资料库、账号连接、模型和基础依赖。为新应用授权后，即可复用已有资源。" : "Manage the libraries, account connections, models and dependencies shared by your apps. Grant a new app access to reuse an existing resource."}</p>
+    <LinkCompanionSection locale={settings.locale} />
     <KnowledgeSourcesSection projection={model.knowledgeSources ? { ...model.knowledgeSources, consumers: model.knowledgeSources.consumers.map(consumer => {
       const product = model.packageLifecycle.find(item => item.packageId === consumer.packageId);
       return { ...consumer, label: product?.displayNameI18n[settings.locale] ?? product?.label ?? consumer.label };

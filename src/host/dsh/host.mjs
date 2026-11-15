@@ -52,6 +52,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
       ctx.provide(OPL_STUDIO_HOST_OPTIONS_SERVICE, Object.freeze({
         ...options,
         webHost: resolveWebBindAddress(options.webHost),
+        webPort: options.webPort ?? Number((options.env ?? process.env).OPL_STUDIO_WEB_PORT || 0),
         workspaceRoot: options.workspaceRoot ?? (options.env ?? process.env).OPL_NATIVE_WORKBENCH_CODEX_CWD
           ?? (options.env ?? process.env).OPL_STUDIO_CODEX_CWD ?? path.dirname(installAnchor),
         dshHome,

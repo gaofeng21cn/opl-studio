@@ -164,6 +164,11 @@ export function installWebTransport(): void {
   const eventSourceUrl = deploymentUrl("/api/opl-events");
   const subscribeEvents = (onEvent: (event: OplBridgeEvent) => void) => connectServerEvents(eventSourceUrl, onEvent);
   const surface: WebSurface = {
+    linkCompanion: {
+      readDevices: () => requestJson("/api/link-management/devices"),
+      createPairing: request => postJson("/api/link-management/pair", request),
+      revokeDevice: request => postJson("/api/link-management/revoke", request)
+    },
     eventSourceUrl,
     platformCapabilities: {
       workspaceRootSelection: false,

@@ -7,10 +7,23 @@ import { createWebUiAuth } from "./webui-auth.mjs";
 
 function request({ cookie = "", csrf = "", address = "127.0.0.1", forwardedFor = "" } = {}) {
   return {
-    headers: { cookie, "x-csrf-token": csrf, "x-forwarded-for": forwardedFor },
+    headers: { host: "127.0.0.1", cookie, "x-csrf-token": csrf, "x-forwarded-for": forwardedFor },
     socket: { remoteAddress: address }
   };
 }
+
+test("unauthenticated mode is direct loopback only and bearer never grants a desktop session", async () => {
+  const auth = await createWebUiAuth({ env: {} });
+  assert.equal(auth.requireSession(request()).ok, true);
+  assert.equal(auth.requireSession(request({ address: "192.0.2.1" })).status, 401);
+  assert.equal(auth.requireSession(request({ forwardedFor: "192.0.2.1" })).status, 401);
+  for (const [header, value] of [["host", "app.example.test"], ["x-forwarded-proto", "https"], ["forwarded", "for=192.0.2.1"], ["origin", "https://evil.test"]]) {
+    const req = request(); req.headers[header] = value;
+    assert.equal(auth.requireSession(req).status, 401, header);
+  }
+  const req = request(); req.headers.authorization = "Bearer scoped-device-token";
+  assert.equal(auth.requireSession(req).status, 403);
+});
 
 function response() {
   const headers = new Map();

@@ -94,7 +94,15 @@ export async function createWebUiAuth({ env = process.env, now = () => Date.now(
   }
 
   function readSession(req) {
-    if (!enabled) return { username, sessionId: "local", csrfToken: null };
+    if (!enabled) {
+      const loopback = value => ["127.0.0.1", "::1", "[::1]", "localhost", "::ffff:127.0.0.1"].includes(value);
+      let incoming;
+      try { incoming = new URL(req.url ?? "/", `http://${req.headers.host ?? ""}`); } catch { return null; }
+      const forwarded = Object.entries(req.headers).some(([key, value]) => (key === "forwarded" || key.startsWith("x-forwarded-")) && Boolean(value));
+      if (!loopback(req.socket?.remoteAddress) || !loopback(incoming.hostname) || forwarded) return null;
+      if (req.headers.origin && ![`http://${req.headers.host}`, `https://${req.headers.host}`].includes(req.headers.origin)) return null;
+      return { username, sessionId: "local", csrfToken: null };
+    }
     const raw = parseCookies(req.headers.cookie).get(SESSION_COOKIE);
     if (!raw) return null;
     const separator = raw.lastIndexOf(".");
@@ -111,6 +119,7 @@ export async function createWebUiAuth({ env = process.env, now = () => Date.now(
   }
 
   function requireSession(req, { csrf = false } = {}) {
+    if (/^Bearer\s/i.test(req.headers.authorization ?? "")) return { ok: false, status: 403, code: "companion_scope_rejected", message: "Device credentials are restricted to companion routes" };
     const session = readSession(req);
     if (!session) return { ok: false, status: 401, code: "authentication_required", message: "Authentication required" };
     if (csrf && enabled && !safeEqual(text(req.headers["x-csrf-token"]), session.csrfToken)) {

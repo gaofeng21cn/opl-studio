@@ -5,13 +5,16 @@ import * as frontendStatic from "@deepseek-ai/dsh-host-frontend-static";
 // Adapt the official static plugin to Studio's existing authentication owner.
 // This isolated view provides only the plugin's index admission and rendering
 // contract; it does not activate DSH Connection, credentials, RPC, or Sessions.
-export async function registerOplFrontend(ctx, { webAuth, webRoot }) {
+export async function registerOplFrontend(ctx, { webAuth, webRoot, webHost = "127.0.0.1" }) {
   const webServer = ctx.webServer;
   const distIndex = path.resolve(webRoot, "index.html");
   const distRoot = path.dirname(distIndex);
   const browserPeer = new Peer(ctx, { principal: { kind: "owner" }, interactions: "none" });
   const frontend = ctx.isolate("connection").isolate("webServer");
-  const authRequest = (request) => ({ headers: Object.fromEntries(request.headers) });
+  // The official Fetch resource omits the socket. A loopback-bound listener is
+  // reachable only by local peers; forwarded headers still fail local auth.
+  const localListener = ["127.0.0.1", "::1"].includes(webHost);
+  const authRequest = (request) => ({ url: new URL(request.url).pathname, headers: Object.fromEntries(request.headers), socket: { remoteAddress: localListener ? webHost : undefined } });
   const admission = (request) => webAuth.requireSession(authRequest(request));
   const redirect = (request) => new Response(null, {
     status: 302,

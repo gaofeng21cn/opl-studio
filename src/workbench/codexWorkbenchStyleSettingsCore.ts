@@ -163,6 +163,8 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     max-width: 100%;
   }
 
+  .opl-link-endpoint { width: min(100%, 28rem); min-width: 0; }
+
   .settings-row-actions {
     min-width: 0;
     display: flex;

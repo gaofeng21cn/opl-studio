@@ -81,6 +81,11 @@ function subscribeEvents(listener) {
 
 contextBridge.exposeInMainWorld("oplStudio", {
   eventSourceUrl: "electron://opl",
+  linkCompanion: {
+    readDevices: () => invoke("readLinkDevices"),
+    createPairing: request => invoke("createLinkPairing", request),
+    revokeDevice: request => invoke("revokeLinkDevice", request)
+  },
   platformCapabilities: {
     workspaceRootSelection: true,
     nativeWorkspaceFileAccess: true,
