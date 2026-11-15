@@ -115,6 +115,7 @@
     "node_modules",
     "dist",
     "out",
-    "src/vendor/deepseek-harness"
+    "src/vendor/deepseek-harness",
+    "src/host/vendor/dsh-remote/source"
   ]
 }

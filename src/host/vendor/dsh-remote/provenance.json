@@ -18,7 +18,99 @@
     "loopback.mjs": {
       "generated_from": "loopback.ts",
       "sha256": "8519ace8a7d429d4b1c7a9fb8fe4193c24144401499588175139630811cc3f70"
+    },
+    "source/packages/protocol/src/binary-upload.ts": {
+      "source": "packages/protocol/src/binary-upload.ts",
+      "sha256": "f65fccc0bfef1635030af146a9f1206bec0caa483abb3c7fbc5b3895c68bde9f"
+    },
+    "source/packages/protocol/src/close-semantics.ts": {
+      "source": "packages/protocol/src/close-semantics.ts",
+      "sha256": "e9733d7cedd3369b88942bbd50c4b6bed3e220615637ae18c5bcab065cd8c19a"
+    },
+    "source/packages/protocol/src/index.ts": {
+      "source": "packages/protocol/src/index.ts",
+      "sha256": "16f5b2b9018598e6ac878cf68f70ddbe0d719938ed434d1c5b01c70109931907"
+    },
+    "source/packages/protocol/src/lan-upload.ts": {
+      "source": "packages/protocol/src/lan-upload.ts",
+      "sha256": "b1efda8c3e7f5212167cff7f0a5d33abf67e2b466bba4082a30e66a788d1dc85"
+    },
+    "source/packages/protocol/src/loopback.ts": {
+      "source": "packages/protocol/src/loopback.ts",
+      "sha256": "4a600abb00f2815a962186f9ffa6b678d2f5be79a2f817aac630062e0a3c0c8f"
+    },
+    "source/packages/protocol/src/wire-json.ts": {
+      "source": "packages/protocol/src/wire-json.ts",
+      "sha256": "f41255f95c2046579a66d3cb5bb991fcc751d9724f37f2edc61d988fe523f591"
+    },
+    "source/packages/webrtc/src/adaptive-transport.ts": {
+      "source": "packages/webrtc/src/adaptive-transport.ts",
+      "sha256": "bb93b9c6d0c1b2d7f3109e5c260b6688315a194cfd1f494a10d2a9b09ca69205"
+    },
+    "source/packages/webrtc/src/control-lease.ts": {
+      "source": "packages/webrtc/src/control-lease.ts",
+      "sha256": "edf102a2ec2f33a5946f0c1fc2b01509acc1b11c9e5a3eb4098757539d943795"
+    },
+    "source/packages/webrtc/src/index.ts": {
+      "source": "packages/webrtc/src/index.ts",
+      "sha256": "ebf5b503f7a6fa09ce99552594f46f3faf3e8cbe857f1d1422b4b16f457c5eec"
+    },
+    "source/packages/webrtc/src/rtc-adapter.ts": {
+      "source": "packages/webrtc/src/rtc-adapter.ts",
+      "sha256": "646b3d3b1abb9bc941e95287698d8cb501128172b5069b40cd9397470c8172cb"
+    },
+    "source/packages/webrtc/src/rtc-chunking.ts": {
+      "source": "packages/webrtc/src/rtc-chunking.ts",
+      "sha256": "8766f275d1d47a9d97d856b092758bdae8c72de60a37fe5ffc6c97d7e1753870"
+    },
+    "source/packages/webrtc/src/rtc-data-channel.ts": {
+      "source": "packages/webrtc/src/rtc-data-channel.ts",
+      "sha256": "970088786181d7f7954548099fa1e28784043a709dd5c4754717b8ac2091df3f"
+    },
+    "source/packages/webrtc/src/serial-send.ts": {
+      "source": "packages/webrtc/src/serial-send.ts",
+      "sha256": "941ee832a8d18b62df0f030d9ee295ff19fc23b45e193383e4bad7430924a5bb"
+    },
+    "source/packages/webrtc/src/transport.ts": {
+      "source": "packages/webrtc/src/transport.ts",
+      "sha256": "6c747e95addf478d8c5048fa4d8b696af45194896402577e05b7a4678806503b"
+    },
+    "source/packages/webrtc/src/util.ts": {
+      "source": "packages/webrtc/src/util.ts",
+      "sha256": "f5d7833d727827f2bf11480597bad9ed068cdbec4569ab9f4cda025b45ace6e4"
+    },
+    "source/packages/webrtc/src/websocket-backpressure.ts": {
+      "source": "packages/webrtc/src/websocket-backpressure.ts",
+      "sha256": "ff7ee84eb388891788584b2faa2fda4c4dcc695f6f9ea03b848f475382df238e"
+    },
+    "source/packages/plugin/src/werift-rtc.ts": {
+      "source": "packages/plugin/src/werift-rtc.ts",
+      "sha256": "f49bbd91e333173aea7338b1e2c042158e4b38c48e1eab2afaaeedb8cd0462e1"
+    },
+    "source/packages/plugin/src/native-rtc-helper.ts": {
+      "source": "packages/plugin/src/native-rtc-helper.ts",
+      "sha256": "8a90f3e376f366f54335cb7baa087c8a3ad57ead48274cf0eebe0ac87e1fadea"
+    },
+    "rtc-entry.mjs": {
+      "authored_entry": true,
+      "sha256": "6c4b04b77acb0e7d4d4e72085c6e379b49cab7f32efc1aad2c0cbf5991a5beaa"
+    },
+    "rtc.mjs": {
+      "generated_from": "rtc-entry.mjs",
+      "sha256": "b4b176e64c018bc33745dca67c633f82e4db0b9ab7c74bfbe6672205dd9498f6"
     }
   },
-  "composition": "Public Host classes only; no HostPluginRuntime, Codex domain, ACP runtime or generic loopback proxy is instantiated."
+  "composition": "Public Host classes only; no HostPluginRuntime, Codex domain, ACP runtime or generic loopback proxy is instantiated.",
+  "rtc_bundle": {
+    "entry": "rtc-entry.mjs",
+    "runtime": "official_loadNodeRtcFactory_with_native_optional_and_bundled_werift_fallback",
+    "dependencies": {
+      "werift": "0.26.0"
+    },
+    "optional_external": [
+      "@roamhq/wrtc"
+    ],
+    "builder": "esbuild@0.25.12",
+    "upstream_sources_modified": false
+  }
 }

@@ -7,6 +7,8 @@ import WebSocket from "ws";
 import { ConnectionController, HostServerApi, HostServerConnection, IdentityStore, RpcRouter, ServerCredentialStore, resolveConfig } from "./vendor/dsh-remote/host.mjs";
 import { LinkLoopback } from "./link-loopback.mjs";
 import { ThreadAdapterError } from "./thread-adapter.mjs";
+import { loadNodeRtcFactory } from "./vendor/dsh-remote/rtc.mjs";
+import { createLinkTransportEvidence } from "./link-transport-evidence.mjs";
 
 export const LINK_SERVICE_ORIGIN = "https://link.medopl.com";
 export const LINK_REMOTE_REVISION = "f214c5abb39434d0e8358956bfca8d4529981fee";
@@ -56,11 +58,12 @@ export async function authorizeLinkHost({ device, env }) {
 }
 
 /** The official Remote carrier feeds only the existing Link owner, with one Noise identity. */
-export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [] } = {}) {
+export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
   const directory = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "link-remote");
   const metadataFile = path.join(directory, "link-host.json");
   const identities = new IdentityStore({ directory, role: "host" });
   const store = new ServerCredentialStore(directory);
+  const evidence = createLinkTransportEvidence();
   let identity; let metadata; let api; let connections; let connection; let operation; let errorCode; let identityError; let closed = false;
   async function saveMetadata(value) {
     await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -89,14 +92,14 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
       }
     }
     connections = new ConnectionController(identities, context => new LinkRouter(32, logger, undefined, undefined, () => [], undefined, undefined, new LinkLoopback({ context, handle })), logger);
-    const config = resolveConfig({ enabled: true, role: "host", serverUrl: serviceOrigin, httpServerAllowlist: httpAllowlist, forceRelay: true, rotatePinnedPeerKey: false, terminal: { enabled: false }, remoteTools: { enabled: false }, hostControl: { enabled: false }, loopback: { ports: [] }, codex: { enabled: false }, cursor: { enabled: false }, reconnect: true });
+    const config = resolveConfig({ enabled: true, role: "host", serverUrl: serviceOrigin, httpServerAllowlist: httpAllowlist, forceRelay: false, rotatePinnedPeerKey: false, terminal: { enabled: false }, remoteTools: { enabled: false }, hostControl: { enabled: false }, loopback: { ports: [] }, codex: { enabled: false }, cursor: { enabled: false }, reconnect: true });
     const makeSocket = url => {
       const incoming = new URL(url); const expected = new URL(serviceOrigin);
       if (incoming.origin !== `${expected.protocol === "https:" ? "wss:" : "ws:"}//${expected.host}`) throw fail("link_service_origin_rejected", "Untrusted phone access service", 403);
       const options = { headers: { "X-OPL-Account": metadata.accountScope }, perMessageDeflate: false, followRedirects: false };
-      return webSocketFactory ? webSocketFactory(url, options) : new WebSocket(url, options);
+      return evidence.observeSocket(webSocketFactory ? webSocketFactory(url, options) : new WebSocket(url, options));
     };
-    connection = new HostServerConnection(config, identity, identities, api, connections, logger, makeSocket, undefined, () => []);
+    connection = new HostServerConnection(config, identity, identities, api, connections, logger, makeSocket, async () => { const factory = await rtcFactoryProvider(); return factory ? evidence.wrapFactory(factory) : undefined; }, () => []);
     connection.start();
   }
   function validateCredentials(value) {
@@ -149,5 +152,5 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     if (!identity || identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
     if (metadata.enabled) await startCarrier();
   } catch (error) { if (error.code !== "ENOENT") { errorCode = error.code ?? "link_host_identity_invalid"; if (errorCode !== "link_account_required") identityError = error; } }
-  return { status, enable, reconnect, createInvitation, revoke, close };
+  return { status, enable, reconnect, createInvitation, revoke, close, readTransportEvidence: () => evidence.read({ authenticated: connections?.isOnline() === true, relayConnected: connections?.connectedPeers().some(peer => peer.mode === "Relay") === true }) };
 }

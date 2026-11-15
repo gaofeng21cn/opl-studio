@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 import WebSocket from "ws";
+import { loadWeriftFactory } from "../../src/host/vendor/dsh-remote/rtc.mjs";
 import { createLinkInternet, LINK_REMOTE_REVISION } from "../../src/host/link-internet.mjs";
 import { LINK_VIRTUAL_PORT } from "../../src/host/link-loopback.mjs";
 import { IdentityStore, ClientSecureTransport } from "../../src/host/vendor/dsh-remote/host.mjs";
@@ -17,6 +18,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const argument = name => { const i = process.argv.indexOf(name); if (i < 0 || !process.argv[i + 1]) throw new Error(`Provide ${name}`); return path.resolve(process.argv[i + 1]); };
 const relaySource = argument("--relay-source");
 const upstreamSource = argument("--upstream-source");
+const forcedFallback = process.argv.includes("--force-fallback");
+const relayOnly = process.argv.includes("--relay-only");
 assert.equal(execFileSync("git", ["-C", upstreamSource, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(), LINK_REMOTE_REVISION);
 const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-interop-"));
 const previousWebSocket = globalThis.WebSocket;
@@ -34,7 +37,7 @@ try {
     alias: { "@dsh-remote/protocol": path.join(upstreamSource, "packages/protocol/src/index.ts"), "@dsh-remote/webrtc": path.join(upstreamSource, "packages/webrtc/src/index.ts"), "@dsh-remote/client-core": path.join(upstreamSource, "packages/client-core/src/index.ts") }, nodePaths: [path.join(root, "node_modules")] });
   const { createRelayService } = await import(pathToFileURL(path.join(temporary, "relay.mjs")));
   const { AdaptiveTransport, RemoteClientCore } = await import(pathToFileURL(path.join(temporary, "client.mjs")));
-  relay = createRelayService({ publicOrigin: "http://127.0.0.1:0", dataDir: path.join(temporary, "relay"), serverSecret: crypto.randomBytes(32), gatewayOrigin: "https://gateway.test", gatewayFetch: async () => new Response(JSON.stringify({ code: 0, data: { id: 101, email: "test@example.com", status: "active", role: "user" } })), allowInsecureLoopbackForTests: true, logLevel: process.argv.includes("--diagnostics") ? "info" : "silent" });
+  relay = createRelayService({ publicOrigin: "http://127.0.0.1:0", dataDir: path.join(temporary, "relay"), serverSecret: crypto.randomBytes(32), gatewayOrigin: "https://gateway.test", gatewayFetch: async () => new Response(JSON.stringify({ code: 0, data: { id: 101, email: "test@example.com", status: "active", role: "user" } })), allowInsecureLoopbackForTests: true, ice: {stunUrls:[],turnUrls:[],turnTtlSeconds:300}, logLevel: process.argv.includes("--diagnostics") ? "info" : "silent" });
   if (process.argv.includes("--diagnostics")) {
     relay.server.on("upgrade", req => console.log(JSON.stringify({ stage: "relay_upgrade_observed", path: req.url, hasScope: typeof req.headers["x-opl-account"] === "string", origin: req.headers.origin ?? null })));
     relay.server.on("clientError", error => console.log(JSON.stringify({ stage: "relay_http_parse_error", code: error.code })));
@@ -43,7 +46,7 @@ try {
   const origin = `http://127.0.0.1:${relay.server.address().port}`;
   const transport = new CodexAppServerTransport({ command: process.execPath, args: [path.join(root, "src/host/fixtures/fake-app-server.mjs")], cwd: temporary, env: { ...process.env, FAKE_WORKSPACE: temporary }, requestTimeoutMs: 2_000 });
   host = await createWebUiHost({ transport, env: { ...process.env, OPL_DATA_DIR: path.join(temporary, "host") }, dshHome: path.join(temporary, "dsh"), opl: { readState: async () => ({}) },
-    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], authorize: async ({ device }) => {
+    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], ...(forcedFallback ? {rtcFactoryProvider:async()=>undefined}:{}), authorize: async ({ device }) => {
       const response = await fetch(`${origin}/api/v1/devices/register`, { method: "POST", headers: { authorization: "Bearer test-gateway-account-token", "content-type": "application/json" }, body: JSON.stringify({ v: 1, device }) });
       assert.equal(response.status, 200);
       return { schema: "opl_link_remote_credentials.v1", ...await response.json(), deviceId: device.deviceId, identityKey: device.identityKey, role: "host" };
@@ -66,10 +69,22 @@ try {
   const enrollment = await fetch(`${origin}/api/v1/link/enroll`, { method: "POST", headers: { "content-type": "application/json", "X-OPL-Account": pairing.accountScope }, body: JSON.stringify({ enrollmentToken: new URL(pairing.pairingURL).searchParams.get("enrollmentToken"), device: { deviceId: identity.deviceId, name: identity.name, role: "client", platform: "ios", identityKey: identity.publicKey, clientVersion: "0.6.5" } }) });
   assert.equal(enrollment.status, 200); const credentials = await enrollment.json();
   globalThis.WebSocket = class ScopedWebSocket extends WebSocket { constructor(url) { super(url, { headers: { "X-OPL-Account": pairing.accountScope }, perMessageDeflate: false }); } };
-  async function connect() {
-    const inner = new AdaptiveTransport(`${origin.replace("http:", "ws:")}/ws/v1/connect`, { role: "client", deviceId: identity.deviceId, accessToken: credentials.accessToken, targetDeviceId: pairing.hostDeviceId, forceRelay: true, capabilities: ["transport.relay"] });
+  async function connect(forceRelay = relayOnly) {
+    let fallback = false;
+    const factory = forceRelay ? undefined : await loadWeriftFactory({routeTargets:[origin]});
+    if (!forceRelay && !factory) throw new Error("The bundled official RTC backend could not load");
+    const inner = new AdaptiveTransport(`${origin.replace("http:", "ws:")}/ws/v1/connect`, { role: "client", deviceId: identity.deviceId, accessToken: credentials.accessToken, targetDeviceId: pairing.hostDeviceId, forceRelay,
+      capabilities:forceRelay?["transport.relay"]:["transport.lan","transport.p2p","transport.turn","transport.relay"],preferredTransports:forceRelay?["relay"]:["lan","p2p","turn","relay"],rtcFactory:factory,negotiateTimeoutMs:forcedFallback?1000:4000,
+      fetchIceServers:async connectionId=>{const response=await fetch(`${origin}/api/v1/turn/credentials?connection_id=${encodeURIComponent(connectionId)}`,{headers:{authorization:`Bearer ${credentials.accessToken}`,"X-OPL-Account":pairing.accountScope}});assert.equal(response.status,200);return (await response.json()).iceServers;},onWebRtcFallback:()=>{fallback=true;}
+    });
     const remote = new RemoteClientCore(new ClientSecureTransport(inner, identity, { deviceId: pairing.hostDeviceId, publicKey: pairing.hostIdentityKey }), 5000);
-    await remote.connect(); return remote;
+    await remote.connect();
+    if (fallback && !forceRelay) {
+      await remote.close();
+      if (!forcedFallback) throw new Error("Direct qualification fell back before proving an ICE candidate path");
+      return connect(true); // A new control connection and Noise session precede business requests.
+    }
+    return remote;
   }
   client = await connect();
   async function request(route, { method = "GET", body, token, headers = [] } = {}) {
@@ -97,7 +112,11 @@ try {
   const download = `/api/link/download?threadId=${encodeURIComponent(threadId)}&relativePath=interop-result.bin&length=524288`;
   const first = await request(`${download}&offset=0`, { token }); assert.equal(first.status, 200);
   const last = await request(`${download}&offset=524288`, { token, headers: [["if-match", first.headers.etag]] }); assert.equal(last.status, 200); assert.deepEqual(Buffer.concat([first.bytes, last.bytes]), file);
-  await client.close(); client = await connect();
+  const transportEvidence = await host.core.linkInternet.readTransportEvidence();
+  assert.ok(transportEvidence,"The Host must observe authenticated byte counters and an actual selected path");
+  if(forcedFallback){assert.equal(transportEvidence.selectedTransport,"relay");assert.equal(transportEvidence.relayFallback,true);assert.equal(transportEvidence.directAttempted,true);}
+  else if(!relayOnly){assert.ok(["lan","p2p"].includes(transportEvidence.selectedTransport));assert.equal(transportEvidence.candidatePairState,"succeeded");assert.notEqual(transportEvidence.localCandidateType,"relay");assert.notEqual(transportEvidence.remoteCandidateType,"relay");}
+  await client.close(); client = await connect(forcedFallback||relayOnly);
   assert.equal((await invoke("readThread", { threadId })).status, 200);
   const beforeReplay = turnDispatches;
   assert.deepEqual((await invoke("startTurn", mutationPayload, mutationId)).json.result, accepted.json.result);
@@ -105,7 +124,7 @@ try {
   await host.core.invoke("revokeLinkDevice", { id: claim.json.device.id });
   assert.equal((await fetch(`${origin}/api/v1/me`, { headers: { authorization: `Bearer ${credentials.accessToken}`, "X-OPL-Account": pairing.accountScope } })).status, 401);
   assert.equal((await host.core.invoke("readLinkDevices")).devices.length, 0);
-  const result = { schema: "opl_link_remote_interop.v1", upstreamRevision: LINK_REMOTE_REVISION, actualRelay: true, actualDshHost: true, officialNoiseAndFragmentation: true, sameCanonicalThread: true, chunkUploadAndRangedDownload: true, freshNoiseReconnect: true, noDuplicateMutationAfterReconnect: true, relayAndBusinessRevocation: true, publicInternet: false, nativeIos: false };
+  const result = { schema: "opl_link_remote_interop.v1", upstreamRevision: LINK_REMOTE_REVISION, actualRelay: true, transportPolicy:"direct_first", transportEvidence, actualDshHost: true, officialNoiseAndFragmentation: true, sameCanonicalThread: true, chunkUploadAndRangedDownload: true, freshNoiseReconnect: true, noDuplicateMutationAfterReconnect: true, relayAndBusinessRevocation: true, publicInternet: false, nativeIos: false };
   const output = path.join(root, "output/link-remote-interop"); await mkdir(output, { recursive: true }); await writeFile(path.join(output, "result.json"), `${JSON.stringify(result, null, 2)}\n`); console.log(JSON.stringify(result));
   }
 } finally {

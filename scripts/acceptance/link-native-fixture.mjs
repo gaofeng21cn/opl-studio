@@ -14,7 +14,17 @@ if (index < 0 || !process.argv[index + 1]) throw new Error("Provide --qr-file in
 const qrFile = path.resolve(process.argv[index + 1]);
 const checkFixture = process.argv.includes("--check-fixture");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-native-public-"));
-let host; let ownsQr = false; let refreshing = false; let disconnectMonitor;
+let host; let ownsQr = false; let refreshing = false; let disconnectMonitor; let evidencePending = false;
+const observations = new Map();
+async function observeTransport() {
+  if (evidencePending) return; evidencePending = true;
+  try {
+    const transportEvidence = await host.core.linkInternet.readTransportEvidence();
+    if (!transportEvidence || JSON.stringify(observations.get(transportEvidence.selectedTransport)) === JSON.stringify(transportEvidence)) return;
+    observations.set(transportEvidence.selectedTransport, transportEvidence);
+    console.log(JSON.stringify({ stage: "native_public_transport_observed", pid: process.pid, transportEvidence }));
+  } finally { evidencePending = false; }
+}
 async function pair() {
   if (refreshing) return;
   refreshing = true;
@@ -44,7 +54,7 @@ try {
   const digest = crypto.createHash("sha256").update(Buffer.from(first.data, "base64")).update(Buffer.from(last.data, "base64")).digest("hex");
   if (digest !== expectedFile.sha256 || last.sizeBytes !== expectedFile.size || !last.eof) throw new Error("The canonical fixture file did not match its bounded download metadata.");
   if (checkFixture) {
-    console.log(JSON.stringify({ stage: "native_fixture_checked", pid: process.pid, threadId: thread.id, relativePath, expectedFile, publicInternet: false, businessOwnerFixture: true }));
+    console.log(JSON.stringify({ stage: "native_fixture_checked", pid: process.pid, threadId: thread.id, relativePath, expectedFile, transportPolicy: "direct_first", publicInternet: false, businessOwnerFixture: true }));
   } else {
   await host.core.invoke("enableLinkInternet");
   for (let attempt = 0; attempt < 100 && host.core.linkInternet.status().status !== "ready"; attempt++) {
@@ -52,10 +62,11 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   if (host.core.linkInternet.status().status !== "ready") throw new Error("The public Relay Host did not become ready.");
-  console.log(JSON.stringify({ stage: "native_public_host_ready", pid: process.pid, threadId: thread.id, relativePath, expectedFile, publicInternet: true, businessOwnerFixture: true }));
+  console.log(JSON.stringify({ stage: "native_public_host_ready", pid: process.pid, threadId: thread.id, relativePath, expectedFile, transportPolicy: "direct_first", publicInternet: true, businessOwnerFixture: true }));
   await pair();
   let sawDevice = false; let emptySince;
   disconnectMonitor = setInterval(() => {
+    void observeTransport().catch(() => {});
     void host.core.invoke("readLinkDevices").then(state => {
       if (state.devices.length) { sawDevice = true; emptySince = undefined; }
       else if (sawDevice) {
