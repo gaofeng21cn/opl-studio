@@ -16,12 +16,18 @@ const checkFixture = process.argv.includes("--check-fixture");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-native-public-"));
 let host; let ownsQr = false; let refreshing = false; let disconnectMonitor; let evidencePending = false;
 const observations = new Map();
+const observationCounts = new Map();
 async function observeTransport() {
   if (evidencePending) return; evidencePending = true;
   try {
     const transportEvidence = await host.core.linkInternet.readTransportEvidence();
-    if (!transportEvidence || JSON.stringify(observations.get(transportEvidence.selectedTransport)) === JSON.stringify(transportEvidence)) return;
+    if (!transportEvidence) return;
+    const previous = observations.get(transportEvidence.selectedTransport);
+    const count = observationCounts.get(transportEvidence.selectedTransport) ?? 0;
+    // At most 16 closed, small records per path: the runner caps total stdout at 64 KiB.
+    if (count >= 16 || previous && transportEvidence.bytesSent + transportEvidence.bytesReceived < 2 * (previous.bytesSent + previous.bytesReceived)) return;
     observations.set(transportEvidence.selectedTransport, transportEvidence);
+    observationCounts.set(transportEvidence.selectedTransport, count + 1);
     console.log(JSON.stringify({ stage: "native_public_transport_observed", pid: process.pid, transportEvidence }));
   } finally { evidencePending = false; }
 }

@@ -462,3 +462,13 @@ OPL composes only public Host carrier and identity classes. It does not apply
 the Remote plugin, start its Codex/ACP domains, or expose generic loopback ports.
 OPL’s separate adapter confines the existing Remote `loopback.call` method to
 the App-owned Link routes and the existing canonical Studio owners.
+
+The generated `src/host/vendor/dsh-remote/rtc.mjs` exports the fixed upstream
+Node RTC factory and selected-path inspector through an OPL-owned entry. Its
+unchanged upstream source closure is retained under `source/`, with source
+paths and digests in the same provenance manifest. The bundle includes
+`werift` `0.26.0` (MIT; <https://github.com/shinyoshiaki/werift-webrtc>) and its
+required JavaScript dependencies from the exact package-lock cohort. The
+optional native `@roamhq/wrtc` load remains optional; the shipped pure JavaScript
+backend does not depend on a native addon or postinstall. No upstream RTC
+implementation body is patched.

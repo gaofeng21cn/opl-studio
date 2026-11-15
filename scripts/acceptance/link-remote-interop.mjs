@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 import WebSocket from "ws";
@@ -37,7 +37,9 @@ try {
     alias: { "@dsh-remote/protocol": path.join(upstreamSource, "packages/protocol/src/index.ts"), "@dsh-remote/webrtc": path.join(upstreamSource, "packages/webrtc/src/index.ts"), "@dsh-remote/client-core": path.join(upstreamSource, "packages/client-core/src/index.ts") }, nodePaths: [path.join(root, "node_modules")] });
   const { createRelayService } = await import(pathToFileURL(path.join(temporary, "relay.mjs")));
   const { AdaptiveTransport, RemoteClientCore } = await import(pathToFileURL(path.join(temporary, "client.mjs")));
-  relay = createRelayService({ publicOrigin: "http://127.0.0.1:0", dataDir: path.join(temporary, "relay"), serverSecret: crypto.randomBytes(32), gatewayOrigin: "https://gateway.test", gatewayFetch: async () => new Response(JSON.stringify({ code: 0, data: { id: 101, email: "test@example.com", status: "active", role: "user" } })), allowInsecureLoopbackForTests: true, ice: {stunUrls:[],turnUrls:[],turnTtlSeconds:300}, logLevel: process.argv.includes("--diagnostics") ? "info" : "silent" });
+  const turnUrls = (process.env.OPL_LINK_TURN_URLS ?? "").split(",").map(value=>value.trim()).filter(Boolean);
+  const turnSecret = process.env.OPL_LINK_TURN_SECRET_FILE ? (await readFile(process.env.OPL_LINK_TURN_SECRET_FILE,"utf8")).trim() : undefined;
+  relay = createRelayService({ publicOrigin: "http://127.0.0.1:0", dataDir: path.join(temporary, "relay"), serverSecret: crypto.randomBytes(32), gatewayOrigin: "https://gateway.test", gatewayFetch: async () => new Response(JSON.stringify({ code: 0, data: { id: 101, email: "test@example.com", status: "active", role: "user" } })), allowInsecureLoopbackForTests: true, ice: {stunUrls:[],turnUrls,turnSecret,turnTtlSeconds:300}, logLevel: process.argv.includes("--diagnostics") ? "info" : "silent" });
   if (process.argv.includes("--diagnostics")) {
     relay.server.on("upgrade", req => console.log(JSON.stringify({ stage: "relay_upgrade_observed", path: req.url, hasScope: typeof req.headers["x-opl-account"] === "string", origin: req.headers.origin ?? null })));
     relay.server.on("clientError", error => console.log(JSON.stringify({ stage: "relay_http_parse_error", code: error.code })));
@@ -46,7 +48,7 @@ try {
   const origin = `http://127.0.0.1:${relay.server.address().port}`;
   const transport = new CodexAppServerTransport({ command: process.execPath, args: [path.join(root, "src/host/fixtures/fake-app-server.mjs")], cwd: temporary, env: { ...process.env, FAKE_WORKSPACE: temporary }, requestTimeoutMs: 2_000 });
   host = await createWebUiHost({ transport, env: { ...process.env, OPL_DATA_DIR: path.join(temporary, "host") }, dshHome: path.join(temporary, "dsh"), opl: { readState: async () => ({}) },
-    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], ...(forcedFallback ? {rtcFactoryProvider:async()=>undefined}:{}), authorize: async ({ device }) => {
+    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], ...(forcedFallback ? {rtcFactoryProvider:async()=>undefined}:{}), ...(process.argv.includes("--diagnostics")||process.argv.includes("--carrier-diagnostics")?{diagnostic:diagnostic=>console.log(JSON.stringify({stage:"native_fixture_carrier_diagnostic",at:Date.now(),diagnostic}))}:{}), authorize: async ({ device }) => {
       const response = await fetch(`${origin}/api/v1/devices/register`, { method: "POST", headers: { authorization: "Bearer test-gateway-account-token", "content-type": "application/json" }, body: JSON.stringify({ v: 1, device }) });
       assert.equal(response.status, 200);
       return { schema: "opl_link_remote_credentials.v1", ...await response.json(), deviceId: device.deviceId, identityKey: device.identityKey, role: "host" };
@@ -55,14 +57,16 @@ try {
   await until(() => host.core.linkInternet.status().status === "ready", "Host Relay hello");
   const pairing = await host.core.invoke("createLinkPairing", {});
   if (holdFile) {
-    const started = await host.core.transport.startThread();
-    const sample = crypto.randomBytes(512 * 1024 + 31); const samplePath = path.join(temporary, "native-result.bin"); await writeFile(samplePath, sample, { mode: 0o600 });
+    const listing=await host.core.invoke("listThreads",{});const selected=listing.data.find(item=>item.id==="thread-source");assert.ok(selected);const started={thread:await host.core.invoke("readThread",{threadId:selected.id,includeTurns:true})};
+    const sample = Buffer.from(Array.from({length:512*1024+31},(_,index)=>index%251)); const samplePath = path.join(temporary, "native-result.bin"); await writeFile(samplePath, sample, { mode: 0o600 });
     await mkdir(path.dirname(holdFile), { recursive: true, mode: 0o700 });
     await writeFile(holdFile, pairing.pairingURL, { mode: 0o600, flag: "wx" });
     ownsHoldFile = true;
-    console.log(JSON.stringify({ stage: "native_fixture_ready", pid: process.pid, desktopOrigin: host.url, qrFile: holdFile, threadId: started.thread.id, relativePath: "native-result.bin", sourcePath: samplePath, expiresAt: pairing.expiresAt, publicInternet: false }));
+    console.log(JSON.stringify({ stage: "native_fixture_ready", pid: process.pid, desktopOrigin: host.url, qrFile: holdFile, threadId: started.thread.id, relativePath: "native-result.bin", sourcePath: samplePath, expiresAt: pairing.expiresAt, transportPolicy:"direct_first", publicInternet: false }));
+    let reading=false;let previous;
+    const metrics=setInterval(()=>{if(reading)return;reading=true;void host.core.linkInternet.readTransportEvidence().then(transportEvidence=>{if(transportEvidence&&JSON.stringify(transportEvidence)!==previous){previous=JSON.stringify(transportEvidence);console.log(JSON.stringify({stage:"native_public_transport_observed",pid:process.pid,transportEvidence}));}}).finally(()=>{reading=false;});},1000);metrics.unref();
     await new Promise(resolve => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
-    process.exitCode = 0;
+    clearInterval(metrics); process.exitCode = 0;
   } else {
   const identities = new IdentityStore({ directory: path.join(temporary, "phone"), role: "client" });
   const identity = await identities.loadOrCreate("Interop iPhone");

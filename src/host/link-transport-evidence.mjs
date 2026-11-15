@@ -39,7 +39,7 @@ export function createLinkTransportEvidence() {
         get(target, key) {
           if (key === "createDataChannel") return (...args) => wrapChannel(target.createDataChannel(...args), record);
           if (key === "getStats") return async () => { const stats = await target.getStats(); record.path = selectedPair(stats) ?? record.path; return stats; };
-          if (key === "close") return (...args) => { record.closed = true; return target.close(...args); };
+          if (key === "close") return (...args) => { record.closed = true; record.pc = undefined; return target.close(...args); };
           const value = Reflect.get(target, key, target); return typeof value === "function" ? value.bind(target) : value;
         },
         set(target, key, value) {

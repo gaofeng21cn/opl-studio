@@ -15,6 +15,22 @@ export const LINK_REMOTE_REVISION = "f214c5abb39434d0e8358956bfca8d4529981fee";
 const fail = (code, message, status = 400) => new ThreadAdapterError(code, message, {}, status);
 const noop = () => {};
 const logger = { debug: noop, info: noop, warn: noop, error: noop };
+const DIAGNOSTIC_EVENTS = new Set(["peer connection accepted", "peer connection disconnected", "peer message handling failed; disconnecting", "peer send failed; disconnecting", "authenticated peer channel ready", "webrtc data channel ready", "webrtc data channel diagnostics", "webrtc data channel failed; disconnecting peer", "webrtc data channel failure diagnostics", "webrtc negotiation failed; falling back to relay", "webrtc negotiation failure diagnostics", "pending secure handshake failed"]);
+const DIAGNOSTIC_STATES = new Set(["new", "checking", "connecting", "connected", "completed", "disconnected", "failed", "closed", "gathering", "complete"]);
+function diagnosticLogger(callback) {
+  if (!callback) return logger;
+  const emit = (event, fields = {}) => {
+    if (!DIAGNOSTIC_EVENTS.has(event)) return;
+    const value = { event };
+    if (typeof fields.code === "string" && (/^[A-Z_]{1,64}$/.test(fields.code) || fields.code === "closed")) value.code = fields.code;
+    if (["host", "server"].includes(fields.closedBy)) value.closedBy = fields.closedBy;
+    if (["LAN", "P2P", "TURN", "Relay", "lan", "p2p", "turn", "relay"].includes(fields.transport)) value.transport = fields.transport;
+    for (const key of ["rtcConnectionState", "rtcIceConnectionState", "rtcIceGatheringState"]) if (DIAGNOSTIC_STATES.has(fields[key])) value[key] = fields[key];
+    if (fields.reason !== undefined) value.reasonCode = ({ "WebRTC data channel closed.": "RTC_CHANNEL_CLOSED", "WebRTC data channel is not open.": "RTC_CHANNEL_NOT_OPEN", "peer channel is not active": "PEER_CHANNEL_NOT_ACTIVE" })[fields.reason] ?? "REDACTED_FAILURE";
+    try { callback(value); } catch { /* Diagnostics never change the carrier lifecycle. */ }
+  };
+  return { debug: emit, info: emit, warn: emit, error: emit };
+}
 const ACCOUNT_ERRORS = new Set(["link_account_required", "AUTH_REQUIRED", "AUTH_INVALID", "TOKEN_EXPIRED", "DEVICE_REVOKED", "MEMBERSHIP_REQUIRED"]);
 
 export async function authorizeLinkHost({ device, env }) {
@@ -58,7 +74,8 @@ export async function authorizeLinkHost({ device, env }) {
 }
 
 /** The official Remote carrier feeds only the existing Link owner, with one Noise identity. */
-export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
+export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }), diagnostic } = {}) {
+  const logger = diagnosticLogger(diagnostic);
   const directory = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "link-remote");
   const metadataFile = path.join(directory, "link-host.json");
   const identities = new IdentityStore({ directory, role: "host" });

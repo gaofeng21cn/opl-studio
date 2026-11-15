@@ -4,11 +4,13 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm, writeFile, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, symlink, copyFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { createLinkCompanion } from "./link-companion.mjs";
 import { LinkLoopback, LINK_VIRTUAL_PORT } from "./link-loopback.mjs";
 import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
 import { createLinkInternet, authorizeLinkHost } from "./link-internet.mjs";
+import { createLinkTransportEvidence } from "./link-transport-evidence.mjs";
 
 async function fixture(t, { now } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-remote-test-"));
@@ -149,4 +151,42 @@ test("the actual Framework CLI maps an isolated signed-out account to the existi
   t.after(async () => { await carrier.close(); await rm(root, { recursive: true, force: true }); });
   await assert.rejects(carrier.enable(), error => error.code === "link_account_required");
   assert.deepEqual(carrier.status(), { status: "account_required", reasonCode: "link_account_required" });
+});
+
+test("RTC evidence requires an actual succeeded pair and data bytes and exposes only closed classifications", async () => {
+  for (const [localType, remoteType, selectedTransport] of [["host", "host", "lan"], ["srflx", "host", "p2p"], ["host", "relay", "turn"]]) {
+    const tracker = createLinkTransportEvidence();
+    const stats = new Map([
+      ["local", { id: "private-local-id", type: "local-candidate", candidateType: localType, address: localType === "srflx" ? "198.51.100.7" : "192.168.4.3", protocol: "udp" }],
+      ["remote", { id: "private-remote-id", type: "remote-candidate", candidateType: remoteType, address: "192.168.4.4", protocol: "udp" }],
+      ["pair", { id: "private-pair-id", type: "candidate-pair", state: "succeeded", nominated: true, localCandidateId: "private-local-id", remoteCandidateId: "private-remote-id" }]
+    ]);
+    const channel = { send() {}, onmessage: null };
+    const raw = { getStats: async () => stats, createDataChannel: () => channel, close() {} };
+    const pc = tracker.wrapFactory({ create: () => raw }).create({});
+    assert.equal(await tracker.read({ authenticated: true, relayConnected: false }), null);
+    const wrapped = pc.createDataChannel("dsh", {}); wrapped.onmessage = () => {}; wrapped.send(new Uint8Array(37)); channel.onmessage({ data: new Uint8Array(29) });
+    assert.equal(await tracker.read({ authenticated: false, relayConnected: false }), null);
+    const evidence = await tracker.read({ authenticated: true, relayConnected: false });
+    assert.deepEqual(evidence, { selectedTransport, localCandidateType: localType, remoteCandidateType: remoteType, candidatePairState: "succeeded", bytesSent: 37, bytesReceived: 29, directAttempted: true, relayFallback: false });
+    assert.equal(/192\.168|198\.51|private-.*-id|sdp/i.test(JSON.stringify(evidence)), false);
+    pc.close(); assert.equal(await tracker.read({ authenticated: true, relayConnected: false }), null);
+  }
+});
+
+test("Relay evidence counts actual ciphertext frames and distinguishes observed direct failure from preference", async () => {
+  const tracker = createLinkTransportEvidence(); const socket = Object.assign(new EventEmitter(), { send() {} }); tracker.observeSocket(socket);
+  socket.send(JSON.stringify({ type: "hello", payload: { capabilities: ["transport.lan"] } }));
+  assert.equal(await tracker.read({ authenticated: true, relayConnected: true }), null);
+  const frame = JSON.stringify({ type: "relay", payload: { ciphertext: Buffer.alloc(41).toString("base64url") } }); socket.send(frame); socket.emit("message", frame);
+  assert.equal((await tracker.read({ authenticated: true, relayConnected: true })).directAttempted, false);
+  socket.emit("message", JSON.stringify({ type: "signal.offer", payload: {} }));
+  assert.deepEqual(await tracker.read({ authenticated: true, relayConnected: true }), { selectedTransport: "relay", localCandidateType: null, remoteCandidateType: null, candidatePairState: null, bytesSent: 41, bytesReceived: 41, directAttempted: true, relayFallback: true });
+});
+
+test("the shipped RTC bundle creates its required backend without external node_modules or postinstall", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-packaged-rtc-")); t.after(() => rm(root, { recursive: true, force: true }));
+  const module = path.join(root, "rtc.mjs"); await copyFile(new URL("./vendor/dsh-remote/rtc.mjs", import.meta.url), module);
+  const result = execFileSync(process.execPath, ["--input-type=module", "-e", `const m=await import(${JSON.stringify(module)});const f=await m.loadWeriftFactory();if(typeof f?.create!=="function")throw new Error("RTC backend unavailable");const pc=f.create({iceServers:[]});await pc.getStats();pc.close();console.log(JSON.stringify({bundledFallbackCreated:true}));`], { encoding: "utf8", timeout: 15000 });
+  assert.deepEqual(JSON.parse(result), { bundledFallbackCreated: true });
 });

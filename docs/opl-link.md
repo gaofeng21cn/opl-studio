@@ -51,11 +51,33 @@ A per-peer in-process adapter supplies the fixed virtual target
 `/api/link/*` routes, rejects desktop management and generic WebUI APIs, and
 never accepts an arbitrary origin or port. Its secure request context comes
 from the official authenticated Noise connection, not HTTP forwarded headers.
-Other Remote domains, WebRTC, terminals and generic loopback forwarding are
-not instantiated or advertised.
+Other Remote domains, terminals and generic loopback forwarding are not
+instantiated or advertised. The existing official RTC carrier negotiates LAN/P2P,
+then configured TURN, with the existing WSS Relay as the final fallback. Server
+capability negotiation controls whether TURN is available; Studio does not
+hardcode a TURN service or require a separate user networking app.
 
 The official carrier owns Noise IK, framing, fragmentation, reconnect and
-peer-key verification. Each new connection receives fresh stream handles;
+peer-key verification. Studio uses the unchanged upstream `loadNodeRtcFactory`:
+native libwebrtc is preferred when available, and the generated RTC bundle
+includes werift `0.26.0` as a pure-JavaScript fallback. The runtime bundle can
+load, create a peer, read statistics and close without external node_modules,
+a native postinstall, or an Electron ABI rebuild. The generator imports the
+upstream RTC source closure without modifying its implementation body.
+
+The Host obtains ICE configuration through upstream’s authenticated
+`GET /api/v1/turn/credentials?connection_id=...`; short-lived TURN credentials
+remain inside the RTC implementation. LAN/P2P/TURN evidence comes from the
+actual succeeded selected/nominated candidate pair using upstream
+`inspectSelectedPath`, with only candidate types and bounded byte counters
+projected. DataChannel counts measure the transmitted encrypted frames; WSS
+Relay counts measure actual Relay ciphertext frames. No IP address, SDP,
+credential, candidate ID or business payload is emitted as evidence. An
+advertised preference alone cannot establish a direct connection.
+
+If RTC negotiation fails, the companion uses a fresh control connection and
+Noise session for its next configured attempt, eventually selecting WSS Relay.
+The same Link request journal continues to reject unknown mutation replay. Each new connection receives fresh stream handles;
 replacing a connection closes the old handles. Host and data WebSockets and
 REST calls attach `X-OPL-Account`; device tokens remain the authorization.
 
@@ -145,12 +167,21 @@ node scripts/acceptance/link-remote-interop.mjs --relay-source /path/to/opl-link
 This starts the actual Relay and DSH Host, uses the official upstream client,
 Noise and fragmentation, and exercises canonical turns, chunked attachments,
 versioned download, a fresh encrypted reconnect and both credential revocations.
+The default lane requires actual LAN/P2P candidate evidence; `--force-fallback`
+injects an unavailable Host RTC provider and requires an observed RTC attempt
+followed by a fresh Relay/Noise connection. `--relay-only` covers a retained
+Relay-only client. The forced-fallback lane also proves a repeated mutation ID
+does not dispatch another turn.
 Its Gateway account response is a local fixture. It does not prove public WSS
 reachability or native iOS behavior.
 
 Add `--hold-qr-file /private/test-directory/pairing.txt` to leave that local
 fixture running for the native test. The file contains only the pairing URL,
-is created exclusively with mode 0600 and is removed on shutdown. The fixture
+is created exclusively with mode 0600 and is removed on shutdown. For a
+short-lived local TURN test, only this fixture accepts `OPL_LINK_TURN_URLS` and
+`OPL_LINK_TURN_SECRET_FILE` to configure its temporary service. The production
+Host has no equivalent environment override; it consumes authenticated service
+ICE configuration. The fixture
 prints its desktop management URL and canonical test thread/file references;
 use the management pairing API to refresh an expired code.
 
@@ -158,7 +189,13 @@ For public WSS/native qualification after the service is deployed, run
 `node scripts/acceptance/link-native-fixture.mjs --qr-file /private/test-directory/public-pairing.txt`.
 This uses the real Framework authorization command and fixed public Relay,
 with a disposable Host and test Codex process. It prints only non-secret
-fixture references. `SIGUSR1` refreshes its pairing file; `SIGTERM` closes the
+fixture references and `transportPolicy: "direct_first"`. Its
+`native_public_transport_observed.transportEvidence` contains exactly eight
+fields: selectedTransport, localCandidateType, remoteCandidateType,
+candidatePairState, bytesSent, bytesReceived, directAttempted and relayFallback.
+LAN/P2P/TURN records require an actual succeeded pair and bidirectional frames;
+Relay candidate fields are null. Observations are limited to 16 per transport
+with increasing byte thresholds, keeping stdout below the runner’s 64 KiB cap. `SIGUSR1` refreshes its pairing file; `SIGTERM` closes the
 Host and removes that file and its temporary state. The test does not create
 or alter the user’s ordinary conversations.
 
