@@ -48,7 +48,7 @@ try {
   const origin = `http://127.0.0.1:${relay.server.address().port}`;
   const transport = new CodexAppServerTransport({ command: process.execPath, args: [path.join(root, "src/host/fixtures/fake-app-server.mjs")], cwd: temporary, env: { ...process.env, FAKE_WORKSPACE: temporary }, requestTimeoutMs: 2_000 });
   host = await createWebUiHost({ transport, env: { ...process.env, OPL_DATA_DIR: path.join(temporary, "host") }, dshHome: path.join(temporary, "dsh"), opl: { readState: async () => ({}) },
-    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], ...(forcedFallback ? {rtcFactoryProvider:async()=>undefined}:{}), ...(process.argv.includes("--diagnostics")||process.argv.includes("--carrier-diagnostics")?{diagnostic:diagnostic=>console.log(JSON.stringify({stage:"native_fixture_carrier_diagnostic",at:Date.now(),diagnostic}))}:{}), authorize: async ({ device }) => {
+    linkInternetFactory: options => createLinkInternet({ ...options, serviceOrigin: origin, httpAllowlist: ["127.0.0.1"], ...(forcedFallback ? {rtcFactoryProvider:async()=>undefined}:{}), authorize: async ({ device }) => {
       const response = await fetch(`${origin}/api/v1/devices/register`, { method: "POST", headers: { authorization: "Bearer test-gateway-account-token", "content-type": "application/json" }, body: JSON.stringify({ v: 1, device }) });
       assert.equal(response.status, 200);
       return { schema: "opl_link_remote_credentials.v1", ...await response.json(), deviceId: device.deviceId, identityKey: device.identityKey, role: "host" };
