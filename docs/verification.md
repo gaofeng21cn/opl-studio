@@ -437,3 +437,8 @@ summaries, full evidence expansion, keyboard controls, paging and thread-scoped
 choices, streaming-to-canonical continuity, and operable approval/input panels.
 `bun test tests/workbench/conversation-details.test.mts` covers protocol-only
 classification, retained source text, and current-turn progress isolation.
+
+The pinned DSH rc.3 cohort requires Node.js 24.9 or newer. Source CI and the
+Docker carrier use Node.js 26; the Docker image remains digest-pinned. The
+renderer build copies the unmodified Superagent vendor source before compiling
+the native delivery plugins.

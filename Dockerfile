@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG NODE_IMAGE=node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
+ARG NODE_IMAGE=node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
 
 FROM ${NODE_IMAGE} AS source-builder-base
 RUN apt-get update \
@@ -48,6 +48,7 @@ WORKDIR /app
 ENV OPL_APP_REPO_ROOT=/app/one-person-lab-app
 COPY package.json package-lock.json ./
 COPY plugins ./plugins
+COPY vendor ./vendor
 RUN npm install --global "bun@${OPL_BUN_VERSION}" \
   && npm ci --ignore-scripts
 COPY LICENSE ./LICENSE

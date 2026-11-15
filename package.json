@@ -242,5 +242,8 @@
     "test:mcp-apps": "node --test src/host/mcp-app-host.test.mjs && bun test tests/workbench/mcp-app-host.test.mts",
     "dsh:replay": "node scripts/dsh-upgrade.mjs replay",
     "dsh:verify": "node scripts/dsh-upgrade.mjs verify"
+  },
+  "engines": {
+    "node": ">=24.9.0"
   }
 }

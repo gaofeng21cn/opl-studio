@@ -6,7 +6,7 @@ const write = (name, value) => fs.writeFileSync(`${root}/${name}`, JSON.stringif
 write('image-manifest.json', {
   schema: 'dev.onepersonlab.opl-webui-image-manifest.v2',
   image_role: 'opl_webui_runtime_image', application_host: 'opl-studio',
-  base_image_family: 'node:22-bookworm-slim',
+  base_image_family: 'node:26-bookworm-slim',
   webui_package: { name: 'opl-studio', source_commit: process.env.OPL_SOURCE_REVISION },
   app_source_commit: process.env.OPL_APP_REF,
   data_dir: '/data', projects_dir: '/projects', seed_dir: `${root}/seed`,
