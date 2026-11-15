@@ -83,6 +83,8 @@ contextBridge.exposeInMainWorld("oplStudio", {
   eventSourceUrl: "electron://opl",
   linkCompanion: {
     readDevices: () => invoke("readLinkDevices"),
+    enableInternet: () => invoke("enableLinkInternet"),
+    reconnectInternet: () => invoke("reconnectLinkInternet"),
     createPairing: request => invoke("createLinkPairing", request),
     revokeDevice: request => invoke("revokeLinkDevice", request)
   },

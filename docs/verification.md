@@ -31,6 +31,7 @@ is the command owner.
 | `npm run test:threads` | Standard Desktop/WebUI thread lifecycle, pagination, renderer, and Codex subagent projection tests |
 | `npm run test:webui-host` | DSH Host boot/profile/plugin inventory, authenticated DSH-tool MCP, persistent Codex ownership, shared Host core, HTTP/SSE, model/thread pagination, OPL projection, and read-only mutation guard |
 | `node --test src/host/opl-passthrough.test.mjs` | Fast Host projection compression, managed-update envelope filtering, and bounded state transport |
+| `node --test src/host/link-internet.test.mjs` | Authenticated virtual Link routing, device/thread-scoped chunk receipts, bounded file ranges, version changes, and enrollment identity rejection |
 | `node --test src/host/thread-workspace-service.test.mjs` | Canonical thread-workspace list/read/search behavior, bounds, UTF-8 handling, and traversal/symlink containment |
 | `bun test tests/workbench/runtime-projection.test.mts` | Workbench consumption of the compressed Framework managed-update and Flow dependency projection |
 | `bun test tests/workbench/project-progress.test.mts` | Exact workspace-to-project matching and explicit Stage/Attempt/attention/next-action projection without inferred current Stage |

@@ -259,7 +259,11 @@ test("bounded byte windows support plugin viewers without exposing paths beyond 
   await writeFile(path.join(paths.workspace, "binary.pdf"), binary);
   const { service } = serviceFor(paths.workspace);
   const window = await service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 1, length: 3 });
-  assert.deepEqual(window, { data: binary.subarray(1, 4).toString("base64"), offset: 1, sizeBytes: 6, eof: false });
+  assert.deepEqual(window, { data: binary.subarray(1, 4).toString("base64"), offset: 1, sizeBytes: 6, eof: false, etag: window.etag });
+  assert.match(window.etag, /^".+"$/);
+  await writeFile(path.join(paths.workspace, "binary.pdf"), Buffer.from("changed"));
+  await assert.rejects(service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 4, length: 2, ifMatch: window.etag }), error => error.code === "workspace_file_changed");
+  await writeFile(path.join(paths.workspace, "binary.pdf"), binary);
   const end = await service.readBytes({ threadId: "thread-1", relativePath: "binary.pdf", offset: 4, length: 512 * 1024 });
   assert.deepEqual(Buffer.from(end.data, "base64"), binary.subarray(4));
   assert.equal(end.eof, true);

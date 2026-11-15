@@ -166,7 +166,9 @@ export function installWebTransport(): void {
   const surface: WebSurface = {
     linkCompanion: {
       readDevices: () => requestJson("/api/link-management/devices"),
-      createPairing: request => postJson("/api/link-management/pair", request),
+      enableInternet: () => postJson("/api/link-management/enable", {}),
+      reconnectInternet: () => postJson("/api/link-management/reconnect", {}),
+      createPairing: request => postJson("/api/link-management/pair", request ?? {}),
       revokeDevice: request => postJson("/api/link-management/revoke", request)
     },
     eventSourceUrl,

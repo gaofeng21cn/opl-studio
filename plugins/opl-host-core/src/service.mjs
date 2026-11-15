@@ -7,6 +7,7 @@ import { OplCodexNative } from "../../opl-codex-native/src/service.mjs";
 import { OplFrameworkBridge } from "../../opl-framework-bridge/src/service.mjs";
 import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
 import { createLinkCompanion } from "../../../src/host/link-companion.mjs";
+import { createLinkInternet } from "../../../src/host/link-internet.mjs";
 import { createThreadWorkspaceService } from "../../../src/host/thread-workspace-service.mjs";
 
 function unavailablePlatformCapability(capability) {
@@ -122,6 +123,7 @@ export class OplHostCore extends EventEmitter {
       ? createSettingsSearchLog({ dshHome: options.dshHome, allowOpen: options.settingsSearchLogOpenAllowed === true })
       : async () => ({ status: 503, body: JSON.stringify({ ok: false, reason: "dsh-home-unavailable" }) });
     this.linkOptions = { env, webAuth: options.webAuth, stagedInputs: options.stagedInputs };
+    this.linkInternetFactory = options.linkInternetFactory ?? createLinkInternet;
     this.closePromise = null;
     this.manualUpdateOperations = new Set();
     this.codex.on("event", (event) => this.emit("event", event));
@@ -132,7 +134,8 @@ export class OplHostCore extends EventEmitter {
     await this.framework.start();
     const webServer = this.hostContext?.get("webServer");
     if (webServer) {
-      this.linkCompanion = await createLinkCompanion({ hostCore: this, ...this.linkOptions });
+      this.linkInternet = await this.linkInternetFactory({ env: this.linkOptions.env, handle: (...args) => this.linkCompanion.handleAuthenticatedPeer(...args) });
+      this.linkCompanion = await createLinkCompanion({ hostCore: this, ...this.linkOptions, internet: this.linkInternet });
       this.disposeLinkRoutes = this.linkCompanion.register(webServer);
     }
     return this.capabilities();
@@ -246,6 +249,14 @@ export class OplHostCore extends EventEmitter {
 
     switch (method) {
       case "readLinkDevices": return this.linkCompanion?.readDevices() ?? { schema: "opl_link_studio_wire.v2", devices: [], unavailable: true };
+      case "enableLinkInternet": {
+        if (!this.linkInternet) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
+        return this.linkInternet.enable();
+      }
+      case "reconnectLinkInternet": {
+        if (!this.linkInternet) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
+        return this.linkInternet.reconnect();
+      }
       case "createLinkPairing": {
         if (!this.linkCompanion) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
         return this.linkCompanion.createPairing(payload);
@@ -350,6 +361,7 @@ export class OplHostCore extends EventEmitter {
     if (!this.managedByDsh) this.mcpApps.dispose();
     this.closePromise ??= (async () => {
       this.disposeLinkRoutes?.();
+      await this.linkInternet?.close();
       await this.linkCompanion?.close();
       await this.updateMaintenance?.close();
       await Promise.allSettled([...this.manualUpdateOperations]);

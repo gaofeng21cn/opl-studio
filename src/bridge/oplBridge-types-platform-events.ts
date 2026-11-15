@@ -123,11 +123,14 @@ export type SettingsSearchLogRequest = { method: "GET" | "POST"; count?: boolean
 export type SettingsSearchLogResponse = { status: number; body: string };
 
 export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
-export type LinkDeviceReadback = { schema: "opl_link_studio_wire.v2"; host?: { id: string; name: string }; endpoint?: string | null; devices: LinkPairedDevice[]; unavailable?: boolean };
-export type LinkPairing = { schema: "opl_link_studio_wire.v2"; endpoint: string; code: string; expiresAt: string; pairingURL: string };
+export type LinkInternetStatus = { status: "disabled" | "account_required" | "connecting" | "reconnecting" | "ready" | "error"; reasonCode?: string };
+export type LinkDeviceReadback = { schema: "opl_link_studio_wire.v2"; host?: { id: string; name: string }; endpoint?: string | null; internet?: LinkInternetStatus; devices: LinkPairedDevice[]; unavailable?: boolean };
+export type LinkPairing = { schema: "opl_link_studio_wire.v2"; endpoint?: string; serverUrl?: string; accountScope?: string; hostDeviceId?: string; hostIdentityKey?: string; hostFingerprint?: string; code: string; expiresAt: string; pairingURL: string };
 export type LinkCompanionManagement = {
   readDevices(): Promise<LinkDeviceReadback>;
-  createPairing(request: { endpoint: string }): Promise<LinkPairing>;
+  enableInternet(): Promise<LinkInternetStatus>;
+  reconnectInternet(): Promise<LinkInternetStatus>;
+  createPairing(request?: { endpoint?: string }): Promise<LinkPairing>;
   revokeDevice(request: { id: string }): Promise<{ id: string; revoked: boolean }>;
 };
 

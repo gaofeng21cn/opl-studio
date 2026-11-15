@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/liguobao/ds-harness-remote",
+  "revision": "f214c5abb39434d0e8358956bfca8d4529981fee",
+  "license": "MIT",
+  "files": {
+    "host.mjs": {
+      "source": "packages/plugin/dist/index.js",
+      "sha256": "1228fd885bce1b14973bbf4849d37bcc1b90926d03a435865727f6abfe887469"
+    },
+    "loopback.ts": {
+      "source": "packages/protocol/src/loopback.ts",
+      "sha256": "4a600abb00f2815a962186f9ffa6b678d2f5be79a2f817aac630062e0a3c0c8f"
+    },
+    "LICENSE": {
+      "source": "LICENSE",
+      "sha256": "6e41a78bbbe0c3ed54d085b661eb5af5a7836f4d40460d54f1469f43b386285d"
+    },
+    "loopback.mjs": {
+      "generated_from": "loopback.ts",
+      "sha256": "8519ace8a7d429d4b1c7a9fb8fe4193c24144401499588175139630811cc3f70"
+    }
+  },
+  "composition": "Public Host classes only; no HostPluginRuntime, Codex domain, ACP runtime or generic loopback proxy is instantiated."
+}

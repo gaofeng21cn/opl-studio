@@ -444,3 +444,21 @@ https://github.com/deepseek-ai/dsh-superagent-prototype at
 `vendor/dsh-superagent/provenance.json`; the original license is preserved.
 `plugins/opl-superagent-engine` is a private delivery wrapper, not a separately
 published upstream package.
+
+## ds-harness-remote
+
+Source: <https://github.com/liguobao/ds-harness-remote>
+
+Pinned revision: `f214c5abb39434d0e8358956bfca8d4529981fee`.
+
+Studio ships the unchanged upstream `packages/plugin/dist/index.js` as
+`src/host/vendor/dsh-remote/host.mjs` and the unchanged upstream
+`packages/protocol/src/loopback.ts`, plus its generated Node module. The
+per-file source paths and SHA-256 digests are recorded in `provenance.json`.
+The upstream MIT license is included as `src/host/vendor/dsh-remote/LICENSE`;
+embedded dependency license comments are retained in the unchanged bundle.
+
+OPL composes only public Host carrier and identity classes. It does not apply
+the Remote plugin, start its Codex/ACP domains, or expose generic loopback ports.
+OPL’s separate adapter confines the existing Remote `loopback.call` method to
+the App-owned Link routes and the existing canonical Studio owners.

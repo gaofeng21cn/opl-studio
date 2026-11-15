@@ -415,7 +415,8 @@ export function createThreadWorkspaceService({
       if (info.size > downloadLimit) {
         throw error("workspace_file_too_large", "File exceeds the download limit", { maxDownloadBytes: downloadLimit }, 413);
       }
-      return { threadId, relativePath, name: path.basename(target), sizeBytes: info.size, handle };
+      return { threadId, relativePath, name: path.basename(target), sizeBytes: info.size, handle,
+        etag: `"${info.dev.toString(16)}-${info.ino.toString(16)}-${info.size.toString(16)}-${info.mtimeMs.toString(16)}-${info.ctimeMs.toString(16)}"` };
     } catch (reason) {
       await handle?.close().catch(() => undefined);
       throw mapFsError(reason, { operation: "download", relativePath });
@@ -440,10 +441,14 @@ export function createThreadWorkspaceService({
     }
     const file = await openDownloadFile(request);
     try {
+      if (request.ifMatch !== undefined && request.ifMatch !== file.etag) throw error("workspace_file_changed", "File changed during download; discard the partial file", {}, 412);
       const requested = Math.min(length, Math.max(0, file.sizeBytes - offset));
       const buffer = Buffer.alloc(requested);
       const { bytesRead } = requested ? await file.handle.read(buffer, 0, requested, offset) : { bytesRead: 0 };
-      return { data: buffer.subarray(0, bytesRead).toString("base64"), offset, sizeBytes: file.sizeBytes, eof: offset + bytesRead >= file.sizeBytes || bytesRead === 0 };
+      const after = await file.handle.stat();
+      const afterTag = `"${after.dev.toString(16)}-${after.ino.toString(16)}-${after.size.toString(16)}-${after.mtimeMs.toString(16)}-${after.ctimeMs.toString(16)}"`;
+      if (afterTag !== file.etag) throw error("workspace_file_changed", "File changed during download; discard the partial file", {}, 412);
+      return { data: buffer.subarray(0, bytesRead).toString("base64"), offset, sizeBytes: file.sizeBytes, eof: offset + bytesRead >= file.sizeBytes || bytesRead === 0, etag: file.etag };
     } catch (reason) {
       throw mapFsError(reason, { operation: "readBytes", relativePath: request.relativePath });
     } finally {

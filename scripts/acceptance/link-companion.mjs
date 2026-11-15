@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../src/host/link-loopback.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -15,6 +17,14 @@ const output = path.join(root, "output/playwright/link-companion");
 const webRoot = path.join(temporary, "web");
 const session = `opl-link-${process.pid}`;
 let host;
+let remote;
+async function phone(route, body, token) {
+  const id = crypto.randomUUID();
+  const head = await remote.call({op:"http.open",id,port:LINK_VIRTUAL_PORT,path:route,method:body?"POST":"GET",headers:[...(body?[["content-type","application/json"]]:[]),...(token?[["authorization",`Bearer ${token}`]]:[])],...(body?{body:Buffer.from(JSON.stringify(body)).toString("base64")}:{} )});
+  const chunks=[];
+  for (;;) {const part=await remote.call({op:"http.read",id});if(part.data)chunks.push(Buffer.from(part.data,"base64"));if(part.done)break;}
+  return {status:head.status,value:JSON.parse(Buffer.concat(chunks))};
+}
 function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: temporary, stdio: ["ignore", "pipe", "pipe"] });
@@ -52,18 +62,24 @@ try {
   const policy = JSON.stringify(readCodexModelPolicy()).replaceAll("<", "\\u003c");
   await writeFile(path.join(webRoot, "index.html"), `<!doctype html><html lang="zh-CN" data-platform="darwin"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OPL Link Settings acceptance</title><link rel="icon" href="data:,"><link rel="stylesheet" href="./link-settings.css"></head><body><div id="root"></div><script>globalThis.__OPL_CODEX_MODEL_POLICY__=${policy};</script><script type="module" src="./link-settings.js"></script></body></html>`);
   const transport = new CodexAppServerTransport({ command: process.execPath, args: [path.join(root, "src/host/fixtures/fake-app-server.mjs")], cwd: temporary, env: { ...process.env, FAKE_WORKSPACE: temporary }, requestTimeoutMs: 2_000 });
-  host = await createWebUiHost({ transport, dshHome: path.join(temporary, "dsh"), env: { ...process.env, OPL_DATA_DIR: temporary, OPL_LINK_ALLOW_LOOPBACK_HTTP: "1" }, webRoot, opl: { readState: async () => ({}) } });
+  host = await createWebUiHost({ transport, dshHome: path.join(temporary, "dsh"), env: { ...process.env, OPL_DATA_DIR: temporary }, webRoot,
+    linkInternetFactory: async ({handle}) => {
+      remote = new LinkLoopback({context:{connectionId:crypto.randomUUID(),peerDeviceId:crypto.randomUUID(),peerIdentityKey:crypto.randomBytes(32).toString("base64url")},handle});
+      let enabled=false;
+      return {status:()=>({status:enabled?"ready":"disabled"}),enable:async()=>{enabled=true;return {status:"ready"}},reconnect:async()=>({status:"ready"}),close:async()=>remote.closeAll(),revoke:async()=>{},createInvitation:async()=>({serverUrl:"https://link.medopl.com",accountScope:"s".repeat(43),hostDeviceId:crypto.randomUUID(),hostIdentityKey:crypto.randomBytes(32).toString("base64url"),enrollmentToken:"ui-fixture-enrollment",expiresAt:Date.now()+120000})};
+    }, opl: { readState: async () => ({}) } });
   await cli(["open", host.url]); await cli(["resize", "1200", "900"]);
   const mounted = await evaluate("() => ({text:document.body.innerText,root:document.querySelector('#root')?.children.length})");
   assert.ok(mounted.text.includes("OPL Link"), `${JSON.stringify(mounted)} ${await cli(["console", "error"])}`);
-  await interact(`await page.getByText('尚未连接手机或平板。', {exact:true}).waitFor(); await page.getByRole('textbox', {name:'此 App 的 HTTPS 地址'}).fill(${JSON.stringify(host.url)}); await page.getByRole('button', {name:'生成连接码'}).click(); await page.getByRole('button', {name:'复制连接链接'}).waitFor();`);
+  await interact(`await page.getByText('尚未连接手机或平板。', {exact:true}).waitFor(); await page.getByRole('button', {name:'开启手机访问'}).click(); await page.getByText('手机访问已就绪', {exact:true}).waitFor(); await page.getByRole('button', {name:'生成连接码'}).click(); await page.getByRole('button', {name:'复制连接链接'}).waitFor();`);
   const pair = await evaluate("() => window.__linkPair");
   assert.equal(pair.schema, "opl_link_studio_wire.v2");
   assert.equal(new URL(pair.pairingURL).protocol, "opllink:");
   assert.ok((await evaluate("() => ({qr:!!document.querySelector('.opl-link-pairing svg'),overflow:document.documentElement.scrollWidth>innerWidth})")).qr);
   await cli(["screenshot", `--filename=${path.join(output, "pairing-wide.png")}`]);
-  const claimed = await fetch(`${host.url}/api/link/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: pair.code, deviceName: "Acceptance iPhone" }) });
-  assert.equal(claimed.status, 200); const device = await claimed.json();
+  assert.equal(new URL(pair.pairingURL).searchParams.has("endpoint"), false);
+  const claimed = await phone("/api/link/claim", {code:pair.code,deviceName:"Acceptance iPhone"});
+  assert.equal(claimed.status,200);const device=claimed.value;
   await interact("await page.getByRole('button', {name:'刷新', exact:true}).click(); await page.getByText('Acceptance iPhone', {exact:true}).waitFor();");
   const listed = await host.core.invoke("readLinkDevices"); assert.equal(listed.devices.length, 1);
   await cli(["resize", "430", "900"]);
@@ -72,10 +88,10 @@ try {
   await cli(["screenshot", `--filename=${path.join(output, "device-narrow.png")}`]);
   await interact("await page.getByRole('button', {name:'断开设备', exact:true}).click(); await page.getByText('尚未连接手机或平板。', {exact:true}).waitFor();");
   assert.equal((await host.core.invoke("readLinkDevices")).devices.length, 0);
-  assert.equal((await fetch(`${host.url}/api/link/bootstrap`, { headers: { authorization: `Bearer ${device.token}` } })).status, 401);
+  assert.equal((await phone("/api/link/bootstrap", undefined, device.token)).status,401);
   const errors = JSON.parse(await cli(["console", "error"]));
   assert.ok(!JSON.stringify(errors).includes("Uncaught"), "Browser must not report an uncaught error");
-  const result = { schema: "opl_link_settings_acceptance.v1", actualComponent: true, productionWebBridge: true, realDshHttpHost: true, pairingQr: true, claimedDeviceDisplayed: true, revocationReadback: true, narrowOverflow: false, screenshots: ["pairing-wide.png", "device-narrow.png"] };
+  const result = { schema: "opl_link_settings_acceptance.v1", actualComponent: true, productionWebBridge: true, realDshHttpHost: true, remoteTransportFixture: true, zeroAddressInput: true, pairingQr: true, claimedDeviceDisplayed: true, revocationReadback: true, narrowOverflow: false, screenshots: ["pairing-wide.png", "device-narrow.png"] };
   await writeFile(path.join(output, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify({ ...result, output }));
 } finally {

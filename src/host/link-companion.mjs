@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { ThreadAdapterError } from "./thread-adapter.mjs";
 import { createWebUiAuth } from "./webui-auth.mjs";
 import { createStagedInputService } from "./staged-inputs.mjs";
+import { createLinkUploads, LINK_CHUNK_BYTES } from "./link-uploads.mjs";
 
 export const LINK_SCHEMA = "opl_link_studio_wire.v2";
 export const LINK_METHODS = Object.freeze(["listThreads", "readThread", "startTurn", "steerTurn", "interruptTurn", "listPendingServerRequests", "respondToServerRequest", "readCodexModels", "listThreadWorkspace", "readThreadWorkspaceFile", "readThreadWorkspaceGit", "renameThread", "setArchived"]);
@@ -48,7 +49,7 @@ async function readJson(req, limit = MAX_CONTROL_BODY) {
 }
 
 /** A scoped adapter over the existing Host. It never owns threads or starts another runtime. */
-export async function createLinkCompanion({ hostCore, env = process.env, webAuth, stagedInputs, now = () => Date.now(), heartbeatMs = 15_000 } = {}) {
+export async function createLinkCompanion({ hostCore, env = process.env, webAuth, stagedInputs, now = () => Date.now(), heartbeatMs = 15_000, internet } = {}) {
   const root = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio");
   const storeFile = env.OPL_LINK_DEVICES_FILE ?? path.join(root, "link-devices.json");
   const allowLoopback = env.OPL_LINK_ALLOW_LOOPBACK_HTTP === "1";
@@ -65,6 +66,8 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
   // Persist only IDs and hashes for mutations. Recovered reservations are deliberately unknown.
   const operations = new Map(stored.operations.map(item => [item.key, { hash: item.hash, unknown: true }]));
   const pairs = new Map(); const clients = new Map(); const stagedTurns = new Map();
+  const securePeers = new WeakMap();
+  const uploads = createLinkUploads({ root: path.join(root, "link-upload-chunks"), hostCore, now });
   const host = { id: stored.hostId, name: env.OPL_LINK_HOST_NAME || os.hostname() };
   let writes = Promise.resolve(); let closed = false;
   function persist() {
@@ -79,9 +82,10 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
   }
   function availableDevice(id) {
     const device = devices.get(id);
-    return device && Date.parse(device.expiresAt) > now() ? device : null;
+    return device && !device.revokedAt && Date.parse(device.expiresAt) > now() ? device : null;
   }
   function assertSecure(req) {
+    if (securePeers.has(req)) return;
     const incoming = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const forwarded = req.headers["x-forwarded-proto"];
     if (req.socket.encrypted === true || (trustProxy && forwarded === "https")) return;
@@ -112,12 +116,24 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     const hash = token ? digest(token) : "";
     const device = [...devices.values()].find(item => item.tokenHash === hash && availableDevice(item.id));
     if (!device) throw fail("link_device_unauthorized", "Reconnect this iPhone from the desktop App", 401);
+    if (device.remotePeerId && securePeers.get(req)?.peerDeviceId !== device.remotePeerId) throw fail("link_device_unauthorized", "Reconnect this iPhone from the desktop App", 401);
     device.lastSeenAt = new Date(now()).toISOString();
     return device;
   }
-  async function createPairing({ endpoint = env.OPL_LINK_PUBLIC_URL } = {}) {
+  async function createPairing({ endpoint } = {}) {
     if (closed) throw fail("link_host_closed", "The desktop App is closing", 503);
-    const normalized = endpointUrl(endpoint, allowLoopback);
+    for (const [key, value] of pairs) if (value.expiresAt <= now()) pairs.delete(key);
+    if (pairs.size >= 16) throw fail("link_pairing_limit", "Finish or wait for an existing pairing to expire", 429);
+    if (endpoint === undefined && internet) {
+      const remote = await internet.createInvitation();
+      const code = crypto.randomBytes(32).toString("base64url"); const expiresAt = Math.min(now() + PAIR_TTL, remote.expiresAt);
+      pairs.set(digest(code), { expiresAt, remote: true });
+      const value = { serverUrl: remote.serverUrl, accountScope: remote.accountScope, hostDeviceId: remote.hostDeviceId, hostIdentityKey: remote.hostIdentityKey, enrollmentToken: remote.enrollmentToken, code, expiresAt: new Date(expiresAt).toISOString() };
+      const url = new URL("opllink://pair"); for (const [key, item] of Object.entries(value)) url.searchParams.set(key, String(item));
+      const hostFingerprint = crypto.createHash("sha256").update(Buffer.from(remote.hostIdentityKey, "base64url")).digest("hex").slice(0, 16).toUpperCase().match(/.{4}/g).join(" ");
+      return { schema: LINK_SCHEMA, ...value, hostFingerprint, pairingURL: url.href };
+    }
+    const normalized = endpointUrl(endpoint ?? env.OPL_LINK_PUBLIC_URL, allowLoopback);
     for (const [key, value] of pairs) if (value.expiresAt <= now()) pairs.delete(key);
     if (pairs.size >= 16) throw fail("link_pairing_limit", "Finish or wait for an existing pairing to expire", 429);
     const code = crypto.randomBytes(32).toString("base64url"); const expiresAt = now() + PAIR_TTL;
@@ -125,31 +141,36 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     const url = new URL("opllink://pair"); url.searchParams.set("endpoint", normalized); url.searchParams.set("code", code);
     return { schema: LINK_SCHEMA, endpoint: normalized, code, expiresAt: new Date(expiresAt).toISOString(), pairingURL: url.href };
   }
-  async function claim({ code, deviceName }) {
+  async function claim({ code, deviceName }, context) {
     const key = digest(string(code, "code", 128)); const pair = pairs.get(key);
     if (!pair || pair.expiresAt <= now()) { pairs.delete(key); throw fail("link_pairing_expired", "This QR code has expired. Generate another on the desktop", 410); }
+    if (pair.remote && !context?.peerDeviceId) throw fail("link_secure_pairing_required", "Scan the desktop code in OPL Link", 403);
     const name = string(deviceName, "deviceName", 80);
     pairs.delete(key);
     for (const [id] of devices) if (!availableDevice(id)) { devices.delete(id); for (const [key] of operations) if (key.startsWith(`${id}:`)) operations.delete(key); }
     if (devices.size >= 32) throw fail("link_device_limit", "Remove an unused device on the desktop first", 409);
     const token = crypto.randomBytes(32).toString("base64url");
-    const device = { id: crypto.randomUUID(), name, createdAt: new Date(now()).toISOString(), lastSeenAt: new Date(now()).toISOString(), expiresAt: new Date(now() + DEVICE_TTL).toISOString(), tokenHash: digest(token) };
+    const device = { id: crypto.randomUUID(), name, createdAt: new Date(now()).toISOString(), lastSeenAt: new Date(now()).toISOString(), expiresAt: new Date(now() + DEVICE_TTL).toISOString(), tokenHash: digest(token), ...(context?.peerDeviceId ? { remotePeerId: context.peerDeviceId } : {}) };
     devices.set(device.id, device);
     try { await persist(); } catch (error) { devices.delete(device.id); throw error; }
     return { schema: LINK_SCHEMA, token, expiresAt: device.expiresAt, device: projectDevice(device), host };
   }
-  function readDevices() { return { schema: LINK_SCHEMA, host, endpoint: env.OPL_LINK_PUBLIC_URL ? endpointUrl(env.OPL_LINK_PUBLIC_URL, allowLoopback) : null, devices: [...devices.values()].filter(item => availableDevice(item.id)).map(projectDevice) }; }
-  async function revokeDevice({ id }) {
+  function readDevices() { return { schema: LINK_SCHEMA, host, endpoint: !internet && env.OPL_LINK_PUBLIC_URL ? endpointUrl(env.OPL_LINK_PUBLIC_URL, allowLoopback) : null, internet: internet?.status() ?? { status: "disabled" }, devices: [...devices.values()].filter(item => availableDevice(item.id)).map(projectDevice) }; }
+  async function revokeDevice({ id }, { revokeRelay = true } = {}) {
     const deviceId = string(id, "id");
-    devices.delete(deviceId);
+    const device = devices.get(deviceId);
+    if (device) device.revokedAt = new Date(now()).toISOString();
     for (const [key] of operations) if (key.startsWith(`${deviceId}:`)) operations.delete(key);
     for (const [res, value] of clients) if (value.deviceId === deviceId) { clearInterval(value.timer); res.end(); clients.delete(res); }
-    await persist(); return { id: deviceId, revoked: true };
+    await uploads.revoke(deviceId); await persist();
+    if (revokeRelay && device?.remotePeerId) await internet?.revoke(device.remotePeerId);
+    devices.delete(deviceId); await persist(); return { id: deviceId, revoked: true };
   }
-  async function prepareAttachments(attachments) {
+  async function prepareAttachments(attachments, device, payload) {
     if (attachments === undefined || (Array.isArray(attachments) && attachments.length === 0)) return { inputs: [], paths: [], groupId: null };
     if (!Array.isArray(attachments) || attachments.length > 5) throw fail("link_attachment_limit", "Attach at most five files");
     const decoded = attachments.map(item => {
+      if (record(item) && Object.keys(item).length === 1 && typeof item.uploadId === "string") return { uploadId: item.uploadId };
       if (!record(item) || Object.keys(item).some(key => !["name", "mimeType", "base64"].includes(key))) throw fail("invalid_link_attachment", "Attachments must contain a name, type and bytes");
       const name = string(item.name, "attachment.name", 180);
       if (name.startsWith(".") || /[\\/]/.test(name)) throw fail("invalid_link_attachment", "Attachment names must not contain paths");
@@ -158,25 +179,30 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
       if (!bytes.length || bytes.length > MAX_ATTACHMENT) throw fail("link_attachment_limit", "Each attachment must be between one byte and 10 MiB", 413);
       return { name, bytes };
     });
-    if (new Set(decoded.map(item => item.name)).size !== decoded.length) throw fail("invalid_link_attachment", "Use distinct attachment names");
+    if (new Set(decoded.map(item => item.uploadId ?? item.name)).size !== decoded.length) throw fail("invalid_link_attachment", "Use distinct attachments");
     inputs ??= await createStagedInputService({ root: path.join(root, "link-inputs") });
     const group = await inputs.create();
     try {
-      for (const item of decoded) await inputs.put(group.id, item.name, Readable.from([item.bytes]));
+      const names = new Set();
+      for (const item of decoded) {
+        const name = item.uploadId ? await uploads.consume(device, item.uploadId, payload, inputs, group.id) : item.name;
+        if (names.has(name)) throw fail("invalid_link_attachment", "Use distinct attachment names"); names.add(name);
+        if (!item.uploadId) await inputs.put(group.id, item.name, Readable.from([item.bytes]));
+      }
       const staged = await inputs.complete(group.id);
       return { groupId: group.id, inputs: staged.inputs.map(item => item.kind === "image" ? { type: "localImage", path: item.path } : { type: "mention", name: item.name, path: item.path }), paths: [] };
     } catch (error) { await inputs.remove(group.id).catch(() => {}); throw error; }
   }
-  async function startTurn(payload) {
-    if (Object.keys(payload).some(key => !["threadId", "prompt", "model", "reasoningEffort", "attachments"].includes(key))) throw fail("link_method_payload_rejected", "Unsupported conversation setting");
+  async function startTurn(payload, device) {
+    if (Object.keys(payload).some(key => !["threadId", "cwd", "prompt", "model", "reasoningEffort", "attachments"].includes(key))) throw fail("link_method_payload_rejected", "Unsupported conversation setting");
     if (payload.prompt !== undefined && (typeof payload.prompt !== "string" || payload.prompt.length > 200_000)) throw fail("invalid_link_prompt", "Message is too large");
-    const attachments = await prepareAttachments(payload.attachments);
+    const attachments = await prepareAttachments(payload.attachments, device, payload);
     const transport = hostCore.transport;
     let threadId = payload.threadId;
     let dispatched = false;
     try {
       if (threadId !== undefined) { threadId = string(threadId, "threadId", 200); await transport.resumeThread(threadId); }
-      else { const started = await transport.startThread(); threadId = started.thread?.id; }
+      else { if (payload.cwd !== undefined && payload.cwd !== transport.cwd) throw fail("invalid_link_workspace", "Choose the desktop workspace", 403); const started = await transport.startThread(); threadId = started.thread?.id; }
       if (!threadId) throw fail("invalid_app_server_response", "The desktop did not return a conversation", 502);
       const prompt = [payload.prompt ?? "", ...attachments.paths.map(value => `Attached file: ${JSON.stringify(value)}`)].filter(Boolean).join("\n\n");
       const overrides = { ...(payload.model ? { model: string(payload.model, "model", 200) } : {}), ...(payload.reasoningEffort ? { effort: string(payload.reasoningEffort, "reasoningEffort", 40) } : {}) };
@@ -194,12 +220,12 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     const groups = stagedTurns.get(turnId) ?? new Set();
     groups.add(groupId); stagedTurns.set(turnId, groups);
   }
-  async function steerTurn(payload) {
+  async function steerTurn(payload, device) {
     if (Object.keys(payload).some(key => !["threadId", "expectedTurnId", "prompt", "attachments"].includes(key))) throw fail("link_method_payload_rejected", "Unsupported conversation setting");
     const threadId = string(payload.threadId, "threadId", 200);
     const expectedTurnId = string(payload.expectedTurnId, "expectedTurnId", 200);
     if (payload.prompt !== undefined && (typeof payload.prompt !== "string" || payload.prompt.length > 200_000)) throw fail("invalid_link_prompt", "Message is too large");
-    const attachments = await prepareAttachments(payload.attachments);
+    const attachments = await prepareAttachments(payload.attachments, device, payload);
     if (attachments.groupId) trackAttachments(expectedTurnId, attachments.groupId);
     return hostCore.invoke("steerTurn", { threadId, expectedTurnId, prompt: payload.prompt ?? "", inputs: attachments.inputs });
   }
@@ -223,9 +249,9 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     } else throw fail("link_request_unsupported", "Answer this request on the desktop", 403);
     return hostCore.invoke("respondToServerRequest", { id: request.id, response: { result } });
   }
-  async function dispatch(method, payload) {
-    if (method === "startTurn") return startTurn(payload);
-    if (method === "steerTurn") return steerTurn(payload);
+  async function dispatch(method, payload, device) {
+    if (method === "startTurn") return startTurn(payload, device);
+    if (method === "steerTurn") return steerTurn(payload, device);
     if (method === "respondToServerRequest") return respond(payload);
     const allowedKeys = {
       listThreads: ["archived", "limit", "searchTerm", "workspace", "projectKey"], readThread: ["threadId", "includeTurns"], interruptTurn: ["threadId", "turnId"], listPendingServerRequests: [], readCodexModels: [], listThreadWorkspace: ["threadId", "relativePath"], readThreadWorkspaceFile: ["threadId", "relativePath"], readThreadWorkspaceGit: ["threadId"], renameThread: ["threadId", "name"], setArchived: ["threadId", "archived", "confirmed"]
@@ -235,7 +261,7 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
   }
   async function invoke(device, { method, payload = {}, requestId }) {
     if (!LINK_METHODS.includes(method) || !record(payload)) throw fail("link_method_rejected", "This action is not available to OPL Link", 403);
-    if (READ_METHODS.has(method)) return dispatch(method, payload);
+    if (READ_METHODS.has(method)) return dispatch(method, payload, device);
     const id = string(requestId, "requestId", 128);
     if (!/^[A-Za-z0-9_-]{16,128}$/.test(id)) throw fail("invalid_link_request_id", "Use a unique request ID");
     const key = `${device.id}:${id}`; const hash = digest(JSON.stringify(stable({ method, payload })));
@@ -251,18 +277,24 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     // Reserve durably before the owner mutation. A restart never replays a reserved request.
     operation.promise = persist().then(() => {
       if (!availableDevice(device.id)) throw fail("link_device_unauthorized", "This device was disconnected", 401);
-      return dispatch(method, payload);
+      return dispatch(method, payload, device);
     });
     // Keep failures as unknown as well; a transport failure can follow an accepted mutation.
     operation.promise.catch(() => { operation.unknown = true; });
     return operation.promise;
   }
   function closeStream(res) { const item = clients.get(res); if (item) clearInterval(item.timer); clients.delete(res); }
+  function writeFrame(res, frame) {
+    const item = clients.get(res);
+    if (!item) return;
+    item.bytes = (item.bytes ?? 0) + Buffer.byteLength(frame);
+    if (Buffer.byteLength(frame) > 1024 * 1024 || item.bytes > 64 * 1024 * 1024 || !res.write(frame)) { closeStream(res); res.end(); }
+  }
   const onEvent = event => {
     const frame = `data: ${JSON.stringify(event)}\n\n`;
     for (const [res, item] of clients) {
       if (!availableDevice(item.deviceId)) { closeStream(res); res.end(); }
-      else if (item.events) res.write(frame);
+      else if (item.events) writeFrame(res, frame);
     }
     if (event.method === "turn/completed") {
       const id = event.params?.turn?.id ?? event.params?.turnId;
@@ -276,19 +308,41 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
       if (closed) throw fail("link_host_closed", "The desktop App is closing", 503);
       const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
       const suffix = pathname.slice("/api/link".length);
+      if (securePeers.has(req) && (suffix === "/pair" || suffix === "/devices" || suffix.startsWith("/devices/"))) throw fail("link_remote_management_rejected", "Manage devices in the desktop App", 403);
       if (suffix === "/pair" && req.method === "POST") { requireDesktop(req, true); return sendJson(res, 200, await createPairing(await readJson(req))); }
       if (suffix === "/devices" && req.method === "GET") { requireDesktop(req); return sendJson(res, 200, readDevices()); }
       if (suffix.startsWith("/devices/") && req.method === "DELETE") { requireDesktop(req, true); return sendJson(res, 200, await revokeDevice({ id: decodeURIComponent(suffix.slice(9)) })); }
-      if (suffix === "/claim" && req.method === "POST") { assertSecure(req); assertOrigin(req); return sendJson(res, 200, await claim(await readJson(req))); }
+      if (suffix === "/claim" && req.method === "POST") { assertSecure(req); assertOrigin(req); return sendJson(res, 200, await claim(await readJson(req), securePeers.get(req))); }
       const device = requireDevice(req);
-      if (suffix === "/bootstrap" && req.method === "GET") return sendJson(res, 200, { schema: LINK_SCHEMA, host, device: projectDevice(device), capabilities: LINK_METHODS.filter(method => !method.includes("Workspace") || Boolean(hostCore.threadWorkspace)) });
+      if (suffix === "/bootstrap" && req.method === "GET") return sendJson(res, 200, { schema: LINK_SCHEMA, host, cwd: hostCore.transport?.cwd, device: projectDevice(device), capabilities: LINK_METHODS.filter(method => !method.includes("Workspace") || Boolean(hostCore.threadWorkspace)) });
       if (suffix === "/invoke" && req.method === "POST") return sendJson(res, 200, { result: await invoke(device, await readJson(req, MAX_BODY)) });
-      if (suffix === "/disconnect" && req.method === "POST") return sendJson(res, 200, await revokeDevice({ id: device.id }));
+      // Acknowledge local invalidation through the current Noise connection;
+      // the phone then revokes its Relay token through the authenticated REST owner.
+      if (suffix === "/disconnect" && req.method === "POST") return sendJson(res, 200, await revokeDevice({ id: device.id }, { revokeRelay: false }));
+      if (suffix === "/uploads" && req.method === "POST") return sendJson(res, 200, await uploads.create(device, await readJson(req)));
+      if (suffix.startsWith("/uploads/")) {
+        const id = decodeURIComponent(suffix.slice(9));
+        if (req.method === "PUT") return sendJson(res, 200, await uploads.append(device, id, await readJson(req, 720 * 1024)));
+        if (req.method === "GET") return sendJson(res, 200, uploads.inspect(device, id));
+        if (req.method === "DELETE") return sendJson(res, 200, await uploads.remove(device, id));
+      }
       if (suffix === "/events" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "connection": "keep-alive", "x-accel-buffering": "no" });
-        res.write(`data: ${JSON.stringify({ method: "host/ready", params: { host, capabilities: LINK_METHODS } })}\n\n`);
-        const timer = setInterval(() => { if (!availableDevice(device.id)) { closeStream(res); res.end(); } else res.write(": heartbeat\n\n"); }, heartbeatMs);
-        timer.unref?.(); clients.set(res, { deviceId: device.id, timer, events: true }); req.once("close", () => closeStream(res)); return;
+        const timer = setInterval(() => { if (!availableDevice(device.id)) { closeStream(res); res.end(); } else writeFrame(res, ": heartbeat\n\n"); }, heartbeatMs);
+        timer.unref?.(); clients.set(res, { deviceId: device.id, timer, events: true, bytes: 0 });
+        writeFrame(res, `data: ${JSON.stringify({ method: "host/ready", params: { host, capabilities: LINK_METHODS } })}\n\n`);
+        req.once("close", () => closeStream(res)); res.once("close", () => closeStream(res)); return;
+      }
+      if (suffix === "/download" && req.method === "GET") {
+        const query = new URL(req.url, "http://localhost").searchParams;
+        if ([...query.keys()].some(key => !["threadId", "relativePath", "offset", "length"].includes(key))) throw fail("invalid_link_download", "Invalid file request");
+        const offset = Number(query.get("offset") ?? 0); const length = Number(query.get("length") ?? LINK_CHUNK_BYTES);
+        const ifMatch = req.headers["if-match"];
+        if (offset > 0 && typeof ifMatch !== "string") throw fail("workspace_file_version_required", "Continue the download with its ETag", 412);
+        const file = await hostCore.threadWorkspace.readBytes({ threadId: query.get("threadId"), relativePath: query.get("relativePath"), offset, length, ...(ifMatch ? { ifMatch } : {}) });
+        const bytes = Buffer.from(file.data, "base64");
+        res.writeHead(200, { "content-type": "application/octet-stream", "content-length": bytes.length, "etag": file.etag, "x-opl-file-size": String(file.sizeBytes), "x-opl-file-offset": String(file.offset), "x-opl-file-eof": String(file.eof), "cache-control": "no-store", "x-content-type-options": "nosniff" });
+        res.end(bytes); return;
       }
       if (suffix === "/download" && req.method === "POST") {
         const payload = await readJson(req);
@@ -305,10 +359,16 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     }
   }
   function register(webServer) {
-    const dispose = ["/pair", "/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, handler: handle }));
+    const dispose = ["/pair", "/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect", "/uploads"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, handler: handle }));
     dispose.push(webServer.register({ kind: "prefix", path: "/api/link/devices/", handler: handle }));
+    dispose.push(webServer.register({ kind: "prefix", path: "/api/link/uploads/", handler: handle }));
     return () => { for (const close of dispose.reverse()) close(); };
   }
-  async function close() { closed = true; pairs.clear(); hostCore.off("event", onEvent); for (const [res] of clients) { closeStream(res); res.end(); } await writes; }
-  return { createPairing, readDevices, revokeDevice, handle, register, close };
+  async function handleAuthenticatedPeer(req, res, context) {
+    if (!context?.connectionId || !context?.peerDeviceId || !context?.peerIdentityKey) throw fail("link_secure_channel_required", "Authenticated desktop channel required", 403);
+    securePeers.set(req, context);
+    try { return await handle(req, res); } finally { securePeers.delete(req); }
+  }
+  async function close() { closed = true; pairs.clear(); hostCore.off("event", onEvent); for (const [res] of clients) { closeStream(res); res.end(); } await uploads.close(); await writes; }
+  return { createPairing, readDevices, revokeDevice, handle, handleAuthenticatedPeer, register, close };
 }
