@@ -59,7 +59,8 @@ hardcode a TURN service or require a separate user networking app.
 
 The official carrier owns Noise IK, framing, fragmentation, reconnect and
 peer-key verification. Studio uses the unchanged upstream `loadNodeRtcFactory`:
-native libwebrtc is preferred when available, and the generated RTC bundle
+native libwebrtc (`@roamhq/wrtc` `0.10.0`, the fixed upstream optional dependency)
+is preferred when available, and the generated RTC bundle
 includes werift `0.26.0` as a pure-JavaScript fallback. The runtime bundle can
 load, create a peer, read statistics and close without external node_modules,
 a native postinstall, or an Electron ABI rebuild. The generator imports the
@@ -95,6 +96,10 @@ the token pair into the upstream store and removes the temporary directory.
 Tokens, Gateway passwords and model keys never reach the renderer. The
 persistent public scope and identity binding live in `link-host.json` beside
 the upstream identity and credential store under `.opl-studio/link-remote/`.
+On restart, the adapter first verifies the existing identity against that
+binding, then initializes the official identity store with the saved name and
+restores its trusted-peer pins. It verifies the same device ID and public key
+again before starting the carrier; a mismatch requires explicit repair.
 Identity or account replacement fails explicitly rather than silently pairing
 a different computer.
 

@@ -150,6 +150,10 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? "")) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
     identity = await identities.loadExisting();
     if (!identity || identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
+    // loadExisting verifies the files; loadOrCreate initializes the official
+    // store and restores peer pins needed by trustPeer on the next connection.
+    identity = await identities.loadOrCreate(identity.name);
+    if (identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
     if (metadata.enabled) await startCarrier();
   } catch (error) { if (error.code !== "ENOENT") { errorCode = error.code ?? "link_host_identity_invalid"; if (errorCode !== "link_account_required") identityError = error; } }
   return { status, enable, reconnect, createInvitation, revoke, close, readTransportEvidence: () => evidence.read({ authenticated: connections?.isOnline() === true, relayConnected: connections?.connectedPeers().some(peer => peer.mode === "Relay") === true }) };

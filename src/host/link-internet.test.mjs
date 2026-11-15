@@ -3,7 +3,7 @@ import test from "node:test";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile, symlink, copyFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createLinkCompanion } from "./link-companion.mjs";
@@ -104,6 +104,74 @@ test("carrier refuses mismatched enrollment identity before persisting or openin
   await assert.rejects(carrier.enable(), error => error.code === "link_credentials_invalid"); assert.equal(sockets, 0);
   assert.equal(carrier.status().status, "error");
   await assert.rejects(readFile(path.join(root, ".opl-studio/link-remote/server-credentials.json")), error => error.code === "ENOENT");
+});
+
+test("restarted carrier accepts new peers and preserves existing identity pins", { timeout: 10_000 }, async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-restart-test-"));
+  const sockets = []; const created = new EventEmitter(); const peers = new Map();
+  class ControlSocket extends EventEmitter {
+    readyState = 0;
+    frames = [];
+    constructor() { super(); queueMicrotask(() => { this.readyState = 1; this.onopen?.(); }); }
+    receive(type, payload) {
+      const data = JSON.stringify({ v: 1, id: crypto.randomUUID(), timestamp: Date.now(), type, payload });
+      this.emit("message", data); this.onmessage?.({ data });
+    }
+    send(raw) {
+      const frame = JSON.parse(raw); this.frames.push(frame); this.emit("sent", frame);
+      if (frame.type === "hello") queueMicrotask(() => this.receive("hello.ack", { protocol: 1, serverVersion: "test", connectionSessionId: crypto.randomUUID(), heartbeatIntervalMs: 25_000, maxControlFrameBytes: 64 * 1024, maxRelayFrameBytes: 1024 * 1024, capabilities: ["transport.relay"] }));
+    }
+    close(code = 1000, reason = "") { if (this.readyState === 3) return; this.readyState = 3; this.onclose?.({ code, reason }); }
+    terminate() { this.close(); }
+    async next(type, connectionId) {
+      for (;;) {
+        const frame = this.frames.find(frame => frame.type === type && (connectionId === undefined || frame.payload.connectionId === connectionId));
+        if (frame) return frame;
+        await once(this, "sent", { signal: AbortSignal.timeout(2000) });
+      }
+    }
+  }
+  let authorizations = 0;
+  const options = {
+    env: { OPL_DATA_DIR: root, OPL_LINK_HOST_NAME: "Original Host" }, handle: () => {},
+    authorize: async ({ device }) => { authorizations++; return { schema: "opl_link_remote_credentials.v1", serverUrl: "https://link.medopl.com", accountScope: "a".repeat(43), role: device.role, deviceId: device.deviceId, identityKey: device.identityKey, accessToken: "a".repeat(32), accessTokenExpiresAt: Date.now() + 120_000, refreshToken: "r".repeat(32), refreshTokenExpiresAt: Date.now() + 500_000 }; },
+    fetchImplementation: async input => {
+      const id = decodeURIComponent(new URL(input).pathname.split("/").at(-1));
+      assert.ok(peers.has(id)); return Response.json(peers.get(id));
+    },
+    webSocketFactory: () => { const socket = new ControlSocket(); sockets.push(socket); created.emit("created"); return socket; },
+    rtcFactoryProvider: async () => undefined,
+  };
+  let carrier = await createLinkInternet(options);
+  t.after(async () => { await carrier.close(); await rm(root, { recursive: true, force: true }); });
+  async function socketAt(index) { while (!sockets[index]) await once(created, "created", { signal: AbortSignal.timeout(2000) }); const socket = sockets[index]; await socket.next("hello"); return socket; }
+  async function incoming(socket, peer) {
+    peers.set(peer.deviceId, peer); const connectionId = crypto.randomUUID();
+    socket.receive("connect.incoming", { connectionId, clientDeviceId: peer.deviceId, clientIdentityKey: peer.identityKey, authorization: "account", preferredTransports: ["relay"] });
+    return connectionId;
+  }
+  const peer = () => ({ deviceId: crypto.randomUUID(), name: "Phone", platform: "ios", role: "client", identityKey: crypto.randomBytes(32).toString("base64url"), membershipId: "membership-test" });
+  await carrier.enable(); const firstSocket = await socketAt(0);
+  const known = peer(); await firstSocket.next("connect.accepted", await incoming(firstSocket, known));
+  const directory = path.join(root, ".opl-studio/link-remote");
+  const identityBefore = await readFile(path.join(directory, "device.json"), "utf8");
+  const keyBefore = await readFile(path.join(directory, "device.key"), "utf8");
+  const pinsBefore = await readFile(path.join(directory, "trusted-peers.json"), "utf8");
+  await carrier.close();
+
+  carrier = await createLinkInternet({ ...options, env: { ...options.env, OPL_LINK_HOST_NAME: "Changed environment name" } });
+  const restarted = await socketAt(1);
+  await restarted.next("connect.accepted", await incoming(restarted, known));
+  const changed = { ...known, identityKey: crypto.randomBytes(32).toString("base64url") };
+  await restarted.next("connect.rejected", await incoming(restarted, changed));
+  assert.equal(await readFile(path.join(directory, "trusted-peers.json"), "utf8"), pinsBefore);
+  const fresh = peer(); await restarted.next("connect.accepted", await incoming(restarted, fresh));
+  const savedPins = JSON.parse(await readFile(path.join(directory, "trusted-peers.json"), "utf8")).peers;
+  assert.equal(savedPins.find(item => item.deviceId === known.deviceId).publicKey, known.identityKey);
+  assert.equal(savedPins.find(item => item.deviceId === fresh.deviceId).publicKey, fresh.identityKey);
+  assert.equal(await readFile(path.join(directory, "device.json"), "utf8"), identityBefore);
+  assert.equal(await readFile(path.join(directory, "device.key"), "utf8"), keyBefore);
+  assert.equal(authorizations, 1);
 });
 
 test("phone disconnect acknowledges durable local revocation before its separate Relay self-revoke", async t => {

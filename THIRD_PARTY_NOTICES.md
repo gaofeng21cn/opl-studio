@@ -469,6 +469,17 @@ unchanged upstream source closure is retained under `source/`, with source
 paths and digests in the same provenance manifest. The bundle includes
 `werift` `0.26.0` (MIT; <https://github.com/shinyoshiaki/werift-webrtc>) and its
 required JavaScript dependencies from the exact package-lock cohort. The
-optional native `@roamhq/wrtc` load remains optional; the shipped pure JavaScript
-backend does not depend on a native addon or postinstall. No upstream RTC
-implementation body is patched.
+optional native `@roamhq/wrtc` `0.10.0` dependency matches the fixed upstream
+plugin manifest. The official factory prefers its native libwebrtc M106 backend
+when loadable and otherwise uses the bundled pure JavaScript backend, which
+does not depend on a native addon or postinstall. No upstream RTC implementation
+body is patched.
+
+`@roamhq/wrtc` and its platform-specific prebuilt packages are distributed under
+the BSD 2-Clause License (Copyright 2019, The node-webrtc project authors), with
+additional licenses for the bundled libwebrtc and third-party libraries. The
+unchanged `LICENSE.md` and `THIRD_PARTY_LICENSES.md` from release source
+`75f1f55642d803ee558abd7f99b1915598ad21a0` are included under
+`src/host/licenses/roamhq-wrtc-0.10.0/`, alongside the Host files in every carrier.
+The exact npm package and platform-binary integrity values are in
+`package-lock.json`. Source: <https://github.com/WonderInventions/node-webrtc>.
