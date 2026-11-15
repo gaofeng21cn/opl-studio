@@ -5,7 +5,7 @@ import { softwareAttentionItems, softwareCanStart } from "./softwareExperience";
 import { RefreshCw } from "lucide-react";
 import { packageActivity, latestPackageOperations } from "./packageOperations";
 import { SoftwareCenterOverview } from "./SoftwareCenterOverview";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { CodexCapabilityCatalog, NativeAppUpdateResult } from "../bridge/oplBridge";
 import type { ActionReceiptView } from "./actionReceiptView";
@@ -18,7 +18,7 @@ import { DshPluginManagerOwner } from "../composition/dshPluginManagerOwner";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { SharedResourcesPage } from "./SharedResourcesPage";
 import { SoftwareSourcesPage } from "./SoftwareSourcesPage";
-import { nativeSoftwareInventory } from "./softwareSources";
+import { nativeSoftwareInventory, pendingSoftwareSourceAccessCheck, softwareSourceActionLabel } from "./softwareSources";
 import { softwareCatalogInventory } from "./softwareCatalog";
 
 export type ApplicationManagementTab = "applications" | "updates" | "resources" | "sources";
@@ -64,6 +64,20 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
+  const accessChecks = useRef(new Set<string>());
+  useEffect(() => {
+    for (const sourceId of accessChecks.current) {
+      if (!model.softwareSources?.entries.some(source => source.sourceId === sourceId && source.accessRefreshRequired)) accessChecks.current.delete(sourceId);
+    }
+    if (stateStatus !== "ready" || actionBusyKey !== null) return;
+    const pending = pendingSoftwareSourceAccessCheck(model.softwareSources, accessChecks.current);
+    if (!pending) return;
+    const { source, action } = pending;
+    accessChecks.current.add(source.sourceId);
+    onAction({ key: `source:${source.sourceId}:source_check`, actionId: action.actionId,
+      label: softwareSourceActionLabel(action.actionId, settings.locale, action.label), payload: action.payload,
+      confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported });
+  }, [actionBusyKey, model.softwareSources, onAction, settings.locale, stateStatus]);
   const [pendingPackageId, setPendingPackageId] = useState<string>();
   const [focus, setFocus] = useState<{ packageId: string; revision: number }>();
   const pendingPackage = model.packageLifecycle.find(item => item.packageId === pendingPackageId);
@@ -108,7 +122,7 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     { id: "resources", label: zh ? "共享资源" : "Shared resources", content: <SharedResourcesPage model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} onApproveConnectionAccess={onApproveConnectionAccess} onPickKnowledgeDirectory={onPickKnowledgeDirectory} selectedPackageId={pendingPackageId} onOpenSettings={onOpenSettings} onOpenApplicationTab={(nextTab) => { setTab(nextTab); onTabChange?.(nextTab); }} /> },
     ...(tab === "sources" ? [{ id: "sources", label: zh ? "软件源" : "Software sources", content: <SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} /> }] : [])
   ];
-  const refreshAll = () => { onRefresh(); packageOperations?.refresh(); };
+  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
   const headerStatus = <div className="opl-app-management-status">
     <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown} inventory={inventory}
       catalogAvailable={catalogAvailable} complete={nativeInventory.complete} activity={activity} issues={issues.length} affected={affected}

@@ -148,6 +148,7 @@ export type SoftwareSourceRef = CatalogProvenanceRef & {
   status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "unknown";
   enabled: boolean | null;
   credentialHandlePresent: boolean;
+  accessRefreshRequired?: boolean;
   verifiedAt?: string;
   entryCount?: number;
   inventoryStatus?: "available" | "not_checked" | "unavailable" | "unknown";
