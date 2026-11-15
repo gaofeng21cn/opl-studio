@@ -193,19 +193,20 @@ async function installPayload({ payload, target, platform }) {
   const previous = `${target}.previous-${suffix}`;
   await fs.promises.rm(temporary, { recursive: true, force: true });
   await fs.promises.rm(previous, { recursive: true, force: true });
-  await fs.promises.cp(payload.payloadRoot, temporary, {
-    recursive: true,
-    dereference: false,
-    preserveTimestamps: true
-  });
-  await makeOwnerWritable(temporary);
-  await removeQuarantine(temporary, platform);
-  await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
-    version: payload.version,
-    manifest_sha256: payload.manifestSha256,
-    installed_at: new Date().toISOString()
-  }, null, 2)}\n`, "utf8");
   try {
+    await fs.promises.cp(payload.payloadRoot, temporary, {
+      recursive: true,
+      dereference: false,
+      mode: fs.constants.COPYFILE_FICLONE,
+      preserveTimestamps: true
+    });
+    await makeOwnerWritable(temporary);
+    await removeQuarantine(temporary, platform);
+    await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
+      version: payload.version,
+      manifest_sha256: payload.manifestSha256,
+      installed_at: new Date().toISOString()
+    }, null, 2)}\n`, "utf8");
     if (fs.existsSync(target)) await fs.promises.rename(target, previous);
     await fs.promises.rename(temporary, target);
     await fs.promises.rm(previous, { recursive: true, force: true });
@@ -392,7 +393,17 @@ export function desktopBootstrapFailure(error, env = process.env) {
   return { status: "framework_bootstrap_failed", error: describe(error) };
 }
 
-function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip-packages"]) {
+export function bootstrapProgressStage(line) {
+  if (line.includes('Preparing One Person Lab managed Node.js')) return 'preparing_node';
+  if (/^==> (?:Cloning|Downloading|Updating) One Person Lab/.test(line)) return 'preparing_framework';
+  if (line.includes('==> Installing OPL CLI')) return 'installing_framework';
+  if (line.includes('==> Preparing the local background-service runtime')) return 'preparing_services';
+  if (line.includes('==> Running complete One Person Lab setup')) return 'configuring_components';
+  if (line.includes('==> Inspecting OPL system state')) return 'checking_components';
+  return null;
+}
+
+function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip-packages"], onProgress = () => {}) {
   return new Promise((resolve, reject) => {
     const child = spawn("/bin/bash", [installerPath, ...args], {
       env,
@@ -402,7 +413,13 @@ function runBootstrapInstaller(installerPath, env, args = ["--headless", "--skip
     let stderr = "";
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => { stdout = `${stdout}${chunk}`.slice(-24_000); });
+    let pending = '';
+    child.stdout.on("data", (chunk) => {
+      stdout = `${stdout}${chunk}`.slice(-24_000);
+      pending = `${pending}${chunk}`;
+      const lines = pending.split(/\r?\n/); pending = lines.pop().slice(-4096);
+      for (const line of lines) { const stage = bootstrapProgressStage(line); if (stage) onProgress({ stage, source: 'network' }); }
+    });
     child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-24_000); });
     child.once("error", reject);
     child.once("close", (code, signal) => {
@@ -474,7 +491,8 @@ export async function ensureStudioDesktopRuntime({
   homeDir = os.homedir(),
   env = process.env,
   platform = process.platform,
-  identity = "preview"
+  identity = "preview",
+  onProgress = () => {}
 } = {}) {
   if (env.OPL_APP_OPL_BIN || env.OPL_COMMAND || env.OPL_FRAMEWORK_PACKAGE_ROOT) return null;
   if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env, identity });
@@ -485,6 +503,7 @@ export async function ensureStudioDesktopRuntime({
     // an existing compatible runtime, including independently updated Packages.
     if (installed && await supportsRuntimeActivation(installed.env)) return installed;
     const target = runtimeHome(homeDir, identity);
+    onProgress({ stage: 'installing_offline_runtime', source: 'bundled' });
     await installPayload({ payload, target, platform });
     writePointer(homeDir, target, payload.version, payload.manifestSha256, "packaged_payload", identity);
     return {
@@ -517,7 +536,8 @@ export async function ensureStudioDesktopRuntime({
   );
   if (!existingManagedRuntime) {
     if (identity === "stable") captureStableOfficialProfileIntent({ homeDir, env, platform });
-    await runBootstrapInstaller(standard.installerPath, { ...env, HOME: homeDir });
+    onProgress({ stage: 'preparing_framework', source: 'network' });
+    await runBootstrapInstaller(standard.installerPath, { ...env, HOME: homeDir }, undefined, onProgress);
   }
   const installedEnv = installedFrameworkEnvironment(homeDir, env);
   if (!installedEnv || (!existingManagedRuntime && !frameworkAtRef(homeDir, standard.manifest.framework_ref))) {

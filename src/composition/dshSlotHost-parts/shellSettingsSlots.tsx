@@ -200,9 +200,11 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
   // they are not extra top-level settings pages.
   const rows = studioRows;
   const setupFlow = studio.initialization?.systemInitialize.setupFlow;
-  const onboardingVisible = studio.initializationStatus === "ready"
+  const preparingRuntime = studio.installationState?.status === 'running'
+    && !['ready', 'preparing_packages'].includes(studio.installationState.stage);
+  const onboardingVisible = preparingRuntime || (studio.initializationStatus === "ready"
     && setupFlow?.isFirstRun === true
-    && setupFlow.readyToLaunch === false;
+    && setupFlow.readyToLaunch === false);
   const sessions = { phase: "ready", current: "opl-current", byId: { "opl-current": { id: "opl-current", blank: onboardingVisible, retainedBy: { mainView: 1 } } } };
   const onboardingSteps = onboardingVisible ? [{ id: "opl-first-run", order: 0 }] : [];
   const renderContribution = useCallback((options?: { only?: string }) => (

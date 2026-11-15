@@ -126,7 +126,8 @@
     "@deepseek-ai/dsh": "0.2.2-rc.3",
     "dsh-superagent": "file:plugins/opl-superagent-engine",
     "@one-person-lab/opl-superagent": "file:plugins/opl-superagent",
-    "proper-lockfile": "4.1.2"
+    "proper-lockfile": "4.1.2",
+    "@deepseek-ai/dsh-client-ui-settings-models": "0.2.2-rc.3"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-api-remotes": "0.2.2-rc.3",

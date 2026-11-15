@@ -51,9 +51,18 @@ if (typeof document !== "undefined") ipcRenderer.on("opl:window-fullscreen", (_e
 });
 
 function subscribeEvents(listener) {
-  const wrapped = (_event, payload) => listener(payload);
+  let observedLiveSetup = false;
+  const wrapped = (_event, payload) => {
+    if (payload?.method === 'desktop/runtime-setup') observedLiveSetup = true;
+    listener(payload);
+  };
   subscriptions.set(listener, wrapped);
   ipcRenderer.on("opl:event", wrapped);
+  // Bootstrap can start before React subscribes. The snapshot endpoint never
+  // waits for desktopHost, so progress remains readable during installation.
+  void invoke('readDesktopSetupStatus').then(params => {
+    if (params && !observedLiveSetup && subscriptions.get(listener) === wrapped) listener({ method: 'desktop/runtime-setup', params });
+  }).catch(() => {});
   if (!pendingDeepLinksRequested) {
     pendingDeepLinksRequested = true;
     void invoke("readPendingDeepLinks").then((pending) => {

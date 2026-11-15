@@ -926,6 +926,7 @@
       "@deepseek-ai/dsh-working-directory@0.2.2-rc.3",
       "@deepseek-ai/dsh-fs-local@0.2.2-rc.3",
       "@deepseek-ai/dsh@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.3",
       "use-sync-external-store@1.7.0"
     ],
     "vendored_source_root": "src/vendor/deepseek-harness",

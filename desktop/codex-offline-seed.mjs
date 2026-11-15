@@ -28,9 +28,11 @@ export function codexOfflineSeedEnvironment(runtimeRoot, env) {
   return result;
 }
 
-export async function ensureFullCodexFirstInstall({ env, opl, executable = file => {
+function executableFile(file) {
   try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; }
-} }) {
+}
+
+export async function ensureFullCodexFirstInstall({ env, opl, executable = executableFile }) {
   if (!env.OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL || !env.OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL) return null;
   if (env.CODEX_APP_SERVER_COMMAND || [env.OPL_CODEX_BIN, env.CODEX_CLI_PATH, env.CODEX_BIN].filter(Boolean).some(executable)) return null;
   const result = await opl.executeAction({ actionId: "codex_install", dryRun: false, payload: { confirmed: true } });
@@ -39,4 +41,27 @@ export async function ensureFullCodexFirstInstall({ env, opl, executable = file 
   const binary = activation.runtime_activation?.codex?.runtime_binary_path;
   if (!path.isAbsolute(binary ?? "") || !executable(binary)) throw new Error("Framework did not activate a usable Codex executable");
   return binary;
+}
+
+// Pending updates are optional at launch. Packaged first-install inputs must
+// still reach Framework when update activation fails or automatic updates are off.
+export async function prepareDesktopCodexRuntime({ env, opl, activatePending = true, onProgress = () => {}, executable = executableFile }) {
+  let activationStatus = 'disabled';
+  let activatedCodexPath;
+  if (activatePending) {
+    try {
+      const activation = await opl.runManagedUpdate('activate');
+      activationStatus = activation.runtime_activation?.status ?? 'unknown';
+      const binary = activation.runtime_activation?.codex?.runtime_binary_path;
+      if (typeof binary === 'string' && path.isAbsolute(binary) && executable(binary)) activatedCodexPath = binary;
+    } catch (error) { activationStatus = error.code ?? 'failed'; }
+  }
+  if (!activatedCodexPath) {
+    const hasSeed = env.OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL && env.OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL;
+    if (hasSeed && !env.OPL_CODEX_BIN && !env.CODEX_APP_SERVER_COMMAND && !env.CODEX_CLI_PATH && !env.CODEX_BIN) {
+      onProgress({ stage: 'preparing_codex', source: 'bundled' });
+    }
+    activatedCodexPath = await ensureFullCodexFirstInstall({ env, opl, executable }) ?? undefined;
+  }
+  return { activationStatus, activatedCodexPath };
 }

@@ -127,8 +127,25 @@ function executeHelper(spec) {
     const terminate = () => { try { if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch {} };
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk; if (stdout.length > 8 * 1024 * 1024) { overflow = true; terminate(); } });
-    // The helper returns bounded/redacted per-Package failures in stdout. Never persist raw stderr.
-    child.stderr.resume();
+    // Only the App-owned bounded progress envelope may reach the renderer.
+    let pending = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      pending += chunk;
+      const lines = pending.split(/\r?\n/); pending = lines.pop().slice(-64_000);
+      for (const line of lines) {
+        if (!line.startsWith('OPL_PROFILE_PROGRESS ')) continue;
+        try {
+          const event = JSON.parse(line.slice(21));
+          if (event.schema === 'opl_official_profile_install_progress.v1'
+            && spec.rootPackageIds.includes(event.package_id) && ['installing', 'ready', 'attention'].includes(event.status)) {
+            spec.onProgress?.({ stage: 'preparing_packages', status: 'running', packageId: event.package_id,
+              packageStatus: event.status, rootPackageIds: spec.rootPackageIds,
+              packageResults: Array.isArray(event.package_results) ? event.package_results.filter(item => spec.rootPackageIds.includes(item.package_id)).map(item => ({ package_id: item.package_id, status: item.status })) : [] });
+          }
+        } catch { /* Other stderr is never renderer content. */ }
+      }
+    });
     const timer = setTimeout(() => { timedOut = true; terminate(); }, spec.timeoutMs);
     child.once("error", (error) => { clearTimeout(timer); resolve({ status: -1, errorCode: error.code ?? "helper_spawn_failed", stdout: "", timedOut: false }); });
     child.once("close", (status) => { clearTimeout(timer); resolve({ status, stdout: overflow ? "" : stdout, timedOut, errorCode: overflow ? "helper_output_too_large" : null }); });
@@ -153,11 +170,18 @@ export function summarizeOfficialProfileResult(result, resources, env = process.
   };
 }
 
-export function startOfficialProfileFirstInstall({ admission, resourcesPath, env = process.env, readInitialize, execute = executeHelper, nodeCommand = "node", timeoutMs = 900_000, readinessTimeoutMs = 120_000, logEvent = () => {}, explicitRetry = false } = {}) {
+export function startOfficialProfileFirstInstall({ admission, resourcesPath, env = process.env, readInitialize, execute = executeHelper, nodeCommand = "node", timeoutMs = 900_000, readinessTimeoutMs = 120_000, logEvent = () => {}, onProgress = () => {}, explicitRetry = false } = {}) {
   invariant(admission?.schema === "opl_studio_official_profile_admission.v1", "Capture Official Profile admission before runtime bootstrap");
   invariant(typeof readInitialize === "function", "Framework initialize readback is required");
   if (exists(admission.completePath)) { regular(admission.completePath); return Promise.resolve({ status: "skipped", reason: "first_install_already_completed" }); }
-  if (!admission.eligible && !(explicitRetry && admission.reason === "previous_attempt_requires_explicit_retry")) return Promise.resolve({ status: "skipped", reason: admission.reason });
+  if (!admission.eligible && !(explicitRetry && admission.reason === "previous_attempt_requires_explicit_retry")) {
+    if (admission.reason === 'previous_attempt_requires_explicit_retry') {
+      regular(admission.attemptPath);
+      const previous = JSON.parse(fs.readFileSync(admission.attemptPath, 'utf8'));
+      onProgress({ stage: 'preparing_packages', status: previous.status === 'failed' ? 'failed' : 'unconfirmed' });
+    }
+    return Promise.resolve({ status: 'skipped', reason: admission.reason });
+  }
   if (inFlight.has(admission.attemptPath)) return inFlight.get(admission.attemptPath);
   const task = (async () => {
     let ownsAttempt = false;
@@ -183,18 +207,21 @@ export function startOfficialProfileFirstInstall({ admission, resourcesPath, env
       }
       try { privateJson(admission.attemptPath, { schema: "opl_official_profile_first_install_terminal.v1", status: "running", intent: "first_install", app_process_id: process.pid, recorded_at: new Date().toISOString() }); ownsAttempt = true; }
       catch (error) { if (error.code === "EEXIST") return { status: "skipped", reason: "first_install_attempt_already_owned" }; throw error; }
-      const result = await execute(buildOfficialProfileCommand({ resources, env, nodeCommand, timeoutMs }));
+      onProgress({ stage: 'preparing_packages', status: 'running', rootPackageIds: resources.rootPackageIds, packageResults: [] });
+      const result = await execute({ ...buildOfficialProfileCommand({ resources, env, nodeCommand, timeoutMs }), rootPackageIds: resources.rootPackageIds, onProgress });
       const receipt = summarizeOfficialProfileResult(result, resources, env);
       privateJson(admission.attemptPath, receipt, "w");
       if (receipt.status === "completed") {
         try { privateJson(admission.completePath, receipt); }
         catch (error) { if (error.code !== "EEXIST") throw error; regular(admission.completePath); }
       }
+      onProgress({ stage: 'preparing_packages', status: receipt.status, rootPackageIds: receipt.root_package_ids, packageResults: receipt.package_results ?? [] });
       logEvent(receipt);
       return receipt;
     } catch (error) {
       const receipt = { schema: "opl_official_profile_first_install_terminal.v1", status: "failed", intent: "first_install", app_process_id: process.pid, recorded_at: new Date().toISOString(), error: { message: safeMessage(error, env) }, automatic_reapply_allowed: false, package_lifecycle_authority: false };
       if (ownsAttempt) privateJson(admission.attemptPath, receipt, "w");
+      if (ownsAttempt) onProgress({ stage: 'preparing_packages', status: 'failed' });
       logEvent(receipt);
       return receipt;
     }

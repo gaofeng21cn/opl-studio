@@ -1,3 +1,4 @@
+import { FirstInstallProgress, type FirstInstallSnapshot } from "./FirstInstallProgress";
 import { usePackageOperations } from './usePackageOperations';
 import { packageActivity, packageActionVerb, preparePackageOperationRequest } from './packageOperations';
 import { softwareCanStart } from "./softwareExperience";
@@ -424,8 +425,7 @@ export function App({
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [applicationManagementTab, setApplicationManagementTab] = useState<ApplicationManagementTab>("applications");
   const [startupAttempt, setStartupAttempt] = useState(0);
-  const [desktopSetupStage, setDesktopSetupStage] = useState<string | null>(null);
-  const [desktopSetupElapsedSeconds, setDesktopSetupElapsedSeconds] = useState<number | null>(null);
+  const [desktopSetup, setDesktopSetup] = useState<FirstInstallSnapshot | null>(null);
   const t = uiCopy[settings.locale];
   const normalizedCapabilityQuery = capabilityQuery.trim().toLowerCase();
   const standardAgentOptions = useMemo<ComposerAgentOption[]>(() => model.packageLifecycle
@@ -1598,9 +1598,11 @@ export function App({
       setPrimaryView(params.view);
     }
     if (method === "desktop/runtime-setup" && typeof params.stage === "string") {
-      setDesktopSetupStage(params.stage === "ready" ? null : params.stage);
-      setDesktopSetupElapsedSeconds(params.stage !== "ready" && typeof params.elapsedSeconds === "number"
-        && Number.isFinite(params.elapsedSeconds) && params.elapsedSeconds >= 0 ? Math.floor(params.elapsedSeconds) : null);
+      setDesktopSetup(params as unknown as FirstInstallSnapshot);
+      if (params.stage === 'preparing_packages') {
+        packageOperations.refresh();
+        if (params.status === 'completed' || params.status === 'failed') void loadState(settings.runtimeProfile);
+      }
     }
     if (method === "desktop/deep-link") {
       const destination = resolveDeepLinkDestination(params);
@@ -2403,15 +2405,15 @@ export function App({
     </nav>
   ) : null;
 
+  const installationProgress = <FirstInstallProgress snapshot={desktopSetup} locale={settings.locale}
+    operations={packageOperations.operations} readError={packageOperations.readError}
+    labels={Object.fromEntries(Object.entries(packageDisplayInfo).map(([id, value]) => [id, value.name]))}
+    onOpenSoftware={() => { setApplicationManagementTab('applications'); setPrimaryView('applications'); }}
+    onRetryRuntime={retryStartup} />;
+
   const studioConversationBody = (
     <div className="opl-dsh-thread" ref={conversationRef as never}>
-      {desktopSetupStage ? <p role="status" data-testid="opl-desktop-runtime-setup">{({
-        checking_host: settings.locale === "zh" ? "正在检查本机运行环境" : "Checking the local runtime",
-        enabling_wsl: settings.locale === "zh" ? "正在启用 Windows 运行环境" : "Enabling the Windows runtime",
-        installing_owned_distribution: settings.locale === "zh" ? "正在安装 OPL 运行环境" : "Installing the OPL runtime",
-        initializing_guest: settings.locale === "zh" ? "正在准备 OPL 组件" : "Preparing OPL components",
-        validating_routes: settings.locale === "zh" ? "正在检查 OPL 组件" : "Checking OPL components"
-      } as Record<string, string>)[desktopSetupStage] ?? (settings.locale === "zh" ? "正在准备运行环境" : "Preparing the runtime")}{desktopSetupElapsedSeconds !== null ? <span>{settings.locale === "zh" ? ` · 已用时 ${desktopSetupElapsedSeconds} 秒` : ` · Elapsed ${desktopSetupElapsedSeconds}s`}</span> : null}</p> : null}
+      {installationProgress}
       {(threadDirectoryStatus === "error" || modelCatalogStatus === "error") && <div role="status" data-testid="opl-codex-recovery"><p>{threadDirectoryError || modelCatalogError}</p><button type="button" onClick={() => void retryStartup().catch(error => setThreadActionError(String(error)))}>{settings.locale === "zh" ? "重试连接" : "Retry connection"}</button><a href="https://github.com/gaofeng21cn/opl-studio/issues/new" target="_blank" rel="noreferrer">{settings.locale === "zh" ? "报告启动问题" : "Report startup issue"}</a></div>}
       <CodexServerRequestPanel requests={pendingServerRequests} locale={settings.locale} error={pendingServerRequestError} onRespond={(request, response) => void respondToServerRequest(request, response)} />
       {threadActionError ? <p className="thread-read-error" role="alert">{threadActionError}</p> : null}
@@ -2838,6 +2840,8 @@ export function App({
     renderSettings: renderStudioSettings,
     renderSettingsContribution: (options, owner) => renderContributionSlot?.("settings.section", { ...contributionOwner, ...owner }, options),
     settingsNavigation,
+    installationProgress,
+    installationState: desktopSetup,
     initializationStatus: initializeStatus,
     initialization: initializeReadback,
     refreshInitialization: () => { void loadInitialize(); },

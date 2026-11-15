@@ -233,26 +233,6 @@ export const codexWorkbenchStyleResponsive = `  @media (max-width: 980px) {
       align-self: flex-end;
     }
 
-    .opl-first-run-surface {
-      padding: 16px;
-    }
-
-    .opl-first-run {
-      width: 100%;
-      justify-content: flex-start;
-      gap: 22px;
-      padding: 42px 0 24px;
-      overflow-y: auto;
-    }
-
-    .opl-first-run > header {
-      grid-template-columns: 1fr;
-    }
-
-    .opl-first-run > footer {
-      flex-wrap: wrap;
-    }
-
     .settings-capability-row > summary,
     .settings-instruction-source > summary {
       grid-template-columns: minmax(0, 1fr);

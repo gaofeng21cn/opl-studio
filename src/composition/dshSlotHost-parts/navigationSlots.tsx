@@ -328,10 +328,17 @@ function RecentSessionsSection({ list, current, locale, open, menus, renderFacto
 export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const studio = useStudio();
   const sessionId = "opl-current";
-  const session = { openState: "open", blank: studio.conversationBlank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
-  const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { id: sessionId, blank: studio.conversationBlank, cwd: studio.workspacePath, retainedBy: { mainView: 1 } } } };
+  // Setup is real view content. Use DSH's active scroll layout instead of its
+  // centered empty hero, which can clip long setup details on short windows.
+  // This is renderer state only; it does not create or change a Codex thread.
+  const blank = studio.conversationBlank && (!studio.installationState || studio.installationState.stage === 'ready');
+  const session = { openState: "open", blank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
+  const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { id: sessionId, blank, cwd: studio.workspacePath, retainedBy: { mainView: 1 } } } };
   const workspaces = { phase: "ready", items: [{ workspaceId: "opl-workspace", title: studio.projectTitle, sessionIds: [sessionId] }] };
   const input = { draft: studio.prompt, attachmentIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
+  // The upstream content treats this factory result as a component type.
+  // Keep it stable across progress/state refreshes so disclosure and scroll survive.
+  const SessionViews = useCallback(() => renderSlot("conversation.session", {}), [renderSlot]);
   return <div className="opl-dsh-conversation-shell">
     <ConversationRoot
       useSessionPendingInteraction={(selector: any) => selector(new Map())}
@@ -356,7 +363,7 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
         renderSlot={renderSlot}
         renderSlotChain={(_key: string, _owner: unknown, chain: { fallback: ReactNode }) => chain.fallback}
         selectWorkspace={async () => undefined}
-        useFactorySlot={(key: string, fallback: unknown) => key === "views" ? (() => renderSlot("conversation.session", {})) : options.slots?.[key] ?? fallback}
+        useFactorySlot={(key: string, fallback: unknown) => key === "views" ? SessionViews : options.slots?.[key] ?? fallback}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
       />}
       renderSlotChain={(_key: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback}

@@ -232,6 +232,7 @@ export function buildGuestLaunchCommand({
   frameworkRef = null,
   caBundle = null,
   publicMetadataBin = null,
+  managedUpdates = true,
   allowActions = false
 }) {
   return [
@@ -242,6 +243,7 @@ export function buildGuestLaunchCommand({
     frameworkSourceArchive ? `OPL_SOURCE_ARCHIVE_URL=${shellQuote(`file://${frameworkSourceArchive}`)}` : null,
     frameworkRef ? `OPL_FRAMEWORK_SOURCE_COMMIT=${shellQuote(frameworkRef)}` : null,
     allowActions ? "OPL_NATIVE_WORKBENCH_READ_ONLY=0" : null,
+    managedUpdates ? null : 'OPL_STUDIO_MANAGED_UPDATES=0',
     "nohup",
     shellQuote(appExecutable),
     "--disable-gpu",
@@ -604,7 +606,7 @@ export async function qualifyCleanVm(options) {
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
       };
-      const launch = buildGuestLaunchCommand(launchOptions);
+      const launch = buildGuestLaunchCommand({ ...launchOptions, managedUpdates: !fullRuntime });
       progress({ phase: "guest-launch", status: "started" });
       guestAppProcessId = Number(guestRun(options, ip, launch).stdout.trim());
       invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest App launch did not return its process ID");
@@ -613,15 +615,27 @@ export async function qualifyCleanVm(options) {
         progress({ phase: "full-offline-first-launch", status: "started" });
         await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
         const protocol = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
-          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
-        invariant(protocol?.threadListValid === true && protocol.simulated === false, "Full offline App Server handshake failed");
+          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {appVisible:!!document.querySelector('[data-testid=opl-studio-root]'),threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
+        invariant(protocol?.appVisible === true && protocol.threadListValid === true && protocol.simulated === false, "Full offline App Server handshake failed");
         const version = guestRun(options, ip, '"$HOME/Library/Application Support/OPL/runtime/current/bin/codex" --version').stdout.trim();
         invariant(!options.codexVersion || version === `codex-cli ${options.codexVersion}`, "Full offline Codex differs from its resolved release identity");
         checks.codex = { status: "passed", expectedVersion: options.codexVersion, verifiedVersion: version,
           source: "packaged_full_offline_seed", bundleIncluded: true, injectedVia: null,
           offlineFirstLaunch: { status: "passed", networkPolicy: FULL_OFFLINE_NETWORK_POLICY,
-            gatewayConfigured: false, protocolCalls: ["thread/list"], generationRequested: false } };
+            gatewayConfigured: false, automaticUpdatesEnabled: false, appVisible: true,
+            protocolCalls: ["thread/list"], generationRequested: false } };
         progress({ phase: "full-offline-first-launch", status: "passed", version });
+        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
+        guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
+        invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, 'Guest offline relaunch did not return its process ID');
+        await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
+        const offlineRelaunch = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
+          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {appVisible:!!document.querySelector('[data-testid=opl-studio-root]'),threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
+        invariant(offlineRelaunch?.appVisible === true && offlineRelaunch.threadListValid === true && offlineRelaunch.simulated === false, 'Full offline relaunch failed');
+        checks.codex.offlineRelaunch = { status: 'passed', automaticUpdatesEnabled: true,
+          networkPolicy: FULL_OFFLINE_NETWORK_POLICY, gatewayConfigured: false, appVisible: true,
+          protocolCalls: ['thread/list'], generationRequested: false };
+        progress({ phase: 'full-offline-relaunch', status: 'passed', version });
         // Continue the existing online Gateway qualification with the same
         // installed bytes and owner state after proving the clean offline start.
         guestRun(options, ip, buildGuestNetworkCommand(false));

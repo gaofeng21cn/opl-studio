@@ -278,123 +278,17 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     overflow-wrap: anywhere;
   }
 
-  .opl-first-run-surface {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-    overflow: auto;
-    background: var(--opl-canvas);
-  }
-
-  .opl-first-run {
-    box-sizing: border-box;
-    width: min(680px, 100%);
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 28px;
-    padding: 32px 0;
-    color: var(--opl-text);
-  }
-
-  .opl-first-run > header {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 18px;
-  }
-
-  .opl-first-run:focus {
-    outline: none;
-  }
-
-  .opl-first-run-mark {
-    width: 40px;
-    height: 40px;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--opl-border-strong);
-    border-radius: var(--dsw-radius-sm);
-    font-size: var(--opl-text-sm);
-    font-weight: var(--opl-weight-semibold);
-  }
-
-  .opl-first-run header p,
-  .opl-first-run header h1,
-  .opl-first-run header span {
-    margin: 0;
-  }
-
-  .opl-first-run header p {
-    margin-bottom: 5px;
-    color: var(--opl-faint);
-    font-size: var(--opl-text-sm);
-  }
-
-  .opl-first-run header h1 {
-    font-size: var(--opl-text-2xl);
-    font-weight: var(--opl-weight-semibold);
-  }
-
-  .opl-first-run header div > span {
-    display: block;
-    margin-top: 9px;
-    color: var(--opl-muted);
-    font-size: var(--opl-text-sm);
-    line-height: var(--opl-leading-relaxed);
-  }
-
-  .opl-first-run-checklist {
-    border-top: 1px solid var(--opl-border);
-  }
-
-  .opl-first-run-checklist > div {
-    min-height: 66px;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid var(--opl-border);
-    color: var(--opl-warning);
-  }
-
-  .opl-first-run-checklist > div[data-ready="true"] {
-    color: var(--opl-success);
-  }
-
-  .opl-first-run-checklist span {
-    min-width: 0;
-    display: grid;
-    gap: 3px;
-  }
-
-  .opl-first-run-checklist strong {
-    color: var(--opl-text);
-    font-size: var(--opl-text-md);
-    font-weight: var(--opl-weight-semibold);
-  }
-
-  .opl-first-run-checklist small {
-    color: var(--opl-muted);
-    line-height: var(--opl-leading-normal);
-  }
-
-  .opl-first-run > footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-
-  .opl-first-run-error {
-    margin: -12px 0 0;
-    color: var(--opl-danger);
-    font-size: var(--opl-text-sm);
-    line-height: var(--opl-leading-normal);
-  }
+  /* Official DSH OnboardingModal owns the surface, heading, scroll, mask and
+     focus lifecycle. These rules only arrange OPL's three owner-projected items. */
+  .opl-first-run { min-width: 0; color: var(--dsw-alias-label-primary); }
+  .opl-first-run-intro { margin: 0 0 16px; color: var(--dsw-alias-label-secondary); font: var(--dsw-font-s-14); }
+  .opl-first-run-checklist { display: grid; gap: 16px; margin: 20px 0; }
+  .opl-first-run-checklist > div { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .opl-first-run-checklist > div > span:last-child { display: grid; gap: 4px; min-width: 0; }
+  .opl-first-run-checklist strong { font: var(--dsw-font-s-strong-14); }
+  .opl-first-run-checklist small { color: var(--dsw-alias-label-secondary); font: var(--dsw-font-xs-13); overflow-wrap: anywhere; }
+  .opl-first-run > footer { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+  .opl-first-run-error { color: var(--dsw-alias-state-error-primary); font: var(--dsw-font-xs-13); }
 
   .agent-catalog,
   .agent-catalog-group,

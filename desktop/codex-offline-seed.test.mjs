@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { codexOfflineSeedEnvironment, ensureFullCodexFirstInstall } from "./codex-offline-seed.mjs";
+import { codexOfflineSeedEnvironment, ensureFullCodexFirstInstall, prepareDesktopCodexRuntime } from "./codex-offline-seed.mjs";
 
 test("Full projects verified archives without selecting a second executable", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-codex-seed-"));
@@ -38,4 +38,47 @@ test("clean Full delegates installation and activation before starting Codex", a
   assert.equal(await ensureFullCodexFirstInstall({ env: { ...env, OPL_CODEX_BIN: "/existing/codex" }, opl, executable: () => true }), null);
   assert.equal(calls.length, 0);
   await assert.rejects(ensureFullCodexFirstInstall({ env, opl: { executeAction: async () => ({ status: "error" }) }, executable: () => false }), /could not initialize/);
+});
+
+test('Full installs its local Codex even when automatic updates are disabled', async () => {
+  const calls = [], progress = [];
+  const result = await prepareDesktopCodexRuntime({
+    env: { OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL: '/seed/package.tgz', OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL: '/seed/platform.tgz' },
+    activatePending: false, executable: file => file === '/managed/codex', onProgress: value => progress.push(value),
+    opl: {
+      executeAction: async request => { calls.push(request.actionId); return { status: 'executed' }; },
+      runManagedUpdate: async operation => { calls.push(operation); return { runtime_activation: { codex: { runtime_binary_path: '/managed/codex' } } }; }
+    }
+  });
+  assert.equal(result.activatedCodexPath, '/managed/codex');
+  assert.equal(result.activationStatus, 'disabled');
+  assert.deepEqual(calls, ['codex_install', 'activate']);
+  assert.deepEqual(progress, [{ stage: 'preparing_codex', source: 'bundled' }]);
+});
+
+test('a broken pending update cannot suppress Full first installation', async () => {
+  const calls = [];
+  const result = await prepareDesktopCodexRuntime({
+    env: { OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL: '/seed/package.tgz', OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL: '/seed/platform.tgz' },
+    executable: file => file === '/managed/codex',
+    opl: {
+      executeAction: async request => { calls.push(request.actionId); return { status: 'executed' }; },
+      runManagedUpdate: async operation => {
+        calls.push(operation);
+        if (calls.length === 1) throw Object.assign(new Error('old staged update unavailable'), { code: 'pending_update_invalid' });
+        return { runtime_activation: { codex: { runtime_binary_path: '/managed/codex' } } };
+      }
+    }
+  });
+  assert.equal(result.activatedCodexPath, '/managed/codex');
+  assert.equal(result.activationStatus, 'pending_update_invalid');
+  assert.deepEqual(calls, ['activate', 'codex_install', 'activate']);
+});
+
+test('failed local installation is returned to startup instead of a false ready result', async () => {
+  await assert.rejects(prepareDesktopCodexRuntime({
+    env: { OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL: '/seed/package.tgz', OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL: '/seed/platform.tgz' },
+    activatePending: false, executable: () => false,
+    opl: { executeAction: async () => ({ status: 'error' }) }
+  }), /could not initialize/);
 });
