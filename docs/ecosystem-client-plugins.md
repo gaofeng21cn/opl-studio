@@ -8,6 +8,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
+| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.2`，MIT，与固定 cohort 同步 | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备和状态内容，不装载其模型或凭据 controller |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | 直接使用官方 `createClientModuleSystem` 装载客户端 factory，React 由 Studio 单实例提供 |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
 | DSH `ui-sidebar-documentpreview` | npm `0.2.2-rc.2`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |

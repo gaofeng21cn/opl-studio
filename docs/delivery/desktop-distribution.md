@@ -75,8 +75,17 @@ activation to Framework before creating the persistent App Server. A usable
 existing Codex takes precedence; the seed never pins subsequent managed updates.
 Full clean-VM qualification first launches the actual App under a network policy
 that permits loopback only, without an external Codex injection or Gateway setup,
-and verifies the local App Server. It then restarts the same installation for
+and with automatic updates disabled, and verifies the local App Server and visible
+App. It then relaunches the same installation offline with automatic updates enabled
+before restoring networking for
 the existing online Gateway and Package qualification.
+
+Packaged Codex initialization runs independently of automatic update preferences
+and a failed pending-update activation. A failed runtime bootstrap retains its
+actual source/stage instead of falling through to an online installer. Full runtime
+copy requests filesystem cloning where available and cleans incomplete staging on
+copy, permission, quarantine or activation failure. Standard continues to use the
+Framework installer, its verified caches and installed-identity readback.
 
 Distribution qualification can consume `OPL_DESKTOP_NOTARIZATION_RECEIPT` from
 the App finalizer. It must bind the final DMG name, SHA-256, size, publisher and
@@ -353,3 +362,33 @@ Real histories containing these characters otherwise produce invalid fragments
 and a misleading `thread/list` timeout. The history transport regression covers
 large responses, Unicode separators, fragmented UTF-8, and CRLF framing without
 truncating or rewriting canonical history.
+
+
+### First-install progress
+
+Desktop replays its ephemeral `desktop/runtime-setup` presentation snapshot to
+late renderer subscribers before waiting for Host readiness. Standard bootstrap
+milestones come from the signed installer; Full reports local payload and Codex
+seed preparation. The App-owned Official Profile helper emits bounded root
+progress on stderr. Only its tagged envelope reaches the renderer; raw installer
+or helper output does not.
+
+The helper uses Framework's existing `package_operation_status` and
+`package_operation_start` transport where available. Transfer bytes and download
+speed remain Framework-owned; completion still requires fresh configured-carrier
+and required-dependency readback. An unavailable or interrupted result requires
+inspection before another install. An older Framework keeps its synchronous
+projected action. No overall percentage, second Package resolver or installed
+state store is introduced.
+
+First launch directly imports the official DSH `OnboardingModal` from the
+pinned `@deepseek-ai/dsh-client-ui-settings-models` package. Its modal, focus
+lifetime, scrolling, responsive dimensions and heading remain upstream-owned.
+Progress uses the official `DisclosureRow`, `StateDot`, `Tag`, and `Button`;
+only OPL content placement and a native measured-byte progress element are local.
+The DSH Settings onboarding coordinator owns dismissal, so entering the App does
+not cancel setup or reopen the same step. Official agents continue in the
+background, with a direct Software Center entry.
+Standard and Full consume the same Official Profile; the lightweight MAC catalog
+is required while full media remains explicitly selected. Cloud model access and
+account sign-in require a network in both forms.

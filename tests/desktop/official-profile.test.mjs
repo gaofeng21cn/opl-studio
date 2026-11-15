@@ -101,3 +101,24 @@ test("missing core readiness defers without claiming an attempt and can resume a
     assert.equal(resumed.status, "completed");
   } finally { f.cleanup(); }
 });
+
+
+test('packaged helper emits root progress without forwarding raw stderr', async () => {
+  const f = fixture();
+  try {
+    const root = path.join(f.resourcesPath, 'opl-official-profile');
+    const helperPath = path.join(root, 'official-profile-package-apply.ts');
+    const event = { schema: 'opl_official_profile_install_progress.v1', package_id: 'mas', status: 'installing', package_results: [] };
+    const script = `process.stderr.write('secret=never-forward\\n');\nprocess.stderr.write('OPL_PROFILE_PROGRESS ' + JSON.stringify(${JSON.stringify(event)}) + '\\n');\nprocess.stdout.write(${JSON.stringify(result().stdout)});\n`;
+    fs.writeFileSync(helperPath, script);
+    const manifestPath = path.join(root, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath));
+    manifest.helper_sha256 = createHash('sha256').update(script).digest('hex'); fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const events = [];
+    const receipt = await startOfficialProfileFirstInstall({ admission: captureOfficialProfileAdmission({ homeDir: f.homeDir, env: {} }), resourcesPath: f.resourcesPath, env: {}, readInitialize: ready, nodeCommand: process.execPath, onProgress: event => events.push(event) });
+    assert.equal(receipt.status, 'completed');
+    assert.equal(events.some(item => item.packageId === 'mas' && item.packageStatus === 'installing'), true);
+    assert.equal(events.at(-1).status, 'completed');
+    assert.equal(JSON.stringify(events).includes('never-forward'), false);
+  } finally { f.cleanup(); }
+});

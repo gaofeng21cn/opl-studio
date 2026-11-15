@@ -11,7 +11,7 @@ import { createManagedUpdateMaintenance } from "../src/host/managed-update-maint
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
-import { ensureFullCodexFirstInstall } from "./codex-offline-seed.mjs";
+import { prepareDesktopCodexRuntime } from "./codex-offline-seed.mjs";
 import { ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 import { createShutdownController } from "./shutdown.mjs";
@@ -70,6 +70,16 @@ let quittingApplication = false;
 let updaterQualificationEnabled = false;
 let updaterQualificationAutomatic = false;
 const appProcessInstanceId = randomUUID();
+// Ephemeral presentation snapshot, replayed before Host readiness. No installed truth.
+let desktopSetupSnapshot = null;
+function reportDesktopSetup(progress) {
+  const previous = desktopSetupSnapshot;
+  const sameStage = previous?.stage === progress.stage;
+  desktopSetupSnapshot = { source: previous?.source, ...progress,
+    startedAt: sameStage ? previous.startedAt : new Date().toISOString(),
+    status: progress.status ?? 'running' };
+  sendDesktopRendererEvent('desktop/runtime-setup', desktopSetupSnapshot);
+}
 const nativeAccessibilityQualificationEnabled = process.env.OPL_DESKTOP_NATIVE_ACCESSIBILITY_QUALIFICATION === "1";
 if (nativeAccessibilityQualificationEnabled) {
   app.commandLine.appendSwitch("force-renderer-accessibility");
@@ -279,7 +289,7 @@ async function createDesktopHost(appLogDirectory) {
   // Recovery updates must remain reachable even if Framework or Host boot fails.
   desktopUpdater = updater;
   const homeDir = app.getPath("home");
-  const reportWindowsSetup = progress => sendDesktopRendererEvent("desktop/runtime-setup", progress);
+  const reportWindowsSetup = reportDesktopSetup;
   const windowsRuntime = app.isPackaged && stableIdentity && process.platform === "win32"
     ? createWindowsRuntime({
       userDataPath: app.getPath("userData"), resourcesPath: process.resourcesPath,
@@ -295,10 +305,13 @@ async function createDesktopHost(appLogDirectory) {
     resourcesPath: process.resourcesPath,
     homeDir,
     identity: stableIdentity ? "stable" : "preview",
-    env: process.env
-  }).catch(() => {
+    env: process.env,
+    onProgress: reportDesktopSetup
+  }).catch(error => {
     bootstrapStatus = "framework_bootstrap_failed";
-    return null;
+    reportDesktopSetup({ stage: desktopSetupSnapshot?.stage ?? 'preparing_framework', status: 'failed',
+      source: desktopSetupSnapshot?.source ?? 'network' });
+    throw error;
   });
   const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
   const runtimeEnvironment = nodeHost ? { ...(runtime?.env ?? process.env),
@@ -315,20 +328,14 @@ async function createDesktopHost(appLogDirectory) {
     && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1";
   let activationStatus = "disabled";
   let activatedCodexPath;
-  if (managedUpdatesEnabled && !windowsRuntime) {
-    try {
-      const activation = await createOplPassthrough({ env: activationEnvironment, cwd: homeDir }).runManagedUpdate("activate");
-      activationStatus = activation.runtime_activation?.status ?? "unknown";
-      const binary = activation.runtime_activation?.codex?.runtime_binary_path;
-      if (typeof binary === "string" && path.isAbsolute(binary) && fs.existsSync(binary)) activatedCodexPath = binary;
-      if (!activatedCodexPath) {
-        activatedCodexPath = await ensureFullCodexFirstInstall({ env: activationEnvironment,
-          opl: createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] }) }) ?? undefined;
-      }
-    } catch (error) {
-      activationStatus = error.code ?? "failed";
-    }
+  if (app.isPackaged && !windowsRuntime && !updaterQualificationEnabled
+    && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1") {
+    ({ activationStatus, activatedCodexPath } = await prepareDesktopCodexRuntime({
+      env: activationEnvironment, activatePending: managedUpdatesEnabled, onProgress: reportDesktopSetup,
+      opl: createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] })
+    }));
   }
+  if (desktopSetupSnapshot?.status === 'running') reportDesktopSetup({ stage: 'checking_components' });
   const hostEnvironment = resolveDesktopRuntimeEnvironment({
     env: {
       ...runtimeEnvironment, OPL_APP_PROCESS_INSTANCE_ID: appProcessInstanceId
@@ -433,6 +440,7 @@ async function createDesktopHost(appLogDirectory) {
       if (!window.isDestroyed()) window.webContents.send("opl:event", event);
     }
   });
+  if (desktopSetupSnapshot?.status === 'running') reportDesktopSetup({ stage: 'ready', status: 'completed' });
   if (officialProfileAdmission && bootstrapStatus === "available") {
     // The packaged App may run under Electron without a system Node binary.
     // Use the exact managed Node selected by runtime bootstrap.
@@ -441,6 +449,7 @@ async function createDesktopHost(appLogDirectory) {
       admission: officialProfileAdmission, resourcesPath: process.resourcesPath,
       env: { ...hostEnvironment, OPL_STATE_DIR: officialProfileAdmission.stateDir },
       nodeCommand: officialNodeCommand,
+      onProgress: progress => reportDesktopSetup({ ...progress, source: runtime?.env?.OPL_FULL_RUNTIME_HOME ? 'bundled' : 'network' }),
       logEvent: (event) => console.warn("[OPL:official-profile] " + JSON.stringify(event))
     };
     core.applyOfficialProfileWhenReady = (initialize) => startOfficialProfileFirstInstall({
@@ -504,6 +513,9 @@ async function desktopHost(appLogDirectory, { retry = false } = {}) {
     hostCore = desktopHost.core;
     desktopUpdater = desktopHost.desktopUpdater;
     return desktopHost;
+  }).catch(error => {
+    if (desktopSetupSnapshot?.status === 'running') reportDesktopSetup({ stage: desktopSetupSnapshot.stage, status: 'failed' });
+    throw error;
   });
   return await desktopHostPromise;
 }
@@ -578,6 +590,7 @@ app.whenReady().then(async () => {
     if (!trustedRendererUrl(event.senderFrame.url)) {
       throw new Error("Untrusted renderer cannot invoke the OPL host");
     }
+    if (request?.method === 'readDesktopSetupStatus') return desktopSetupSnapshot;
     if (request?.method === "readPendingDeepLinks") return deepLinks.takePending();
     const updateOperation = {
       readNativeAppUpdateStatus: "status", checkNativeAppUpdate: "check",

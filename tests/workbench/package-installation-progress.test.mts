@@ -1,3 +1,4 @@
+import { FirstInstallProgress } from '../../src/workbench/FirstInstallProgress';
 import { expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -89,4 +90,34 @@ test('global activity and overview distinguish unknown results, background work 
   expect(unknown).toContain('部分状态待确认');
   expect(unknown).not.toContain('当前没有待办');
   expect(packageRemainingTime(3660, 'zh')).toBe('约剩 1.1 小时');
+});
+
+
+test('first installation separates offline payloads, network services and measured component transfer', () => {
+  const snapshot = { stage: 'preparing_packages', source: 'bundled', status: 'running', rootPackageIds: ['mac-media-assets'], packageId: 'mac-media-assets', packageStatus: 'installing', packageResults: [] };
+  const view = (readError = false, overrides = {}) => renderToStaticMarkup(createElement(FirstInstallProgress, {
+    snapshot: { ...snapshot, ...overrides }, locale: 'zh', labels: { 'mac-media-assets': 'MAC 素材目录' }, operations: [operation], readError, onOpenSoftware() {}, onRetryRuntime() {},
+  }));
+  const html = view();
+  expect(html).toContain('Full 已包含本机所需组件');
+  expect(html).toContain('账户登录仍需联网');
+  expect(html).toContain('MAC 素材目录');
+  expect(html).toContain('value="250"');
+  expect(html).toContain('软件中心');
+  expect(html).not.toContain('25%');
+  const unknown = view(true);
+  expect(unknown).toContain('进度待确认');
+  expect(unknown).not.toContain('<progress');
+  const done = view(false, { status: 'completed', packageResults: [{ package_id: 'mac-media-assets', status: 'already_present' }] });
+  expect(done).toContain('官方智能体已准备完成');
+  expect(done).toContain('1 / 1');
+  expect(done).not.toContain('<progress');
+  const failed = view(false, { status: 'failed' });
+  expect(failed).toContain('部分准备未完成');
+  expect(failed).toContain('检查未完成项');
+  expect(failed).not.toContain('请保持应用开启');
+  const localFailure = view(false, { stage: 'installing_offline_runtime', status: 'failed', source: 'bundled' });
+  expect(localFailure).toContain('此步骤无需联网');
+  expect(localFailure).toContain('磁盘空间');
+  expect(localFailure).not.toContain('检查网络');
 });

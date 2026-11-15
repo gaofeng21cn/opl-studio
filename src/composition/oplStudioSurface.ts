@@ -74,6 +74,8 @@ export type OplStudioSurface = {
   renderSettings(destination: SettingsDestinationId, renderContribution?: RenderSettingsContribution, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void): ReactNode;
   renderSettingsContribution: RenderSettingsContribution;
   settingsNavigation?: { open: boolean; destination?: SettingsDestinationId; revision: number };
+  installationProgress?: ReactNode;
+  installationState?: { stage: string; status: string } | null;
   initializationStatus: "loading" | "ready" | "error";
   initialization: OplInitializeReadback | null;
   refreshInitialization(): void;

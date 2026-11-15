@@ -41,12 +41,15 @@ test("preload installs the live listener before taking pending links and does no
       ipcRenderer: {
         on: (event, callback) => { calls.push("subscribe"); handlers.set(callback, event); },
         removeListener: (_event, callback) => handlers.delete(callback),
-        invoke: (_channel, request) => { calls.push(request.method); return pending; }
+        invoke: (_channel, request) => {
+          calls.push(request.method);
+          return request.method === 'readDesktopSetupStatus' ? Promise.resolve(null) : pending;
+        }
       }, webUtils: {} })
   });
   const events = [];
   const dispose = exposed.subscribeEvents(value => events.push(value));
-  assert.deepEqual(calls, ["subscribe", "readPendingDeepLinks"]);
+  assert.deepEqual(calls, ["subscribe", "readDesktopSetupStatus", "readPendingDeepLinks"]);
   const payload = { action: "navigate", params: { route: "/guid" } };
   releasePending([payload]);
   await Promise.resolve();

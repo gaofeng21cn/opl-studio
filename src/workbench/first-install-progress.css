@@ -1,0 +1,16 @@
+.opl-first-install-progress { margin: 12px 0; color: var(--dsw-alias-label-primary); font: var(--dsw-font-s-14); line-height: var(--dsw-font-s-14-line-height); overflow-wrap: anywhere; }
+.opl-first-install-heading { display: flex; align-items: center; min-width: 0; gap: 8px; }
+.opl-first-install-heading strong { min-width: 0; flex: 1; font-weight: var(--dsw-font-s-strong-14-font-weight); }
+.opl-first-install-progress p { margin: 8px 0; max-width: 72ch; color: var(--dsw-alias-label-secondary); }
+.opl-first-install-progress small { color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
+.opl-first-install-progress ul { padding: 4px 0 0 22px; margin: 0; list-style: none; }
+.opl-first-install-progress li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 4px 0; color: var(--dsw-alias-label-secondary); }
+.opl-first-install-progress li span:last-child { color: var(--dsw-alias-label-tertiary); }
+.opl-first-install-progress progress { width: 100%; height: 4px; accent-color: var(--dsw-alias-state-business-primary); }
+.opl-first-install-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+
+/* The official onboarding is the active preparation surface. Keep its retained
+   conversation counterpart quiet behind the modal. */
+body:has(.opl-first-run) .opl-dsh-thread > .opl-first-install-progress { visibility: hidden; }
+
+.opl-first-run > .opl-first-install-progress { margin: 0; }

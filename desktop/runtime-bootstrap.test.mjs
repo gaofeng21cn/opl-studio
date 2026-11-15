@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
+import { bootstrapProgressStage, activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode } from "./runtime-bootstrap.mjs";
 
 function createPayload(root, overrides = {}) {
   const resourcesPath = path.join(root, "Resources");
@@ -256,6 +256,26 @@ test("an unsafe Full Node cannot win over an already verified Framework toolchai
   assert.equal(actual.command, path.resolve(safe));
 });
 
+test('failed Full copy cleans partial staging so retry does not retain another runtime tree', async context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-full-copy-failure-'));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, 'home');
+  const resourcesPath = createPayload(root);
+  const copy = fs.promises.cp;
+  fs.promises.cp = async (_source, target) => {
+    await fs.promises.mkdir(target, { recursive: true });
+    await fs.promises.writeFile(path.join(target, 'partial'), 'incomplete');
+    throw Object.assign(new Error('copy interrupted'), { code: 'ENOSPC' });
+  };
+  try {
+    await assert.rejects(ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: 'linux' }), { code: 'ENOSPC' });
+    const runtimeRoot = path.join(homeDir, 'Library/Application Support/opl-studio/runtime');
+    assert.deepEqual(fs.readdirSync(runtimeRoot), []);
+  } finally { fs.promises.cp = copy; }
+  const runtime = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath, homeDir, env: {}, platform: 'linux' });
+  assert.equal(runtime.source, 'packaged_payload');
+});
+
 test("packaged Standard preserves a newer managed Framework identity across App starts", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-standard-update-test-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -378,4 +398,12 @@ test("packaged Standard rejects installer byte drift before execution", async (t
     }),
     /does not match its App-owned manifest/
   );
+});
+
+
+test('bootstrap stage adapter only projects known installer milestones', () => {
+  assert.equal(bootstrapProgressStage('==> Preparing One Person Lab managed Node.js v26.12.1'), 'preparing_node');
+  assert.equal(bootstrapProgressStage('==> Installing OPL CLI'), 'installing_framework');
+  assert.equal(bootstrapProgressStage('==> Preparing the local background-service runtime'), 'preparing_services');
+  assert.equal(bootstrapProgressStage('untrusted output password=secret'), null);
 });
