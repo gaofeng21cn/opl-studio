@@ -55,3 +55,11 @@ The pinned official DSH MCP client supplies tools/resources but no UI host. The
 plugin therefore reuses the official ext-apps SDK and canonical Codex transport.
 Revisit this gap on every upstream upgrade. Framework owns the host-neutral task
 workbench resource; domain packages own research payloads and actions.
+
+## DSH Host Plugin and Framework Package boundary
+
+`opl-studio/plugins/` is the DSH Application Host source set. These standard npm/Cordis packages share the Studio profile, App/Shell release, and cross-plugin tests; they own Host services, Codex transport, client slots, MCP Apps hosting, collaboration, and Web routes.
+
+A Framework Package is a separate delivery unit. Its owner descriptor, native carrier, and Framework projection own installation and callability. It may contribute Settings, Workspace, Task Detail, or an MCP App without becoming a DSH Host plugin. Codex Plugin Manager is one carrier, not a second DSH profile loader.
+
+User entry points remain Software Center, Settings, App Workspace, Task Detail, and Runtime Maintenance. Repository, Package role, and carrier choices affect development and operations, not the user entry point.

@@ -15,7 +15,6 @@ import { zh as settingsZh, en as settingsEn } from "../../vendor/deepseek-harnes
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";
-import { workspaceEntries } from "../workspaceViewModel";
 type SidebarPanelActionsOwnerProps = {
   entries: readonly { id: string; label: string; pinned: boolean; active?: boolean }[];
   onOpen(id: string): void;
@@ -210,7 +209,7 @@ export function useStudioPanels<T>(selector: (panels: readonly { id: string; ord
   ];
   if (pluginPanels.has("teams")) panels.push({ id: "teams", order: 35, label: zh ? "智能体协作" : "Agent collaboration" });
   if (pluginPanels.has("superagent")) panels.push({ id: "superagent", order: 36, label: "Superagent" });
-  if (workspaceEntries(studio.uiContributions.entries).length) {
+  if (pluginPanels.has("workspace")) {
     panels.push({ id: "workspace", order: 40, label: zh ? "应用工作台" : "App workspace" });
   }
   return selector(panels);

@@ -15,7 +15,6 @@ export type McpAppProps = {
   onPreferredEntryConsumed?: (entry: NonNullable<McpAppProps["preferredEntry"]>) => void;
   onManage?: () => void;
   onConversation?: () => void;
-  onModules?: () => void;
   onContext(threadId: string, context: string): void;
   onMessage(threadId: string, text: string): void;
 };
@@ -315,7 +314,6 @@ export function McpAppWorkspace(props: McpAppProps) {
         <div onClick={event => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
           {threadId ? <Button variant="outline" type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</Button> : null}
           {props.onManage ? <Button variant="outline" type="button" onClick={props.onManage}>{zh ? "软件中心" : "Software Center"}</Button> : null}
-          {props.onModules ? <Button variant="outline" type="button" onClick={props.onModules}>{zh ? "模块视图" : "Module views"}</Button> : null}
           <p>{zh ? "关闭或切换仅收起界面，后台任务继续运行。安装、更新和启停请到软件中心。" : "Closing or switching only closes the UI. Background tasks continue. Install, update, and enable apps in Software Center."}</p>
         </div>
       </details>

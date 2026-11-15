@@ -63,6 +63,7 @@ export type SettingsPanelProps = {
   workbenchServices?: WorkbenchServicesClient;
   onClose?: () => void;
   onOpenSchedules?: () => void;
+  onOpenAppWorkspace?: () => void;
   onOpenSoftwareCenter?: (section?: "applications" | "updates" | "resources" | "sources") => void;
   model: WorkbenchModel;
   managedUpdate: ManagedUpdateProjection | null;
@@ -122,7 +123,7 @@ export type SettingsPanelProps = {
   pendingConfirmation: SettingsActionConfirmation | null;
   onConfirmAction: () => void;
   onCancelAction: () => void;
-  renderSettingsContributions?: (destination: "resources" | "capabilities") => ReactNode;
+  renderSettingsContributions?: (destination: "resources" | "services" | "capabilities") => ReactNode;
 };
 
 export type SettingsActionFeedback = {

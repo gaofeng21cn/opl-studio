@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { declaredItemActions, itemSummary, itemTitle, parseWorkspaceInput, readWorkspaceCollection, workspaceEntries, workspaceGroups, workspaceReadInput } from "../../src/composition/workspaceViewModel";
+import { declaredItemActions, itemSummary, itemTitle, parseWorkspaceInput, readWorkspaceCollection, workspaceReadInput } from "../../src/composition/workspaceViewModel";
 import type { OplUiContribution } from "../../src/composition/contributionProjection";
 import { contributionActionOutcome } from "../../src/composition/contributionProjection";
 
@@ -9,10 +9,6 @@ const entry: OplUiContribution = {
   view: { viewId: "items", viewType: "approval_diff", title: {"en-US": "Review"}, dataRef: "some.capability.v1#items" },
   commands: [{commandId: "review", label: {"en-US": "Review"}, actionRef: "some.capability.v1#review", confirmationRequired: true}], badges: []
 };
-
-test("workspace consumes only admitted root collection views without recognizing package brands", () => {
-  expect(workspaceEntries([entry, {...entry, slot: "runtime.detail"}, {...entry, scope: "work_item"}, {...entry, view: {...entry.view!, viewType: "service_status"}}])).toEqual([entry]);
-});
 
 test("unavailable owner state cannot become a ready empty inbox", () => {
   expect(readWorkspaceCollection({kind: "data", state: "input_required", reason: "binding missing", data: null})).toMatchObject({items: [], commandInputs: {}, state: "input_required", reason: "binding missing"});
@@ -37,11 +33,6 @@ test("clearing optional search omits empty input while retaining owner defaults 
   const collection = readWorkspaceCollection({state: "ready", input_schema: {query: {type: "string", required: false}, source_ref: {type: "string", required: true}, status: {type: "string", required: false, default: "pending"}}, data: {items: []}})!;
   expect(collection.readInput.defaults.status).toBe("pending");
   expect(workspaceReadInput(collection.readInput, {query: "", source_ref: "", offset: 0, status: undefined})).toEqual({source_ref: ""});
-});
-
-test("navigation groups by declared capability namespace rather than package identity", () => {
-  const mail = {...entry, packageId: "unknown-provider", view: {...entry.view!, dataRef: "communications.mail.v1#recent"}};
-  expect(workspaceGroups([mail])[0]).toEqual({key: "communications", entries: [mail]});
 });
 
 test("transport execution alone never closes a form with stale or nonterminal owner result", () => {

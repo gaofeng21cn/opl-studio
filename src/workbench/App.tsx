@@ -2601,6 +2601,7 @@ export function App({
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsPanel
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
+      onOpenAppWorkspace={() => { onClose?.(); setMcpTaskTarget(undefined); setMcpAppSelectedLaunch(undefined); setPreferredSoftwareEntry(undefined); setPrimaryView("workspace"); }}
       onOpenSoftwareCenter={(section = "applications") => { onClose?.(); setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 })); setApplicationManagementTab(section); setPrimaryView("applications"); }}
       model={{ ...model, features: featureRefsWithCodexStatus(model.features, threadDirectoryStatus, threadDirectoryError, stateStatus, {
         ...(activeTurnId ? { 'B0-03': { state: 'available', summary: '当前 canonical turn 已接受并运行；最终结果尚待回读。' } } : {}),

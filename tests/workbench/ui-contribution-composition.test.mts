@@ -295,9 +295,9 @@ describe("OPL Studio DSH contribution composition", () => {
   test("routes package settings to the unified catalog", () => {
     expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("resources");
     expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("resources");
-    expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("capabilities");
+    expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("services");
     expect(settingsContributionDestination({ view: { viewId: "fleet", viewType: "activity_log", title: {}, dataRef: "fleet#state" } })).toBeNull();
-    expect(settingsContributionDestination({ view: { viewId: "capability", viewType: "table", title: {}, dataRef: "capability#state" } })).toBe("capabilities");
+    expect(settingsContributionDestination({ view: { viewId: "capability", viewType: "table", title: {}, dataRef: "capability#state" } })).toBeNull();
   });
 
   test("groups package status and settings in the catalog while hiding technical activity logs", () => {
@@ -388,7 +388,7 @@ describe("OPL Studio DSH contribution composition", () => {
     });
     const fleetEntries = projection.entries.filter((entry) => entry.packageId === "opl-fleet-agent");
     expect(fleetEntries).toHaveLength(2);
-    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === "capabilities")).toBe(true);
+    expect(fleetEntries.every((entry) => settingsContributionDestination(entry) === "services")).toBe(true);
 
     const activityEntry = projection.entries.find((entry) => entry.packageId === "legacy-fleet-agent");
     expect(activityEntry && settingsContributionDestination(activityEntry)).toBeNull();
@@ -396,10 +396,10 @@ describe("OPL Studio DSH contribution composition", () => {
     const weixinEntry = projection.entries.find((entry) => entry.packageId === "opl-channel-weixin");
     expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("resources");
 
-    const groups = groupSettingsContributions(projection.entries.filter((entry) => settingsContributionDestination(entry) === "capabilities"));
-    expect(groups).toHaveLength(2);
-    const generic = groups.find((group) => group.packageId === "generic-package");
-    expect(generic?.entries.map((entry) => entry.contributionId)).toEqual(["overview", "details"]);
+    const groups = groupSettingsContributions(projection.entries.filter((entry) => settingsContributionDestination(entry) === "services"));
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.packageId).toBe("opl-fleet-agent");
+    expect(projection.entries.filter(entry => entry.packageId === "generic-package").every(entry => settingsContributionDestination(entry) === null)).toBe(true);
   });
 
   test("summarizes service status without exposing operational payload fields by default", () => {
