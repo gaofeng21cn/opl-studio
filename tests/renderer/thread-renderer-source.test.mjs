@@ -11,7 +11,7 @@ import { assistantDisplayMarkdown } from "../../src/workbench/messageDisplay.ts"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
-const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachments.ts")].join("\n");
+const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachments.ts"), read("src/workbench/useSettingsActions.ts")].join("\n");
 const main = read("src/main.tsx");
 const bridge = [
   read("src/bridge/oplBridge.ts"),
@@ -595,7 +595,7 @@ test("desktop version and updater state have one main-process source", () => {
 });
 
 test("Framework managed updates reuse the projected App action bus", () => {
-  const settingsActionFlow = app.match(/async function runSettingsAction\([\s\S]*?\n  async function runSettingsHostAction/)?.[0] ?? "";
+  const settingsActionFlow = app.match(/async function runSettingsAction\([\s\S]*?\n  return \{/)?.[0] ?? "";
   assert.match(app, /readProjectedManagedUpdateActions\(state\)/);
   assert.match(app, /setProjectedManagedUpdateActions/);
   assert.match(app, /managedUpdateActions: \[[\s\S]*\.\.\.projectedManagedUpdateHostActions/);
