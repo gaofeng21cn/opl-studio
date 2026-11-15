@@ -146,7 +146,7 @@ export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   platformCapabilities: OplPlatformCapabilities;
   readSuperagent(): Promise<SuperagentState>;
   executeSuperagent(request: { operation: "start" | "stop" }): Promise<SuperagentState>;
-  readTeamBots(request?: { teamId?: string; memberId?: string }): Promise<TeamBotsState>;
+  readTeamBots(): Promise<TeamBotsState>;
   executeTeamBot(request: TeamBotAction): Promise<unknown>;
   requestSettingsSearchLog(request: SettingsSearchLogRequest): Promise<SettingsSearchLogResponse>;
   beginWindowDrag(): void;

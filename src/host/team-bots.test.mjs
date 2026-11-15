@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { boot as bootOfficial, initProfile, loadProfile, createRuntimeResolution, PluginPackages, readProfilePatches } from "@deepseek-ai/dsh-app-boot";
+import { provideCmdline } from "@deepseek-ai/dsh-cmdline";
+import { pathToFileURL } from "node:url";
 import { bootOplStudioHost } from "./dsh/host.mjs";
 
 class CodexFixture extends EventEmitter {
@@ -16,16 +19,17 @@ class CodexFixture extends EventEmitter {
   createChannelCallbackAdapter() { return null; }
   async start() { this.initialized = true; }
   async stop() { this.initialized = false; }
-  async listModels() { return { data: [{ id: "fixture", displayName: "Fixture" }] }; }
+  async listModels() { return { data: [{ id: "fixture", displayName: "Fixture" }, { id: "fixture-alt", displayName: "Alternate" }] }; }
   async startThread(input) {
     const thread = { id: `thread-${++this.next}`, turns: [], input };
     this.threads.set(thread.id, thread);
     this.calls.push({ method: "thread/start", input });
     return { thread };
   }
-  async resumeThread(id) { assert.ok(this.threads.has(id)); return { thread: this.threads.get(id) }; }
+  async resumeThread(id, input) { this.calls.push({ method: "thread/resume", input }); assert.ok(this.threads.has(id)); return { thread: this.threads.get(id) }; }
   async readThread(id) { return { thread: this.threads.get(id) }; }
-  async startTurn(threadId, prompt) {
+  async startTurn(threadId, prompt, _inputs, overrides) {
+    this.calls.push({ method: "turn/options", overrides });
     const turn = { id: `turn-${++this.next}`, threadId, prompt, status: "completed" };
     this.turns.set(turn.id, turn);
     this.threads.get(threadId).turns.push(turn);
@@ -41,10 +45,10 @@ class CodexFixture extends EventEmitter {
       await new Promise(resolve => {
         this.pendingTool = resolve;
         this.emit("serverRequest", { id: ++this.next, method: "item/tool/call", params: {
-          threadId: turn.threadId, turnId: id, tool: turn.prompt.includes("CREATE_MODEL_CHILD") ? "opl_dsh_subagent" : "opl_dsh_team_task_create", callId: `call-${this.next}`,
-          arguments: turn.prompt.includes("CREATE_MODEL_CHILD")
+          threadId: turn.threadId, turnId: id, tool: "opl_dsh_call", callId: `call-${this.next}`,
+          arguments: { name: turn.prompt.includes("CREATE_MODEL_CHILD") ? "subagent" : "team_task_create", arguments: turn.prompt.includes("CREATE_MODEL_CHILD")
             ? { name: "worker", description: "Verify inherited permissions", prompt: "Acknowledge" }
-            : { subject: "Review", description: "Verify the implementation" }
+            : { subject: "Review", description: "Verify the implementation" } }
         } });
       });
     }
@@ -65,112 +69,123 @@ class CodexFixture extends EventEmitter {
 }
 
 async function boot(home, transport) {
-  return bootOplStudioHost({ dshHome: home, workspaceRoot: home, transport, webPort: 0,
+  const host = await bootOplStudioHost({ dshHome: home, workspaceRoot: home, transport, webPort: 0,
     opl: Object.fromEntries(["readState", "readInitialize", "readFullDrilldown", "readDomainDetailView", "readContribution", "executeAction"].map(name => [name, async () => ({})])) });
+  assert.equal(host.context.get("agents"), undefined, "ordinary Host must not own DSH sessions");
+  // Exercise the official controller/adapter graph directly. The packed-package
+  // integration test covers the shipped CLI process and parent transport.
+  const profileHome = path.join(home, "opl-collaboration");
+  const dir = path.join(profileHome, "profiles/web");
+  initProfile(dir, ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@one-person-lab/opl-codex-agents"]);
+  const installAnchor = path.resolve("package.json");
+  const profile = loadProfile("executor test", "web", installAnchor, profileHome);
+  const root = path.join(dir, "cordis.yml");
+  await writeFile(root, "[]\n");
+  const overlays = [{ id: "hmr", disabled: true }, { id: "session-telemetry-otel", disabled: true },
+    { id: "credentials", config: { dshHome: profileHome } },
+    { id: "session-persistence-jsonl", config: { root: path.join(home, "opl/sessions") } },
+    { id: "web-runtime", config: { openBrowser: false, printUrl: false } }];
+  const profileContext = { name: "web", dir, patchPath: profile.patchPath, installAnchor, home: profileHome,
+    cwd: home, startedBundles: profile.layers.map(layer => layer.packageName), overlays, telemetryDisabledEnv: "1" };
+  const resolution = await createRuntimeResolution({ installAnchor, profile, home: profileHome });
+  const collaboration = await bootOfficial("executor test", root, readProfilePatches("executor test", profileContext, profile), async ctx => {
+    ctx.set("dshHomePath", (...parts) => path.join(profileHome, ...parts));
+    ctx.provide("profileContext", profileContext);
+    ctx.provide("oplStudioHostOptions", { dshHome: home, workspaceRoot: home });
+    ctx.provide("oplCodexNative", { transport });
+    ctx.provide("oplCodexDefaultModel", "fixture");
+    await ctx.plugin(PluginPackages, { resolution });
+    provideCmdline(ctx, { args: ["--host", "127.0.0.1", "--port", "0", "--no-open"], exit: () => {} });
+  }, pathToFileURL(path.join(dir, "package.json")).href);
+  let closing;
+  const core = { close: () => closing ??= (async () => { await collaboration.fiber.dispose(); await host.core.close(); })() };
+  return { ...host, core, collaboration };
 }
 
-test("official Team uses exact members, durable messages and one continuing Codex thread after restart", async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), "opl-team-integration-"));
-  const transport = new CodexFixture();
-  let host;
-  try {
-    host = await boot(home, transport);
-    let service = host.context.oplTeamBots;
-    assert.ok(!host.context.tools.schemas().some(tool => tool.name.startsWith("team_task_") || tool.name === "subagent"));
-    const lead = await service.saveBot({ name: "coordinator", role: "Coordinate", cwd: home, permissions: ":read-only" });
-    const reviewer = await service.saveBot({ name: "reviewer", role: "Review", cwd: home, permissions: ":read-only" });
-    const team = await service.createTeam({ title: "Team", botId: lead.id });
-    await service.send({ teamId: team.id, text: "CREATE_SHARED_TASK" });
-    await (await service.resolve(team.id)).whenIdle();
-    assert.ok(transport.toolResponse, JSON.stringify({ calls: transport.calls.map(call => ({ method: call.method, prompt: call.prompt })), events: Array.from({ length: (await service.resolve(team.id)).session.seq }, (_, index) => (host.context.agents.get(team.id)).session.eventAt(index)).filter(event => /error|attempt/.test(event.type)) }));
-    assert.equal(transport.toolResponse.result.success, true);
-    assert.equal((await service.read(team.id)).tasks.length, 1);
-    const member = await service.addMember({ teamId: team.id, botId: reviewer.id, prompt: "Review the task" });
-    await host.context.agents.get(member.id).whenIdle();
-    await (await service.resolve(team.id)).whenIdle();
-    const starts = transport.calls.filter(call => call.method === "thread/start");
-    assert.equal(starts.length, 2);
-    assert.ok(starts.every(call => call.input.permissions === ":read-only"));
-    const memberThread = host.context.oplCodexAgents.state.bindings[member.id].threadId;
-    await service.send({ teamId: team.id, memberId: member.id, text: "Refine the review" });
-    await host.context.agents.get(member.id).whenIdle();
-    assert.ok(transport.calls.some(call => call.method === "turn/start" && call.threadId === memberThread && call.prompt.includes("Refine the review")));
-    assert.equal(transport.calls.filter(call => call.method === "thread/start").length, 2);
-    await host.core.close();
-    host = await boot(home, transport);
-    service = host.context.oplTeamBots;
-    const restored = await service.read(team.id);
-    assert.equal(restored.tasks.length, 1);
-    const cold = await service.read(team.id, member.id);
-    assert.ok(cold.messages.some(event => event.type === "assistant/message"));
-    assert.equal(host.context.agents.get(member.id), undefined, "transcript reads must not activate a cold member");
-    await assert.rejects(service.execute({ operation: "cancel_member", input: { teamId: "foreign", memberId: member.id } }), /Unknown Team/);
-    assert.ok(restored.members.some(item => item.id === member.id && item.path === "reviewer"));
-    await service.send({ teamId: team.id, memberId: member.id, text: "Continue after restart" });
-    await host.context.agents.get(member.id).whenIdle();
-    assert.equal(host.context.oplCodexAgents.state.bindings[member.id].threadId, memberThread);
-    assert.equal(transport.calls.filter(call => call.method === "thread/start").length, 2);
-  } finally {
-    await host?.core.close();
-    await rm(home, { recursive: true, force: true });
-  }
-});
+async function create(ctx, home) {
+  const { sessionId } = await ctx.sessionController.create({ cwd: home });
+  const agent = ctx.agents.get(sessionId);
+  agent.session.append("sandbox/mode", { mode: "read-only" });
+  return agent;
+}
+async function prompt(ctx, agent, text) {
+  await ctx.sessionController.prompt({ sessionId: agent.id, requestId: crypto.randomUUID(), mode: "queue", content: [{ type: "text", text }] }, new AbortController().signal);
+  await agent.whenIdle();
+}
 
-test("an unconfirmed dispatch remains inspectable and is never blindly sent again", async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), "opl-team-unknown-"));
-  const transport = new CodexFixture();
-  let host;
-  try {
-    host = await boot(home, transport);
-    const service = host.context.oplTeamBots;
-    const bot = await service.saveBot({ name: "coordinator", cwd: home });
-    const team = await service.createTeam({ botId: bot.id });
-    await service.send({ teamId: team.id, text: "Initial task" });
-    const root = await service.resolve(team.id);
-    await root.whenIdle();
-    await host.context.oplCodexAgents.mutate(state => {
-      state.bindings[team.id].attempt = { status: "dispatching", ids: ["unconfirmed-input"] };
-    });
-    const before = transport.calls.filter(call => call.method === "turn/start").length;
-    await service.send({ teamId: team.id, text: "Continue" });
-    await root.whenIdle();
-    assert.equal(transport.calls.filter(call => call.method === "turn/start").length, before);
-    assert.equal(host.context.oplCodexAgents.state.bindings[team.id].attempt.status, "dispatching");
-  } finally { await host?.core.close(); await rm(home, { recursive: true, force: true }); }
-});
-
-test("model-created official subagents inherit the exact Bot permission profile", async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), "opl-team-inheritance-"));
+test("the official workbench toggles teamwork on the same Codex thread and restores members and tasks", async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "opl-native-team-"));
   const transport = new CodexFixture(); let host;
   try {
+    await mkdir(path.join(home, "opl"));
+    await writeFile(path.join(home, "opl/bots.json"), '{"bots":[{"name":"legacy"}]}');
     host = await boot(home, transport);
-    const service = host.context.oplTeamBots;
-    const bot = await service.saveBot({ name: "coordinator", cwd: home, permissions: ":read-only", skills: ["review"] });
-    const team = await service.createTeam({ botId: bot.id });
-    await service.send({ teamId: team.id, text: "CREATE_MODEL_CHILD" });
-    const root = await service.resolve(team.id); await root.whenIdle();
-    const members = (await service.read(team.id)).members;
+    let ctx = host.collaboration;
+    assert.equal(ctx.oplCodexNative.transport, transport);
+    const root = await create(ctx, home);
+    assert.equal(ctx.agentTeams.isEnabled(root), false);
+    await prompt(ctx, root, "Initial acknowledgement");
+    const threadId = ctx.oplCodexAgents.state.bindings[root.id].threadId;
+    await ctx.agentTeams.setEnabled(root, true);
+    await prompt(ctx, root, "CREATE_SHARED_TASK");
+    assert.equal(transport.toolResponse?.result.success, true, JSON.stringify(transport.toolResponse));
+    assert.equal(ctx.agentTeams.listTasks(root).length, 1);
+    assert.ok(Array.from({ length: root.session.seq }, (_, index) => root.session.eventAt(index)).some(event => event.type === "tool/call" && event.data.name === "team_task_create"), "official tool cards receive native log events");
+    await prompt(ctx, root, "CREATE_MODEL_CHILD");
+    const members = await ctx.subagents.listDescendants(root.id);
     assert.equal(members.length, 1);
-    await host.context.agents.get(members[0].id)?.whenIdle();
-    assert.equal(host.context.oplCodexAgents.state.bindings[members[0].id].bot.permissions, ":read-only");
+    const memberId = members[0].id;
+    await ctx.agents.get(memberId)?.whenIdle(); await root.whenIdle();
+    const memberThread = ctx.oplCodexAgents.state.bindings[memberId].threadId;
+    assert.equal(transport.calls.filter(call => call.method === "thread/start").length, 2);
     assert.ok(transport.calls.filter(call => call.method === "thread/start").every(call => call.input.permissions === ":read-only"));
+    await ctx.agentTeams.setEnabled(root, false);
+    await prompt(ctx, root, "Teamwork disabled");
+    const disabledCatalog = transport.calls.filter(call => call.method === "thread/resume").at(-1).input.developerInstructions;
+    assert.ok(!disabledCatalog.includes('"name":"team_task_create"'));
+    assert.equal(ctx.oplCodexAgents.state.bindings[root.id].threadId, threadId);
+    await ctx.agentTeams.setEnabled(root, true);
+    assert.equal(ctx.agentTeams.listTasks(root).length, 1);
+    await ctx.subagents.sendMessage(root, memberId, [{ type: "text", text: "Refine the review" }], { signal: new AbortController().signal });
+    await ctx.agents.get(memberId).whenIdle(); await root.whenIdle();
+    await ctx.sessionController.selectModel({ sessionId: root.id, provider: "opl-codex", model: "fixture-alt" });
+    await ctx.agentDefaultModel.saveSelection({ provider: "opl-codex", model: "fixture-alt" });
+    await host.core.close();
+    host = await boot(home, transport); ctx = host.collaboration;
+    assert.equal(ctx.agentDefaultModel.currentSelection().model, "fixture-alt");
+    await ctx.sessionController.selectModel({ sessionId: root.id, provider: "opl-codex", model: "fixture" });
+    await ctx.agentDefaultModel.saveSelection({ provider: "opl-codex", model: "fixture" });
+    const restored = ctx.agents.get(root.id);
+    assert.equal(ctx.agentTeams.listTasks(restored).length, 1);
+    assert.ok((await ctx.subagents.listDescendants(root.id)).some(member => member.id === memberId));
+    await ctx.sessionQuery.inspectSession(memberId, session => assert.ok(session.seq > 0));
+    assert.equal(ctx.agents.get(memberId), undefined, "cold transcript reads do not activate members");
+    await ctx.subagents.sendMessage(restored, memberId, [{ type: "text", text: "Continue after restart" }], { signal: new AbortController().signal });
+    await ctx.agents.get(memberId).whenIdle(); await restored.whenIdle();
+    assert.equal(ctx.oplCodexAgents.state.bindings[memberId].threadId, memberThread);
+    assert.equal(transport.calls.filter(call => call.method === "thread/start").length, 2);
+    assert.equal(await readFile(path.join(home, "opl/bots.json"), "utf8"), '{"bots":[{"name":"legacy"}]}');
+    await assert.rejects(host.context.oplTeamBots.execute({ operation: "save_bot" }), /official DSH workbench/);
   } finally { await host?.core.close(); await rm(home, { recursive: true, force: true }); }
 });
 
-test("cancelling a Team member interrupts that member's exact Codex turn", async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), "opl-team-cancel-"));
+test("unconfirmed native dispatch fails closed and official Stop interrupts the exact Codex turn", async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "opl-native-cancel-"));
   const transport = new CodexFixture(); let host;
   try {
-    host = await boot(home, transport);
-    const service = host.context.oplTeamBots;
-    const bot = await service.saveBot({ name: "coordinator", cwd: home });
-    const team = await service.createTeam({ botId: bot.id });
-    await service.send({ teamId: team.id, text: "WAIT_FOR_CANCEL" });
+    host = await boot(home, transport); const ctx = host.collaboration;
+    const root = await create(ctx, home);
+    await ctx.agentTeams.setEnabled(root, true);
+    await ctx.sessionController.prompt({ sessionId: root.id, requestId: crypto.randomUUID(), mode: "queue", content: [{ type: "text", text: "WAIT_FOR_CANCEL" }] }, new AbortController().signal);
     await transport.cancellationReady;
-    const binding = host.context.oplCodexAgents.state.bindings[team.id];
-    await service.execute({ operation: "cancel_member", input: { teamId: team.id, memberId: team.id } });
-    await (await service.resolve(team.id)).whenIdle();
-    assert.ok(transport.calls.some(call => call.method === "turn/interrupt"
-      && call.input.threadId === binding.threadId && call.input.turnId === binding.attempt.turnId));
+    const binding = ctx.oplCodexAgents.state.bindings[root.id];
+    ctx.sessionController.cancel({ sessionId: root.id });
+    await root.whenIdle();
+    assert.ok(transport.calls.some(call => call.method === "turn/interrupt" && call.input.threadId === binding.threadId && call.input.turnId === binding.attempt.turnId));
+    await ctx.oplCodexAgents.mutate(state => { state.bindings[root.id].attempt = { status: "dispatching", ids: ["unknown"] }; });
+    const before = transport.calls.filter(call => call.method === "turn/start").length;
+    await prompt(ctx, root, "Continue");
+    assert.equal(transport.calls.filter(call => call.method === "turn/start").length, before);
+    assert.equal(ctx.oplCodexAgents.state.bindings[root.id].attempt.status, "dispatching");
   } finally { await host?.core.close(); await rm(home, { recursive: true, force: true }); }
 });

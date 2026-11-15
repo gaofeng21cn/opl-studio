@@ -97,7 +97,11 @@
       "coordination_owner": "official_DSH_Agent_Subagent_Session_and_AgentTeam",
       "execution_owner": "opl-codex-native_existing_persistent_App_Server",
       "adapter": "opl-codex-agents",
-      "bot_templates": "opl-team-bots",
+      "role_presets": "official_DSH_Agent_Presets_and_Creator",
+      "interaction_owner": "complete_unmodified_official_DSH_Web_application",
+      "launcher": "opl-team-bots",
+      "runtime": "official_DSH_CLI_with_private_parent_Codex_transport",
+      "profile_data": "$DSH_HOME/opl-collaboration",
       "data": "$DSH_HOME/opl",
       "ordinary_Codex_conversations_unchanged": true
     },

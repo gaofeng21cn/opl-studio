@@ -1,149 +1,152 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import { mkdir, writeFile, symlink, readlink, unlink } from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
-const PROVIDER = "opl-codex";
+import { initProfile, readProfileManifest, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
 
 export const name = "opl-team-bots";
-export const inject = ["oplStudioHostOptions", "oplCodexAgents", "agents", "agentLoop", "sessions", "sessionQuery", "sessionPersistence", "subagents", "agentTeams"];
+export const inject = ["oplStudioHostOptions", "oplCodexNative"];
+const CHANNEL = "opl-codex-parent.v1";
+const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@one-person-lab/opl-codex-agents"];
+const METHODS = new Set(["listModels", "startThread", "resumeThread", "readThread", "startTurn", "waitForTurn", "request"]);
 
-/** Product configuration only; official DSH owns members, inboxes, tasks and history. */
-export class TeamBots {
-  constructor(ctx, directory) {
-    this.ctx = ctx;
-    this.file = path.join(directory, "bots.json");
-    this.handles = new Map();
-    this.resuming = new Map();
-    this.serial = Promise.resolve();
-    this.state = { revision: 0, bots: [], teams: [] };
+/** Complete official application; OPL owns only launch and the executor reference. */
+export class CollaborationProfile {
+  constructor(options, codex) {
+    this.options = options;
+    this.transport = codex.transport;
+    this.home = path.join(options.dshHome, "opl-collaboration");
+    this.state = "stopped"; this.url = null; this.error = null;
+    this.child = null; this.starting = null; this.generation = 0;
+    this.diagnostic = "";
+    this.turns = new Map(); this.threads = new Set(); this.toolRequests = new Set();
+    const require = createRequire(import.meta.url);
+    this.cli = path.join(path.dirname(require.resolve("@deepseek-ai/dsh/package.json")), "lib/bin.js");
+    this.engine = path.dirname(require.resolve("@one-person-lab/opl-codex-agents/package.json"));
   }
-  async load() {
-    try { this.state = JSON.parse(await readFile(this.file, "utf8")); }
-    catch (error) { if (error.code !== "ENOENT") throw error; }
+  read() { return { state: this.state, url: this.url, error: this.error, dataDirectory: this.home }; }
+  async prepare(defaultModel) {
+    const dir = path.join(this.home, "profiles/web");
+    initProfile(dir, BUNDLES);
+    const manifest = readProfileManifest("OPL collaboration", dir);
+    if (JSON.stringify(manifest.dsh?.profile?.bundles) === JSON.stringify(BUNDLES.slice(0, 2))) writeProfileBundles(dir, manifest, BUNDLES);
+    const link = path.join(dir, "node_modules/@one-person-lab/opl-codex-agents");
+    await mkdir(path.dirname(link), { recursive: true });
+    try { if (await readlink(link) !== this.engine) { await unlink(link); await symlink(this.engine, link, "dir"); } }
+    catch (error) { if (error.code !== "ENOENT") throw error; await symlink(this.engine, link, "dir"); }
+    // Deployment facts stay outside the user's native Settings/profile patch.
+    const patch = path.join(this.home, "opl-runtime.patch.yml");
+    await writeFile(patch, JSON.stringify([
+      { insert: [{ id: "opl-parent-transport", name: "@one-person-lab/opl-codex-agents/parent-transport", config: {
+        parentHome: this.options.dshHome, workspaceRoot: this.options.workspaceRoot, defaultModel } }] },
+      { id: "session-persistence-jsonl", config: { root: path.join(this.options.dshHome, "opl/sessions") } },
+      { id: "fs-sandbox", config: { cwd: this.options.workspaceRoot } },
+      { id: "session-telemetry-otel", disabled: true },
+    ], null, 2), { mode: 0o600 });
+    return patch;
   }
-  mutate(operation) {
-    const pending = this.serial.then(async () => {
-      const next = structuredClone(this.state);
-      const result = await operation(next);
-      next.revision++;
-      await mkdir(path.dirname(this.file), { recursive: true });
-      const temp = `${this.file}.${randomUUID()}.tmp`;
-      await writeFile(temp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
-      await rename(temp, this.file);
-      this.state = next;
-      return result;
-    });
-    this.serial = pending.catch(() => {});
-    return pending;
-  }
-  async saveBot(input) {
-    if (!/^[a-z][a-z0-9-]{0,31}$/.test(input.name ?? "") || input.name === "lead") throw Error("Bot name must be 1–32 lowercase letters, numbers or hyphens, starting with a letter.");
-    if (!path.isAbsolute(input.cwd ?? "")) throw Error("Bot workspace must be an absolute directory.");
-    if (![":read-only", ":workspace", ":danger-full-access"].includes(input.permissions ?? ":workspace")) throw Error("Unknown Codex permission profile.");
-    const bot = { id: input.id ?? randomUUID(), name: input.name, role: String(input.role ?? ""),
-      cwd: input.cwd, model: input.model || "default", permissions: input.permissions ?? ":workspace",
-      skills: Array.isArray(input.skills) ? input.skills.map(String) : [] };
-    return this.mutate(state => {
-      const index = state.bots.findIndex(item => item.id === bot.id);
-      if (index < 0) state.bots.push(bot); else state.bots[index] = bot;
-      return bot;
-    });
-  }
-  async resolve(id) {
-    const live = this.ctx.agents.get(id);
-    if (live) return live;
-    if (!this.resuming.has(id)) {
-      const pending = this.ctx.agents.resume({ resumeSessionId: id, agentOptions: { provider: PROVIDER, model: this.ctx.oplCodexAgents.state.bindings[id]?.bot?.model ?? "default" } })
-        .then(handle => { this.handles.set(id, handle); return handle.agent; })
-        .finally(() => this.resuming.delete(id));
-      this.resuming.set(id, pending);
+  async handle(child, message) {
+    if (message?.channel !== CHANNEL) return;
+    if (message.event === "toolResponse") {
+      if (this.toolRequests.delete(message.id)) this.transport.respondToServerRequest(message.id, message.response);
+      return;
     }
-    return this.resuming.get(id);
-  }
-  async createTeam({ title, botId }) {
-    const bot = this.state.bots.find(item => item.id === botId);
-    if (!bot) throw Error("Choose a saved Bot for the Team lead.");
-    const id = `opl-team-${randomUUID()}`;
-    const handle = await this.ctx.agents.create({ sessionId: id, meta: { cwd: bot.cwd },
-      agentOptions: { provider: PROVIDER, model: bot.model },
-      setup: (_scope, agent) => this.ctx.oplCodexAgents.setBot(agent.id, bot) });
-    this.handles.set(id, handle);
-    await this.ctx.agentTeams.setEnabled(handle.agent, true);
-    try { await this.mutate(state => { state.teams.push({ id, title: String(title || bot.name), botId }); }); }
-    catch (error) { await handle.dispose(); this.handles.delete(id); throw error; }
-    return { id };
-  }
-  async addMember({ teamId, botId, prompt }) {
-    const bot = this.state.bots.find(item => item.id === botId);
-    if (!bot) throw Error("Unknown Bot.");
-    if (!this.state.teams.some(item => item.id === teamId)) throw Error("Unknown Team.");
-    const parent = await this.resolve(teamId);
-    const childId = `opl-bot-${randomUUID()}`;
-    const dispose = this.ctx.on("agent/created", async ({ agent }) => {
-      if (agent.id === childId) await this.ctx.oplCodexAgents.setBot(agent.id, { ...bot, cwd: parent.session.header.cwd });
-    });
     try {
-      const activation = await this.ctx.subagents.startActivation({ provider: "spawn", childId,
-        label: bot.role || bot.name, name: bot.name, parent, prompt: [{ type: "text", text: String(prompt || `You are ${bot.name}. ${bot.role}\nWait for the Team's next assignment after acknowledging your role.`) }],
-        agentOptions: { provider: PROVIDER, model: bot.model }, delivery: "parent", signal: new AbortController().signal });
-      void activation.result.catch(error => this.ctx.logger.warn("Bot execution failed: %s", error.code ?? "unknown"));
-      return { id: activation.childId, name: activation.name };
-    } finally { dispose(); }
-  }
-  async send({ teamId, memberId, text }) {
-    if (!this.state.teams.some(item => item.id === teamId) || !String(text ?? "").trim()) throw Error("Choose a Team and enter a message.");
-    const root = await this.resolve(teamId);
-    if (!memberId || memberId === teamId) root.followup(createUserMessage({ content: [{ type: "text", text }], source: { kind: "user" } }));
-    else await this.ctx.subagents.sendMessage(root, memberId, [{ type: "text", text }], { signal: new AbortController().signal });
-    await this.ctx.sessions.flush(root.session);
-    return { accepted: true };
-  }
-  async execute({ operation, input = {} }) {
-    switch (operation) {
-      case "save_bot": return this.saveBot(input);
-      case "delete_bot": return this.mutate(state => { state.bots = state.bots.filter(bot => bot.id !== input.id); return { deleted: true }; });
-      case "create_team": return this.createTeam(input);
-      case "add_member": return this.addMember(input);
-      case "send_message": return this.send(input);
-      case "cancel_member": {
-        if (!this.state.teams.some(item => item.id === input.teamId)) throw Error("Unknown Team.");
-        const root = await this.resolve(input.teamId);
-        const members = await this.ctx.subagents.listDescendants(root.id);
-        if (input.memberId !== root.id && !members.some(member => member.id === input.memberId)) throw Error("Member is outside this Team.");
-        this.ctx.agents.get(input.memberId)?.cancel({ kind: "user" }, { keepInbox: true });
-        return { accepted: true };
+      if (!METHODS.has(message.method) || !Array.isArray(message.args)) throw Error("Unsupported Codex transport operation.");
+      if (message.method === "request" && message.args[0] !== "turn/interrupt") throw Error("Only exact-turn cancellation is available.");
+      if (["startThread", "startTurn"].includes(message.method) && this.state === "stopped") throw Error("Collaboration is stopping.");
+      const result = await this.transport[message.method](...message.args);
+      if (message.method === "startThread" && child === this.child) this.threads.add(result.thread.id);
+      if (message.method === "resumeThread" && child === this.child) this.threads.add(message.args[0]);
+      if (message.method === "startTurn" && result.turn?.id) {
+        this.turns.set(result.turn.id, message.args[0]);
+        if (!child.connected || child !== this.child) {
+          await this.transport.request("turn/interrupt", { threadId: message.args[0], turnId: result.turn.id });
+          this.turns.delete(result.turn.id);
+        }
       }
-      default: throw Error("Unknown Team/Bot operation.");
+      if (message.method === "waitForTurn") this.turns.delete(message.args[0]);
+      if (child.connected) child.send({ channel: CHANNEL, id: message.id, result }, () => {});
+    } catch (error) {
+      if (child.connected) child.send({ channel: CHANNEL, id: message.id, error: { message: error.message, code: error.code } }, () => {});
     }
   }
-  async read(teamId, memberId) {
-    const base = structuredClone(this.state);
-    if (!teamId) return base;
-    if (!base.teams.some(item => item.id === teamId)) throw Error("Unknown Team.");
-    const root = await this.resolve(teamId);
-    const members = await this.ctx.subagents.listDescendants(root.id);
-    if (memberId && memberId !== teamId && !members.some(member => member.id === memberId)) throw Error("Member is outside this Team.");
-    const binding = this.ctx.oplCodexAgents.state.bindings[memberId || teamId];
-    const messages = await this.ctx.sessionQuery.inspectSession(memberId || teamId, session =>
-      Array.from({ length: Math.min(100, session.seq) }, (_, index) => session.eventAt(Math.max(0, session.seq - 100) + index))
-        .filter(event => ["user/message", "assistant/message"].includes(event?.type)).map(event => structuredClone(event)));
-    return { ...base, teamId, memberId, members,
-      execution: { threadId: binding?.threadId, status: binding?.attempt?.status },
-      tasks: this.ctx.agentTeams.listTasks(root),
-      messages };
+  start() {
+    if (this.state === "running") return Promise.resolve(this.read());
+    this.starting ??= this.launch().finally(() => { this.starting = null; });
+    return this.starting;
   }
-  async dispose() {
-    for (const handle of this.handles.values()) {
-      await this.ctx.subagents.drainDescendants([handle.agent]);
-      await handle.dispose();
+  async launch() {
+    const generation = this.generation;
+    this.state = "starting"; this.error = null; this.diagnostic = "";
+    try {
+      const models = (await this.transport.listModels()).data ?? [];
+      const model = models.find(item => item.isDefault) ?? models[0];
+      if (!model) throw Error("Codex has no available models for collaboration.");
+      const patch = await this.prepare(model.id ?? model.model);
+      if (generation !== this.generation) return this.read();
+      const child = spawn(process.execPath, [this.cli, "--profile", "web", "--patch", patch, "--host", "127.0.0.1", "--port", "0", "--no-open"], {
+        cwd: this.home, env: { ...(this.options.env ?? process.env), DSH_HOME: this.home, ELECTRON_RUN_AS_NODE: "1" }, stdio: ["ignore", "pipe", "pipe", "ipc"]
+      });
+      this.child = child;
+      const onRequest = request => {
+        if (request.method !== "item/tool/call" || !this.threads.has(request.params?.threadId) || !child.connected) return;
+        this.toolRequests.add(request.id);
+        child.send({ channel: CHANNEL, event: "serverRequest", value: request }, () => {});
+      };
+      this.transport.on("serverRequest", onRequest);
+      child.on("message", message => { void this.handle(child, message); });
+      child.once("exit", () => {
+        this.transport.off("serverRequest", onRequest);
+        if (this.child === child) {
+          this.child = null; this.url = null;
+          void Promise.allSettled([...this.turns].map(([turnId, threadId]) => this.transport.request("turn/interrupt", { threadId, turnId })));
+          this.turns.clear(); this.threads.clear(); this.toolRequests.clear();
+          if (this.state === "running") { this.state = "error"; this.error = "Collaboration workbench stopped."; }
+        }
+      });
+      return await new Promise((resolve, reject) => {
+        let output = ""; let settled = false;
+        const timer = setTimeout(() => { child.kill("SIGTERM"); reject(Error("Official collaboration profile did not report readiness within 60 seconds.")); }, 60_000);
+        child.stdout.setEncoding("utf8");
+        child.stdout.on("data", chunk => {
+          output = `${output}${chunk}`.slice(-16384);
+          const match = output.replace(/\u001b\[[0-9;]*m/g, "").match(/https?:\/\/127\.0\.0\.1:\d+[^\s]*/);
+          if (!match || settled || generation !== this.generation) return;
+          settled = true; clearTimeout(timer); this.url = new URL(match[0]).href; this.state = "running"; resolve(this.read());
+        });
+        // Drain diagnostics without exposing credentials or model input to the UI.
+        child.stderr.setEncoding("utf8");
+        child.stderr.on("data", chunk => { this.diagnostic = `${this.diagnostic}${chunk}`.slice(-12000); });
+        child.once("error", error => { clearTimeout(timer); reject(error); });
+        child.once("exit", () => { clearTimeout(timer); reject(Error("Official collaboration profile exited before readiness.")); });
+      });
+    } catch (error) {
+      error.diagnostic = this.diagnostic;
+      if (generation === this.generation) { await this.stop(); this.state = "error"; this.error = error.message; }
+      throw error;
     }
-    this.handles.clear();
   }
+  async execute({ operation }) {
+    if (operation === "start") return this.start();
+    if (operation === "stop") { await this.stop(); return this.read(); }
+    throw Error("Use the official DSH workbench to manage sessions, presets and teamwork.");
+  }
+  async stop() {
+    this.generation++; this.state = "stopped"; this.url = null; this.error = null;
+    const child = this.child;
+    await Promise.allSettled([...this.turns].map(([turnId, threadId]) => this.transport.request("turn/interrupt", { threadId, turnId })));
+    if (child && child.exitCode === null) await new Promise(resolve => {
+      const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
+      child.once("exit", () => { clearTimeout(timer); resolve(); }); child.kill("SIGTERM");
+    });
+    this.turns.clear(); this.threads.clear(); this.toolRequests.clear();
+  }
+  dispose() { return this.stop(); }
 }
 
-export async function apply(ctx) {
-  const service = new TeamBots(ctx, path.join(ctx.oplStudioHostOptions.dshHome, "opl"));
-  await service.load();
+export function apply(ctx) {
+  const service = new CollaborationProfile(ctx.oplStudioHostOptions, ctx.oplCodexNative);
   ctx.provide("oplTeamBots", service);
-  ctx.effect(() => async () => { await service.dispose(); }, "opl-team-bots lifecycle");
+  ctx.effect(() => () => service.dispose(), "official collaboration application lifecycle");
 }

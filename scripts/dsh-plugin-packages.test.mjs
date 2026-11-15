@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { once } from "node:events";
 import { readPluginInventory } from "@deepseek-ai/dsh-host-plugin-inventory";
 import { ThreadAdapterError } from "../src/host/thread-adapter.mjs";
 
@@ -58,6 +59,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     const { bootOplStudioHost } = await import(pathToFileURL(path.join(staging, "src/host/dsh/host.mjs")));
     const transport = {
       initialized: false, on() {}, off() {}, createChannelCallbackAdapter: () => null,
+      async listModels() { return { data: [{ id: "fixture", displayName: "Fixture" }] }; },
       async start() { this.initialized = true; }, async stop() { this.initialized = false; }
     };
     const host = await bootOplStudioHost({
@@ -69,7 +71,27 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     core = host.core;
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@one-person-lab/"));
-    assert.equal(own.length, 8);
+    assert.equal(own.length, 7);
+    assert.equal(host.context.get("agents"), undefined);
+    await host.context.oplTeamBots.start();
+    const collaboration = host.context.oplTeamBots.read();
+    assert.equal(collaboration.state, "running");
+    assert.equal(new URL(collaboration.url).hostname, "127.0.0.1");
+    const entry = await fetch(collaboration.url, { redirect: "manual" });
+    assert.equal(entry.status, 303);
+    const cookie = entry.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const page = await fetch(new URL("/", collaboration.url), { headers: { cookie } });
+    assert.equal(page.status, 200);
+    assert.ok((await page.text()).includes("__DSH_BOOT__"));
+    const workbench = host.context.oplTeamBots;
+    const child = workbench.child;
+    const exited = once(child, "exit");
+    child.disconnect();
+    await exited;
+    assert.equal(workbench.read().state, "error", "a lost parent channel shuts down the official profile");
+    assert.equal(transport.initialized, true, "the borrowed Codex owner stays alive");
+    await workbench.start();
+    assert.equal(workbench.read().state, "running");
     assert.equal(core.mcpApps, host.context.oplMcpApps);
     for (const entry of own) {
       assert.equal(entry.fiberPhase, "active", entry.moduleName);

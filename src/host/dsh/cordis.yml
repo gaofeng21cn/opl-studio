@@ -34,59 +34,10 @@
 - id: plugin-inventory
   name: '@deepseek-ai/dsh-host-plugin-inventory'
 
-# Official collaboration services use an isolated native tool registry. Normal
-# Codex conversations keep the existing MCP registry and cannot call Team tools.
-- id: collaboration
-  name: cordis:group
-  group: true
-  isolate:
-    tools: true
-  config:
-    - id: collaboration-tools
-      name: '@deepseek-ai/dsh-tools'
-    - id: collaboration-tool-executor
-      name: '@deepseek-ai/dsh-tool-executor-native'
-    - id: collaboration-llm
-      name: '@deepseek-ai/dsh-llm'
-    - id: collaboration-session
-      name: '@deepseek-ai/dsh-session'
-    - id: collaboration-projections
-      name: '@deepseek-ai/dsh-session-projection'
-    - id: collaboration-persistence
-      name: '@deepseek-ai/dsh-session-persistence-jsonl'
-      config:
-        root: !!js ctx.oplStudioHostOptions.dshHome + '/opl/sessions'
-    - id: collaboration-query
-      name: '@deepseek-ai/dsh-session-query'
-    - id: collaboration-agents
-      name: '@deepseek-ai/dsh-agent'
-    - id: collaboration-agent-loop
-      name: '@deepseek-ai/dsh-agent-loop'
-    - id: collaboration-fs
-      name: '@deepseek-ai/dsh-fs-local'
-    - id: collaboration-working-directory
-      name: '@deepseek-ai/dsh-working-directory'
-    - id: collaboration-subagents
-      name: '@deepseek-ai/dsh-subagent'
-    - id: collaboration-spawn
-      name: '@deepseek-ai/dsh-subagent-spawn-in-process'
-    - id: collaboration-delegate
-      name: '@deepseek-ai/dsh-tool-subagent'
-      config:
-        provider: spawn
-        maxDepth: 4
-    - id: collaboration-control
-      name: '@deepseek-ai/dsh-tool-subagent-control'
-      config:
-        interrupt: true
-    - id: collaboration-team
-      name: '@deepseek-ai/dsh-agent-team'
-    - id: collaboration-team-tools
-      name: '@deepseek-ai/dsh-tool-agent-team'
-    - id: opl-codex-agents
-      name: '@one-person-lab/opl-codex-agents'
-    - id: opl-team-bots
-      name: '@one-person-lab/opl-team-bots'
+# Collaboration launches the unchanged official base/web application on demand.
+# Its adapter borrows the existing Codex transport; the main profile stays Codex-only.
+- id: opl-team-bots
+  name: '@one-person-lab/opl-team-bots'
 
 - id: opl-superagent
   name: '@one-person-lab/opl-superagent'

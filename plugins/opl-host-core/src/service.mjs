@@ -264,7 +264,7 @@ export class OplHostCore extends EventEmitter {
         if (payload.operation === "stop") return service.stop();
         throw new ThreadAdapterError("invalid_request", "Unknown Superagent operation", {}, 400);
       }
-      case "readTeamBots": return this.hostContext.get("oplTeamBots").read(payload.teamId, payload.memberId);
+      case "readTeamBots": return this.hostContext.get("oplTeamBots").read();
       case "executeTeamBot": return this.hostContext.get("oplTeamBots").execute(payload);
       case "readState": {
         const state = await this.opl.readState(payload.profile ?? "fast");

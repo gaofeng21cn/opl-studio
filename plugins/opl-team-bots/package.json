@@ -13,7 +13,7 @@
     "lib"
   ],
   "license": "Apache-2.0",
-  "description": "Reusable Bot templates and official DSH Team coordination with persistent Codex execution.",
+  "description": "Unmodified official DSH collaboration workbench with the existing persistent Codex executor.",
   "engines": {
     "node": ">=22.19.0",
     "dsh": "0.2.2-rc.3"

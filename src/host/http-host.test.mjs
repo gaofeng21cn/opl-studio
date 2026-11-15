@@ -129,10 +129,9 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
       ["@one-person-lab/opl-framework-bridge", true, "active"],
       ["@one-person-lab/opl-mcp-apps", true, "active"],
       ["@one-person-lab/opl-host-core", true, "active"],
+      ["@one-person-lab/opl-team-bots", true, "active"],
       ["@one-person-lab/opl-superagent", true, "active"],
-      ["@one-person-lab/opl-web-routes", true, "active"],
-      ["@one-person-lab/opl-codex-agents", true, "active"],
-      ["@one-person-lab/opl-team-bots", true, "active"]
+      ["@one-person-lab/opl-web-routes", true, "active"]
     ]
   );
   for (const entry of inventory.entries.filter((item) => item.moduleName.startsWith("@one-person-lab/"))) {

@@ -1,9 +1,13 @@
-import { LlmAdapter } from "@deepseek-ai/dsh-llm";
+import { LlmAdapter, createAssistantMessage } from "@deepseek-ai/dsh-llm";
+import { threadPermissionOverrides, turnPermissionOverrides } from "../../../src/host/app-server-protocol.mjs";
 
 const PROVIDER = "opl-codex";
 const textOf = (content) => (Array.isArray(content) ? content : [])
   .filter(block => block.type === "text").map(block => block.text).join("\n");
 const failure = (code, message) => Object.assign(new Error(message), { code });
+const DISPATCH_TOOL = { name: "opl_dsh_call", description: "Call an available DSH tool from the current DSH tool catalog in the developer instructions.",
+  inputSchema: { type: "object", properties: { name: { type: "string" }, arguments: { type: "object", additionalProperties: true } }, required: ["name", "arguments"], additionalProperties: false } };
+const permissionForMode = mode => ({ "read-only": ":read-only", "workspace-write": ":workspace", "danger-full-access": ":danger-full-access" })[mode];
 
 /** Official DSH owns coordination. This adapter owns only its Codex execution binding. */
 export class CodexTeamAdapter extends LlmAdapter {
@@ -25,29 +29,46 @@ export class CodexTeamAdapter extends LlmAdapter {
   providerInfo() { return { id: PROVIDER, name: "Codex" }; }
   async listModels() {
     const result = await this.transport.listModels();
-    return (result.data ?? []).map(model => ({ id: model.id ?? model.model, name: model.displayName ?? model.id ?? model.model }));
+    return (result.data ?? []).map(model => ({ provider: PROVIDER, id: model.id ?? model.model, name: model.displayName ?? model.id ?? model.model }));
+  }
+
+  async resolveModel(provider, id) {
+    const result = await this.transport.listModels();
+    const model = (result.data ?? []).find(item => (item.id ?? item.model) === id);
+    return { provider, id, name: model?.displayName ?? id,
+      ...(model?.supportedReasoningEfforts?.length ? { reasoning: {
+        efforts: model.supportedReasoningEfforts.map(item => ({ id: item.reasoningEffort, name: item.reasoningEffort, description: item.description })),
+        defaultEffort: model.defaultReasoningEffort,
+      } } : {}) };
   }
 
   async commit(agent, type, data) {
     await this.store.mutate(state => {
       const binding = state.bindings[agent.id] ??= {};
-      if (type === "opl/codex-thread") binding.threadId = data.threadId;
+      if (type === "opl/codex-thread") { binding.threadId = data.threadId; binding.toolBridge = "dispatcher-v1"; }
       if (type === "opl/codex-attempt") binding.attempt = data;
       if (type === "opl/codex-inputs") binding.delivered = [...new Set([...(binding.delivered ?? []), ...data.ids])];
     });
   }
 
   async dispatchTool(request, call) {
-    const { tool, arguments: args, callId, threadId } = request.params;
+    const { tool, arguments: input, callId, threadId } = request.params;
+    const name = call.legacy && tool.startsWith("opl_dsh_") ? tool.slice("opl_dsh_".length) : input?.name;
+    const args = call.legacy ? input : input?.arguments;
     let response;
     try {
-      if (!call.names.has(tool) || call.agent !== this.ctx.agents.get(call.agent.id)
+      if ((!call.legacy && tool !== DISPATCH_TOOL.name) || !call.names.has(name) || call.agent !== this.ctx.agents.get(call.agent.id)
         || call.signal.aborted || call.threadId !== threadId) {
         throw failure("team_tool_unavailable", "This tool is not available to this exact Team member.");
       }
+      const block = { type: "tool-call", id: callId, name, arguments: JSON.stringify(args ?? {}) };
+      // Translate the actual Codex callback into the official advertised-call
+      // lifecycle before its native executor records tool/call and tool/result.
+      if (call.log) call.agent.session.append("assistant/message", { ...call.log,
+        message: createAssistantMessage({ content: [block], source: { provider: PROVIDER, model: call.model } }), stream: [] }, { surfaceOp: "append" });
       const batch = await this.ctx.tools.execute({
-        calls: [{ type: "tool-call", id: callId, name: call.names.get(tool), arguments: JSON.stringify(args ?? {}) }],
-        agent: call.agent, signal: call.signal, toolSet: call.toolSet
+        calls: [block],
+        agent: call.agent, signal: call.signal, toolSet: call.toolSet, log: call.log
       });
       const result = batch.results?.[0];
       if (batch.results?.length !== 1 || result.callId !== callId) throw Error("Uncorrelated Team tool result.");
@@ -69,18 +90,27 @@ export class CodexTeamAdapter extends LlmAdapter {
     const delivered = new Set(binding.delivered ?? []);
     let pending = messages.filter(message => !delivered.has(message.id));
     let threadId = binding?.threadId;
-    const tools = (options.tools ?? []).map(tool => ({ type: "function", name: `opl_dsh_${tool.name}`, description: tool.description, inputSchema: tool.parameters }));
+    const legacy = Boolean(threadId && binding.toolBridge !== "dispatcher-v1");
     const model = options.model === "default" ? undefined : options.model;
     const cwd = agent.session.header.cwd;
+    const policy = this.ctx.get("sandboxPolicy");
+    const selectedMode = policy?.overrideOf(agent.session);
+    const permissions = permissionForMode(selectedMode) ?? bot.permissions ?? permissionForMode(policy?.resolve({ session: agent.session }).mode) ?? ":workspace";
+    // Codex fixes dynamicTools at thread/start. A stable dispatcher plus the
+    // current admitted catalog preserves DSH's enable/disable and preset semantics.
+    const instructions = [legacy ? "Use the existing opl_dsh_ prefixed tools for DSH collaboration. Only the tools in the current catalog are admitted."
+      : "Use opl_dsh_call with {name, arguments} for the DSH tools below. Only this catalog is available for this turn. Codex native subagents are independent of this DSH Team.",
+      bot.role, ...(bot.skills ?? []).map(skill => `Use the installed Skill ${skill}.`),
+      ...options.messages.filter(message => message.role === "system").map(message => textOf(message.content)),
+      `Current DSH tool catalog: ${JSON.stringify(options.tools ?? [])}`].filter(Boolean).join("\n\n");
     if (!threadId) {
-      const result = await this.transport.startThread({ cwd, model, permissions: bot.permissions ?? ":workspace",
-        dynamicTools: tools, developerInstructions: ["Use the opl_dsh_ tools for DSH Team collaboration. Tool names in DSH guidance below use that prefix. Codex native subagents are independent of this Team.", bot.role, ...(bot.skills ?? []).map(skill => `Use the installed Skill ${skill}.`), ...options.messages.filter(message => message.role === "system")
-          .map(message => textOf(message.content))].filter(Boolean).join("\n\n") });
+      const result = await this.transport.startThread({ cwd, model, permissions,
+        dynamicTools: [DISPATCH_TOOL], developerInstructions: instructions });
       threadId = result.thread?.id;
       if (!threadId) throw Error("Codex did not return a persistent Team thread.");
       await this.commit(agent, "opl/codex-thread", { threadId });
     } else {
-      await this.transport.resumeThread(threadId, { cwd });
+      await this.transport.resumeThread(threadId, { cwd, excludeTurns: true, ...threadPermissionOverrides(permissions, cwd), developerInstructions: instructions });
     }
     if (previous && previous.status !== "settled") {
       if (!previous.turnId) throw failure("team_execution_unconfirmed", "Previous dispatch is unconfirmed. Inspect the linked Codex thread before continuing.");
@@ -97,8 +127,12 @@ export class CodexTeamAdapter extends LlmAdapter {
     const prompt = pending.map(message => textOf(message.content)).filter(Boolean).join("\n\n");
     if (!prompt) throw failure("team_input_unsupported", "This Team adapter currently requires text input.");
     const toolSet = await this.ctx.tools.resolve({ agent, signal: options.signal, modelSelection: { provider: options.provider, model: options.model } });
+    const boundary = this.ctx.agents.turnBoundaryOf(agent.session);
+    const position = boundary.lastStepStartSeq === null ? undefined : agent.session.eventAt(boundary.lastStepStartSeq)?.data;
     const attempt = { ids: pending.map(message => message.id), status: "dispatching" };
-    const call = { agent, threadId, signal: options.signal, toolSet, names: new Map((options.tools ?? []).map(tool => [`opl_dsh_${tool.name}`, tool.name])) };
+    const call = { agent, threadId, legacy, model: options.model, signal: options.signal, toolSet,
+      log: position ? { turn: position.turn, step: position.step } : undefined,
+      names: new Set((options.tools ?? []).map(tool => tool.name)) };
     this.calls.set(threadId, call);
     let turnId;
     const abort = () => {
@@ -109,7 +143,7 @@ export class CodexTeamAdapter extends LlmAdapter {
       options.signal.throwIfAborted();
       await this.commit(agent, "opl/codex-attempt", attempt);
       const started = await this.transport.startTurn(threadId, prompt, [], {
-        cwd, ...(model ? { model } : {}), ...(options.reasoningEffort ? { effort: options.reasoningEffort } : {})
+        cwd, ...turnPermissionOverrides(permissions, cwd), ...(model ? { model } : {}), ...(options.reasoningEffort ? { effort: options.reasoningEffort } : {})
       });
       turnId = started.turn?.id;
       if (!turnId) throw Error("Codex did not return a Team turn id.");

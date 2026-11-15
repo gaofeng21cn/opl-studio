@@ -208,7 +208,7 @@ export function useStudioPanels<T>(selector: (panels: readonly { id: string; ord
     { id: "runtime", order: 20, label: zh ? "运行状态" : "Runtime status" },
     { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
   ];
-  if (pluginPanels.has("teams")) panels.push({ id: "teams", order: 35, label: zh ? "团队与 Bot" : "Teams and Bots" });
+  if (pluginPanels.has("teams")) panels.push({ id: "teams", order: 35, label: zh ? "智能体协作" : "Agent collaboration" });
   if (pluginPanels.has("superagent")) panels.push({ id: "superagent", order: 36, label: "Superagent" });
   if (workspaceEntries(studio.uiContributions.entries).length) {
     panels.push({ id: "workspace", order: 40, label: zh ? "应用工作台" : "App workspace" });

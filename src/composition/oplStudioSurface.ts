@@ -22,7 +22,7 @@ export type RenderSettingsContribution = (options?: { only?: string }, owner?: {
 
 export type OplStudioSurface = {
   superagent: { read(): Promise<SuperagentState>; execute(request: { operation: "start" | "stop" }): Promise<SuperagentState> };
-  teamBots: { read(request?: { teamId?: string; memberId?: string }): Promise<TeamBotsState>; execute(request: TeamBotAction): Promise<unknown> };
+  teamBots: { read(): Promise<TeamBotsState>; execute(request: TeamBotAction): Promise<unknown> };
   locale: "zh" | "en";
   projectTitle: string;
   sessionTitle: string;

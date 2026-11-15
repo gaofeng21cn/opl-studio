@@ -62,8 +62,8 @@ export function createBrowserBridge(): OplBridge {
     },
     readSuperagent: () => candidate?.readSuperagent?.() ?? Promise.reject(new Error("Superagent plugin is unavailable")),
     executeSuperagent: request => candidate?.executeSuperagent?.(request) ?? Promise.reject(new Error("Superagent plugin is unavailable")),
-    readTeamBots: request => candidate?.readTeamBots?.(request) ?? Promise.reject(new Error("Team/Bot plugin is unavailable")),
-    executeTeamBot: request => candidate?.executeTeamBot?.(request) ?? Promise.reject(new Error("Team/Bot plugin is unavailable")),
+    readTeamBots: () => candidate?.readTeamBots?.() ?? Promise.reject(new Error("Collaboration workbench is unavailable")),
+    executeTeamBot: request => candidate?.executeTeamBot?.(request) ?? Promise.reject(new Error("Collaboration workbench is unavailable")),
     requestSettingsSearchLog: request => candidate?.requestSettingsSearchLog?.(request) ?? Promise.reject(new Error("Settings search logs are unavailable in this host")),
     beginWindowDrag() {
       candidate?.beginWindowDrag?.();

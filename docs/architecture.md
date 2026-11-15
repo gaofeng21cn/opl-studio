@@ -58,8 +58,9 @@ DSH services:
 - `dsh-host-webserver` and `dsh-host-plugin-inventory`;
 - Web-only frontend static hosting and client modules.
 
-The main profile does not load `dsh-base`. Official DSH collaboration services
-coordinate Team members through the existing Codex execution owner. The optional
+The main profile does not load `dsh-base`. The on-demand collaboration profile runs the complete official base/Web
+application through the official CLI. Its private Node IPC transport borrows the
+existing Codex execution owner; it starts no additional Codex App Server. The optional
 Superagent profile is isolated and loads the official base and Web bundles. The OPL plugin tree is:
 
 ```text
@@ -104,11 +105,23 @@ Package metadata is only the first gate. Ordinary conversations retain their
 Codex thread, permission and approval owners. Collaboration loads the official
 DSH Session, AgentLoop, Subagent and AgentTeam services. The `opl-codex-agents`
 plugin supplies an LLM adapter backed by the existing persistent Codex App Server;
-`opl-team-bots` stores reusable role/model/permission templates and projects the
-official member tree, inbox and shared task board. Each member has a continuing
+`opl-team-bots` launches the unmodified official Web application. Its model-menu
+Team toggle, disable confirmation, Subagent tree, right-side member chat, shared
+task board and Agent Preset/Creator flows are the real callers. OPL maintains no
+parallel role editor or team management page. Each member has a continuing
 Codex execution thread. Unknown dispatches require inspection before resending.
 Official tools are bound to the exact initiating Agent through native Codex
-dynamic tools, including admission and cancellation.
+dynamic dispatcher, including per-turn admission, native permission projection
+and cancellation. The stable dispatcher lets Team mode change after thread
+creation without replacing the persistent Codex thread. Existing bindings and
+DSH session logs remain in place; the retired bots.json is preserved read-only.
+The CLI owns application readiness, HMR, Settings and shutdown. Parent transport
+RPCs admit only the adapter operations; callbacks are limited to its linked
+threads, and stopping the workbench interrupts its exact active turns. Native
+Codex built-in command traces and token accounting remain in the canonical
+Codex thread; this adapter currently projects final text and official DSH tool
+cards, not the full native event stream. This executor gap is reviewed on DSH
+upgrades; collaboration UI and role management remain upstream-owned.
 
 Superagent uses the unmodified upstream prototype at
 `8c32a9dc5d72c033816c6a8110b37f40cf94fba4`, with per-file provenance under

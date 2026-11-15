@@ -1,0 +1,24 @@
+# Executor composition only. The official Web application owns every UI flow.
+- id: agent-loop
+  inject: [oplCodexAgents]
+
+- id: agent-default-model
+  inject: [oplCodexDefaultModel]
+  config:
+    provider: opl-codex
+    model: !!js ctx.oplCodexDefaultModel
+
+# Auxiliary title requests have no initiating Agent or persistent Codex thread.
+- id: session-title-llm
+  disabled: true
+
+- id: llm-deepseek
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: llm-pi-ai
+  disabled: true
+
+- insert:
+    - id: opl-codex-agents
+      name: '@one-person-lab/opl-codex-agents'
