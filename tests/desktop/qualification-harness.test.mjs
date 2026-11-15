@@ -11,6 +11,7 @@ import {
   buildGuestNetworkCommand,
   buildGuestDmgAdmissionCommand,
   buildGuestLaunchCommand,
+  buildGuestProcessStopCommand,
   prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
 } from "../../scripts/desktop/qualify-clean-vm.mjs";
@@ -107,6 +108,14 @@ test("Full offline launch isolates VM networking and preserves the Electron sand
   assert.match(launch, /OPL_STUDIO_MANAGED_UPDATES=0/);
   assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
+});
+
+test("clean VM force-stops a stubborn relaunch process before continuing online qualification", () => {
+  const command = buildGuestProcessStopCommand(1234);
+  assert.match(command, /kill -TERM 1234/);
+  assert.match(command, /kill -KILL 1234/);
+  assert.match(command, /kill -KILL 1234[\s\S]*exit 0$/);
+  assert.throws(() => buildGuestProcessStopCommand(0), /positive integer/);
 });
 
 test('Full offline installation consumes the quarantined DMG notarization ticket', () => {

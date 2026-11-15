@@ -365,6 +365,11 @@ function scpToGuest(options, ip, source, target) {
   return run("scp", ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, source, `${options.guestUser}@${ip}:${target}`]);
 }
 
+export function buildGuestProcessStopCommand(pid) {
+  invariant(Number.isSafeInteger(pid) && pid > 0, "Guest process ID must be a positive integer");
+  return `kill -TERM ${pid} 2>/dev/null || true; for attempt in $(seq 1 30); do kill -0 ${pid} 2>/dev/null || exit 0; sleep 1; done; kill -KILL ${pid} 2>/dev/null || true; for attempt in $(seq 1 5); do kill -0 ${pid} 2>/dev/null || exit 0; sleep 1; done; exit 0`;
+}
+
 export async function waitForVmIp(vmName, { vmProcess, timeoutMs = 120_000, pollMs = 2_000,
   readIp = () => run("tart", ["ip", vmName], { allowFailure: true }) } = {}) {
   let diagnostics = "";
@@ -625,7 +630,7 @@ export async function qualifyCleanVm(options) {
             gatewayConfigured: false, automaticUpdatesEnabled: false, appVisible: true,
             protocolCalls: ["thread/list"], generationRequested: false } };
         progress({ phase: "full-offline-first-launch", status: "passed", version });
-        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
+        guestRun(options, ip, buildGuestProcessStopCommand(guestAppProcessId));
         guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
         invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, 'Guest offline relaunch did not return its process ID');
         await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
@@ -641,7 +646,7 @@ export async function qualifyCleanVm(options) {
         guestRun(options, ip, buildGuestNetworkCommand(false));
         networkIsolated = false;
         progress({ phase: 'restore_vm_network', status: 'passed', vm_name: options.vmName });
-        guestRun(options, ip, `kill -TERM ${guestAppProcessId}; for attempt in $(seq 1 30); do kill -0 ${guestAppProcessId} 2>/dev/null || exit 0; sleep 1; done; exit 1`);
+        guestRun(options, ip, buildGuestProcessStopCommand(guestAppProcessId));
         guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
         invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest online relaunch did not return its process ID");
       }
