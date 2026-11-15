@@ -16,12 +16,25 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
   try {
     const manifest = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
     await fs.writeFile(path.join(staging, "package.json"), JSON.stringify(manifest));
+    // Mirror the installed dependency graph, including CLI/plugin transitive packages.
+    // Local delivery plugins below are replaced by their packed bytes.
+    for (const entry of await fs.readdir(path.join(root, "node_modules"), { withFileTypes: true })) {
+      if (entry.name.startsWith(".")) continue;
+      const names = entry.name.startsWith("@")
+        ? (await fs.readdir(path.join(root, "node_modules", entry.name))).map(name => `${entry.name}/${name}`)
+        : [entry.name];
+      for (const name of names) {
+        if (manifest.dependencies[name]?.startsWith("file:plugins/")) continue;
+        const destination = path.join(staging, "node_modules", name);
+        await fs.mkdir(path.dirname(destination), { recursive: true });
+        await fs.symlink(await fs.realpath(path.join(root, "node_modules", name)), destination, "dir");
+      }
+    }
     const entrypoints = [];
     for (const [name, source] of Object.entries(manifest.dependencies)) {
       const destination = path.join(staging, "node_modules", name);
       await fs.mkdir(path.dirname(destination), { recursive: true });
       if (!source.startsWith("file:plugins/")) {
-        await fs.symlink(await fs.realpath(path.join(root, "node_modules", name)), destination, "dir");
         continue;
       }
       const packed = spawnSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", staging], {
@@ -44,7 +57,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     await fs.cp(path.join(root, "src/host/dsh"), path.join(staging, "src/host/dsh"), { recursive: true });
     const { bootOplStudioHost } = await import(pathToFileURL(path.join(staging, "src/host/dsh/host.mjs")));
     const transport = {
-      initialized: false, on() {}, createChannelCallbackAdapter: () => null,
+      initialized: false, on() {}, off() {}, createChannelCallbackAdapter: () => null,
       async start() { this.initialized = true; }, async stop() { this.initialized = false; }
     };
     const host = await bootOplStudioHost({
@@ -56,7 +69,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     core = host.core;
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@one-person-lab/"));
-    assert.equal(own.length, 5);
+    assert.equal(own.length, 8);
     assert.equal(core.mcpApps, host.context.oplMcpApps);
     for (const entry of own) {
       assert.equal(entry.fiberPhase, "active", entry.moduleName);

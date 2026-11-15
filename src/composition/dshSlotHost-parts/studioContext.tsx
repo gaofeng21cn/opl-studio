@@ -201,11 +201,15 @@ export function useConversationPanelInfo<T>(selector: (info: { activePanelId: st
 export function useStudioPanels<T>(selector: (panels: readonly { id: string; order: number; label: string }[]) => T): T {
   const studio = useStudio();
   const zh = studio.locale === "zh";
+  const slots = useContext(SlotCoreContext);
+  const pluginPanels = new Set(slots?.entries("sidebar.panellist").map(entry => entry.options.id));
   const panels = [
     { id: "applications", order: 10, label: zh ? "软件中心" : "Software Center" },
     { id: "runtime", order: 20, label: zh ? "运行状态" : "Runtime status" },
     { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
   ];
+  if (pluginPanels.has("teams")) panels.push({ id: "teams", order: 35, label: zh ? "团队与 Bot" : "Teams and Bots" });
+  if (pluginPanels.has("superagent")) panels.push({ id: "superagent", order: 36, label: "Superagent" });
   if (workspaceEntries(studio.uiContributions.entries).length) {
     panels.push({ id: "workspace", order: 40, label: zh ? "应用工作台" : "App workspace" });
   }

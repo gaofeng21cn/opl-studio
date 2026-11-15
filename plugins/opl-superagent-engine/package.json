@@ -1,0 +1,51 @@
+{
+  "name": "dsh-superagent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./github-watch": "./lib/github-watch.mjs",
+    "./feishu-watch": "./lib/feishu-watch.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib",
+    "prompts",
+    "skills",
+    "locale",
+    "cordis.patch.yml",
+    "UPSTREAM.json"
+  ],
+  "license": "MIT",
+  "description": "Unmodified DeepSeek Superagent prototype source packaged for the pinned official DSH runtime.",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.2-rc.3"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  },
+  "dependencies": {
+    "proper-lockfile": "4.1.2",
+    "zod": "4.6.7"
+  }
+}

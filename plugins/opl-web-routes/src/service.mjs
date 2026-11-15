@@ -45,6 +45,14 @@ async function body(req) {
 async function dispatchApi(req, res, hostCore) {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
 
+  if (req.method === "POST" && ["/api/superagent/read", "/api/superagent/action"].includes(url.pathname)) {
+    json(res, 200, await hostCore.invoke(url.pathname.endsWith("/read") ? "readSuperagent" : "executeSuperagent", await body(req)));
+    return true;
+  }
+  if (req.method === "POST" && ["/api/teams/read", "/api/teams/action"].includes(url.pathname)) {
+    json(res, 200, await hostCore.invoke(url.pathname.endsWith("/read") ? "readTeamBots" : "executeTeamBot", await body(req)));
+    return true;
+  }
   if (url.pathname === "/api/settings-search-log") {
     if (!["GET", "POST"].includes(req.method)) return json(res, 405, { ok: false, reason: "method-not-allowed" });
     const chunks = [];

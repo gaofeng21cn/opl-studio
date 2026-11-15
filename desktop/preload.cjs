@@ -79,6 +79,10 @@ contextBridge.exposeInMainWorld("oplStudio", {
     modelAccessSecretInput: true,
     connectionAccessApproval: true
   },
+  readSuperagent: () => invoke("readSuperagent"),
+  executeSuperagent: request => invoke("executeSuperagent", request),
+  readTeamBots: request => invoke("readTeamBots", request),
+  executeTeamBot: request => invoke("executeTeamBot", request),
   requestSettingsSearchLog: request => invoke("requestSettingsSearchLog", request),
   beginWindowDrag: () => invoke("beginWindowDrag"),
   retryDesktopHost: () => invoke("retryDesktopHost"),

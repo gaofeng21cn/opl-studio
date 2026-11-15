@@ -28,7 +28,7 @@ combines a persistent Codex backend, the OPL App product model, Framework-owned
 runtime and Package projections, and a shared desktop/WebUI renderer in one
 workbench.
 
-Studio is built on a pinned DeepSeek Harness (DSH) `v0.2.2-rc.2` application
+Studio is built on a pinned DeepSeek Harness (DSH) `v0.2.2-rc.3` application
 skeleton and GUI source cohort. DSH supplies the Cordis application host,
 plugin lifecycle, layout system, UI primitives, and interaction foundations.
 OPL supplies the product identity, Codex integration, Framework bridge, product
@@ -113,9 +113,11 @@ OPL Studio DSH/Cordis Application Host
                            runtime and Package authority
 ```
 
-Studio runs a dedicated `opl-studio` DSH profile but deliberately excludes
-`dsh-base`. It therefore does not adopt a second DSH session store, LLM/provider
-router, Agent loop, or credential authority. `opl-codex-native` is the only
+Studio runs the `opl-studio` profile without `dsh-base`. Ordinary conversations
+retain Codex ownership. Official DSH Session, AgentLoop, Subagent and Team
+services own collaboration state; OPL plugins bind each member to a continuing
+thread in the same Codex App Server. Superagent is an optional independent
+profile with its own model, accounts, Sources, Policy and Tickets. `opl-codex-native` is the only
 owner of the persistent Codex App Server, canonical threads and turns,
 approvals, and live turn events inside Studio.
 

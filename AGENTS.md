@@ -15,8 +15,11 @@
 - `opl-codex-native` is the only owner of the persistent Codex App Server,
   canonical threads, approvals, and live turn events inside Studio.
 - DSH Host plugins may contribute tools and application services, but Studio
-  must not load `dsh-base` or adopt a second DSH session, LLM, agent-loop, or
-  credential authority.
+  keeps ordinary conversations in Codex. The main profile does not load `dsh-base`;
+  official DSH Session/AgentLoop/Subagent/Team services own collaboration state,
+  and `opl-codex-agents` binds members to the same persistent Codex App Server.
+  Superagent runs in an independent official profile with its own model,
+  credentials, Sources, Policy, Tickets and lifecycle; it has no Team dependency.
 - Use OPL App state/action contracts as the only interface to Framework-owned
   runtime and Package truth; `opl-framework-bridge` remains a consumer bridge,
   not a second owner.

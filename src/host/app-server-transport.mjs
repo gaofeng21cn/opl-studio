@@ -45,7 +45,7 @@ export class CodexAppServerTransport extends EventEmitter {
       ?? "codex";
     const args = options.args
       ?? env.CODEX_APP_SERVER_ARGS?.split(" ").filter(Boolean)
-      ?? ["app-server", "--stdio"];
+      ?? ["app-server"];
     const cwd = options.cwd ?? env.OPL_STUDIO_CODEX_CWD ?? process.cwd();
     const host = options.host ?? os.hostname();
     const clientVersion = options.clientVersion ?? env.OPL_APP_VERSION ?? "unknown";

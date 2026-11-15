@@ -1,3 +1,5 @@
+import type { SuperagentState } from "../../plugins/opl-superagent/src/client/types";
+import type { TeamBotsState, TeamBotAction } from "../../plugins/opl-team-bots/src/client/types";
 import type { McpAppsBridge, McpAppOpen } from "../bridge/mcpApps";
 import type { ReactNode } from "react";
 import type { SettingsDestinationId } from "../workbench/SettingsPanel";
@@ -15,10 +17,12 @@ export type OplSetupOperationResult = {
 
 export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
 
-export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace" | "applications";
+export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace" | "applications" | "teams" | "superagent";
 export type RenderSettingsContribution = (options?: { only?: string }, owner?: { close?: () => void }) => ReactNode;
 
 export type OplStudioSurface = {
+  superagent: { read(): Promise<SuperagentState>; execute(request: { operation: "start" | "stop" }): Promise<SuperagentState> };
+  teamBots: { read(request?: { teamId?: string; memberId?: string }): Promise<TeamBotsState>; execute(request: TeamBotAction): Promise<unknown> };
   locale: "zh" | "en";
   projectTitle: string;
   sessionTitle: string;

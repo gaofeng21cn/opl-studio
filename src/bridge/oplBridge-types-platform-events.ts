@@ -1,3 +1,5 @@
+import type { SuperagentState } from "../../plugins/opl-superagent/src/client/types";
+import type { TeamBotsState, TeamBotAction } from "../../plugins/opl-team-bots/src/client/types";
 import type { McpAppsBridge } from "./mcpApps";
 import type {
   AppLogDirectoryUpdateResult,
@@ -122,7 +124,7 @@ export type SettingsSearchLogResponse = { status: number; body: string };
 
 export type OplStudioSurface = Pick<
   OplBridge,
-  keyof McpAppsBridge | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "revealLocalPath" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
+  keyof McpAppsBridge | "readSuperagent" | "executeSuperagent" | "readTeamBots" | "executeTeamBot" | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "revealLocalPath" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   eventSourceUrl?: string;
   retryDesktopHost?: () => Promise<{ status: string }>;
@@ -132,6 +134,10 @@ export type OplStudioSurface = Pick<
 
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   platformCapabilities: OplPlatformCapabilities;
+  readSuperagent(): Promise<SuperagentState>;
+  executeSuperagent(request: { operation: "start" | "stop" }): Promise<SuperagentState>;
+  readTeamBots(request?: { teamId?: string; memberId?: string }): Promise<TeamBotsState>;
+  executeTeamBot(request: TeamBotAction): Promise<unknown>;
   requestSettingsSearchLog(request: SettingsSearchLogRequest): Promise<SettingsSearchLogResponse>;
   beginWindowDrag(): void;
   retryDesktopHost(): Promise<void>;

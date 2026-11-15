@@ -44,7 +44,7 @@ export class OplCodexNative extends EventEmitter {
       ? { ...env, [connection.bearerTokenEnvVar]: connection.bearerToken }
       : env;
     const baseArgs = env.CODEX_APP_SERVER_ARGS?.split(" ").filter(Boolean)
-      ?? ["app-server", "--stdio"];
+      ?? ["app-server"];
     this.transport = transport ?? new CodexAppServerTransport({
       cwd: workspaceRoot,
       env: childEnv,

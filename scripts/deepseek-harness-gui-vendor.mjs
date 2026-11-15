@@ -159,14 +159,15 @@ function sync(sourceRoot) {
         "host_webserver",
         "host_plugin_inventory",
         "frontend_static_primitive_behind_studio_auth_routes",
-        "client_modules_web_only"
+        "client_modules_web_only",
+        "collaboration_sessions_and_persistence",
+        "collaboration_agents_and_official_agent_loop",
+        "official_subagent_and_team_task_board"
       ],
       excluded_upstream_profiles: ["dsh-base"],
       excluded_upstream_authorities: [
-        "dsh_session",
-        "dsh_llm_provider_routing",
-        "dsh_agent_loop",
-        "dsh_credentials"
+        "ordinary_conversation_DSH_sessions_and_model_execution",
+        "main_profile_DSH_provider_credentials"
       ],
       upgrade_validation: [
         "npm run verify:dsh-gui",

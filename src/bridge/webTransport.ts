@@ -179,6 +179,10 @@ export function installWebTransport(): void {
       }));
       return { status: response.status, body: await response.text() };
     },
+    readSuperagent: () => postJson("/api/superagent/read", {}),
+    executeSuperagent: request => postJson("/api/superagent/action", request),
+    readTeamBots: request => postJson("/api/teams/read", request ?? {}),
+    executeTeamBot: request => postJson("/api/teams/action", request),
     beginWindowDrag: () => undefined,
     readState: (profile = "fast") => requestJson<OplStateReadback>(`/api/opl/state?profile=${encodeURIComponent(profile)}`),
     readInitialize: () => requestJson("/api/opl/initialize"),

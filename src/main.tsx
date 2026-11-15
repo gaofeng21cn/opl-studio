@@ -1,3 +1,5 @@
+import { superagentClientPlugin } from "../plugins/opl-superagent/src/client/plugin";
+import { teamBotsClientPlugin } from "../plugins/opl-team-bots/src/client/plugin";
 import { mcpAppsClientPlugin } from "../plugins/opl-mcp-apps/src/client/plugin";
 import { AppWebEntry } from "@deepseek-ai/dsh-client-web";
 import "./integrations/deepseek-harness/theme";
@@ -11,6 +13,8 @@ declare global {
   }
 
   var __OPL_MCP_APPS_CLIENT__: typeof mcpAppsClientPlugin | undefined;
+  var __OPL_SUPERAGENT_CLIENT__: typeof superagentClientPlugin | undefined;
+  var __OPL_TEAM_BOTS_CLIENT__: typeof teamBotsClientPlugin | undefined;
   var __OPL_STUDIO_CLIENT__: typeof oplStudioClientPlugin | undefined;
 }
 
@@ -25,6 +29,8 @@ const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("missing #root renderer mount");
 
 globalThis.__OPL_MCP_APPS_CLIENT__ = mcpAppsClientPlugin;
+globalThis.__OPL_SUPERAGENT_CLIENT__ = superagentClientPlugin;
+globalThis.__OPL_TEAM_BOTS_CLIENT__ = teamBotsClientPlugin;
 globalThis.__OPL_STUDIO_CLIENT__ = oplStudioClientPlugin;
 
 if (desktopTransportInstalled || window.location.protocol === "file:") {

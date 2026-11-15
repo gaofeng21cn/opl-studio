@@ -17,7 +17,7 @@ OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
   `dsh-typert-protocol`, `dsh-client-store`, and
   `dsh-util-workspace-path`, `dsh-util-file-drag`, `dsh-util-values`,
   `dsh-client-connection` (public Peer type/primitive only), and
-  `dsh-tool-executor-native`, all at `0.2.2-rc.2`;
+  `dsh-tool-executor-native`, all at `0.2.2-rc.3`;
 - `use-sync-external-store` `1.7.0` for the vendored renderer closure;
 - `zustand` `5.1.0` and `immer` `11.2.9` for the DSH client store runtime
   closure (MIT, pmndrs and Michel Weststrate);
@@ -32,7 +32,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`
+Inspected source ref: `38a6a5c965aa99ab525161efb7cc5cf1fe62fced`
 
 The complete `src/` trees of twenty-one client packages are vendored from that ref under `src/vendor/deepseek-harness/packages/client/`:
 
@@ -62,7 +62,7 @@ The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
 The snapshot contains 701 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.2`), and
+roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.3`), and
 update boundary are recorded in
 `src/composition/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks every local digest and reverts the declared compatibility patches
@@ -83,9 +83,9 @@ The live One Person Lab composition directly renders upstream `AppFrame`,
 registration, disposal, and entry error isolation. OPL components import `Button`, `Pill`, `Input`, `Tooltip`,
 `StateDot`, `projectUserText`, and icons directly from the vendored upstream
 `@deepseek-ai/dsh-client-ui-primitives` index. User-visible identity uses the
-DSH 0.2.2-rc.2 brand slots with the text `One Person Lab`; OPL adds no logo artwork or replacement shell palette. OPL-owned content pages
+DSH 0.2.2-rc.3 brand slots with the text `One Person Lab`; OPL adds no logo artwork or replacement shell palette. OPL-owned content pages
 retain bounded layout and typography adapters outside the upstream source. The
-DSH 0.2.2-rc.2 attachment slot is occupied by a null adapter and does not enable a
+DSH 0.2.2-rc.3 attachment slot is occupied by a null adapter and does not enable a
 multimodal runtime. Workspace host description remains unavailable until the
 App ABI supplies it; the POSIX home-path compatibility shim therefore does not
 claim a visible `~` abbreviation.
@@ -435,3 +435,12 @@ Documentation in this project (excluding specifications) is licensed under
 CC-BY-4.0. See https://creativecommons.org/licenses/by/4.0/legalcode for
 the full license text.
 ```
+
+## DeepSeek Superagent prototype
+
+`vendor/dsh-superagent` contains unmodified MIT-licensed source from
+https://github.com/deepseek-ai/dsh-superagent-prototype at
+`8c32a9dc5d72c033816c6a8110b37f40cf94fba4`. Per-file SHA-256 values are in
+`vendor/dsh-superagent/provenance.json`; the original license is preserved.
+`plugins/opl-superagent-engine` is a private delivery wrapper, not a separately
+published upstream package.

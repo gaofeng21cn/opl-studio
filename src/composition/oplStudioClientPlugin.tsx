@@ -1,3 +1,5 @@
+import { teamBotsClientPlugin } from "../../plugins/opl-team-bots/src/client/plugin";
+import { superagentClientPlugin } from "../../plugins/opl-superagent/src/client/plugin";
 import { McpAppsClientContext, mcpAppsClientPlugin, type McpAppsClient } from "../../plugins/opl-mcp-apps/src/client/plugin";
 import { Context } from "@deepseek-ai/cordis";
 import { createRoot } from "react-dom/client";
@@ -37,6 +39,8 @@ export async function mountOplStudioClient(container: HTMLElement) {
   const ctx = new Context();
   await ctx.plugin(mcpAppsClientPlugin);
   const fiber = await ctx.plugin(oplStudioClientPlugin);
+  await ctx.plugin(teamBotsClientPlugin);
+  await ctx.plugin(superagentClientPlugin);
   const renderer = ctx.get("uiRenderer");
   const contributions = ctx.get(OPL_CLIENT_CONTRIBUTIONS_SERVICE) as OplClientContributionsService | undefined;
   if (!renderer || !contributions) {

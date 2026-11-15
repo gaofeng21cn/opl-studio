@@ -60,6 +60,10 @@ export function createBrowserBridge(): OplBridge {
       modelAccessSecretInput: candidate?.platformCapabilities?.modelAccessSecretInput === true,
       connectionAccessApproval: candidate?.platformCapabilities?.connectionAccessApproval === true
     },
+    readSuperagent: () => candidate?.readSuperagent?.() ?? Promise.reject(new Error("Superagent plugin is unavailable")),
+    executeSuperagent: request => candidate?.executeSuperagent?.(request) ?? Promise.reject(new Error("Superagent plugin is unavailable")),
+    readTeamBots: request => candidate?.readTeamBots?.(request) ?? Promise.reject(new Error("Team/Bot plugin is unavailable")),
+    executeTeamBot: request => candidate?.executeTeamBot?.(request) ?? Promise.reject(new Error("Team/Bot plugin is unavailable")),
     requestSettingsSearchLog: request => candidate?.requestSettingsSearchLog?.(request) ?? Promise.reject(new Error("Settings search logs are unavailable in this host")),
     beginWindowDrag() {
       candidate?.beginWindowDrag?.();

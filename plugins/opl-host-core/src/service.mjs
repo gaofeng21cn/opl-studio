@@ -241,6 +241,15 @@ export class OplHostCore extends EventEmitter {
       case "requestSettingsSearchLog": return this.settingsSearchLog(payload);
       case "beginWindowDrag": return this.platform.beginWindowDrag();
       case "readHostPluginInventory": return this.readHostPluginInventory();
+      case "readSuperagent": return this.hostContext.get("oplSuperagent").read();
+      case "executeSuperagent": {
+        const service = this.hostContext.get("oplSuperagent");
+        if (payload.operation === "start") return service.start();
+        if (payload.operation === "stop") return service.stop();
+        throw new ThreadAdapterError("invalid_request", "Unknown Superagent operation", {}, 400);
+      }
+      case "readTeamBots": return this.hostContext.get("oplTeamBots").read(payload.teamId, payload.memberId);
+      case "executeTeamBot": return this.hostContext.get("oplTeamBots").execute(payload);
       case "readState": {
         const state = await this.opl.readState(payload.profile ?? "fast");
         let carrierDiagnostics;
@@ -328,6 +337,8 @@ export class OplHostCore extends EventEmitter {
       await Promise.allSettled([...this.manualUpdateOperations]);
       if (this.managedByDsh && this.hostContext) {
         await this.framework.close();
+        await this.hostContext.get("oplTeamBots")?.dispose();
+        await this.hostContext.get("oplSuperagent")?.stop();
         await this.codex.close();
         await this.hostContext.fiber.dispose();
         return;

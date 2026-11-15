@@ -27,7 +27,7 @@ OPL Studio 是 One Person Lab 当前的第一方应用宿主。它把持久化
 Codex 后端、OPL App 产品模型、由 OPL Framework 管理的运行时和软件包投影，
 以及桌面端与 WebUI 共用的渲染器整合在一个工作台中。
 
-Studio 固定使用 DeepSeek Harness（DSH）`v0.2.2-rc.2` 的应用骨架和配套 GUI
+Studio 固定使用 DeepSeek Harness（DSH）`v0.2.2-rc.3` 的应用骨架和配套 GUI
 源码。DSH 提供 Cordis 应用宿主、插件生命周期、布局系统、基础 UI 组件和交互
 能力；OPL 提供产品身份、Codex 集成、Framework 桥接层、产品策略和第一方插件。
 
@@ -99,8 +99,10 @@ OPL Studio DSH/Cordis 应用宿主
                               运行时和软件包的权威来源
 ```
 
-Studio 使用独立的 DSH 配置 `opl-studio`，但明确不加载 `dsh-base`，因此不会
-引入第二套 DSH 会话存储、LLM 及模型提供方路由、智能体循环或凭据管理权。
+Studio 主 profile `opl-studio` 不加载 `dsh-base`。普通对话保持 Codex 所有权；
+Team 使用官方 DSH Session、AgentLoop、Subagent 与任务板，每个成员通过 OPL 插件
+关联同一个 Codex App Server 中的持续线程。Superagent 是可选的独立 profile，
+单独配置模型、账号、Source、Policy 与 Ticket。
 `opl-codex-native` 是 Studio 内持久化 Codex App Server、规范线程与执行轮次、
 审批和实时执行事件的唯一负责人。
 

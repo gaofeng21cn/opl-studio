@@ -2749,6 +2749,8 @@ export function App({
     selectedAgentPresetId: selectedAgent?.packageId ?? "opl-daily-work",
     conversationBody: studioConversationBody,
     primaryView,
+    superagent: { read: bridge.readSuperagent, execute: bridge.executeSuperagent },
+    teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
     openPackageActivity: () => { setApplicationManagementTab('applications'); setPrimaryView('applications'); },
     applicationManagement: <ApplicationManagementPage

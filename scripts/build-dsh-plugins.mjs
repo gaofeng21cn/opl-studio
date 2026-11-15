@@ -11,7 +11,7 @@ export function buildDshPlugins() {
     if (!entry.isDirectory()) continue;
     const directory = path.join(root, "plugins", entry.name);
     const manifest = JSON.parse(fs.readFileSync(path.join(directory, "package.json"), "utf8"));
-    fs.copyFileSync(path.join(root, "LICENSE"), path.join(directory, "LICENSE"));
+    fs.copyFileSync(path.join(root, entry.name === "opl-superagent-engine" ? "vendor/dsh-superagent/LICENSE" : "LICENSE"), path.join(directory, "LICENSE"));
     const source = path.join(directory, "src/index.mjs");
     if (fs.existsSync(source)) {
       fs.mkdirSync(path.join(directory, "lib"), { recursive: true });
@@ -22,6 +22,8 @@ export function buildDshPlugins() {
     if (fs.existsSync(client)) fs.copyFileSync(client, path.join(directory, "lib/client.js"));
     packages.push(manifest.name);
   }
+  const superagent = spawnSync(process.execPath, [path.join(root, "scripts/build-superagent-engine.mjs")], { cwd: root, encoding: "utf8" });
+  if (superagent.status !== 0) throw new Error(superagent.stderr || superagent.stdout);
   return packages;
 }
 

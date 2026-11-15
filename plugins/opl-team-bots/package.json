@@ -1,0 +1,30 @@
+{
+  "name": "@one-person-lab/opl-team-bots",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./package.json": "./package.json",
+    "./client": "./lib/client.js"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "Reusable Bot templates and official DSH Team coordination with persistent Codex execution.",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.2-rc.3"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@one-person-lab/opl-studio-client"
+      ]
+    }
+  }
+}

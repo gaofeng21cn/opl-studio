@@ -35,8 +35,8 @@
   "application_host": {
     "role": "deepseek_harness_cordis_application_host",
     "implementation_status": "source_implemented_release_admission_separate",
-    "upstream_version": "0.2.2-rc.2",
-    "upstream_ref": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+    "upstream_version": "0.2.2-rc.3",
+    "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
     "profile": "opl-studio",
     "profile_source": "src/host/dsh/cordis.yml",
     "web_overlay": "src/host/dsh/web.patch.yml",
@@ -48,14 +48,21 @@
       "host_webserver",
       "host_plugin_inventory",
       "frontend_static_primitive_behind_studio_auth_routes",
-      "client_modules_web_only"
+      "client_modules_web_only",
+      "collaboration_sessions_and_persistence",
+      "collaboration_agents_and_official_agent_loop",
+      "official_subagent_and_team_task_board"
     ],
     "studio_plugins": [
       "opl-dsh-tool-mcp",
       "opl-codex-native",
       "opl-framework-bridge",
       "opl-host-core",
-      "opl-web-routes"
+      "opl-web-routes",
+      "opl-mcp-apps",
+      "opl-codex-agents",
+      "opl-team-bots",
+      "opl-superagent"
     ],
     "codex_runtime_owner": "opl-codex-native",
     "codex_owned_state": [
@@ -67,10 +74,8 @@
     "dsh_tool_bridge": "authenticated_stateful_loopback_mcp",
     "dsh_tool_plugin_compatibility": "plugins_registering_tools_in_ctx_tools_are_exposed_to_codex",
     "excluded_upstream_authorities": [
-      "dsh_session",
-      "dsh_llm_provider_routing",
-      "dsh_agent_loop",
-      "dsh_credentials"
+      "ordinary_conversation_DSH_sessions_and_model_execution",
+      "main_profile_DSH_provider_credentials"
     ],
     "framework_bridge": "consume_framework_app_state_action_authentication_and_channel_callbacks_only",
     "startup_order": [
@@ -95,6 +100,30 @@
       "installed_location": "node_modules",
       "third_party_policy": "pinned_native_package_or_provenance_preserving_adapter",
       "codex_capability_packages_are_dsh_plugins": false
+    },
+    "collaboration": {
+      "coordination_owner": "official_DSH_Agent_Subagent_Session_and_AgentTeam",
+      "execution_owner": "opl-codex-native_existing_persistent_App_Server",
+      "adapter": "opl-codex-agents",
+      "bot_templates": "opl-team-bots",
+      "data": "$DSH_HOME/opl",
+      "ordinary_Codex_conversations_unchanged": true
+    },
+    "superagent": {
+      "implementation": "unmodified_dsh-superagent_prototype_in_independent_official_DSH_profile",
+      "upstream_ref": "8c32a9dc5d72c033816c6a8110b37f40cf94fba4",
+      "lifecycle_owner": "opl-superagent",
+      "data": "$DSH_HOME/opl-superagent",
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-superagent"
+      ],
+      "enabled_by_default": false,
+      "team_dependency": false,
+      "model_and_credentials": "independently_configured_in_official_profile",
+      "bind": "127.0.0.1_random_port",
+      "remote_access": "operator_port_forwarding_required"
     }
   },
   "canonical_docs": [

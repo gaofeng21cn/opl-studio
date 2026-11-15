@@ -7,9 +7,9 @@
   },
   "upstream": {
     "repo": "https://github.com/deepseek-ai/deepseek-harness",
-    "ref": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
-    "branch_at_intake": "master",
-    "source_package_version": "0.2.2-rc.2",
+    "ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
+    "branch_at_intake": "dsh-v0.2.2-rc.3",
+    "source_package_version": "0.2.2-rc.3",
     "license": "MIT"
   },
   "application_host": {
@@ -22,39 +22,53 @@
       "@deepseek-ai/cordis-plugin-group@1.1.0",
       "@deepseek-ai/cordis-plugin-include@1.1.0",
       "@deepseek-ai/cordis-plugin-loader@1.1.0",
-      "@deepseek-ai/dsh-client-connection@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-store@0.2.2-rc.2",
-      "@deepseek-ai/dsh-official-bundles@0.2.2-rc.2",
-      "@deepseek-ai/dsh-util-crypto@0.2.2-rc.2",
-      "@deepseek-ai/dsh-util-workspace-path@0.2.2-rc.2",
-      "@deepseek-ai/dsh-util-file-drag@0.2.2-rc.2",
-      "@deepseek-ai/dsh-util-values@0.2.2-rc.2",
-      "@deepseek-ai/dsh-util-code-language@0.2.2-rc.2",
-      "@deepseek-ai/dsh-app-boot@0.2.2-rc.2",
-      "@deepseek-ai/dsh-agent-preset-registry@0.2.2-rc.2",
-      "@deepseek-ai/dsh-brand@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-modules@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-ui-sidebar-documentpreview@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-ui-dockkit@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-ui-slots@0.2.2-rc.2",
-      "@deepseek-ai/dsh-client-web@0.2.2-rc.2",
-      "@deepseek-ai/dsh-error@0.2.2-rc.2",
-      "@deepseek-ai/dsh-home-paths@0.2.2-rc.2",
-      "@deepseek-ai/dsh-host-frontend-static@0.2.2-rc.2",
-      "@deepseek-ai/dsh-host-plugin-inventory@0.2.2-rc.2",
-      "@deepseek-ai/dsh-host-webserver@0.2.2-rc.2",
-      "@deepseek-ai/dsh-launch-environment@0.2.2-rc.2",
-      "@deepseek-ai/dsh-llm@0.2.2-rc.2",
-      "@deepseek-ai/dsh-scope@0.2.2-rc.2",
-      "@deepseek-ai/dsh-sandbox@0.2.2-rc.2",
-      "@deepseek-ai/dsh-sandbox-policy@0.2.2-rc.2",
-      "@deepseek-ai/dsh-session@0.2.2-rc.2",
-      "@deepseek-ai/dsh-system-prompt@0.2.2-rc.2",
-      "@deepseek-ai/dsh-timeout@0.2.2-rc.2",
-      "@deepseek-ai/dsh-tool-executor-native@0.2.2-rc.2",
-      "@deepseek-ai/dsh-tools@0.2.2-rc.2",
-      "@deepseek-ai/dsh-typert-protocol@0.2.2-rc.2"
+      "@deepseek-ai/dsh-client-connection@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-store@0.2.2-rc.3",
+      "@deepseek-ai/dsh-official-bundles@0.2.2-rc.3",
+      "@deepseek-ai/dsh-util-crypto@0.2.2-rc.3",
+      "@deepseek-ai/dsh-util-workspace-path@0.2.2-rc.3",
+      "@deepseek-ai/dsh-util-file-drag@0.2.2-rc.3",
+      "@deepseek-ai/dsh-util-values@0.2.2-rc.3",
+      "@deepseek-ai/dsh-util-code-language@0.2.2-rc.3",
+      "@deepseek-ai/dsh-app-boot@0.2.2-rc.3",
+      "@deepseek-ai/dsh-agent-preset-registry@0.2.2-rc.3",
+      "@deepseek-ai/dsh-brand@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-modules@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-ui-sidebar-documentpreview@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-ui-dockkit@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-ui-slots@0.2.2-rc.3",
+      "@deepseek-ai/dsh-client-web@0.2.2-rc.3",
+      "@deepseek-ai/dsh-error@0.2.2-rc.3",
+      "@deepseek-ai/dsh-home-paths@0.2.2-rc.3",
+      "@deepseek-ai/dsh-host-frontend-static@0.2.2-rc.3",
+      "@deepseek-ai/dsh-host-plugin-inventory@0.2.2-rc.3",
+      "@deepseek-ai/dsh-host-webserver@0.2.2-rc.3",
+      "@deepseek-ai/dsh-launch-environment@0.2.2-rc.3",
+      "@deepseek-ai/dsh-llm@0.2.2-rc.3",
+      "@deepseek-ai/dsh-scope@0.2.2-rc.3",
+      "@deepseek-ai/dsh-sandbox@0.2.2-rc.3",
+      "@deepseek-ai/dsh-sandbox-policy@0.2.2-rc.3",
+      "@deepseek-ai/dsh-session@0.2.2-rc.3",
+      "@deepseek-ai/dsh-system-prompt@0.2.2-rc.3",
+      "@deepseek-ai/dsh-timeout@0.2.2-rc.3",
+      "@deepseek-ai/dsh-tool-executor-native@0.2.2-rc.3",
+      "@deepseek-ai/dsh-tools@0.2.2-rc.3",
+      "@deepseek-ai/dsh-typert-protocol@0.2.2-rc.3",
+      "@deepseek-ai/dsh-agent@0.2.2-rc.3",
+      "@deepseek-ai/dsh-agent-loop@0.2.2-rc.3",
+      "@deepseek-ai/dsh-session-projection@0.2.2-rc.3",
+      "@deepseek-ai/dsh-session-persistence-jsonl@0.2.2-rc.3",
+      "@deepseek-ai/dsh-session-query@0.2.2-rc.3",
+      "@deepseek-ai/dsh-subagent@0.2.2-rc.3",
+      "@deepseek-ai/dsh-subagent-spawn-in-process@0.2.2-rc.3",
+      "@deepseek-ai/dsh-tool-subagent@0.2.2-rc.3",
+      "@deepseek-ai/dsh-tool-subagent-control@0.2.2-rc.3",
+      "@deepseek-ai/dsh-agent-team@0.2.2-rc.3",
+      "@deepseek-ai/dsh-tool-agent-team@0.2.2-rc.3",
+      "@deepseek-ai/dsh-working-directory@0.2.2-rc.3",
+      "@deepseek-ai/dsh-fs-local@0.2.2-rc.3",
+      "@deepseek-ai/dsh@0.2.2-rc.3"
     ],
     "loaded_dsh_services": [
       "system-prompt_without_harness_identity_or_runtime_context",
@@ -62,16 +76,17 @@
       "host_webserver",
       "host_plugin_inventory",
       "frontend_static_primitive_behind_studio_auth_routes",
-      "client_modules_web_only"
+      "client_modules_web_only",
+      "collaboration_sessions_and_persistence",
+      "collaboration_agents_and_official_agent_loop",
+      "official_subagent_and_team_task_board"
     ],
     "excluded_upstream_profiles": [
       "dsh-base"
     ],
     "excluded_upstream_authorities": [
-      "dsh_session",
-      "dsh_llm_provider_routing",
-      "dsh_agent_loop",
-      "dsh_credentials"
+      "ordinary_conversation_DSH_sessions_and_model_execution",
+      "main_profile_DSH_provider_credentials"
     ],
     "upgrade_validation": [
       "npm run verify:dsh-gui",
@@ -119,19 +134,19 @@
     {
       "path": "src/integrations/deepseek-harness/patches/react19.patch",
       "sha256": "9e1cd2fe27a178443856b0a3178e8a171ee93990325a1ad45d3e631d1b4896ba",
-      "upstream_ref": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+      "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
       "reason": "React 19 refs, nullable DOM refs, inert, callback-ref cleanup and convergent menu anchor effects; no runtime authority changes."
     },
     {
       "path": "src/integrations/deepseek-harness/patches/schedule-owner.patch",
       "sha256": "b8dbecb15c6f5e3ab021c246174bd1e256e93df8f9881437fa2ffdf6fb6e584c",
-      "upstream_ref": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+      "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
       "reason": "Optional owner view fields, timing limits, manual creation and execution-history slots for Framework/Temporal and canonical Codex tasks; default DSH Schedule behavior retained."
     },
     {
       "path": "src/integrations/deepseek-harness/patches/plugin-manager-owner.patch",
       "sha256": "a4c709a0804a753210fe65c9196984c4a4d034af856d5fbcde771d0850b13b4d",
-      "upstream_ref": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+      "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
       "reason": "Render-only owner card/detail projection and contributed tabs reuse the official plugin management page while Framework retains Package lifecycle authority; upstream default behavior is retained."
     }
   ],
@@ -1672,11 +1687,11 @@
     },
     {
       "path": "packages/client/ui-primitives/src/icons/artwork.ts",
-      "sha256": "8e3cb90197b7f92647b9b961ae91fef0b6f11e110c8f5547a86386ba72a0d45b"
+      "sha256": "bfd440fbbe1f50a497a095c51ee9b47b0e2f50517d992352414710530418bfe7"
     },
     {
       "path": "packages/client/ui-primitives/src/icons/index.tsx",
-      "sha256": "0a9914ca41f430d548169c02ddfe28bc7d14f999a5b61fa19727c56dc30370cb"
+      "sha256": "8a15dbf35f87f49d6b8f7e9890c5e48290bb920757d045747f1ca98948b804b0"
     },
     {
       "path": "packages/client/ui-primitives/src/icons/props.ts",
@@ -2857,19 +2872,19 @@
     },
     {
       "path": "packages/client/ui-sidebar/src/client/SidebarRoot.module.css",
-      "sha256": "e7c0a9720e72b6a3c7e3202edadc6678245f10298b588ff8995f63797ad8c25d"
+      "sha256": "8ec2d391c9ba971838d0b3f17b4ba35014cef065f47e7c807331dfe3424fc15b"
     },
     {
       "path": "packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
-      "sha256": "610796c346bfb721bf6430fd39af0c840cd6ecb43b7a612d720a540cdd8e24db"
+      "sha256": "99afedce21a93471b94f6bd205e5072bac14bb4d228755e4ae1220bd78f5adff"
     },
     {
       "path": "packages/client/ui-sidebar/src/client/contract/slots.ts",
-      "sha256": "7583ce7a93eba5acea3a8cee26e75ff63e946ba88b0fafe01a0ed90cf04ac380"
+      "sha256": "1820bab870ea6254ccaf0b3ca52c427c3acb88ff66400795a9dcdb64c3c91b5c"
     },
     {
       "path": "packages/client/ui-sidebar/src/client/index.ts",
-      "sha256": "bfc3483f9843d3c7538f05270bed84fc09b54387309488e3bf21a9c3c83871b9"
+      "sha256": "b086e7485c61a3cf995fad32b38df1fee70f2e178a89e751908a75a0cb1671a7"
     },
     {
       "path": "packages/client/ui-sidebar/src/client/locales.ts",
@@ -3029,11 +3044,11 @@
     },
     {
       "path": "packages/client/ui-workspace/src/client/WorkspacePicker.tsx",
-      "sha256": "6acb7a630b1fc6204b13b7d891ed543c62302e65e6edcb33303b339abda5d665"
+      "sha256": "85298ee8f40586b45f2f53a26667412742c64ab3d089ebafad0922bb374f00a2"
     },
     {
       "path": "packages/client/ui-workspace/src/client/contract/slots.ts",
-      "sha256": "65a12fed8943d0c00f0b930f19cc81d254b69e2963caf891849969579bcb6215"
+      "sha256": "41d8dabef9ef678c5af9b4933e9841c43218fc4a89c3fa877d411980221a6f68"
     },
     {
       "path": "packages/client/ui-workspace/src/client/contract/toast.ts",
@@ -3041,7 +3056,7 @@
     },
     {
       "path": "packages/client/ui-workspace/src/client/index.ts",
-      "sha256": "177105bb5970c27db085581067f9cd6e43ae46775988db58e723531744ba3a9b"
+      "sha256": "1e976df1a09626cad6fa5b8407434d535e029eb682ae894698f85b4444ab863a"
     },
     {
       "path": "packages/client/ui-workspace/src/client/locales.ts",
@@ -3137,7 +3152,7 @@
     },
     {
       "path": "packages/util/official-bundles/src/bundles.ts",
-      "sha256": "b498ab7e29a0a01a6b24d6c926857cfb0c8df28ba4173b68eb7972d064bce225"
+      "sha256": "dc9f06ad9541a39284a28f509d8877413e2506037476d7c1e7b056f58e04f826"
     },
     {
       "path": "packages/util/official-bundles/src/catalog.generated.ts",
@@ -3149,7 +3164,7 @@
     },
     {
       "path": "packages/util/official-bundles/src/plugin-manager.ts",
-      "sha256": "61e7be23785b2b5f5c9e30b617e100c03024d572fde84c306ed2c7bf20337049"
+      "sha256": "bd27c11e85b15a1b2c415b395436cd55ce0433a3ed92ae6130df860edd828782"
     },
     {
       "path": "packages/util/workspace-path/src/file-address.ts",

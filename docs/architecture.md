@@ -19,7 +19,7 @@ itself change the selected Stable carrier, GUI ABI freeze, release composition,
 or installed product.
 
 ```text
-DeepSeek Harness v0.2.2-rc.2 boot/profile/patch loader
+DeepSeek Harness v0.2.2-rc.3 boot/profile/patch loader
   -> Studio Cordis Application Host
        -> DSH native tool registry -> authenticated MCP -> opl-codex-native
        -> opl-framework-bridge -> public OPL App contracts
@@ -58,9 +58,9 @@ DSH services:
 - `dsh-host-webserver` and `dsh-host-plugin-inventory`;
 - Web-only frontend static hosting and client modules.
 
-Studio deliberately does not load `dsh-base`. Therefore DSH session, LLM
-provider routing, Agent loop, and credential services do not become a second
-backend. The OPL plugin tree is:
+The main profile does not load `dsh-base`. Official DSH collaboration services
+coordinate Team members through the existing Codex execution owner. The optional
+Superagent profile is isolated and loads the official base and Web bundles. The OPL plugin tree is:
 
 ```text
 opl-dsh-tool-mcp
@@ -89,7 +89,7 @@ adapter and authority decision.
 
 ### DSH Version And Plugin Compatibility
 
-The pinned `0.2.2-rc.2` cohort follows the official upstream `dsh-v0.2.2-rc.2` release
+The pinned `0.2.2-rc.3` cohort follows the official upstream `dsh-v0.2.2-rc.3` release
 candidate. Its source, npm packages, vendored GUI and Host overlays are validated
 together. The official 0.2.2 static frontend plugin is composed through a narrow
 Studio authentication view, and native tool execution uses the official executor
@@ -100,14 +100,31 @@ cohort: npm prerelease range matching requires the same patch tuple, so the newe
 prerelease is not an eligible range target even though SemVer orders it later.
 That is a range consequence, not a downgrade.
 
-Package metadata is only the first gate. A plugin is directly reusable when it
-registers a bounded `ctx.tools` capability or a renderer-only contribution
-without claiming session or model state. A plugin that expects DSH Session,
-LLM, Agent Runtime, credentials, or `dsh-base` cannot be installed unchanged,
-because Studio intentionally assigns persistent thread/turn ownership to
-`opl-codex-native` and Codex App Server. Such a plugin needs a small explicit
-adapter that consumes Studio's existing owner APIs, or it remains unsupported.
-Changing its peer range alone would hide the real authority conflict.
+Package metadata is only the first gate. Ordinary conversations retain their
+Codex thread, permission and approval owners. Collaboration loads the official
+DSH Session, AgentLoop, Subagent and AgentTeam services. The `opl-codex-agents`
+plugin supplies an LLM adapter backed by the existing persistent Codex App Server;
+`opl-team-bots` stores reusable role/model/permission templates and projects the
+official member tree, inbox and shared task board. Each member has a continuing
+Codex execution thread. Unknown dispatches require inspection before resending.
+Official tools are bound to the exact initiating Agent through native Codex
+dynamic tools, including admission and cancellation.
+
+Superagent uses the unmodified upstream prototype at
+`8c32a9dc5d72c033816c6a8110b37f40cf94fba4`, with per-file provenance under
+`vendor/dsh-superagent`. Its private delivery wrapper builds that source without
+patching it. `opl-superagent` starts and stops an independent official Web
+profile under `$DSH_HOME/opl-superagent`, including `dsh-base`. That process
+owns its model, credentials, Source ingestion, Policy, Tickets, Assignments,
+Reports and recovery. It does not depend on Team or inherit Team credentials.
+The original management UI handles setup, settings, execution and recovery.
+The listener is loopback only; remote WebUI operators need a port forward to
+that machine. No external Source is configured or enabled for work by OPL.
+
+The profile is opt-in and preserves its database/configuration after stopping.
+The main renderer entry uses standard plugin metadata and DSH slots; desktop
+mounts the same client plugin objects through Cordis. Neither feature creates
+another plugin format, loader, task registry or general communication protocol.
 
 ## Client Composition Boundary
 
