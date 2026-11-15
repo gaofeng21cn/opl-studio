@@ -206,7 +206,7 @@
     "test:gateway-account-projection": "bun test tests/workbench/gateway-account-cache.test.mts && bun run scripts/gateway-account-projection-regression.ts",
     "test:package-projection": "bun test tests/workbench/package-projection.test.mts",
     "test:runtime-projection": "bun test tests/workbench/runtime-projection.test.mts tests/workbench/service-recovery-model.test.mts",
-    "test:ui-contributions": "bun test tests/workbench/native-settings-lifecycle.test.mts tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts tests/workbench/dsh-schedule-adapter.test.mts",
+    "test:ui-contributions": "bun test tests/workbench/remote-settings.test.tsx && bun test tests/workbench/native-settings-lifecycle.test.mts tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts tests/workbench/dsh-schedule-adapter.test.mts",
     "test:client-cordis": "bun test tests/conformance/client-cordis-conformance.test.mts",
     "validate:client-conformance": "bun run scripts/validate-client-conformance.mjs",
     "test:storage-migration": "bun test tests/workbench/storage-migration.test.mts",

@@ -94,7 +94,9 @@ function hostActionReceipt(request, result) {
     stdout: "",
     stderr: "",
     timedOut: false,
-    payload: request.payload,
+    payload: request.payload?.input && Object.hasOwn(request.payload.input, "verify_code")
+      ? { ...request.payload, input: { ...request.payload.input, verify_code: "[redacted]" } }
+      : request.payload,
     stdoutJson: result
   };
 }

@@ -74,8 +74,8 @@ test("settings navigation exposes primary categories with related destinations g
   assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "schedules" || destination.id === "memory"), false);
   assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.label, "连接与部署");
   assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.label, "Connections & Deployment");
-  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "共享资源与网页访问");
-  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Shared resources & web access");
+  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "远程连接与网页访问");
+  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Remote connections & web access");
   assert.match(settingsSource, /role="tablist"/);
   assert.match(settingsSource, /role=\{usesDestinationTabs \? "tabpanel" : "region"\}/);
   assert.match(settingsSource, /ArrowRight|ArrowLeft/);

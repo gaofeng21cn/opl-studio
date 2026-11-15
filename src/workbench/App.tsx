@@ -150,7 +150,8 @@ import type {
   OplUiContributionsProjection,
   RenderOplContributionSlot
 } from "../composition/contributionProjection";
-import { settingsContributionDestination } from "../composition/contributionProjection";
+import { settingsEntriesForDestination } from "../composition/contributionProjection";
+import { SettingsPluginSections } from "../composition/SettingsPluginSections";
 import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
@@ -219,7 +220,7 @@ function formatReceipt(value: unknown): string {
 }
 
 function contributionReceiptForDisplay(entry: OplUiContribution, receipt: OplActionReceipt, transientPresentation = false): OplActionReceipt | Record<string, unknown> {
-  if (entry.view?.viewType !== "remote_companion_access" && !transientPresentation) return receipt;
+  if (!["remote_companion_access", "channel_access"].includes(entry.view?.viewType ?? "") && !transientPresentation) return receipt;
   // Remote pairing input and provider output are transient; keep only action metadata in the global receipt panel.
   return {
     actionId: receipt.actionId,
@@ -2597,14 +2598,6 @@ export function App({
   }), [bridge]);
 
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
-  const renderPackageContributions = (packageId: string, renderContribution?: (options?: { only?: string }) => ReactNode) => {
-    const entries = model.uiContributions.entries.filter((entry) => (
-      entry.slot === "settings.section" && entry.packageId === packageId && settingsContributionDestination(entry) !== null
-    ));
-    return entries.length ? <div className="opl-contribution-slot" data-package-id={packageId}>
-      {entries.map((entry) => <div key={entry.contributionKey}>{renderContribution?.({ only: entry.contributionKey }) ?? null}</div>)}
-    </div> : null;
-  };
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsPanel
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
@@ -2670,7 +2663,12 @@ export function App({
       pendingConfirmation={null}
       onConfirmAction={() => void confirmSettingsAction()}
       onCancelAction={cancelSettingsAction}
-      renderPackageContributions={(packageId) => renderPackageContributions(packageId, renderContribution)}
+      renderSettingsContributions={(destination) => {
+        const entries = settingsEntriesForDestination(model.uiContributions.entries, destination, settings.developerDetails);
+        if (!entries.length) return null;
+        const labels = new Map(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n?.[settings.locale] ?? item.label]));
+        return <SettingsPluginSections entries={entries} labels={labels} collapsible={destination !== 'resources'} renderEntry={entry => renderContribution?.({ only: entry.contributionKey }) ?? null} />;
+      }}
     />
   );
 
@@ -2777,7 +2775,6 @@ export function App({
       onHostAction={(intent) => void runSettingsHostAction(intent)}
       onRefresh={() => void loadState(settings.runtimeProfile)}
       manifestInstallAction={projectedManifestInstallAction}
-      renderPackageContributions={(packageId) => renderPackageContributions(packageId, options => renderContributionSlot?.("settings.section", contributionOwner, options))}
       onOpenSettings={(destination) => setSettingsNavigation(current => ({ open: true, destination, revision: (current?.revision ?? 0) + 1 }))}
       initialTab={applicationManagementTab}
       onTabChange={setApplicationManagementTab}

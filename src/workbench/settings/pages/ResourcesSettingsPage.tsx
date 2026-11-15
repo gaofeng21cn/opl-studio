@@ -8,8 +8,9 @@ import { SettingRow, SettingsGroup, StatusValue } from "../../settings/primitive
 import { RuntimeActionButton } from "../../settings/actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, onAction, onApproveConnectionAccess, onOpenSoftwareCenter, navigate }: Pick<SettingsPageContext, "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "onAction" | "onApproveConnectionAccess" | "onOpenSoftwareCenter" | "navigate">) {
+export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, onAction, onApproveConnectionAccess, onOpenSoftwareCenter, navigate, renderSettingsContributions }: Pick<SettingsPageContext, "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "onAction" | "onApproveConnectionAccess" | "onOpenSoftwareCenter" | "navigate" | "renderSettingsContributions">) {
 
+      const remoteConnections = renderSettingsContributions?.("resources");
       const dockerActions = projection?.dockerWebui.actions ?? [];
       const diagnoseAction = dockerActions.find((action) => action.actionId === "settings_diagnose_docker_webui");
       const diagnoseBusy = actionBusyKey === "runtime:settings_diagnose_docker_webui";
@@ -23,6 +24,12 @@ export function ResourcesSettingsPage({ projection, actionBusyKey, dockerDiagnos
       ));
       return (
         <>
+          <SettingsGroup title={zh ? "消息与远程连接" : "Messages & remote connections"}>
+            <p className="settings-inline-note">{zh ? "通过微信等消息通道远程使用 OPL。已启用的远程扩展在这里统一连接和管理。" : "Use OPL remotely through Weixin and other messaging channels. Connect and manage enabled remote extensions here."}</p>
+            {remoteConnections ?? <SettingRow label={zh ? "微信及其他远程扩展" : "Weixin and other remote extensions"} detail={zh ? "当前没有可配置的消息通道。请到“软件中心 → 运行组件”检查远程能力包的安装与启用状态，完成后刷新。" : "No configurable message channel is available. Check installation and enablement in Software Center → Runtime components, then refresh."}>
+              <button className="settings-action-button" type="button" disabled={!onOpenSoftwareCenter} onClick={() => onOpenSoftwareCenter?.("applications")}>{zh ? "管理远程扩展" : "Manage remote extensions"}</button>
+            </SettingRow>}
+          </SettingsGroup>
           <LinkCompanionSection locale={settings.locale} onOpenAccount={() => navigate("account")} />
           <SoftwareCenterSettingsLink locale={settings.locale} section="resources" onOpen={onOpenSoftwareCenter} />
           <SettingsGroup title={settings.locale === "zh" ? "网页访问" : "Web access"}>

@@ -24,9 +24,10 @@ export type OplChannelAccessAction = {
 };
 
 export type OplChannelAccessConnection = {
-  state: "disconnected" | "connecting" | "qr_ready" | "qr_scanned" | "connected" | "attention";
+  state: "disconnected" | "connecting" | "authorizing" | "qr_ready" | "qr_scanned" | "pin_required" | "connected" | "attention";
   accountDisplayName?: string;
   reasonCode?: string;
+  verificationChallenge?: { challengeId: string; expiresAtMs: number; retry: boolean };
   qrChallenge?: {
     payload: string;
     expiresAtMs: number;
@@ -115,7 +116,7 @@ export function settingsContributionDestination(
   switch (entry.view?.viewType) {
     case "channel_access":
     case "remote_companion_access":
-      return "capabilities";
+      return "resources";
     case "service_status":
       return "capabilities";
     case "activity_log":
@@ -126,6 +127,13 @@ export function settingsContributionDestination(
     default:
       return "capabilities";
   }
+}
+
+/** Installation and catalog roles do not decide user-facing configuration placement. */
+export function settingsEntriesForDestination(entries: readonly OplUiContribution[], destination: OplSettingsContributionDestination, developerDetails = false): OplUiContribution[] {
+  return entries.filter(entry => entry.slot === "settings.section"
+    && (settingsContributionDestination(entry) === destination
+      || (developerDetails && destination === "capabilities" && entry.view?.viewType === "activity_log")));
 }
 
 /** Keeps Package identity as grouping metadata without making it a navigation source. */
@@ -345,9 +353,12 @@ function parseChannelAccessInput(
   if (scope === "user" && userId && hasOnlyKeys(input, ["channel_id", "user_id"])) {
     return { channel_id: channelId, user_id: userId };
   }
-  return scope === "channel" && hasOnlyKeys(input, ["channel_id"])
-    ? { channel_id: channelId }
-    : null;
+  const challengeId = asBoundedString(input.challenge_id, 512);
+  if (scope === "channel" && hasOnlyKeys(input, ["channel_id", "challenge_id"])) {
+    if (input.challenge_id !== undefined && !challengeId) return null;
+    return { channel_id: channelId, ...(challengeId ? { challenge_id: challengeId } : {}) };
+  }
+  return null;
 }
 
 function parseChannelAccessAction(
@@ -378,9 +389,9 @@ function parseChannelAccessConnection(value: unknown): OplChannelAccessConnectio
   const state = asString(connection?.state);
   if (
     !connection
-    || !hasOnlyKeys(connection, ["state", "account_display_name", "reason_code", "qr_challenge"])
+    || !hasOnlyKeys(connection, ["state", "account_display_name", "reason_code", "qr_challenge", "verification_challenge"])
     || !state
-    || !["disconnected", "connecting", "qr_ready", "qr_scanned", "connected", "attention"].includes(state)
+    || !["disconnected", "connecting", "authorizing", "qr_ready", "qr_scanned", "pin_required", "connected", "attention"].includes(state)
   ) {
     return null;
   }
@@ -400,8 +411,18 @@ function parseChannelAccessConnection(value: unknown): OplChannelAccessConnectio
       || qrExpiresAtMs === null
     )
   ) return null;
+  const verification = connection.verification_challenge === undefined ? null : asRecord(connection.verification_challenge);
+  const challengeId = asBoundedString(verification?.challenge_id, 512);
+  const challengeExpiry = asInteger(verification?.expires_at_ms);
+  if (connection.qr_challenge !== undefined && (!['qr_ready', 'authorizing'].includes(state) || qrExpiresAtMs === 0)) return null;
+  if (state === 'authorizing' && !qrPayload) return null;
+  if (state === 'pin_required') {
+    if (!verification || !hasOnlyKeys(verification, ['challenge_id', 'expires_at_ms', 'retry'])
+      || !challengeId || !challengeExpiry || typeof verification.retry !== 'boolean') return null;
+  } else if (connection.verification_challenge !== undefined) return null;
   return {
     state: state as OplChannelAccessConnection["state"],
+    ...(verification && challengeId && challengeExpiry ? { verificationChallenge: { challengeId, expiresAtMs: challengeExpiry, retry: verification.retry as boolean } } : {}),
     ...(accountDisplayName ? { accountDisplayName } : {}),
     ...(reasonCode ? { reasonCode } : {}),
     ...(qrPayload && qrExpiresAtMs !== null ? { qrChallenge: { payload: qrPayload, expiresAtMs: qrExpiresAtMs } } : {})

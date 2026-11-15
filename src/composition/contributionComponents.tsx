@@ -1,7 +1,7 @@
-import { Button, Pill, StateDot, Tooltip, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, Input, Pill, StateDot, Tooltip, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Boxes, Check, Link2, Pencil, Play, QrCode, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   contributionLabel,
   createOplContributionReadInput,
@@ -481,6 +481,8 @@ function channelStatusLabel(result: OplChannelAccessResult, locale: OplContribut
     unavailable: ["不可用", "Unavailable"],
     disconnected: ["未连接", "Disconnected"],
     connecting: ["正在连接", "Connecting"],
+    authorizing: ["等待实名授权", "Authorization required"],
+    pin_required: ["输入手机验证码", "Phone PIN required"],
     qr_ready: ["等待扫码", "Scan required"],
     qr_scanned: ["已扫码，等待确认", "Scanned; awaiting confirmation"],
     connected: ["已连接", "Connected"],
@@ -498,6 +500,10 @@ export function channelAttentionMessage(reason: string | undefined, zh: boolean)
     invalid_response: ['微信服务返回了无法识别的响应，请稍后重试；持续失败时检查应用更新。', 'The Weixin service returned an unexpected response. Retry, then check for an app update if it persists.'],
     qr_failed: ['扫码登录未完成，请重新扫码并在微信中确认。', 'QR login did not complete. Scan again and confirm in Weixin.'],
     api_error: ['微信服务拒绝了本次连接，请稍后重新扫码。', 'The Weixin service rejected the connection. Try a new QR connection later.'],
+    verify_code_blocked: ['验证码错误次数过多，请稍后重新连接。', 'Too many incorrect PIN attempts. Connect again later.'],
+    already_bound: ['微信提示此机器人已绑定。请在微信中检查现有连接，或解除绑定后重新连接。', 'Weixin reports this bot is already bound. Check the existing connection in Weixin, or unlink it before reconnecting.'],
+    auth_rejected: ['实名授权未通过，请由操作者本人扫码授权后重试。', 'Authorization was rejected. The operator must scan with their own Weixin account.'],
+    auth_expired: ['实名授权已过期，请重新发起连接。', 'Authorization expired. Start a new connection.'],
   };
   return labels[reason ?? '']?.[zh ? 0 : 1] ?? (zh ? '连接未完成。请重新扫码；若仍失败，在“日志与诊断”中查看连接错误。' : 'Connection did not complete. Retry; if it fails again, check Logs and diagnostics.');
 }
@@ -509,6 +515,9 @@ function ChannelAccessView({ entry, owner }: {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [result, setResult] = useState<OplChannelAccessResult | null>(null);
   const [error, setError] = useState("");
+  const [pin, setPin] = useState("");
+  const [submittedChallenge, setSubmittedChallenge] = useState<string | null>(null);
+  const pinInputId = useId();
   const [timerRevision, setTimerRevision] = useState(0);
   const scopedInputRef = useRef<Record<string, unknown>>({});
   const view = entry.view!;
@@ -546,9 +555,12 @@ function ChannelAccessView({ entry, owner }: {
   const runAction = (action: OplChannelAccessAction) => {
     const command = entry.commands.find((candidate) => candidate.commandId === action.commandId);
     if (!command) return;
-    scopedInputRef.current = action.input;
+    scopedInputRef.current = { channel_id: action.input.channel_id };
     owner.onAction(entry, command, action.input);
   };
+
+  const challenge = result?.connection?.verificationChallenge;
+  useEffect(() => { setPin(""); setSubmittedChallenge(null); }, [challenge?.challengeId]);
 
   if (state === "loading") {
     return <p className="opl-contribution-fallback" role="status"><StateDot state="ongoing" size={10} />{owner.locale === "zh" ? "正在读取渠道" : "Loading channel"}</p>;
@@ -560,8 +572,8 @@ function ChannelAccessView({ entry, owner }: {
     return <p className="opl-contribution-fallback" role="status"><StateDot state="warning" size={10} />{owner.locale === "zh" ? "渠道当前不可用" : "The channel is unavailable"}</p>;
   }
 
-  const qr = result.connection?.state === "qr_ready"
-    && result.connection.qrChallenge
+  const qr = ["qr_ready", "authorizing"].includes(result.connection?.state ?? "")
+    && result.connection?.qrChallenge
     && result.connection.qrChallenge.expiresAtMs > Date.now()
     ? result.connection.qrChallenge
     : undefined;
@@ -572,10 +584,10 @@ function ChannelAccessView({ entry, owner }: {
         {result.connection?.accountDisplayName ? <Pill>{result.connection.accountDisplayName}</Pill> : null}
       </div>
       {result.connection?.state === "attention" ? <p role="status" className="settings-inline-note">{channelAttentionMessage(result.connection.reasonCode, owner.locale === "zh")}</p> : null}
-      {result.connection?.state === "disconnected" ? <p className="settings-inline-note">{owner.locale === "zh" ? '点击“扫码连接”，然后用微信扫描二维码并确认登录。' : 'Start a QR connection, then scan and confirm in Weixin.'}</p> : null}
+      {result.connection?.state === "disconnected" ? <p className="settings-inline-note">{owner.locale === "zh" ? '选择连接方式，然后用微信扫描二维码并确认登录。' : 'Start a QR connection, then scan and confirm in Weixin.'}</p> : null}
       {qr ? (
         <section className="opl-structured-fields" data-testid="opl-channel-access-qr">
-          <div><dt><QrCode aria-hidden="true" size={15} />{owner.locale === "zh" ? "扫码登录" : "Scan to connect"}</dt><dd>
+          <div><dt><QrCode aria-hidden="true" size={15} />{owner.locale === "zh" ? result.connection?.state === "authorizing" ? "操作者本人扫码授权" : "使用者扫码连接" : result.connection?.state === "authorizing" ? "Operator authorization" : "Scan to connect"}</dt><dd>
             {qr.payload.startsWith("data:image/")
               ? <img src={qr.payload} alt={owner.locale === "zh" ? "渠道登录二维码" : "Channel login QR code"} />
               : <QRCodeSVG
@@ -588,7 +600,23 @@ function ChannelAccessView({ entry, owner }: {
           </dd></div>
         </section>
       ) : null}
-      <ChannelAccessActions actions={result.actions} entry={entry} owner={owner} onScopedAction={runAction} />
+      {challenge ? <form method="post" style={{ display: "grid", gap: "0.5rem", justifyItems: "start" }} aria-labelledby={pinInputId + '-label'} data-testid="opl-channel-access-pin" onSubmit={(event) => {
+        event.preventDefault();
+        if (submittedChallenge === challenge.challengeId || challenge.expiresAtMs <= Date.now()) return;
+        const action = result.actions.find(candidate => candidate.input.challenge_id === challenge.challengeId);
+        if (!action || !/^[0-9]{1,16}$/.test(pin)) return;
+        setSubmittedChallenge(challenge.challengeId);
+        runAction({ ...action, input: { ...action.input, verify_code: pin } });
+        setPin("");
+      }}>
+        <label id={pinInputId + '-label'} htmlFor={pinInputId}>{owner.locale === "zh" ? "手机微信显示的数字（必填）" : "Digits shown in Weixin (required)"}</label>
+        <p id={pinInputId + '-help'} role="status" className="settings-inline-note">{challenge.retry
+          ? (owner.locale === "zh" ? "数字不匹配，请核对手机微信后重新输入。" : "The PIN did not match. Check Weixin and enter it again.")
+          : (owner.locale === "zh" ? "在手机微信查看本次连接验证码，输入后继续。" : "Enter the PIN displayed for this connection in Weixin.")}</p>
+        <Input style={{ maxWidth: "18rem", fontSize: "max(1rem, 1em)" }} id={pinInputId} name="verify_code" type="text" inputMode="numeric" autoComplete="one-time-code" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done" required pattern="[0-9]{1,16}" maxLength={16} aria-describedby={pinInputId + '-help'} value={pin} onChange={event => setPin(event.target.value)} />
+        <button className="settings-action-button" type="submit" disabled={!owner.actionAvailable || submittedChallenge === challenge.challengeId || challenge.expiresAtMs <= Date.now()}>{owner.locale === "zh" ? "验证并继续" : "Verify and continue"}</button>
+      </form> : null}
+      <ChannelAccessActions actions={result.actions.filter(action => !action.input.challenge_id)} entry={entry} owner={owner} onScopedAction={runAction} />
       <section data-testid="opl-channel-access-pairings">
         <h3><Users aria-hidden="true" size={15} />{owner.locale === "zh" ? "待处理配对" : "Pending pairings"}</h3>
         {result.pendingPairings.length ? (

@@ -112,15 +112,13 @@ Framework action 与版本校验，成功后重新读取。正文与资料位置
 | --- | --- | --- |
 | 登录 Gateway、切换账户或 API Key | 账户与访问 | App settings read model 与 action |
 | 查看包安装、版本、升级或 App 开关 | 软件中心的软件详情 | Framework Package 投影与 action |
-| 查看包服务状态、绑定微信或远端设备 | 同一包的展开详情 | 包声明的 `settings.section` typed contribution |
+| 绑定微信、消息通道或远端设备 | 设置 → 连接与部署 → 远程连接与网页访问 | 动态 `channel_access`、`remote_companion_access` 与原生 OPL Link |
+| 查看插件状态和配置 | 设置 → 能力配置 → 扩展设置 | 当前启用插件的 `settings.section` typed contribution |
 | 查看 Skills、原生插件及连接能力 | 软件中心的其他来源；能力设置保留配置 | Codex App Server capability catalog |
 | 查看任务服务、执行进程和定时服务 | 服务状态 | Framework runtime projection |
 | 查看磁盘用量及清理动作 | 数据与存储 | Framework storage lifecycle |
 
-包详情关闭时不挂载贡献视图；展开且 `app_enabled=true` 才开始读取。包状态不再
-自动堆在服务状态或资源与连接页。`channel_access`、`remote_companion_access`、
-`service_status` 和其他已准入类型均按 Package 分组；`activity_log` 仍不是普通
-设置页入口。新包依 descriptor 接入，不增加固定包名单或专用状态页。
+远程通道和伴侣连接按功能语义放在设置，不以安装器或软件分类决定可见性。设置页打开且 `app_enabled=true` 时读取远程贡献；无提供者时保留配置引导。其他配置统一按插件分组呈现在能力设置，折叠时不挂载、不读取；软件和运行组件使用同一路径。`activity_log` 只在用户启用技术详情后于相应扩展设置组呈现。软件中心只提供同一设置页的直达入口。新包依 descriptor 接入，不增加固定包名单或专用状态页。
 
 Package 适配器的安装不证明独立桌面 App 的安装或进程状态。例如 Fleet 或 iPhone
 Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替代其独立 App

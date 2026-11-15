@@ -293,8 +293,8 @@ test("App-disabled packages leave all contribution slots while remaining nativel
 
 describe("OPL Studio DSH contribution composition", () => {
   test("routes package settings to the unified catalog", () => {
-    expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("capabilities");
-    expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("capabilities");
+    expect(settingsContributionDestination({ view: { viewId: "wechat", viewType: "channel_access", title: {}, dataRef: "wechat#state" } })).toBe("resources");
+    expect(settingsContributionDestination({ view: { viewId: "opl-link", viewType: "remote_companion_access", title: {}, dataRef: "opl-link#state" } })).toBe("resources");
     expect(settingsContributionDestination({ view: { viewId: "local-service", viewType: "service_status", title: {}, dataRef: "local-service#state" } })).toBe("capabilities");
     expect(settingsContributionDestination({ view: { viewId: "fleet", viewType: "activity_log", title: {}, dataRef: "fleet#state" } })).toBeNull();
     expect(settingsContributionDestination({ view: { viewId: "capability", viewType: "table", title: {}, dataRef: "capability#state" } })).toBe("capabilities");
@@ -394,10 +394,10 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(activityEntry && settingsContributionDestination(activityEntry)).toBeNull();
 
     const weixinEntry = projection.entries.find((entry) => entry.packageId === "opl-channel-weixin");
-    expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("capabilities");
+    expect(weixinEntry && settingsContributionDestination(weixinEntry)).toBe("resources");
 
     const groups = groupSettingsContributions(projection.entries.filter((entry) => settingsContributionDestination(entry) === "capabilities"));
-    expect(groups).toHaveLength(3);
+    expect(groups).toHaveLength(2);
     const generic = groups.find((group) => group.packageId === "generic-package");
     expect(generic?.entries.map((entry) => entry.contributionId)).toEqual(["overview", "details"]);
   });
@@ -760,4 +760,19 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(appSource).toMatch(/function contributionReceiptForDisplay/);
     expect(appSource).toContain("contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))");
   });
+});
+
+
+test("phone PIN projections carry a current challenge but never submitted digits", () => {
+  const value: any = {
+    schema_version: "opl-app-channel-access.v1", status: "available", channel_id: "weixin",
+    connection: { state: "pin_required", verification_challenge: { challenge_id: "challenge-1", expires_at_ms: 1800000000000, retry: true } },
+    actions: [{ command_id: "weixin-submit-pin", input: { channel_id: "weixin", challenge_id: "challenge-1" } }], pending_pairings: [], authorized_users: []
+  };
+  expect(readChannelAccessResult(value)?.connection?.verificationChallenge?.retry).toBe(true);
+  value.actions[0].input.verify_code = "012345";
+  expect(readChannelAccessResult(value)).toBeNull();
+  delete value.actions[0].input.verify_code;
+  value.connection.state = "connected";
+  expect(readChannelAccessResult(value)).toBeNull();
 });

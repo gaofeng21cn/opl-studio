@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { settingsContributionDestination } from "./contributionProjection";
 import { latestPackageOperations, packageStagePresentation, type PackageOperation } from "../workbench/packageOperations";
 import { softwareCanStart } from "../workbench/softwareExperience";
 import { SoftwareArtwork } from "../workbench/SoftwareArtwork";
@@ -31,7 +32,6 @@ export type DshPluginManagerOwnerProps = {
   actionBusyKey: string | null;
   onAction(request: SettingsActionRequest): void;
   manifestInstallAction?: SettingsPanelProps["manifestInstallAction"];
-  renderPackageContributions?: (packageId: string) => ReactNode;
   contributedTabs?: readonly PluginManagerOwnerTab[];
   selectedTab?: string;
   onTabChange?: (tab: string) => void;
@@ -55,9 +55,6 @@ export type DshPluginManagerOwnerProps = {
 
 const noop = () => {};
 
-function PackageContribution({ packageId, render }: { packageId: string; render: (packageId: string) => ReactNode }) {
-  return <section className="opl-dsh-owner-section" data-testid="opl-package-state">{render(packageId)}</section>;
-}
 
 function isPluginSkill(skill: CodexSkillCapability): boolean {
   return skill.scope === "plugin" || /(?:^|\/)plugins\/(?:cache|marketplaces)\//.test(skill.path.replaceAll("\\", "/"));
@@ -166,7 +163,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
           {props.onConfigureSoftware ? <Button size="sm" variant="outline" onClick={() => props.onConfigureSoftware?.(item.packageId)}>{isZh ? "管理共享资源" : "Manage shared resources"}</Button> : null}
         </section>
         {shortcuts(item)}
-        {item.catalogScope === "software" && item.appEnabled && props.renderPackageContributions ? <PackageContribution packageId={item.packageId} render={props.renderPackageContributions} /> : null}
+        {item.appEnabled && props.onOpenSettings ? [...new Set(model.uiContributions.entries.filter(entry => entry.packageId === item.packageId && entry.slot === 'settings.section').map(entry => settingsContributionDestination(entry) ?? (settings.developerDetails ? 'capabilities' : null)).filter((destination): destination is 'resources' | 'capabilities' => destination === 'resources' || destination === 'capabilities'))].map(destination => <section key={destination} className="opl-dsh-owner-section"><Button size="sm" variant="outline" onClick={() => props.onOpenSettings?.(destination)}>{destination === 'resources' ? (isZh ? '配置远程连接' : 'Configure remote connection') : (isZh ? '打开扩展设置' : 'Open extension settings')}</Button></section>) : null}
         {settings.developerDetails ? <section className="opl-dsh-owner-section"><h4>{isZh ? "技术详情" : "Technical details"}</h4><p>{agentAvailabilityDetail(item, locale)}</p><dl>{item.details.map(detail => <div key={detail.label}><dt>{detail.label}</dt><dd>{detail.value}</dd></div>)}</dl></section> : null}
       </>,
     };
