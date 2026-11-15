@@ -5,8 +5,9 @@ import { componentReadinessStatus } from "../../settings/packages";
 import { RuntimeActionButton } from "../../settings/actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpenSchedules, actionBusyKey, onAction, locale }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "onOpenSchedules" | "actionBusyKey" | "onAction" | "locale">) {
+export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpenSchedules, actionBusyKey, onAction, locale, renderSettingsContributions }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "onOpenSchedules" | "actionBusyKey" | "onAction" | "locale" | "renderSettingsContributions">) {
 
+      const pluginServices = renderSettingsContributions?.("services");
       const runtimeActions = runtime?.maintenanceActions ?? [];
       const serviceAction = runtimeActions.find((action) => action.actionId === (runtime?.temporal.serviceReady === false ? "provider_service_start" : "provider_service_status"));
       const workerAction = runtimeActions.find((action) => action.actionId === (runtime?.temporal.workerReady === false ? "provider_worker_start" : "provider_worker_status"));
@@ -35,6 +36,7 @@ export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpen
               <SettingRow key={carrier.packageId} label={carrier.label}><StatusValue status={carrier.status} locale={settings.locale} /></SettingRow>
             )) : <SettingRow label={settings.locale === "zh" ? "运行环境" : "Runtime environments"}><span className="settings-muted">--</span></SettingRow>}
           </SettingsGroup>
+          {pluginServices ? <SettingsGroup title={zh ? "服务与设备" : "Services and devices"}>{pluginServices}</SettingsGroup> : null}
         </>
       );
 

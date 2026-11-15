@@ -2,7 +2,11 @@ import React, { act } from "react";
 let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import { McpAppsClientContext } from "../../plugins/opl-mcp-apps/src/client/plugin";
+import { installWorkspaceClientPlugin } from "../../src/composition/workspaceClientPlugin";
 import { SettingsPluginSections } from "../../src/composition/SettingsPluginSections";
+import { CapabilitiesSettingsPage } from "../../src/workbench/settings/pages/CapabilitiesSettingsPage";
+import { ServicesSettingsPage } from "../../src/workbench/settings/pages/ServicesSettingsPage";
 import { ResourcesSettingsPage } from "../../src/workbench/settings/pages/ResourcesSettingsPage";
 import { ProjectedContribution } from "../../src/composition/contributionComponents";
 import { readUiContributionsProjection, settingsEntriesForDestination, type OplContributionSlotOwner } from "../../src/composition/contributionProjection";
@@ -78,8 +82,8 @@ test('software and component details retain ordinary configuration and opt-in te
   const channel = entries[0]!;
   const service = { ...channel, contributionKey: 'component:health', packageId: 'component', view: { ...channel.view!, viewType: 'service_status' } };
   const activity = { ...service, contributionKey: 'component:doctor', view: { ...service.view, viewType: 'activity_log' } };
-  expect(settingsEntriesForDestination([channel, service, activity], "capabilities", false)).toEqual([service]);
-  expect(settingsEntriesForDestination([channel, service, activity], "capabilities", true)).toEqual([service, activity]);
+  expect(settingsEntriesForDestination([channel, service, activity], "services", false)).toEqual([service]);
+  expect(settingsEntriesForDestination([channel, service, activity], "services", true)).toEqual([service, activity]);
   expect(settingsEntriesForDestination([channel], "capabilities", true)).toEqual([]);
   expect(settingsEntriesForDestination([channel, service, activity], "resources")).toEqual([channel]);
   const disabled = readUiContributionsProjection({ agent_packages: { directory: { entries: [{ package_id: channel.packageId, app_enabled: false }] } }, ui_contributions: { surface_kind: 'opl_app_ui_contributions_projection.v1', entries: [{ contribution_key: channel.contributionKey, contribution_id: channel.contributionId, package_id: channel.packageId, slot: 'settings.section' }] } });
@@ -102,4 +106,53 @@ test('plugin configuration uses the shared renderer only while its Settings grou
   expect(document.querySelector('button')).toBeNull();
   await act(async () => root.render(<SettingsPluginSections entries={[]} labels={new Map()} renderEntry={renderEntry} collapsible />));
   expect(document.querySelector('details')).toBeNull();
+});
+
+
+test('operational views never mount or read in Settings and the previous entry opens the common workspace', async () => {
+  let workspaces = 0;
+  const operationTypes = ['list_detail', 'timeline', 'approval_diff', 'task_board', 'artifact_view'];
+  const operations = operationTypes.map(viewType => ({...entries[0]!, view: {...entries[0]!.view!, viewType}}));
+  for (const destination of ['resources', 'services', 'capabilities'] as const) {
+    expect(settingsEntriesForDestination(operations, destination, true)).toHaveLength(0);
+  }
+  await act(async () => root.render(<CapabilitiesSettingsPage {...pageProps} model={{managedCompanions: [], packageLifecycle: []} as any} capabilityCatalog={{plugins: [], skills: [], apps: [], errors: []} as any} onOpenAppWorkspace={() => {workspaces++;}} />));
+  expect(document.body.textContent).not.toContain('扩展设置');
+  const button = [...document.querySelectorAll('button')].find(button => button.textContent === '打开应用工作台')!;
+  await act(async () => button.click());
+  expect(workspaces).toBe(1);
+});
+
+test('service contributions mount through the actual maintenance page', async () => {
+  let destination = '';
+  await act(async () => root.render(<ServicesSettingsPage {...pageProps} locale="zh-CN" renderSettingsContributions={value => {destination = value; return <button type="button">设备状态操作</button>;}} />));
+  expect(destination).toBe('services');
+  expect(document.body.textContent).toContain('服务与设备');
+  expect(document.body.textContent).toContain('设备状态操作');
+});
+
+
+test('one workspace entry uses the common MCP host and preserves task identity and return navigation', async () => {
+  let Page: React.ComponentType = () => null;
+  let opened = '';
+  const surface = {locale: 'zh', currentThreadId: 'thread-1', openPrimaryView: (view: string) => {opened = view;}, mcpApps: {bridge: {}}, uiContributions: {entries}, contributionOwner: {readData: () => {throw new Error('a parallel module reader must not run');}}} as any;
+  const dispose = installWorkspaceClientPlugin({register(options: any, component: any) {if (options.name === 'main') Page = component; return () => {};}} as any, () => surface);
+  const client = {Workspace: (props: any) => <button type="button" onClick={props.onConversation}>返回对话</button>, TaskWorkbench: (props: any) => <p>{props.itemId}:{props.viewId}:{props.threadId}:{props.revision}</p>} as any;
+  await act(async () => root.render(<McpAppsClientContext.Provider value={client}><Page /></McpAppsClientContext.Provider>));
+  expect(document.body.textContent).not.toContain('模块视图');
+  await act(async () => document.querySelector('button')!.click());
+  expect(opened).toBe('conversation');
+  surface.mcpApps.task = {itemId: 'task-1', viewId: 'review'};
+  await act(async () => root.render(<McpAppsClientContext.Provider value={client}><Page /></McpAppsClientContext.Provider>));
+  expect(document.body.textContent).toContain('task-1:review:thread-1');
+  await act(async () => (document.querySelector('button[aria-label="刷新"]') as HTMLButtonElement).click());
+  expect(document.body.textContent).toContain('task-1:review:thread-1:1');
+  await act(async () => (document.querySelector('button[aria-label="返回运行状态"]') as HTMLButtonElement).click());
+  expect(opened).toBe('runtime');
+  surface.mcpApps = undefined;
+  await act(async () => root.render(<McpAppsClientContext.Provider value={client}><Page /></McpAppsClientContext.Provider>));
+  const manage = [...document.querySelectorAll('button')].find(button => button.textContent === '打开软件中心')!;
+  await act(async () => manage.click());
+  expect(opened).toBe('applications');
+  dispose();
 });

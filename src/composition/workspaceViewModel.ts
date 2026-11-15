@@ -2,21 +2,6 @@ import type { OplUiContribution, OplUiContributionCommand } from "./contribution
 
 export const WORKSPACE_VIEW_TYPES = new Set(["list_detail", "timeline", "approval_diff", "activity_log"]);
 
-export function workspaceEntries(entries: readonly OplUiContribution[]): OplUiContribution[] {
-  return entries.filter(entry => entry.slot === "settings.section" && entry.scope === "root"
-    && entry.contributionKind === "view" && entry.view && WORKSPACE_VIEW_TYPES.has(entry.view.viewType));
-}
-
-export function workspaceGroups(entries: readonly OplUiContribution[]) {
-  const groups = new Map<string, OplUiContribution[]>();
-  for (const entry of workspaceEntries(entries)) {
-    const family = entry.view!.dataRef.split(".")[0];
-    const key = ["personal", "communications", "knowledge"].includes(family) ? family : "other";
-    groups.set(key, [...(groups.get(key) ?? []), entry]);
-  }
-  return [...groups].map(([key, entries]) => ({ key, entries }));
-}
-
 export function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown> : null;

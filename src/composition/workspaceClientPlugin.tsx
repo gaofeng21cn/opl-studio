@@ -5,8 +5,7 @@ import { diffLines } from "diff";
 import type { SlotCore } from "@deepseek-ai/dsh-client-ui-slots";
 import type { OplStudioSurface } from "./oplStudioSurface";
 import { contributionLabel, type OplContributionActionOutcome, type OplContributionSlotOwner, type OplUiContribution, type OplUiContributionCommand } from "./contributionProjection";
-import { declaredItemActions, itemIdentity, itemSummary, itemTitle, parseWorkspaceInput, record, workspaceEntries, workspaceGroups, type WorkspaceCollection, type WorkspaceCommandInput, type WorkspaceField } from "./workspaceViewModel";
-import { ProjectedContribution } from "./contributionComponents";
+import { declaredItemActions, itemIdentity, itemSummary, itemTitle, parseWorkspaceInput, record, type WorkspaceCollection, type WorkspaceCommandInput, type WorkspaceField } from "./workspaceViewModel";
 import "./workspace.css";
 
 function label(name: string, zh: boolean) {
@@ -185,43 +184,33 @@ export function WorkspaceCollectionView({ collection, entry, owner, onRead, read
 
 export const name = "opl-workspace-client";
 
-// DSH owns the main-page and sidebar slots. This client plugin consumes the
-// admitted Package views and keeps only the selected view across page visits.
+// All business views share the standard MCP App workspace and its navigation.
 export function installWorkspaceClientPlugin(core: Pick<SlotCore, "register">, useSurface: () => OplStudioSurface) {
-  let selectedView: string | null = null;
   function Page() {
     const surface = useSurface();
     const mcpClient = useMcpAppsClient();
-    const [selection, setSelection] = useState<string | null>(() => selectedView);
-    const [revision, setRevision] = useState(0);
-    const [showMcp, setShowMcp] = useState(Boolean(surface.mcpApps));
-    useEffect(() => { if (surface.mcpApps?.launch || surface.mcpApps?.task) setShowMcp(true); }, [surface.mcpApps?.launch, surface.mcpApps?.task]);
-    const entries = workspaceEntries(surface.uiContributions.entries);
-    const groups = workspaceGroups(entries);
-    const current = selection ? entries.find(entry => entry.contributionKey === selection) : entries[0];
-    useEffect(() => {
-      if (!showMcp && selection && !current) {
-        selectedView = null;
-        setSelection(null);
-        surface.openPrimaryView("conversation");
-      }
-    }, [current, selection, showMcp, surface.openPrimaryView]);
     const zh = surface.locale === "zh";
-    const groupLabel = (key: string) => ({personal: zh ? "个人" : "Personal", communications: zh ? "通信" : "Communication", knowledge: zh ? "知识" : "Knowledge", other: zh ? "其他能力" : "Other capabilities"}[key] ?? key);
-    const hasContributions = groups.some(group => group.entries.length > 0);
-    const appCanvas = showMcp && surface.mcpApps && mcpClient && !surface.mcpApps.task;
-    return <section className="opl-workspace-page" aria-label={zh ? "应用工作台" : "App workspace"}>
-      {!appCanvas ? <header><div><Boxes size={18} aria-hidden="true"/><h2>{zh ? "应用工作台" : "App workspace"}</h2></div><div className="opl-workspace-mode-toggle" role="group" aria-label={zh ? "工作台模式" : "Workspace mode"}>{surface.mcpApps && mcpClient ? <button type="button" aria-pressed={showMcp} onClick={() => setShowMcp(true)}>{zh ? "应用" : "Apps"}</button> : null}{hasContributions ? <button type="button" aria-pressed={!showMcp} onClick={() => setShowMcp(false)}>{zh ? "模块视图" : "Module views"}</button> : null}</div><span title={surface.workspacePath}>{surface.workspacePath.split("/").filter(Boolean).at(-1)}</span><button type="button" aria-label={zh ? "刷新" : "Refresh"} title={zh ? "刷新" : "Refresh"} onClick={() => setRevision(value => value + 1)}><RefreshCw size={16}/></button><button type="button" aria-label={zh ? "返回聊天" : "Back to chat"} title={zh ? "返回聊天" : "Back to chat"} onClick={() => surface.openPrimaryView("conversation")}><ChevronLeft size={18}/></button></header> : null}
-      {showMcp && surface.mcpApps && mcpClient ? <div className="opl-workspace-app-content">{surface.mcpApps.task ? <mcpClient.TaskWorkbench {...surface.mcpApps} {...surface.mcpApps.task} locale={surface.locale} threadId={surface.currentThreadId} revision={revision}/> : <mcpClient.Workspace {...surface.mcpApps} onModules={hasContributions ? () => setShowMcp(false) : undefined} onConversation={() => surface.openPrimaryView("conversation")} locale={surface.locale} threadId={surface.currentThreadId} revision={revision}/>}</div> : <div className="opl-workspace-body"><nav aria-label={zh ? "模块视图" : "Module views"}>{groups.map(group => <section key={group.key}><h3>{groupLabel(group.key)}</h3>{group.entries.map(entry => <button key={entry.contributionKey} type="button" title={surface.contributionOwner.developerDetails ? entry.packageId : undefined} aria-current={current?.contributionKey === entry.contributionKey ? "page" : undefined} onClick={() => {selectedView = entry.contributionKey; setSelection(selectedView);}}>{contributionLabel(entry.view?.title ?? {}, surface.locale, entry.contributionId)}</button>)}</section>)}</nav>
-        <div className="opl-workspace-content">{current ? <ProjectedContribution key={current.contributionKey} entry={current} owner={{...surface.contributionOwner, refreshRevision: surface.contributionOwner.refreshRevision + revision}}/> : <p role="status">{zh ? "当前没有可用的能力视图，请检查模块安装和运行状态。" : "No capability views are available. Check module installation and runtime status."}</p>}</div>
-      </div>}
+    const [revision, setRevision] = useState(0);
+    return <section className="opl-workspace-page">
+      {surface.mcpApps?.task ? <header><h2>{zh ? "任务工作台" : "Task workbench"}</h2><span/>
+        <button type="button" aria-label={zh ? "刷新" : "Refresh"} onClick={() => setRevision(value => value + 1)}><RefreshCw size={16} aria-hidden="true"/></button>
+        <button type="button" aria-label={zh ? "返回运行状态" : "Back to runtime"} onClick={() => surface.openPrimaryView("runtime")}><ChevronLeft size={18} aria-hidden="true"/></button>
+      </header> : null}
+      {surface.mcpApps && mcpClient ? <div className="opl-workspace-app-content">{surface.mcpApps.task
+        ? <mcpClient.TaskWorkbench {...surface.mcpApps} {...surface.mcpApps.task} locale={surface.locale} threadId={surface.currentThreadId} revision={revision}/>
+        : <mcpClient.Workspace {...surface.mcpApps} onConversation={() => surface.openPrimaryView("conversation")} locale={surface.locale} threadId={surface.currentThreadId}/>}</div>
+        : <div className="opl-workspace-content"><h2>{zh ? "应用工作台" : "App workspace"}</h2>
+          <p role="status">{zh ? "工作台连接当前不可用，请在软件中心检查应用与连接后重试。" : "The workspace connection is unavailable. Check apps and connections in Software Center, then try again."}</p>
+          <button className="settings-action-button" type="button" onClick={() => surface.openPrimaryView("applications")}>{zh ? "打开软件中心" : "Open Software Center"}</button>
+          <button className="settings-action-button" type="button" onClick={() => surface.openPrimaryView("conversation")}>{zh ? "返回对话" : "Back to conversation"}</button>
+        </div>}
     </section>;
   }
   const disposers = [
     core.register({name: "sidebar.panellist", id: "workspace", order: 10, registrant: name}, ({ size }: {size: number}) => <Boxes size={size} aria-hidden="true"/>),
     core.register({name: "main", key: "workspace", registrant: name}, Page)
   ];
-  return () => {disposers.forEach(dispose => dispose()); selectedView = null;};
+  return () => {disposers.forEach(dispose => dispose());};
 }
 
 export const workspaceClientPlugin = { name, install: installWorkspaceClientPlugin };
