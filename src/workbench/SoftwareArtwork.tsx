@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { AppWindow, Bot, Puzzle, Server, TerminalSquare } from "lucide-react";
+import { AppWindow, Bot, ImageOff, Puzzle, Server, TerminalSquare } from "lucide-react";
 
-/** Only immutable public owner assets reach the network from the renderer. */
+/** Local, bounded PNG artwork needs no network or credentials. Remote assets stay public and immutable. */
 export function publicSoftwareIconUrl(value?: string, privateAsset = false): string | undefined {
-  if (!value || privateAsset) return undefined;
+  if (!value) return undefined;
+  if (value.length <= 174786 && /^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(value)) return value;
+  if (privateAsset) return undefined;
   try {
     const url = new URL(value);
     return url.protocol === "https:" && url.hostname === "raw.githubusercontent.com" && !url.port
@@ -13,17 +15,15 @@ export function publicSoftwareIconUrl(value?: string, privateAsset = false): str
   } catch { return undefined; }
 }
 
-export function SoftwareArtwork({ identity, label, kind, iconUrl, privateAsset = false }: {
-  identity: string; label: string; kind?: string; iconUrl?: string; privateAsset?: boolean;
+export function SoftwareArtwork({ identity, label, kind, iconUrl, privateAsset = false, firstParty = false, locale = "zh" }: {
+  identity: string; label: string; kind?: string; iconUrl?: string; privateAsset?: boolean; firstParty?: boolean; locale?: "zh" | "en";
 }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   const url = publicSoftwareIconUrl(iconUrl, privateAsset);
-  const words = label.match(/[\p{L}\p{N}]+/gu) ?? [identity];
-  const initials = words.length > 1 ? `${words[0][0]}${words.at(-1)![0]}`.toUpperCase() : words[0].slice(0, 2).toUpperCase();
-  const tone = [...identity].reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 0) % 6;
-  const Icon = kind === "agent" ? Bot : kind === "cli" ? TerminalSquare : kind === "runtime" ? Server : kind === "application" ? AppWindow : Puzzle;
-  return <span className="opl-package-artwork" data-tone={tone} aria-hidden="true">
-    {url && failedUrl !== url ? <img src={url} alt="" width={36} height={36} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedUrl(url)} />
-      : <><span className="opl-package-initials">{initials}</span><Icon className="opl-package-type-icon" size={12} strokeWidth={1.8} /></>}
+  const available = Boolean(url && failedUrl !== url && (!firstParty || !url.endsWith(".svg")));
+  const Icon = firstParty ? ImageOff : kind === "agent" ? Bot : kind === "cli" ? TerminalSquare : kind === "runtime" ? Server : kind === "application" ? AppWindow : Puzzle;
+  return <span className="opl-package-artwork" data-software-id={identity} data-artwork-state={available ? "image" : "unavailable"} title={!available ? `${label} · ${locale === "zh" ? "图标暂不可用" : "Icon unavailable"}` : undefined} aria-hidden="true">
+    {available ? <img src={url} alt="" width={40} height={40} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedUrl(url)} />
+      : <Icon size={20} strokeWidth={1.5} />}
   </span>;
 }
