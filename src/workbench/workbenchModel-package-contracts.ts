@@ -161,6 +161,7 @@ export type SoftwareSourceRef = CatalogProvenanceRef & {
 };
 
 export type NativeSoftwareItemRef = CatalogProvenanceRef & {
+  iconUrl?: string;
   itemId: string;
   productId?: string;
   productDisplayName?: string;

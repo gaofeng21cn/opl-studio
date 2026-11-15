@@ -36,6 +36,7 @@ function readNativeItem(item: Record<string, unknown>, sourceId: string): Native
   if (!itemId || !name || !["formula", "cask", "managed_runtime"].includes(String(item.kind))) return null;
   return {
     itemId, name,
+    iconUrl: asString(item.icon_url) ?? undefined,
     ...readCatalogProvenance(item),
     productId: asString(item.product_id) ?? undefined,
     productDisplayName: asString(item.product_display_name) ?? undefined,
