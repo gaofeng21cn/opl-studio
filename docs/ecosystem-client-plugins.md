@@ -218,3 +218,7 @@ DSH Host 实现在各插件的 `src/`，共用协议与辅助代码在 `src/host
 计划任务使用主导航入口，设置中的后台任务页仅提供运行条件和跳转，两个入口共用同一 Framework 服务及操作确认组件。模型与执行页包含权限、Codex Auto Review 和逐次发送的时间上下文。偏好页包含自定义快捷键和语音输入；语音由运行环境的识别服务提供，未提供时明确说明系统听写替代入口。能力目录提供用途入口、类型筛选与动态 Package 管理，配置表单仍由其唯一功能页持有。
 
 App 的 `app-shell-adapter.json` 是当前壳采用状态的唯一权威；Studio 候选证据不声明发布就绪。OPL Link 暂不内置、不进入自动注册或未安装推荐目录，保留已安装实例及其数据。
+
+## Plugin composition boundary
+
+The Studio repository contains the DSH Host and Client plugin composition. Framework capability Packages are discovered from owner descriptors and projected through the existing contribution ABI; they are not admitted into the DSH profile merely because their native carrier is a Codex plugin manager. Keep these surfaces separate while sharing the same user-facing Settings, Workspace, Task Detail, and MCP App entry patterns.
