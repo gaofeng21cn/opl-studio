@@ -129,7 +129,7 @@ test("upload digest and TTL failures discard receipts without dispatching a turn
 test("Framework exchange uses only private temporary files and removes them on success or rejection", async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-cli-test-")); t.after(() => rm(root, { recursive: true, force: true }));
   const cli = path.join(root, "opl"); const receipt = path.join(root, "receipt.json");
-  await writeFile(cli, `#!${process.execPath}\nimport fs from 'node:fs';\nlet body='';for await (const part of process.stdin)body+=part;const request=JSON.parse(body);const file=process.argv[process.argv.indexOf('--credential-file')+1];fs.writeFileSync(process.env.TEST_RECEIPT,JSON.stringify({file,request,args:process.argv.slice(2)}));if(process.env.TEST_MODE==='login'){console.log(JSON.stringify({ok:false,details:{reason_code:'auth_expired'}}));process.exit(1)}fs.writeFileSync(file,JSON.stringify({schema:'opl_link_remote_credentials.v1',accessToken:'private-test-secret'}),{mode:process.env.TEST_MODE==='public'?0o644:0o600,flag:'wx'});console.log(JSON.stringify({ok:true,companion_authorization:{credential_written:true}}));\n`, { mode: 0o700 });
+  await writeFile(cli, `#!${process.execPath}\nimport fs from 'node:fs';\nlet body='';for await (const part of process.stdin)body+=part;const request=JSON.parse(body);const file=process.argv[process.argv.indexOf('--credential-file')+1];fs.writeFileSync(process.env.TEST_RECEIPT,JSON.stringify({file,request,args:process.argv.slice(2)}));if(process.env.TEST_MODE==='login'||process.env.TEST_MODE==='login-stderr'){const output=process.env.TEST_MODE==='login-stderr'?console.error:console.log;output(JSON.stringify({ok:false,error:'Private backend detail',details:{reason_code:'auth_expired',accessToken:'private-error-secret'}}));process.exit(1)}if(process.env.TEST_MODE==='stderr-overflow'){process.stderr.write('x'.repeat(70000));process.exit(1)}fs.writeFileSync(file,JSON.stringify({schema:'opl_link_remote_credentials.v1',accessToken:'private-test-secret'}),{mode:process.env.TEST_MODE==='public'?0o644:0o600,flag:'wx'});console.log(JSON.stringify({ok:true,companion_authorization:{credential_written:true}}));\n`, { mode: 0o700 });
   const env = { ...process.env, OPL_APP_OPL_BIN: cli, TEST_RECEIPT: receipt };
   const device = { deviceId: crypto.randomUUID(), role: "host", name: "Test", platform: "darwin", identityKey: crypto.randomBytes(32).toString("base64url"), clientVersion: "0.6.5" };
   assert.equal((await authorizeLinkHost({ device, env })).accessToken, "private-test-secret");
@@ -137,4 +137,16 @@ test("Framework exchange uses only private temporary files and removes them on s
   await assert.rejects(readFile(recorded.file), error => error.code === "ENOENT");
   await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "public" } }), error => error.code === "link_credentials_invalid");
   await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "login" } }), error => error.code === "link_account_required");
+  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "login-stderr" } }), error => error.code === "link_account_required" && !JSON.stringify(error).includes("private-error-secret") && !error.message.includes("Private backend detail"));
+  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "stderr-overflow" } }), error => error.code === "link_authorization_failed");
+});
+
+test("the actual Framework CLI maps an isolated signed-out account to the existing account entry", async t => {
+  const frameworkRoot = process.env.OPL_LINK_FRAMEWORK_SOURCE;
+  if (!frameworkRoot) { t.skip("Set OPL_LINK_FRAMEWORK_SOURCE to the matching Framework checkout"); return; }
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-framework-cli-"));
+  const carrier = await createLinkInternet({ env: { ...process.env, NODE_ENV: "test", OPL_DATA_DIR: root, OPL_STATE_DIR: path.join(root, "framework-state"), OPL_APP_OPL_BIN: path.join(frameworkRoot, "bin/opl"), OPL_GATEWAY_CONTROL_BASE_URL: "http://127.0.0.1:1/api/v1" }, handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
+  t.after(async () => { await carrier.close(); await rm(root, { recursive: true, force: true }); });
+  await assert.rejects(carrier.enable(), error => error.code === "link_account_required");
+  assert.deepEqual(carrier.status(), { status: "account_required", reasonCode: "link_account_required" });
 });

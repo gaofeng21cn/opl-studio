@@ -22,17 +22,25 @@ export async function authorizeLinkHost({ device, env }) {
     await chmod(temporary, 0o700);
     const result = await new Promise((resolve, reject) => {
       const child = spawn(env.OPL_APP_OPL_BIN ?? "opl", ["connect", "gateway", "authorize-companion", "--request-stdin", "--credential-file", credentialFile, "--json"], { env, stdio: ["pipe", "pipe", "pipe"] });
-      let stdout = ""; let bytes = 0; let ended = false;
+      const stdout = []; const stderr = []; let bytes = 0; let ended = false;
       const timer = setTimeout(() => { child.kill("SIGKILL"); finish(fail("link_authorization_timeout", "Account authorization timed out. Try again.", 503)); }, 60_000);
       function finish(error, value) { if (ended) return; ended = true; clearTimeout(timer); error ? reject(error) : resolve(value); }
-      child.stdout.on("data", chunk => { bytes += chunk.length; if (bytes > 64 * 1024) { child.kill("SIGKILL"); finish(fail("link_authorization_failed", "Could not enable phone access", 503)); } else stdout += chunk; });
-      child.stderr.resume();
+      function append(target, chunk) {
+        bytes += chunk.length;
+        if (bytes > 64 * 1024) { child.kill("SIGKILL"); finish(fail("link_authorization_failed", "Could not enable phone access", 503)); }
+        else target.push(chunk);
+      }
+      child.stdout.on("data", chunk => append(stdout, chunk));
+      child.stderr.on("data", chunk => append(stderr, chunk));
       child.once("error", () => finish(fail("link_authorization_unavailable", "Update OPL App to enable phone access", 503)));
       child.once("close", code => {
-        let value; try { value = JSON.parse(stdout); } catch {}
+        let value; let errorValue;
+        try { value = JSON.parse(Buffer.concat(stdout).toString("utf8")); } catch {}
+        try { errorValue = JSON.parse(Buffer.concat(stderr).toString("utf8")); } catch {}
         if (code === 0) finish(undefined, value);
         else {
-          const reason = value?.error?.code ?? value?.error_code ?? value?.details?.reason_code ?? value?.error?.details?.reason_code ?? value?.code ?? value?.reason_code;
+          const reasonFrom = body => body?.details?.reason_code ?? body?.error?.details?.reason_code ?? body?.error?.code ?? body?.error_code ?? body?.code ?? body?.reason_code;
+          const reason = reasonFrom(errorValue) ?? reasonFrom(value);
           finish(fail(/login|sign.?in|auth.*(?:required|expired)|reauth_required|account.*required|credential.*missing|managed_key_missing/i.test(reason ?? "") ? "link_account_required" : "link_authorization_failed", "Open OPL Account in Settings, then enable phone access again.", 401));
         }
       });

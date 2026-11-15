@@ -117,6 +117,12 @@ npm run typecheck
 node scripts/acceptance/link-companion.mjs
 ```
 
+Set `OPL_LINK_FRAMEWORK_SOURCE=/path/to/one-person-lab` for the focused tests
+to additionally spawn the matching real Framework CLI with an isolated signed-out
+account store. That check verifies stderr reason codes reach the existing OPL
+Account entry. Both subprocess output streams are bounded and their raw error
+bodies remain outside the renderer.
+
 The browser acceptance mounts the actual Settings component, production Web
 bridge and real DSH Host with a transport fixture. It checks the address-free
 flow, QR, fingerprint, claimed device, revocation and narrow layout. It does
