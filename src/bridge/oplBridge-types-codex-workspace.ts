@@ -195,6 +195,12 @@ export type CodexPendingServerRequest = {
   params: Record<string, unknown>;
 };
 
+export type CodexServerRequestsClearedDetail = {
+  reason: string;
+  count?: number;
+  requestIds?: readonly (string | number)[];
+};
+
 
 export type ThreadWorkspaceGit = {
   threadId: string;

@@ -171,8 +171,7 @@ test("real DSH HTTP Host pairs a phone to its single Codex transport, streams an
   assert.ok(found);
   const readback = await invoke("readThread", { threadId: started.threadId }); assert.ok(readback.turns.some(turn => turn.id === started.turnId));
   const desktop = await host.core.invoke("readThread", { threadId: started.threadId, includeTurns: true }); assert.equal(desktop.id, readback.id);
-  const pending = await invoke("listPendingServerRequests"); assert.ok(pending.some(item => item.id === "approval-1"));
-  await invoke("respondToServerRequest", { id: "approval-1", response: { result: { decision: "decline" } } });
+  const pending = await invoke("listPendingServerRequests"); assert.deepEqual(pending, []);
   rpc = (await readFile(logPath, "utf8")).trim().split("\n").map(JSON.parse);
   const resumed = rpc.find(item => item.direction === "client_to_server" && item.method === "thread/resume");
   assert.deepEqual(resumed.params, { threadId: "thread-source" });

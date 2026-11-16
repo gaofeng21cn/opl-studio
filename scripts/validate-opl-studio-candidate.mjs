@@ -95,6 +95,7 @@ const requiredFiles = [
   "desktop/updater.mjs",
   "src/host/app-server-protocol.mjs",
   "src/host/app-server-transport.mjs",
+  "src/host/app-server-turn-lifecycle.mjs",
   "src/host/dsh/cordis.yml",
   "src/host/dsh/host.mjs",
   "src/host/dsh/web.patch.yml",
