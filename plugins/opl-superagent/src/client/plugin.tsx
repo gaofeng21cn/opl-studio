@@ -33,7 +33,7 @@ export function SuperagentPanel() {
     {state?.error && <p role="alert">{state.error}</p>}
     {state?.state !== "running" && <p>{zh ? "使用 App 的 Codex 模型与登录状态。启动后配置仓库专用账号、来源、授权策略和执行目录；配置与工单会在停止后保留。" : "Uses the App’s Codex models and sign-in. Start the workbench to configure its repository account, Sources, Policy and execution directory. Settings and Tickets persist after stopping."}</p>}
     {state?.state === "running" && state.url && (local
-      ? <iframe title="Superagent workbench" src={state.url} referrerPolicy="no-referrer" />
+      ? <div className="opl-superagent-launch"><p>{zh ? "DSH 工作台需要在顶层页面完成一次登录交换，完成后即可使用同一工作台。" : "The DSH workbench completes its sign-in exchange in a top-level page before use."}</p><a href={state.url} target="_blank" rel="noopener noreferrer">{zh ? "打开工作台" : "Open workbench"}</a></div>
       : <p>{zh ? "工作台监听 Studio 所在机器的回环地址。请在该机器打开，或通过 SSH 转发工作台端口后访问。" : "The workbench listens on the Studio machine's loopback address. Open it there or forward its port over SSH."}<br /><a href={state.url} target="_blank" rel="noreferrer">{zh ? "本机工作台地址" : "Local workbench address"}</a></p>)}
   </section>;
 }
