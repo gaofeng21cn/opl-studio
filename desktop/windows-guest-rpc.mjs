@@ -2,19 +2,24 @@ import { EventEmitter } from "node:events";
 
 // Private parent/child pipe: no listener socket, credentials file, or second
 // session store. Only request IDs cross it; application errors stay bounded.
-export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, timeoutMs = 120000 }) {
-  let serial = 0, buffered = "", closed = false;
+export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, timeoutMs = 120000, maxFrameBytes = 128 * 1024 * 1024 }) {
+  // Canonical thread reads can contain image data and exceed 32 MiB. Bound each
+  // private pipe frame, rather than the sum of frames coalesced in one chunk.
+  let serial = 0, fragments = [], bufferedBytes = 0, closed = false;
   const pending = new Map();
   const events = new EventEmitter();
   const write = value => {
     if (closed) throw Object.assign(new Error("Guest Host connection closed"), { code: "guest_host_closed" });
-    output.write(`${JSON.stringify(value, (_key, value) => Buffer.isBuffer(value)
+    const frame = JSON.stringify(value, (_key, value) => Buffer.isBuffer(value)
       ? { __oplBuffer: value.toString("base64") } : value?.type === "Buffer" && Array.isArray(value.data)
-        ? { __oplBuffer: Buffer.from(value.data).toString("base64") } : value)}\n`);
+        ? { __oplBuffer: Buffer.from(value.data).toString("base64") } : value);
+    if (Buffer.byteLength(frame) > maxFrameBytes) throw Object.assign(new Error("Guest Host response exceeds the private frame limit"), { code: "guest_frame_too_large" });
+    output.write(`${frame}\n`);
   };
   const close = () => {
     if (closed) return;
     closed = true;
+    fragments = []; bufferedBytes = 0;
     for (const request of pending.values()) { clearTimeout(request.timer); request.reject(Object.assign(new Error("Guest Host disconnected"), { code: "guest_host_closed" })); }
     pending.clear(); events.emit("close");
   };
@@ -33,13 +38,19 @@ export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, t
   };
   input.setEncoding("utf8");
   input.on("data", chunk => {
-    buffered += chunk;
-    if (Buffer.byteLength(buffered) > 32 * 1024 * 1024) { close(); return; }
-    let next;
-    while ((next = buffered.indexOf("\n")) !== -1) {
-      const line = buffered.slice(0, next); buffered = buffered.slice(next + 1);
+    if (closed) return;
+    let start = 0;
+    while (start < chunk.length) {
+      const next = chunk.indexOf("\n", start);
+      const part = chunk.slice(start, next === -1 ? chunk.length : next);
+      bufferedBytes += Buffer.byteLength(part);
+      if (bufferedBytes > maxFrameBytes) { close(); return; }
+      fragments.push(part);
+      if (next === -1) return;
+      const line = fragments.join(""); fragments = []; bufferedBytes = 0;
       try { void consume(JSON.parse(line, (_key, value) => value?.__oplBuffer && Object.keys(value).length === 1 ? Buffer.from(value.__oplBuffer, "base64") : value)); }
       catch { close(); return; }
+      start = next + 1;
     }
   });
   input.once("end", close);
