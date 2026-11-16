@@ -178,7 +178,8 @@ export function useStudioDirectoryFlow<S>(slot: StudioDirectoryFlowSlot, selecto
     getSnapshot: () => core.entries(slot).length > 0,
     subscribe: (listener: () => void) => core.subscribe(slot, listener)
   }), [core, slot]);
-  return selector(studio.directoryPickerAvailable && useDshSnapshot(source, occupied => occupied));
+  const occupied = useDshSnapshot(source, value => value);
+  return selector(studio.directoryPickerAvailable && occupied);
 }
 
 export function translate(locale: "zh" | "en", key: string, params?: Record<string, unknown>): string {

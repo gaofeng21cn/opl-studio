@@ -1,9 +1,17 @@
 import { readFileSync } from "node:fs";
-import { act, type ReactElement } from "react";
+import { Component, act, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { Root } from "react-dom/client";
 import { NativeDirectoryFlow } from "@deepseek-ai/dsh-client-ui-directory-picker-native/src/client/flow.ts";
+import { Context } from "@deepseek-ai/cordis";
+import { SlotRegistry } from "../../src/vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
+import {
+  SlotCoreContext,
+  StudioContext,
+  useStudioDirectoryFlow,
+  type StudioContextValue
+} from "../../src/composition/dshSlotHost-parts/studioContext.tsx";
 
 const readSource = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const sourceSection = (source: string, start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
@@ -214,4 +222,104 @@ test("native flow discards a settlement that arrives after unmount", async () =>
 
   // Then the dead occupant reports no outcome.
   expect(outcomes).toEqual([]);
+});
+
+const DIRECTORY_FLOW_SLOT = "conversation.hero.workspace.directoryFlow";
+
+function studioSurface(directoryPickerAvailable: boolean): StudioContextValue {
+  return {
+    directoryPickerAvailable,
+    narrow: false,
+    detailsOpen: false,
+    toggleSidebar: () => undefined,
+    closeDetails: () => undefined
+  } as unknown as StudioContextValue;
+}
+
+function DirectoryFlowProbe() {
+  const visible = useStudioDirectoryFlow(DIRECTORY_FLOW_SLOT, occupied => occupied);
+  return <output data-directory-flow={String(visible)}>{String(visible)}</output>;
+}
+
+class CaptureBoundary extends Component<{ onError(error: unknown): void; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
+  override componentDidCatch(error: unknown): void { this.props.onError(error); }
+  override render(): ReactNode { return this.state.failed ? <p data-crashed="true" /> : this.props.children; }
+}
+
+test("directory-flow occupancy survives capability toggles without a hook-order crash", async () => {
+  // Given a real slot registry whose conversation hero seat is declared.
+  const ctx = new Context();
+  new SlotRegistry(ctx);
+  const slots = ctx.get("slots") as SlotRegistry;
+  const shell = await ctx.plugin({
+    apply(child: Context) {
+      (child.get("slots") as SlotRegistry).register(
+        { name: "root", children: { [DIRECTORY_FLOW_SLOT]: { kind: "single", scope: "root" } } },
+        () => null
+      );
+    }
+  });
+  const errors: unknown[] = [];
+  const surface = (directoryPickerAvailable: boolean) => (
+    <CaptureBoundary onError={error => { errors.push(error); }}>
+      <StudioContext.Provider value={studioSurface(directoryPickerAvailable)}>
+        <SlotCoreContext.Provider value={slots}>
+          <DirectoryFlowProbe />
+        </SlotCoreContext.Provider>
+      </StudioContext.Provider>
+    </CaptureBoundary>
+  );
+  const visible = () => document.querySelector("[data-directory-flow]")?.getAttribute("data-directory-flow");
+
+  try {
+    // When a blank Workspace renders before the native picker capability exists.
+    await render(surface(false));
+
+    // Then the gated selection is off while the occupancy hook already runs.
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("false");
+
+    // And an occupant arriving under a disabled capability keeps the gate off.
+    let occupy = slots.register({ name: DIRECTORY_FLOW_SLOT }, () => null);
+    await act(async () => {});
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("false");
+
+    // When the capability turns on for the same mounted consumer.
+    await render(surface(true));
+
+    // Then the occupied selection shows without any hook-count/order crash.
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("true");
+
+    // And flipping occupancy and the capability on the same instance keeps the selection honest.
+    await act(async () => { occupy(); });
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("false");
+
+    occupy = slots.register({ name: DIRECTORY_FLOW_SLOT }, () => null);
+    await act(async () => {});
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("true");
+
+    await render(surface(false));
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("false");
+
+    await render(surface(true));
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("true");
+
+    occupy();
+    await act(async () => {});
+    expect(errors).toEqual([]);
+    expect(visible()).toBe("false");
+  } finally {
+    await act(async () => root.unmount());
+    mounted = false;
+    await shell.dispose();
+    await ctx.fiber.dispose();
+  }
 });
