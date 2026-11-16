@@ -358,9 +358,14 @@
           "initialize",
           "thread/start",
           "turn/start",
-          "item/agentMessage/delta",
-          "turn/completed",
           "thread/resume"
+        ]
+      },
+      {
+        "file": "src/host/app-server-turn-lifecycle.mjs",
+        "contains": [
+          "item/agentMessage/delta",
+          "turn/completed"
         ]
       },
       {
