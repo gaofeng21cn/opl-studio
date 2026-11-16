@@ -7,18 +7,24 @@ import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
 import { ConversationRoot } from "@opl-vendor/dsh-conversation-root";
 import { ConversationContent } from "../../integrations/deepseek-harness/conversationContent.mjs";
 import { WorkspaceBrowser } from "@opl-vendor/dsh-workspace-browser";
+import { WorkspacePicker } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/WorkspacePicker.tsx";
+import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/contract/slots.ts";
+import { NativeDirectoryFlow } from "@deepseek-ai/dsh-client-ui-directory-picker-native/src/client/flow.ts";
+import type { WorkspaceSnapshot } from "@deepseek-ai/dsh-api-workspace-controller/client";
 import { SessionNodeItem, type DshSessionNode } from "@opl-vendor/dsh-session-node";
 import { Button, IconPinOutlineRegular, MenuItemButton } from "../../vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts";
 import { createWorkspaceViewStore } from "../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts";
 import { createSnapshotStore, type SessionListState, type WorkspaceListState } from "../../integrations/deepseek-harness/runtimeShim";
 import { useStudioMenus } from "./studioMenus";
 import type { OplStudioSurface } from "../oplStudioSurface";
+import { buildConversationWorkspaceItems } from "../conversationWorkspace";
 import {
   StudioContext,
   useConversationPanelInfo,
   useDshSnapshot,
   useStudioFoldedLandscape,
   useStudio,
+  useStudioDirectoryFlow,
   useStudioPanels,
   useStudioRemoteAccess,
   useStudioSessionAccess,
@@ -26,6 +32,50 @@ import {
   useStudioShortcuts,
   translate
 } from "./studioContext";
+
+function conversationWorkspaceSnapshot(studio: OplStudioSurface, sessionId: string): WorkspaceSnapshot {
+  return {
+    items: buildConversationWorkspaceItems({
+      projects: studio.threadProjects,
+      currentThreadId: studio.currentThreadId,
+      selectedProjectId: studio.selectedProjectId,
+      pendingWorkspacePath: studio.pendingWorkspacePath,
+      workspacePath: studio.workspacePath,
+      projectTitle: studio.projectTitle,
+      sessionId
+    }),
+    archivedSessionIds: [],
+    pinnedSessionIds: [],
+    phase: studio.threadDirectoryStatus === "ready" ? "ready" : "pending",
+    state: studio.threadDirectoryStatus === "error" ? "error" : studio.threadDirectoryStatus === "loading" ? "loading" : "idle",
+    error: null
+  };
+}
+
+function useHeroDirectoryFlow<S>(selector: (occupied: boolean) => S): S {
+  return useStudioDirectoryFlow("conversation.hero.workspace.directoryFlow", selector);
+}
+
+function useSidebarDirectoryFlow<S>(selector: (occupied: boolean) => S): S {
+  return useStudioDirectoryFlow("sidebar.workspaces.directoryFlow", selector);
+}
+
+export function StudioDirectoryFlow(props: DirectoryFlowOwnerProps) {
+  const studio = useStudio();
+  return studio.directoryPickerAvailable ? <NativeDirectoryFlow {...props} pick={studio.pickDirectory} /> : null;
+}
+
+export function WorkspacePickerSlot(props: Omit<WorkspacePickerProps, "createWorkspace" | "useDirectoryFlow" | "useWorkspaces" | "t">) {
+  const studio = useStudio();
+  const workspaces = conversationWorkspaceSnapshot(studio, "opl-current");
+  return <WorkspacePicker
+    {...props}
+    createWorkspace={({ path }) => studio.createWorkspace(path)}
+    useDirectoryFlow={useHeroDirectoryFlow}
+    useWorkspaces={selector => selector(workspaces)}
+    t={(key, params) => translate(studio.locale, key, params)}
+  />;
+}
 
 export function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface; renderSlot: any }) {
   const [panels, setPanels] = useState({ sidebar: 280, rightbar: 0, rightbarTrack: false, rightbarShown: false, rightbarFullscreen: false, rightbarInstant: false, viewportWidth: globalThis.innerWidth || 1440, narrow: (globalThis.innerWidth || 1440) < 1024, narrowExpanded: false });
@@ -166,7 +216,7 @@ export function SidebarPanelActionsSlot({ entries, onOpen, onPinnedChange, onDis
   </div>)}</>;
 }
 
-export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller, renderFactorySlot }: { wide: boolean; expandSidebar(): void; useSectionScroller: any; renderFactorySlot: any }) {
+export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller, renderFactorySlot, renderSlot }: { wide: boolean; expandSidebar(): void; useSectionScroller: any; renderFactorySlot: any; renderSlot: any }) {
   const studio = useStudio();
   const menus = useStudioMenus();
   const workspaceStore = useMemo(() => createWorkspaceViewStore().create(), []);
@@ -262,10 +312,10 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller,
     renameWorkspace={(workspaceId: string, title: string) => studio.renameWorkspace(workspaceId, title)}
     deleteWorkspace={(workspaceId: string) => studio.deleteWorkspace(workspaceId)}
     insertWorkspaceBefore={(workspaceId: string, beforeWorkspaceId?: string) => studio.insertWorkspaceBefore(workspaceId, beforeWorkspaceId)}
-    createWorkspace={async ({ path }: { path: string }) => studio.createWorkspace(path).then(() => ({ workspaceId: path, path, title: path, sessionIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }) as never)}
+    createWorkspace={({ path }: { path: string }) => studio.createWorkspace(path)}
     searchSessions={async (query: string) => ({ items: await studio.searchThreads(query), hasMore: false })}
     searchResultLimit={100}
-    useDirectoryFlow={() => false}
+    useDirectoryFlow={useSidebarDirectoryFlow}
     useHostInfo={(selector: any) => selector({ home: undefined })}
     useShortcuts={useStudioShortcuts}
     useWorkspaceShortcuts={menus.useWorkspaceShortcuts}
@@ -273,7 +323,7 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller,
     requestAddWorkspace={menus.requestAddWorkspace}
     closeAddWorkspace={menus.closeAddWorkspace}
     setDirectoryBusy={menus.setDirectoryBusy}
-    renderSlot={() => null}
+    renderSlot={renderSlot}
     t={dshLocale}
   />
   {wide ? <RecentSessionsSection list={recentList} current={studio.currentThreadId} locale={studio.locale} open={studio.openThread} menus={menus} renderFactorySlot={renderFactorySlot} /> : null}
@@ -335,7 +385,7 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
   const blank = studio.conversationBlank && (!studio.installationState || studio.installationState.stage === 'ready');
   const session = { openState: "open", blank, awaitingFirstTurn: false, promptAttempted: false, pending: [], promptError: null, running: studio.sending, subagent: null, removed: false };
   const sessions = { phase: "ready", current: sessionId, byId: { [sessionId]: { id: sessionId, blank, cwd: studio.workspacePath, retainedBy: { mainView: 1 } } } };
-  const workspaces = { phase: "ready", items: [{ workspaceId: "opl-workspace", title: studio.projectTitle, sessionIds: [sessionId] }] };
+  const workspaces = conversationWorkspaceSnapshot(studio, sessionId);
   const input = { draft: studio.prompt, attachmentIds: [], draftRev: studio.promptRevision, phase: "plain", occurrences: [], queue: studio.queue };
   // The upstream content treats this factory result as a component type.
   // Keep it stable across progress/state refreshes so disclosure and scroll survive.
@@ -363,7 +413,7 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
         useComposerBlock={(selector: any) => selector(undefined)}
         renderSlot={renderSlot}
         renderSlotChain={(_key: string, _owner: unknown, chain: { fallback: ReactNode }) => chain.fallback}
-        selectWorkspace={async () => undefined}
+        selectWorkspace={async (workspaceId: string) => studio.selectSessionWorkspace(workspaceId)}
         useFactorySlot={(key: string, fallback: unknown) => key === "views" ? SessionViews : options.slots?.[key] ?? fallback}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}
       />}

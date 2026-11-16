@@ -15,6 +15,7 @@ import { zh as settingsZh, en as settingsEn } from "../../vendor/deepseek-harnes
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";
+import type { WorkspaceId } from "@deepseek-ai/dsh-api-workspace-controller/client";
 type SidebarPanelActionsOwnerProps = {
   entries: readonly { id: string; label: string; pinned: boolean; active?: boolean }[];
   onOpen(id: string): void;
@@ -23,6 +24,13 @@ type SidebarPanelActionsOwnerProps = {
 };
 type SidebarSectionHookContext = { useSectionScroller: () => { bindScrollerRef: (element: HTMLElement | null) => void } };
 type SidebarSectionInjected = { hooks: { sectionScroller: (standard: unknown, context: SidebarSectionHookContext) => SidebarSectionHookContext["useSectionScroller"] } };
+type ConversationHeroWorkspaceOwnerProps = {
+  open: boolean;
+  anchorRef?: RefObject<HTMLElement>;
+  selectedId?: WorkspaceId | undefined;
+  onPick: (workspaceId: WorkspaceId) => void;
+  onClose: () => void;
+};
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -48,7 +56,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "conversation.input.model": { kind: "single"; scope: "root"; owner: object };
     "conversation.input.dock": { kind: "list"; scope: "root"; owner: object };
     "conversation.composer.dock": { kind: "list"; scope: "root"; owner: object };
-    "conversation.hero.workspace": { kind: "single"; scope: "root"; owner: object };
+    "conversation.hero.workspace": { kind: "single"; scope: "root"; owner: ConversationHeroWorkspaceOwnerProps };
     "conversation.hero.agentPreset": { kind: "single"; scope: "root"; owner: object };
     "settings.trigger": { kind: "single"; scope: "root"; owner: { wide: boolean } };
     "settings.header": { kind: "single"; scope: "root"; owner: SettingsHeaderOwnerProps };
@@ -159,6 +167,18 @@ export function useStudio(): StudioContextValue {
   const value = useContext(StudioContext);
   if (!value) throw new Error("OPL Studio DSH slot rendered outside the Studio surface");
   return value;
+}
+
+type StudioDirectoryFlowSlot = "conversation.hero.workspace.directoryFlow" | "sidebar.workspaces.directoryFlow";
+
+export function useStudioDirectoryFlow<S>(slot: StudioDirectoryFlowSlot, selector: (occupied: boolean) => S): S {
+  const studio = useStudio();
+  const core = useSlotCore();
+  const source = useMemo(() => ({
+    getSnapshot: () => core.entries(slot).length > 0,
+    subscribe: (listener: () => void) => core.subscribe(slot, listener)
+  }), [core, slot]);
+  return selector(studio.directoryPickerAvailable && useDshSnapshot(source, occupied => occupied));
 }
 
 export function translate(locale: "zh" | "en", key: string, params?: Record<string, unknown>): string {

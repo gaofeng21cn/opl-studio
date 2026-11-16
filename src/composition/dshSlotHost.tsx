@@ -38,6 +38,8 @@ import {
   RuntimeMainSlot,
   SchedulesMainSlot,
   OplBrandMarkSlot,
+  StudioDirectoryFlow,
+  WorkspacePickerSlot,
   SidebarSlot,
   SidebarPanelActionsSlot,
   SidebarLeadingSlot,
@@ -136,7 +138,7 @@ export class OplStudioDshSlotHost {
     register({ name: "shell.leading", registrant: "dsh-ui-sidebar" }, SidebarLeadingSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
-    register({ name: "sidebar.workspaces", registrant: "opl-studio" }, SidebarWorkspacesSlot);
+    register({ name: "sidebar.workspaces", registrant: "opl-studio", children: { "sidebar.workspaces.directoryFlow": { kind: "single", scope: "root" }, "sidebar.workspaces.session.row.action": { kind: "list", scope: "root" }, "sidebar.session.row.leading": { kind: "list", scope: "root", inline: true }, "sidebar.session.row.trailing": { kind: "list", scope: "root", inline: true }, "sidebar.session.row.hover": { kind: "list", scope: "root" } } }, SidebarWorkspacesSlot);
     register({ name: "sidebar.settings", registrant: "dsh-ui-settings", store: createSettingsShellStore, children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section.icon": { kind: "list", scope: "root", inline: true }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
     register({ name: "settings.trigger", registrant: "opl-studio" }, SettingsTriggerSlot);
     register({ name: "settings.header", registrant: "opl-studio" }, SettingsHeaderSlot);
@@ -163,6 +165,9 @@ export class OplStudioDshSlotHost {
     register({ name: "main", key: "runtime", registrant: "opl-studio" }, RuntimeMainSlot);
     register({ name: "main", key: "schedules", registrant: "opl-studio" }, SchedulesMainSlot);
     register({ name: "conversation.hero.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
+    register({ name: "conversation.hero.workspace", registrant: "dsh-ui-workspace", children: { "conversation.hero.workspace.directoryFlow": { kind: "single", scope: "root" } } }, WorkspacePickerSlot);
+    register({ name: "conversation.hero.workspace.directoryFlow", registrant: "dsh-ui-directory-picker-native" }, StudioDirectoryFlow);
+    register({ name: "sidebar.workspaces.directoryFlow", registrant: "dsh-ui-directory-picker-native" }, StudioDirectoryFlow);
     register({ name: "conversation.header", registrant: "opl-studio" }, ConversationHeaderSlot);
     register({ name: "conversation.session", registrant: "opl-studio" }, ConversationBodySlot);
     register({ name: "conversation.composer.bar", registrant: "dsh-ui-conversation", inject: () => ({ registerFileIntake: fileIntake }), children: { "conversation.input.attachments": { kind: "single", scope: "root" }, "conversation.input.permission": { kind: "single", scope: "root" }, "conversation.input.plan": { kind: "single", scope: "root" }, "conversation.input.model": { kind: "single", scope: "root" }, "conversation.input.activity": { kind: "single", scope: "root" }, "conversation.input.overlay": { kind: "single", scope: "root" }, "conversation.input.left": { kind: "list", scope: "root" }, "conversation.input.right": { kind: "list", scope: "root" }, "conversation.composer.dock": { kind: "list", scope: "root" } } }, InputBarSlot);
