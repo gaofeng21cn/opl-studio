@@ -659,7 +659,7 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(slotHost.includes('id: "automatic"') && slotHost.includes("label: autoModelLabel(studio.locale)") && slotHost.includes('studio.selectModel("__auto")'), "composer must expose App-owned Auto as the third root recommendation action");
   assert(!slotHost.includes('{ id: "__auto", name:'), "Auto must not be represented as a model row");
   assert(settingsPanel.includes('<option value="__auto">{autoModelLabel(settings.locale)}</option>'), "Settings must expose Auto model restoration");
-  assert(app.includes("model: resolvedModel.id"), "composer must send the App-resolved model");
+  assert(app.includes("model: resolvedModel.wireModel"), "composer must send the App-resolved wire model");
   assert(app.includes("reasoningEffort: resolvedReasoning"), "composer must send a supported reasoning effort");
   assert(bridge.includes("model?: string"), "bridge request must carry the App-selected model override");
   assert(bridge.includes("reasoningEffort?: string"), "bridge request must carry the App-selected reasoning override");
