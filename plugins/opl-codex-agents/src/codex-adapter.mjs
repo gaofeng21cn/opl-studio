@@ -42,6 +42,20 @@ export class CodexTeamAdapter extends LlmAdapter {
       } } : {}) };
   }
 
+  async executionOverrides() {
+    const stateDir = this.ctx.oplStudioHostOptions.codexEnvironmentStateDir;
+    if (!stateDir) return {};
+    // Codex is a parent-owned process, so project the original Superagent
+    // account environment per thread instead of changing the App's environment.
+    const { agentVariables, workerBin } = await import("dsh-superagent/environment");
+    const variables = agentVariables(stateDir);
+    const set = Object.fromEntries(Object.entries(variables).filter(([, value]) => value !== undefined));
+    const delimiter = process.platform === "win32" ? ";" : ":";
+    const directory = workerBin(stateDir);
+    set.PATH = [directory, ...(process.env.PATH ?? "").split(delimiter).filter(entry => entry !== directory)].join(delimiter);
+    return { config: { shell_environment_policy: { inherit: "all", exclude: Object.keys(variables).filter(name => variables[name] === undefined), set } } };
+  }
+
   async commit(agent, type, data) {
     await this.store.mutate(state => {
       const binding = state.bindings[agent.id] ??= {};
@@ -93,6 +107,7 @@ export class CodexTeamAdapter extends LlmAdapter {
     const legacy = Boolean(threadId && binding.toolBridge !== "dispatcher-v1");
     const model = options.model === "default" ? undefined : options.model;
     const cwd = agent.session.header.cwd;
+    const execution = await this.executionOverrides();
     const policy = this.ctx.get("sandboxPolicy");
     const selectedMode = policy?.overrideOf(agent.session);
     const permissions = permissionForMode(selectedMode) ?? bot.permissions ?? permissionForMode(policy?.resolve({ session: agent.session }).mode) ?? ":workspace";
@@ -105,12 +120,12 @@ export class CodexTeamAdapter extends LlmAdapter {
       `Current DSH tool catalog: ${JSON.stringify(options.tools ?? [])}`].filter(Boolean).join("\n\n");
     if (!threadId) {
       const result = await this.transport.startThread({ cwd, model, permissions,
-        dynamicTools: [DISPATCH_TOOL], developerInstructions: instructions });
+        dynamicTools: [DISPATCH_TOOL], developerInstructions: instructions, ...execution });
       threadId = result.thread?.id;
       if (!threadId) throw Error("Codex did not return a persistent Team thread.");
       await this.commit(agent, "opl/codex-thread", { threadId });
     } else {
-      await this.transport.resumeThread(threadId, { cwd, excludeTurns: true, ...threadPermissionOverrides(permissions, cwd), developerInstructions: instructions });
+      await this.transport.resumeThread(threadId, { cwd, excludeTurns: true, ...threadPermissionOverrides(permissions, cwd), developerInstructions: instructions, ...execution });
     }
     if (previous && previous.status !== "settled") {
       if (!previous.turnId) throw failure("team_execution_unconfirmed", "Previous dispatch is unconfirmed. Inspect the linked Codex thread before continuing.");

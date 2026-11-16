@@ -8,6 +8,10 @@
     provider: opl-codex
     model: !!js ctx.oplCodexDefaultModel
 
+# Models and sign-in are owned by the parent OPL App.
+- id: ui-settings-models
+  disabled: true
+
 # Auxiliary title requests have no initiating Agent or persistent Codex thread.
 - id: session-title-llm
   disabled: true

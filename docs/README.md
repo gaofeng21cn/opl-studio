@@ -11,6 +11,7 @@ below explains one part of that arrangement without becoming another authority.
 | Change implementation boundaries | [Architecture](architecture.md) | Host, bridge, renderer, ownership, and durable design rationale |
 | Place a Settings contribution | [Settings projection](settings-information-architecture.md) | Studio rendering of App-owned placement policy |
 | Connect an iPhone or iPad | [OPL Link connection](opl-link.md) | Scoped companion connection on the existing Host, pairing, revocation and verification |
+| Use Codex workbenches | [Codex workbenches](product/codex-workbenches.md) | Shared Codex execution, Superagent account environment, sidebar preferences and packaged runtime closure |
 | Reuse generic DSH plugins | [Ecosystem clients](ecosystem-client-plugins.md) | Reviewed official/community plugins, source provenance, and canonical workspace adapters |
 | Select verification | [Verification](verification.md) | Commands, prerequisites, and what their results prove |
 | Build and qualify macOS distribution | [Desktop distribution](delivery/desktop-distribution.md) | Desktop bundle, updater, bootstrap, release qualification, and carrier transition constraints |

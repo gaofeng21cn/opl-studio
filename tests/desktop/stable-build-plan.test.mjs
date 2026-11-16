@@ -107,6 +107,10 @@ test('Stable Windows and Linux package validators preserve published names', () 
       const unpacked = platform === 'win32' ? 'win-unpacked' : 'linux-unpacked';
       fs.mkdirSync(path.join(outRoot, unpacked, 'resources'), { recursive: true });
       fs.writeFileSync(path.join(outRoot, unpacked, 'resources/app.asar'), 'asar');
+      if (platform !== 'win32') {
+        fs.mkdirSync(path.join(outRoot, unpacked, 'resources/app.asar.unpacked'));
+        fs.writeFileSync(path.join(outRoot, unpacked, 'resources/app.asar.unpacked/package.json'), JSON.stringify({ dependencies: {} }));
+      }
       fs.writeFileSync(path.join(outRoot, unpacked, platform === 'win32' ? 'One Person Lab.exe' : 'one-person-lab'), 'exe');
       if (platform === 'win32') writePackagedWslHostPayload(path.join(outRoot, unpacked, 'resources', 'opl-wsl-host'));
       const assets = platform === 'win32' ? ['win-x64.exe', 'win-x64.zip'] : ['linux-x64.deb'];

@@ -26,6 +26,8 @@ async function fixture(platform, { arch = "x64", artifactVersion = version } = {
     const unpacked = arch === "x64" ? "linux-unpacked" : `linux-${arch}-unpacked`;
     const debArch = arch === "x64" ? "amd64" : arch;
     await artifact(path.join(outRoot, unpacked, "resources", "app.asar"));
+    await mkdir(path.join(outRoot, unpacked, "resources/app.asar.unpacked"), { recursive: true });
+    await writeFile(path.join(outRoot, unpacked, "resources/app.asar.unpacked/package.json"), JSON.stringify({ dependencies: {} }));
     await artifact(path.join(outRoot, unpacked, "one-person-lab-preview"), { executable: true });
     await artifact(path.join(outRoot, `one-person-lab-preview-${artifactVersion}-linux-${debArch}.deb`));
   }

@@ -11,7 +11,8 @@
     "./github-watch": "./lib/github-watch.mjs",
     "./feishu-watch": "./lib/feishu-watch.mjs",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./locale/*.json": "./locale/*.json"
+    "./locale/*.json": "./locale/*.json",
+    "./environment": "./lib/environment.mjs"
   },
   "files": [
     "lib",

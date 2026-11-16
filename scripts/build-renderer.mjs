@@ -313,7 +313,8 @@ export function buildRenderer({
   const hasStylesheet = fs.existsSync(emittedCssPath);
   if (hasStylesheet) fs.renameSync(emittedCssPath, cssPath);
 
-  const policyScript = `<script>globalThis.__OPL_CODEX_MODEL_POLICY__=${JSON.stringify(modelPolicy).replaceAll("<", "\\u003c")};globalThis.__OPL_CLIENT_COMPOSITION_POLICY__=${JSON.stringify(clientCompositionProfile).replaceAll("<", "\\u003c")};globalThis.__OPL_DEEP_LINK_POLICY__=${JSON.stringify(deepLinkPolicy).replaceAll("<", "\\u003c")};</script>`;
+  const sidebarDefaultPins = appProductProfile.gui.home.home_layout.active_studio_primary_navigation.customization.default_pinned_panel_ids;
+  const policyScript = `<script>globalThis.__OPL_SIDEBAR_DEFAULT_PINS__=${JSON.stringify(sidebarDefaultPins).replaceAll("<", "\\u003c")};globalThis.__OPL_CODEX_MODEL_POLICY__=${JSON.stringify(modelPolicy).replaceAll("<", "\\u003c")};globalThis.__OPL_CLIENT_COMPOSITION_POLICY__=${JSON.stringify(clientCompositionProfile).replaceAll("<", "\\u003c")};globalThis.__OPL_DEEP_LINK_POLICY__=${JSON.stringify(deepLinkPolicy).replaceAll("<", "\\u003c")};</script>`;
   const html = fs.readFileSync(templatePath, "utf8")
     .replace("</head>", hasStylesheet ? `  <link rel="stylesheet" href="./${cssName}" />\n</head>` : "</head>")
     .replace("<body>", `<body>\n  ${policyScript}`)

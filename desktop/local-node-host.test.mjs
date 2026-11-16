@@ -92,3 +92,15 @@ test("Node Host startup failure closes its private pipe without waiting for an R
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   await assert.rejects(createLocalNodeHost({ nodeExecutable: process.execPath, hostRoot: root }), { code: "guest_host_closed" });
 });
+
+
+test("failed Host startup retains a bounded private diagnostic", async context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-host-diagnostic-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const hostLogPath = path.join(root, "logs/host-failure.json");
+  await assert.rejects(createLocalNodeHost({ nodeExecutable: process.execPath, hostRoot: root, hostLogPath }), { code: "guest_host_closed" });
+  const diagnostic = JSON.parse(fs.readFileSync(hostLogPath, "utf8"));
+  assert.equal(diagnostic.code, "guest_host_closed");
+  assert.match(diagnostic.diagnostic, /MODULE_NOT_FOUND|Cannot find module/);
+  assert.equal(fs.statSync(hostLogPath).mode & 0o777, 0o600);
+});

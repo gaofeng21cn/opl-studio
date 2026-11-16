@@ -1,0 +1,43 @@
+diff --git a/packages/client/ui-sidebar/src/client/SidebarRoot.tsx b/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
+index c8193d2..fabe389 100644
+--- a/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
++++ b/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
+@@ -100,11 +100,13 @@ function PanelRow({
+       </Tooltip>
+       {wide && canUnpin && <Tooltip label={unpinTooltip} side="bottom" align="end" delayMs={500} portal>
+         <button type="button" className={css.panelUnpin} aria-label={unpinLabel} onClick={(event) => {
+-          // Unpin is rendered only while this navigation also renders More.
++          // More mounts after unpinning the first hidden entry; move focus after that render.
+           const navigation = event.currentTarget.closest('nav') as HTMLElement
+-          const more = navigation.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
+-          focusWithoutRing(more)
+           setPinned(id, false)
++          requestAnimationFrame(() => {
++            const more = navigation.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')
++            if (more) focusWithoutRing(more)
++          })
+         }}>
+           <IconPinFillRegular size={14} />
+         </button>
+@@ -125,10 +127,10 @@ function PanelMoreMenu({ wide, label, entries, onOpen, onPinnedChange, trackEntr
+   const [open, setOpen] = useState(false)
+   const onDismiss = (): void => { setOpen(false) }
+   return (
+-    <Menu open={open} onClose={onDismiss} portal autoFocus className={css.moreAnchor} listClassName={css.moreMenu}
++    <Menu open={open} onClose={onDismiss} portal autoFocus className={clsx(css.moreAnchor, entries.some(entry => !entry.pinned && entry.active) && css.panelEntryActive)} listClassName={css.moreMenu}
+       anchor={(
+         <Tooltip label={label} delayMs={500} disabled={wide}>
+-          <button type="button" className={css.panelRow} aria-label={label} aria-haspopup="menu" aria-expanded={open}
++          <button type="button" className={css.panelRow} aria-label={label} aria-current={entries.some(entry => !entry.pinned && entry.active) ? 'page' : undefined} aria-haspopup="menu" aria-expanded={open}
+             onClick={() => {
+               trackEntryClick({ menu_name: 'more', position: 'sidebar' })
+               setOpen(value => !value)
+@@ -431,7 +433,7 @@ export function SidebarRoot({
+                   renderFactorySlot={renderFactorySlot}
+                 />
+               ))}
+-              {hasEntryActions && (
++              {hasEntryActions && panels.some(({ id }) => id !== FIXED_PANEL_ID && unpinned.includes(id)) && (
+                 <PanelMoreMenu
+                   wide={wide}
+                   label={t('panels.more')}

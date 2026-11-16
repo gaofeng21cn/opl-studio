@@ -2,7 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { HeaderLeadingControls } from "../../integrations/deepseek-harness/sidebarComponents.mjs";
 import { AppFrame } from "@opl-vendor/dsh-app-frame";
-import { createPanelPins } from "../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/panel-pins.ts";
+import { createSidebarPanelPins } from "./sidebarPreferences";
 import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
 import { ConversationRoot } from "@opl-vendor/dsh-conversation-root";
 import { ConversationContent } from "../../integrations/deepseek-harness/conversationContent.mjs";
@@ -111,8 +111,9 @@ export function StudioFrame({ surface, renderSlot }: { surface: OplStudioSurface
 
 export function SidebarSlot({ collapsed, width, drawer, renderSlot, renderFactorySlot }: { collapsed: boolean; width: number; drawer: boolean; renderSlot: any; renderFactorySlot: any }) {
   const studio = useStudio();
-  const pins = useMemo(() => createPanelPins(), []);
-  const pinnedPanelIds = useStudioPanels(panels => panels.map(panel => panel.id));
+  const panelIds = useStudioPanels(panels => panels.map(panel => panel.id));
+  const pins = useMemo(() => createSidebarPanelPins(panelIds, globalThis.__OPL_SIDEBAR_DEFAULT_PINS__ ?? []), []);
+  useEffect(() => pins.reconcile(panelIds), [pins, panelIds]);
   return (
     <div className="opl-dsh-sidebar-shell" data-collapsed={collapsed || undefined} data-narrow-expanded={studio.narrow && !collapsed || undefined}>
       <SidebarRoot
@@ -131,7 +132,7 @@ export function SidebarSlot({ collapsed, width, drawer, renderSlot, renderFactor
           }
         }}
         usePanels={useStudioPanels}
-        useEntryActions={(selector: (registered: boolean) => unknown) => selector(pinnedPanelIds.length > 0)}
+        useEntryActions={(selector: (registered: boolean) => unknown) => selector(panelIds.length > 0)}
         useShortcuts={useStudioShortcuts}
         usePanelInfo={useConversationPanelInfo}
         t={(key: string, params?: Record<string, unknown>) => translate(studio.locale, key, params)}

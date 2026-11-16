@@ -57,7 +57,7 @@ export function apply(ctx, config) {
   const transport = new ParentTransport(process, () => ctx.get("appExit")?.(0));
   ctx.provide("oplCodexNative", { transport });
   ctx.provide("oplCodexDefaultModel", config.defaultModel);
-  ctx.provide("oplStudioHostOptions", { dshHome: config.parentHome, workspaceRoot: config.workspaceRoot });
+  ctx.provide("oplStudioHostOptions", { dshHome: config.bindingHome ?? config.parentHome, workspaceRoot: config.workspaceRoot, codexEnvironmentStateDir: config.codexEnvironmentStateDir });
   ctx.effect(() => () => transport.dispose(), "parent-owned Codex transport reference");
 }
 

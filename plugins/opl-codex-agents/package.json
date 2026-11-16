@@ -8,7 +8,9 @@
     ".": "./lib/index.mjs",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./parent-transport": "./lib/parent-transport.mjs"
+    "./parent-transport": "./lib/parent-transport.mjs",
+    "./workbench-profile": "./lib/workbench-profile.mjs",
+    "./client": "./lib/client.js"
   },
   "files": [
     "lib",
@@ -25,6 +27,13 @@
     "bundle": {
       "patch": [
         "./cordis.patch.yml"
+      ]
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout"
       ]
     }
   }

@@ -65,6 +65,7 @@ let mainWindow;
 let desktopTray;
 let desktopUpdater;
 let desktopHostPromise;
+let desktopHostClosing;
 let installingUpdate = false;
 let quittingApplication = false;
 let updaterQualificationEnabled = false;
@@ -434,7 +435,7 @@ async function createDesktopHost(appLogDirectory) {
     ...hostOptions, windowsRuntime, resourcesPath: process.resourcesPath,
     userDataPath: app.getPath("userData"), version: hostEnvironment.OPL_APP_VERSION,
     instanceId: appProcessInstanceId
-  }) : await createLocalNodeHost({ ...hostOptions, nodeExecutable: nodeHost.command });
+  }) : await createLocalNodeHost({ ...hostOptions, nodeExecutable: nodeHost.command, hostLogPath: path.join(app.getPath("logs"), "host-failure.json") });
 
   core.on("event", (event) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -498,6 +499,11 @@ async function createDesktopHost(appLogDirectory) {
 }
 
 async function desktopHost(appLogDirectory, { retry = false } = {}) {
+  const closing = desktopHostClosing;
+  if (closing) {
+    await closing;
+    if (desktopHostClosing === closing) desktopHostClosing = undefined;
+  }
   if (retry && desktopHostPromise) {
     const previous = desktopHostPromise;
     desktopHostPromise = undefined;
@@ -513,6 +519,14 @@ async function desktopHost(appLogDirectory, { retry = false } = {}) {
   desktopHostPromise ??= createDesktopHost(appLogDirectory).then((desktopHost) => {
     hostCore = desktopHost.core;
     desktopUpdater = desktopHost.desktopUpdater;
+    desktopHost.core.once("disconnected", () => {
+      if (hostCore !== desktopHost.core) return;
+      // Future calls boot a fresh Host. The failed request is never replayed.
+      desktopHostPromise = undefined;
+      hostCore = undefined;
+      desktopUpdater = undefined;
+      desktopHostClosing = desktopHost.core.close().catch(() => {});
+    });
     return desktopHost;
   }).catch(error => {
     if (desktopSetupSnapshot?.status === 'running') reportDesktopSetup({ stage: desktopSetupSnapshot.stage, status: 'failed' });

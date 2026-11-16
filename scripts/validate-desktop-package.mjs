@@ -52,6 +52,21 @@ export function validateDesktopPackage({
   assert.ok(asar, "desktop package must contain app.asar");
   assert.ok(files.some((entry) => executablePattern(platform, stable).test(entry)), `desktop package must contain the ${platform} executable`);
 
+  if (platform !== "win32") {
+    const runtimeRoot = path.join(outRoot, `${asar}.unpacked`);
+    const manifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, "package.json"), "utf8"));
+    // DSH bundles load peer services dynamically. They must ship as runtime
+    // dependencies even when a development install has already resolved them.
+    for (const name of Object.keys(manifest.dependencies).filter(name => name.startsWith("@deepseek-ai/"))) {
+      const packageFile = path.join(runtimeRoot, "node_modules", name, "package.json");
+      assert.ok(fs.existsSync(packageFile), `packaged DSH runtime dependency is missing: ${name}`);
+      const dependency = JSON.parse(fs.readFileSync(packageFile, "utf8"));
+      for (const peer of Object.keys(dependency.peerDependencies ?? {}).filter(peer => peer.startsWith("@deepseek-ai/"))) {
+        assert.ok(fs.existsSync(path.join(runtimeRoot, "node_modules", peer, "package.json")), `packaged DSH peer dependency is missing: ${name} -> ${peer}`);
+      }
+    }
+  }
+
   // The packaged Windows guest Host payload is a different artifact than the
   // staged source directory: electron-builder drops the root-level node_modules
   // of an extraResources entry (app-builder-lib filter.js). Verifying only the

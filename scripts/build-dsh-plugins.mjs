@@ -18,9 +18,10 @@ export function buildDshPlugins() {
       const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", "--packages=external", "--minify-syntax", "--outfile", path.join(directory, "lib/index.mjs")], { cwd: root, encoding: "utf8" });
       if (result.status !== 0) throw new Error(result.stderr || result.stdout || `Failed to build ${manifest.name}`);
     }
-    const parentTransport = path.join(directory, "src/parent-transport.mjs");
-    if (fs.existsSync(parentTransport)) {
-      const result = spawnSync("bun", ["build", parentTransport, "--target=node", "--format=esm", "--packages=external", "--minify-syntax", "--outfile", path.join(directory, "lib/parent-transport.mjs")], { cwd: root, encoding: "utf8" });
+    for (const entrypoint of ["parent-transport", "workbench-profile"]) {
+      const source = path.join(directory, `src/${entrypoint}.mjs`);
+      if (!fs.existsSync(source)) continue;
+      const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", "--packages=external", "--minify-syntax", "--outfile", path.join(directory, `lib/${entrypoint}.mjs`)], { cwd: root, encoding: "utf8" });
       if (result.status !== 0) throw new Error(result.stderr || result.stdout);
     }
     const client = path.join(directory, "src/client.js");

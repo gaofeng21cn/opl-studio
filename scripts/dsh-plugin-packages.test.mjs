@@ -69,6 +69,20 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       webHost: "127.0.0.1", webPort: 0
     });
     core = host.core;
+    await host.context.oplSuperagent.start();
+    const superagent = host.context.oplSuperagent.read();
+    assert.equal(superagent.state, "running");
+    assert.equal(superagent.executor, "codex");
+    const setupResponse = await fetch(new URL("/orchestrator/api/state", superagent.url), { headers: { "x-orchestrator-request": "1" } });
+    assert.equal(setupResponse.status, 200);
+    assert.equal((await setupResponse.json()).setup.problem.code, "repositoryUnset");
+    const superagentEntry = await fetch(superagent.url, { redirect: "manual" });
+    const superagentCookie = superagentEntry.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const superagentPage = await fetch(new URL("/", superagent.url), { headers: { cookie: superagentCookie } });
+    const superagentHtml = await superagentPage.text();
+    assert.ok(superagentHtml.includes("__OPL_CODEX_WORKBENCH_INITIAL_PANEL__"));
+    assert.ok(!superagentHtml.includes('"id":"ui-settings-models"'), "Codex profile must not mount a second model sign-in flow");
+    await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@one-person-lab/"));
     assert.equal(own.length, 7);

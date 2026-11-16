@@ -29,6 +29,9 @@ export class CodexAgentBindings {
   setBot(id, bot) { return this.mutate(state => { (state.bindings[id] ??= {}).bot = structuredClone(bot); }); }
 }
 export async function apply(ctx) {
+  ctx.on("webserver/index-inject", table => {
+    if (ctx.oplStudioHostOptions.codexEnvironmentStateDir) table.push({ kind: "global", name: "__OPL_CODEX_WORKBENCH_INITIAL_PANEL__", value: "dsh-superagent" });
+  });
   const bindings = new CodexAgentBindings(path.join(ctx.oplStudioHostOptions.dshHome, "opl", "codex-agent-bindings.json"));
   await bindings.load();
   const adapter = new CodexTeamAdapter(ctx, ctx.oplCodexNative.transport, bindings);

@@ -14,7 +14,7 @@ for (const [file, expected] of Object.entries(provenance.source_files)) {
   if (actual !== expected) throw new Error(`Superagent upstream source changed: ${file}`);
 }
 
-for (const [name, source] of [["github-watch", "src/sources/github.ts"], ["feishu-watch", "src/sources/feishu.ts"]]) {
+for (const [name, source] of [["github-watch", "src/sources/github.ts"], ["feishu-watch", "src/sources/feishu.ts"], ["environment", "src/infra/environment.ts"]]) {
   const result = spawnSync("bun", ["build", path.join(vendor, source), "--target=node", "--format=esm", "--packages=external", "--outfile", path.join(target, "lib", `${name}.mjs`)], { encoding: "utf8" });
   if (result.status) throw Error(result.stderr);
 }

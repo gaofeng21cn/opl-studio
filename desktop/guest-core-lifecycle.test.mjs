@@ -104,3 +104,17 @@ test("closing the Host rejects a read queued behind its maintenance lease", asyn
   await read;
   assert.equal(invoked, false);
 });
+
+
+test("disconnected Host closes its child even when maintenance cleanup fails", async context => {
+  const fx = fixture();
+  let closed = false;
+  const proxy = await createGuestCoreProxy({ child: fx.child, initialize: {}, closeChild: async () => { closed = true; } });
+  context.after(() => fx.worker.close());
+  proxy.updateMaintenance = { close: async () => { throw Error("maintenance failed"); } };
+  fx.child.emit("close", 1);
+  assert.equal(proxy.isConnected(), false);
+  await assert.rejects(proxy.close(), /maintenance failed/);
+  assert.equal(closed, true);
+  await assert.rejects(proxy.invoke("readSuperagent"), { code: "guest_host_closed" });
+});

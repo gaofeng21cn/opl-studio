@@ -5,9 +5,10 @@ const nativeMethods = new Set(["beginWindowDrag", "pickFiles", "pickDirectory", 
 
 // The same private stdio protocol backs the Windows guest and local Node Host.
 export async function createGuestCoreProxy({ child, initialize, platform = {}, nativeUpdater, carrierDiagnostics,
-  projectHostPath = value => value, projectGuestPath = value => value, closeChild = async () => {}, onProgress = () => {}, validateInitialize = () => {} }) {
+  projectHostPath = value => value, projectGuestPath = value => value, closeChild = async () => {}, onProgress = () => {}, validateInitialize = () => {}, onHostFailure = () => {} }) {
   const core = new EventEmitter();
-  let closing;
+  let closing, connected = true;
+  let diagnostic = "";
   let capabilities, codexCapabilities;
   const rpc = createGuestRpc({ input: child.stdout, output: child.stdin,
     onEvent: event => {
@@ -38,14 +39,20 @@ export async function createGuestCoreProxy({ child, initialize, platform = {}, n
       return result;
     }
   });
-  child.stderr.on("data", () => {}); // Guest diagnostics may contain user paths; never echo them into release logs.
+  child.stderr.on("data", chunk => { diagnostic = `${diagnostic}${chunk}`.slice(-16384); });
   const disconnected = () => {
+    if (!connected) return;
+    connected = false;
+    core.hostFailure = { code: "guest_host_closed", exitCode: child.exitCode, signal: child.signalCode, diagnostic };
     if (capabilities) capabilities.appServerAvailable = false;
     if (codexCapabilities) codexCapabilities.available = false;
     if (core.transport) core.transport.initialized = false;
     rpc.close();
     core.emit("event", { method: "host/availability", params: { available: false, code: "guest_host_closed" } });
+    if (!closing) onHostFailure(core.hostFailure);
+    core.emit("disconnected", core.hostFailure);
   };
+  rpc.events.once("close", disconnected);
   child.once("error", disconnected);
   child.once("close", disconnected);
   let initialized;
@@ -75,6 +82,7 @@ export async function createGuestCoreProxy({ child, initialize, platform = {}, n
     return method === "readState" && core.updateMaintenance
       ? { ...result, managedUpdateMaintenance: core.updateMaintenance.snapshot() } : result;
   };
+  core.isConnected = () => connected;
   core.capabilities = () => ({ ...capabilities });
   core.opl = {
     runManagedUpdate: operation => rpc.request("managedUpdate", { operation }, { timeoutMs: 0 }),
@@ -92,9 +100,13 @@ export async function createGuestCoreProxy({ child, initialize, platform = {}, n
   core.codex = { transport: core.transport, capabilities: () => ({ ...codexCapabilities }),
     reloadConfiguration: options => rpc.request("reloadConfiguration", options, { timeoutMs: 0 }) };
   core.close = () => closing ??= (async () => {
-    await core.updateMaintenance?.close();
-    try { await rpc.request("close", {}, { timeoutMs: 0 }); } finally { child.stdin.end(); }
-    await closeChild();
+    try {
+      await core.updateMaintenance?.close();
+      if (connected) await rpc.request("close", {}, { timeoutMs: 0 });
+    } finally {
+      child.stdin.end();
+      await closeChild();
+    }
   })();
   return core;
 }
