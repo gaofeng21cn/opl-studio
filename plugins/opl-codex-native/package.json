@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-codex-native",
   "version": "0.1.0",
-  "private": true,
   "description": "Persistent Codex App Server integration for the OPL DSH application host.",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -22,5 +21,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.1.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

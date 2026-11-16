@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-dsh-tool-mcp",
   "version": "0.1.0",
-  "private": true,
   "description": "Authenticated DSH tool registry bridge for Codex.",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -25,5 +24,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

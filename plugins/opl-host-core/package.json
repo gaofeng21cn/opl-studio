@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-host-core",
   "version": "0.1.0",
-  "private": true,
   "description": "Shared OPL application services for desktop and WebUI.",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -26,5 +25,9 @@
   "dependencies": {
     "@objectivex666/dsh-settings-search": "1.14.0",
     "semver": "7.8.5"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

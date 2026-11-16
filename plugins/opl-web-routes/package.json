@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-web-routes",
   "version": "0.1.0",
-  "private": true,
   "description": "Authenticated HTTP and SSE routes for OPL Studio.",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -27,5 +26,9 @@
     "@deepseek-ai/dsh-client-connection": "0.2.2-rc.3",
     "@deepseek-ai/dsh-host-frontend-static": "0.2.2-rc.3",
     "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.3"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

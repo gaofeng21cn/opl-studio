@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-mcp-apps",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {
@@ -31,5 +30,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "2.0.4"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

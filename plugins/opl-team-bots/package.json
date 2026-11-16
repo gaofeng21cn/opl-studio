@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-team-bots",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {
@@ -26,5 +25,9 @@
         "@one-person-lab/opl-studio-client"
       ]
     }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }
