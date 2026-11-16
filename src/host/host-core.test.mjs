@@ -217,7 +217,7 @@ test("App Server exit clears pending interactive requests instead of leaving sta
 
   const clearedPromise = new Promise((resolve) => transport.once("serverRequestsCleared", resolve));
   transport.process.kill("SIGTERM");
-  assert.deepEqual(await clearedPromise, { reason: "app_server_exited", count: 1 });
+  assert.deepEqual(await clearedPromise, { reason: "app_server_exited", count: 1, requestIds: ["approval-1"] });
   assert.deepEqual(transport.listPendingServerRequests(), []);
 });
 

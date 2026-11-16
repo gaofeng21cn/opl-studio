@@ -178,3 +178,60 @@ test("terminal completion clears an outstanding approval and releases idle work"
   await idle;
   assert.equal(idleRuns, 1);
 });
+
+test("turn completion emits a turn-scoped cleanup that leaves another turn's approval pending", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-done");
+  await startTurn(transport, "turn-other");
+  const received = [];
+  transport.on("serverRequest", request => received.push(request));
+  transport.notify("fixture/emit", { steps: [
+    { frame: serverRequest("approval-done", "turn-done") },
+    { frame: serverRequest("approval-other", "turn-other") }
+  ] });
+  while (received.length < 2) await delay(5);
+
+  const cleared = once(transport, "serverRequestsCleared");
+  transport.notify("fixture/emit", { steps: [{ frame: completed("turn-done") }] });
+
+  const [completedDetail] = await cleared;
+  assert.deepEqual(completedDetail, {
+    reason: "turn_completed",
+    count: 1,
+    requestIds: ["approval-done"]
+  });
+  assert.deepEqual(
+    transport.listPendingServerRequests().map(request => request.id),
+    ["approval-other"],
+    "another turn's approval survives the completed turn's cleanup"
+  );
+});
+
+test("turn timeout emits a turn-scoped cleanup for only the timed-out turn's requests", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-expire");
+  await startTurn(transport, "turn-live");
+  const received = [];
+  transport.on("serverRequest", request => received.push(request));
+  transport.notify("fixture/emit", { steps: [
+    { frame: serverRequest("input-expire", "turn-expire", "item/tool/requestUserInput") },
+    { frame: serverRequest("approval-live", "turn-live") }
+  ] });
+  while (received.length < 2) await delay(5);
+
+  const cleared = once(transport, "serverRequestsCleared");
+  const expired = outcome(transport.waitForTurn("turn-expire", 60));
+
+  assert.equal((await expired).error.code, "turn_timeout");
+  const [timeoutDetail] = await cleared;
+  assert.deepEqual(timeoutDetail, {
+    reason: "turn_timeout",
+    count: 1,
+    requestIds: ["input-expire"]
+  });
+  assert.deepEqual(
+    transport.listPendingServerRequests().map(request => request.id),
+    ["approval-live"],
+    "another turn's approval survives the timed-out turn's cleanup"
+  );
+});

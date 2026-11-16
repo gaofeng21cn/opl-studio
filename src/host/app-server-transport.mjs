@@ -978,17 +978,20 @@ export class CodexAppServerTransport extends EventEmitter {
   #clearPendingServerRequests(reason) {
     const count = this.pendingServerRequests.size;
     if (count === 0) return;
+    const requestIds = [...this.pendingServerRequests.keys()];
     this.pendingServerRequests.clear();
-    this.emit("serverRequestsCleared", { reason, count });
+    this.emit("serverRequestsCleared", { reason, count, requestIds });
     this.#notifyIdleIfPossible();
   }
 
   #clearTurnServerRequests(requestIds, reason) {
-    let count = 0;
+    const clearedRequestIds = [];
     for (const id of requestIds) {
-      if (this.pendingServerRequests.delete(id)) count += 1;
+      if (this.pendingServerRequests.delete(id)) clearedRequestIds.push(id);
     }
-    if (count > 0) this.emit("serverRequestsCleared", { reason, count });
+    if (clearedRequestIds.length > 0) {
+      this.emit("serverRequestsCleared", { reason, count: clearedRequestIds.length, requestIds: clearedRequestIds });
+    }
   }
 
   listPendingServerRequests() {
