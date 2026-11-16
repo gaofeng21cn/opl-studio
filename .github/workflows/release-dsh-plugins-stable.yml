@@ -1,0 +1,219 @@
+name: Build DSH Plugin-Only Stable Candidate
+
+# Shell-unchanged stable release path: builds an App bundle with plugin
+# versions from a composition receipt instead of compiling from local source.
+#
+# Use when Electron, DSH cohort, and opl-studio-client are identical to the
+# previous Stable release. Plugin compilation is skipped; npm ci pulls
+# pre-built packages from GitHub Packages.
+#
+# Design: docs/delivery/dsh-plugin-publication.md (in one-person-lab-app)
+#
+# Preconditions:
+# - release-plugin-composition-test.yml passed and produced a receipt artifact
+# - Electron/renderer/cohort bytes are UNCHANGED from previous Stable
+#
+# After this workflow succeeds, hand the produced Studio artifacts to the
+# App-side release-stable.yml as a carrier build candidate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      composition_receipt_run_id:
+        description: >
+          Run ID of a successful release-plugin-composition-test.yml run.
+          The composition_receipt.json artifact will be downloaded from it.
+        required: true
+      app_repo_ref:
+        description: >
+          Exact commit SHA of one-person-lab-app to use for the App product
+          cohort (passed to build scripts as OPL_APP_REPO_ROOT). Defaults to
+          the ref declared in candidateContractEvidence.json.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: read
+  actions: read          # to download artifact from another run
+
+concurrency:
+  group: opl-studio-plugin-stable-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plugin-stable-build:
+    name: Plugin-only stable build (shell-unchanged)
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      OPL_APP_REPO_ROOT: ${{ github.workspace }}/app-product
+
+    steps:
+      - name: Verify arm64 runner
+        run: test "$(uname -m)" = arm64
+
+      - name: Checkout Studio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read pinned App product cohort
+        id: app-cohort
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const override = process.env.APP_REPO_REF_OVERRIDE;
+          if (override && /^[0-9a-f]{40}$/.test(override)) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `sha=${override}\n`);
+            console.log("Using override App ref:", override);
+          } else {
+            const evidence = JSON.parse(fs.readFileSync("src/candidateContractEvidence.json", "utf8"));
+            const appCommit = evidence.candidate_runtime_qualification?.external_cohort?.app_commit;
+            if (!/^[0-9a-f]{40}$/.test(appCommit ?? "")) throw new Error("missing exact App product cohort commit");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `sha=${appCommit}\n`);
+            console.log("Using pinned App ref:", appCommit);
+          }
+          NODE
+        env:
+          APP_REPO_REF_OVERRIDE: ${{ inputs.app_repo_ref }}
+
+      - name: Checkout pinned App product contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab-app
+          ref: ${{ steps.app-cohort.outputs.sha }}
+          path: app-product
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          check-latest: true
+          cache: npm
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@one-person-lab"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Download composition receipt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dsh-plugin-composition-receipt
+          run-id: ${{ inputs.composition_receipt_run_id }}
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate composition receipt
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
+          if (receipt.schema !== "opl_dsh_plugin_composition_receipt.v1") {
+            throw new Error(`Unexpected receipt schema: ${receipt.schema}`);
+          }
+          if (!receipt.plugins || !Object.keys(receipt.plugins).length) {
+            throw new Error("Receipt has no plugins");
+          }
+          console.log("Receipt valid:", JSON.stringify(receipt, null, 2));
+          NODE
+
+      - name: Apply composition receipt to package.json
+        run: node scripts/apply-composition-receipt.mjs --receipt composition_receipt.json
+
+      - name: Install dependencies from registry
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify no local source compilation occurred
+        shell: bash
+        run: |
+          # Confirm that plugin lib/ files come from registry packages in
+          # node_modules, not from local plugins/ source directories.
+          # (Local plugins/ still exist in source tree but were NOT built.)
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
+          for (const [pkg, version] of Object.entries(receipt.plugins)) {
+            const installed = JSON.parse(
+              fs.readFileSync(`node_modules/${pkg}/package.json`, "utf8")
+            );
+            if (installed.version !== version) {
+              throw new Error(`Expected ${pkg}@${version} but found ${installed.version}`);
+            }
+            console.log(`OK: ${pkg}@${installed.version}`);
+          }
+          console.log("All registry plugin versions match the composition receipt.");
+          NODE
+
+      - name: Build macOS Desktop candidate (registry-plugins mode)
+        run: |
+          npm run build:desktop:receipt
+          npx electron-builder --mac --arm64 --config electron-builder.yml --publish never
+
+      - name: Validate package and update metadata
+        run: npm run qualify:desktop:distribution
+
+      - name: Verify arm64 binary and DMG
+        shell: bash
+        run: |
+          executable="out/mac-arm64/One Person Lab Preview.app/Contents/MacOS/One Person Lab Preview"
+          test -x "$executable"
+          file "$executable" | grep -q 'arm64'
+          dmg="$(find out -maxdepth 1 -name '*-mac-arm64.dmg' -print -quit)"
+          test -n "$dmg"
+          hdiutil verify "$dmg"
+
+      - name: Upload candidate artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: plugin-stable-candidate-${{ github.run_id }}
+          path: |
+            out/mac-arm64/*.dmg
+            out/mac-arm64/*.zip
+            out/mac-arm64/*.blockmap
+            out/mac-arm64/latest-mac.yml
+            out/mac-arm64/latest-arm64-mac.yml
+            composition-receipt-applied.json
+            composition_receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Report build provenance
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
+          const applied = JSON.parse(fs.readFileSync("composition-receipt-applied.json", "utf8"));
+          const studio = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const summary = {
+            schema: "opl_dsh_plugin_stable_build_provenance.v1",
+            build_path: "plugin_only_shell_unchanged",
+            studio_version: studio.version,
+            dsh_cohort: receipt.dsh_cohort,
+            composition_receipt_run_id: process.env.COMPOSITION_RUN_ID,
+            applied_versions: applied.applied_versions,
+            github_run_id: process.env.GITHUB_RUN_ID,
+            github_sha: process.env.GITHUB_SHA,
+          };
+          console.log(JSON.stringify(summary, null, 2));
+          fs.writeFileSync("plugin-stable-provenance.json", JSON.stringify(summary, null, 2) + "\n");
+          NODE
+        env:
+          COMPOSITION_RUN_ID: ${{ inputs.composition_receipt_run_id }}
+
+      - name: Upload build provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: plugin-stable-provenance-${{ github.run_id }}
+          path: plugin-stable-provenance.json
+          if-no-files-found: error
+          retention-days: 30
