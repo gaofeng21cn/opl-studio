@@ -28,6 +28,7 @@ export function normalizeCodexModelCatalog(value: unknown): CodexModelCatalog {
       model: asString(model?.model) ?? id,
       displayName: asString(model?.displayName) ?? id,
       isDefault: asBoolean(model?.isDefault) ?? false,
+      hidden: asBoolean(model?.hidden) ?? false,
       defaultReasoningEffort: asString(model?.defaultReasoningEffort) ?? reasoning.at(-1) ?? "medium",
       supportedReasoningEfforts: reasoning
     }];

@@ -231,6 +231,37 @@ export function createCodexModelPolicy(profile) {
     requireNonEmptyString(effort, `codex.auto_model_policy.known_model_reasoning_effort_overrides.${model}`);
   }
 
+  const unknownDefaultPolicies = {
+    ignore_catalog_default_for_app_auto: false,
+    accept_catalog_default_even_when_not_in_frontier_model_preference_order: true
+  };
+  const unknownReasoningPolicies = {
+    highest_supported_reasoning_effort_from_catalog: true
+  };
+  const catalogWithoutDefaultPolicies = new Set([
+    "first_available_known_model_then_first_catalog_model"
+  ]);
+  let acceptUnknownCatalogDefault = true;
+  let useHighestSupportedReasoningForUnknown = true;
+  let catalogWithoutDefaultPolicy = "first_available_known_model_then_first_catalog_model";
+  if (autoPolicy) {
+    const unknownDefaultPolicy = autoPolicy.unknown_default_model_policy;
+    if (!Object.hasOwn(unknownDefaultPolicies, unknownDefaultPolicy)) {
+      throw new Error("OPL App product profile codex.auto_model_policy.unknown_default_model_policy must be a recognized policy");
+    }
+    acceptUnknownCatalogDefault = unknownDefaultPolicies[unknownDefaultPolicy];
+    const unknownReasoningPolicy = autoPolicy.unknown_model_reasoning_effort_policy;
+    if (!Object.hasOwn(unknownReasoningPolicies, unknownReasoningPolicy)) {
+      throw new Error("OPL App product profile codex.auto_model_policy.unknown_model_reasoning_effort_policy must be a recognized policy");
+    }
+    useHighestSupportedReasoningForUnknown = unknownReasoningPolicies[unknownReasoningPolicy];
+    const withoutDefaultPolicy = autoPolicy.catalog_without_default_policy;
+    if (!catalogWithoutDefaultPolicies.has(withoutDefaultPolicy)) {
+      throw new Error("OPL App product profile codex.auto_model_policy.catalog_without_default_policy must be a recognized policy");
+    }
+    catalogWithoutDefaultPolicy = withoutDefaultPolicy;
+  }
+
   return {
     source: autoPolicy ? autoModelPolicySource : legacyModelPolicySource,
     defaultModel,
@@ -242,12 +273,9 @@ export function createCodexModelPolicy(profile) {
       en: requireNonEmptyString(autoOption.label_en, "gui.home.codex_model_display_options.auto_option.label_en")
     },
     knownModelReasoningEffortOverrides,
-    acceptUnknownCatalogDefault: autoPolicy
-      ? autoPolicy.unknown_default_model_policy === "accept_catalog_default_even_when_not_in_frontier_model_preference_order"
-      : true,
-    useHighestSupportedReasoningForUnknown: autoPolicy
-      ? autoPolicy.unknown_model_reasoning_effort_policy === "highest_supported_reasoning_effort_from_catalog"
-      : true
+    acceptUnknownCatalogDefault,
+    useHighestSupportedReasoningForUnknown,
+    catalogWithoutDefaultPolicy
   };
 }
 
