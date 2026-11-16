@@ -82,14 +82,19 @@ The bundled profile is a baseline. Compatible native npm packages installed in
 bundle. `npm run dsh:plugins -- inspect` reads native profile resolution;
 `update-source --package opl-superagent` builds and packs only the selected
 Studio package, then uses the official DSH plugin manager/pnpm operation.
+`update-registry --all` (or `--package <name>`) pulls the latest compatible
+published version from GitHub Packages (`@one-person-lab` scope) into the native
+profile, with optional `--token <ghp_...>` for registry authentication.
 `remove --package @one-person-lab/opl-superagent` removes that override and
 restores the bundled baseline on the next launch. Multiple explicit `--package`
 arguments are supported. Installation reports restart required, not activation.
 
 The operator can select another carrier with `--install-anchor <package.json>`
 and another native home with `--home <directory>`. The default anchor is the
-installed macOS App. This source lane does not publish npm artifacts, configure
-an automatic public update channel, or change Framework Package lifecycle.
+installed macOS App. The public plugin channel publishes OPL DSH Host plugins to
+GitHub Packages via `release-dsh-plugins.yml` CI on push to main; the composition
+compatibility test (`release-plugin-composition-test.yml`) validates combinations
+and emits a composition receipt for the shell-unchanged stable release path.
 DSH retains package metadata admission, profile resolution and locking; Studio
 adds no package registry, loader or compatibility exemptions.
 
