@@ -264,7 +264,11 @@ export function buildRenderer({
 } = {}) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
-  buildDshPlugins();
+  const registryPlugins = process.argv.includes("--registry-plugins");
+  buildDshPlugins(undefined, { skipBuild: registryPlugins });
+  if (registryPlugins) {
+    console.log("registry-plugins mode: skipped source plugin compilation (using pre-built registry packages)");
+  }
   const require = createRequire(import.meta.url);
   const pluginRoot = path.join(outDir, "ecosystem");
   fs.mkdirSync(pluginRoot, { recursive: true });
