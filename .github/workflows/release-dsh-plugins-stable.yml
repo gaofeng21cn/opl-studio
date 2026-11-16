@@ -13,8 +13,8 @@ name: Build DSH Plugin-Only Stable Candidate
 # - release-plugin-composition-test.yml passed and produced a receipt artifact
 # - Electron/renderer/cohort bytes are UNCHANGED from previous Stable
 #
-# After this workflow succeeds, hand the produced Studio artifacts to the
-# App-side release-stable.yml as a carrier build candidate.
+# After this workflow succeeds, an App-side release consumer must explicitly
+# admit the candidate. This workflow does not sign, publish, or move Stable.
 
 on:
   workflow_dispatch:
@@ -127,17 +127,26 @@ jobs:
       - name: Apply composition receipt to package.json
         run: node scripts/apply-composition-receipt.mjs --receipt composition_receipt.json
 
+      - name: Sync lockfile to composition receipt
+        run: npm install --package-lock-only --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies from registry
+        # Preserve registry Host plugins in the root prepare hook while
+        # allowing Electron and native dependency lifecycle scripts.
         run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPL_DSH_REGISTRY_PLUGINS: "1"
 
       - name: Verify no local source compilation occurred
         shell: bash
         run: |
-          # Confirm that plugin lib/ files come from registry packages in
-          # node_modules, not from local plugins/ source directories.
-          # (Local plugins/ still exist in source tree but were NOT built.)
+          # Confirm that published plugin lib/ files come from registry
+          # packages in node_modules, not from local plugins/ source dirs.
+          # The static carrier entry is generated later by build-renderer and
+          # is intentionally outside this receipt-selected set.
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
@@ -176,11 +185,11 @@ jobs:
         with:
           name: plugin-stable-candidate-${{ github.run_id }}
           path: |
-            out/mac-arm64/*.dmg
-            out/mac-arm64/*.zip
-            out/mac-arm64/*.blockmap
-            out/mac-arm64/latest-mac.yml
-            out/mac-arm64/latest-arm64-mac.yml
+            out/*.dmg
+            out/*.zip
+            out/*.blockmap
+            out/latest-mac.yml
+            out/latest-arm64-mac.yml
             composition-receipt-applied.json
             composition_receipt.json
           if-no-files-found: error

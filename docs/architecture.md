@@ -95,14 +95,26 @@ installed macOS App. The public plugin channel publishes OPL DSH Host plugins to
 GitHub Packages via `release-dsh-plugins.yml` CI on push to main; the composition
 compatibility test (`release-plugin-composition-test.yml`) validates combinations
 and emits a composition receipt for the shell-unchanged stable release path.
-DSH retains package metadata admission, profile resolution and locking; Studio
-adds no package registry, loader or compatibility exemptions.
+DSH retains package metadata admission, profile resolution and locking. Registry
+updates inspect the selected carrier's baseline and DSH version, retain profile
+authentication, save exact native dependencies, and report lookup failures rather
+than treating them as a successful currentness check. Composition CI installs and
+boots the receipt's exact registry versions; source-package tests alone cannot
+qualify that receipt.
 
 Electron, DSH core/cohort and the statically compiled Studio renderer still
 require a carrier update. The source lane rejects `opl-studio-client`, whose
 client entry currently bridges that static renderer. Runtime dependency files
 must survive carrier pruning, including nested directories named `doc` such as
 `yaml/dist/doc`; source boot alone cannot verify packaged dependency closure.
+
+This is partial plugin delivery. Superagent, Team/Bot and MCP Apps client
+implementations are still imported into `src/main.tsx` and the static renderer;
+updating their Host package alone changes neither those views nor the main UI.
+The remaining cutover must use the official DSH client module graph and Cordis
+lifecycle for the real callers. The registry CLI also remains an operator entry;
+App-integrated update/readback and a production Stable artifact consumer have
+not been qualified. The candidate workflow is not a second release controller.
 
 `opl-dsh-tool-mcp` exposes the current DSH `ctx.tools` registry through a
 stateful Streamable HTTP MCP endpoint on the Host loopback WebServer. A random

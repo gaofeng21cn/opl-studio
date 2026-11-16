@@ -135,6 +135,9 @@ jobs:
           buildDshPlugins(["${{ matrix.plugin }}"]);
           NODE
 
+      - name: Run plugin package tests
+        run: node --test scripts/dsh-plugin-packages.test.mjs
+
       - name: Check version not already published
         id: version-check
         shell: bash
@@ -154,7 +157,10 @@ jobs:
 
       - name: Publish to GitHub Packages
         if: steps.version-check.outputs.already_published == 'false'
-        run: npm publish --provenance plugins/${{ matrix.plugin }}
+        # npm treats a positional path after `publish` as a package spec in
+        # this runner's npm version. Enter the package directory so the
+        # publish target is unambiguous and never becomes github:plugins/...
+        run: cd plugins/${{ matrix.plugin }} && npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

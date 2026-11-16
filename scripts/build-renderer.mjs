@@ -265,9 +265,15 @@ export function buildRenderer({
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
   const registryPlugins = process.argv.includes("--registry-plugins");
-  buildDshPlugins(undefined, { skipBuild: registryPlugins });
   if (registryPlugins) {
-    console.log("registry-plugins mode: skipped source plugin compilation (using pre-built registry packages)");
+    // Published Host plugins are already present in node_modules at the
+    // receipt-selected versions. The static opl-studio-client package is the
+    // carrier's own host entry and still needs its tiny generated lib so the
+    // DSH profile can resolve it during packaging.
+    buildDshPlugins(["opl-studio-client", "opl-superagent-engine"]);
+    console.log("registry-plugins mode: skipped published Host plugin compilation; built the unpublished carrier and upstream engine");
+  } else {
+    buildDshPlugins();
   }
   const require = createRequire(import.meta.url);
   const pluginRoot = path.join(outDir, "ecosystem");
