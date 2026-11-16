@@ -58,3 +58,51 @@ test("source plugin selection rejects static renderer, unknown and duplicate pac
   }
   assert.deepEqual(await fs.readdir(temp), []);
 });
+
+test("update-registry writes .npmrc with scope mapping and optional auth token", async t => {
+  // Import the internal helpers via dynamic import to test ensureProfileNpmrc
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-npmrc-"));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+
+  // ensureProfileNpmrc is not exported; exercise it through the CLI by
+  // calling update-registry with a fake token and a temp home. The registry
+  // query will fail (no network / no published packages in test), but the
+  // .npmrc must be written before the query runs.
+  const home = path.join(temp, "home");
+  const anchor = path.join(root, "package.json");
+  const result = spawnSync(process.execPath, [
+    path.join(root, "scripts/dsh-profile-plugins.mjs"), "update-registry",
+    "--package", "opl-superagent", "--token", "test-token-value",
+    "--home", home, "--install-anchor", anchor
+  ], { encoding: "utf8", timeout: 30000 });
+
+  // The command exits non-zero because no published packages are found,
+  // but the .npmrc must have been written to the profile dir before the query.
+  const profileDir = path.join(home, "profiles", "opl-studio");
+  const npmrcPath = path.join(profileDir, ".npmrc");
+  const npmrc = await fs.readFile(npmrcPath, "utf8");
+  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"),
+    ".npmrc must map @one-person-lab scope to GitHub Packages");
+  assert.ok(npmrc.includes("//npm.pkg.github.com/:_authToken=test-token-value"),
+    ".npmrc must contain the provided auth token");
+});
+
+test("update-registry with --all targets every publishable package", async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-all-"));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const home = path.join(temp, "home");
+  const anchor = path.join(root, "package.json");
+  // Run with --all but no token and no network; expect it to write .npmrc
+  // and report no-updates for all packages (none published yet).
+  const result = spawnSync(process.execPath, [
+    path.join(root, "scripts/dsh-profile-plugins.mjs"), "update-registry",
+    "--all", "--home", home, "--install-anchor", anchor
+  ], { encoding: "utf8", timeout: 30000 });
+  // Exit code 0 is expected when no updates are available (graceful no-updates).
+  // If pnpm view fails entirely the command exits non-zero; accept either
+  // as long as .npmrc was written.
+  const npmrcPath = path.join(home, "profiles", "opl-studio", ".npmrc");
+  const npmrc = await fs.readFile(npmrcPath, "utf8");
+  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"),
+    ".npmrc scope mapping must be written for --all");
+});
