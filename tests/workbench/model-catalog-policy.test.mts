@@ -61,6 +61,27 @@ test("empty catalog discovery retains the configured App fallback", () => {
   expect(options.filter(option => option.available).map(option => option.id)).toEqual(["app-default"]);
   expect(automatic.model?.id).toBe("app-default");
   expect(automatic.reasoningEffort).toBe("max");
+  expect(automatic.model?.wireModel).toBe("app-default");
+});
+
+test("catalog identity and executable model names stay separate", () => {
+  // Given a live catalog row whose stable identity is an opaque display id.
+  const catalog = normalizeCodexModelCatalog({
+    data: [{
+      id: "opaque-row",
+      model: "custom-wire",
+      displayName: "Custom model",
+      supportedReasoningEfforts: ["low", "high"]
+    }]
+  });
+
+  // When the row is resolved for an explicit selection.
+  const options = resolveCodexModelOptions(catalog.models);
+  const selected = resolveCodexSelection(options, "opaque-row", "low");
+
+  // Then UI selection keeps the catalog id while execution uses the wire name.
+  expect(selected.model?.id).toBe("opaque-row");
+  expect(selected.model?.wireModel).toBe("custom-wire");
 });
 
 test("hidden-only discovery stays distinct from an empty catalog", () => {
