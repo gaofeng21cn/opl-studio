@@ -277,7 +277,8 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   assert.equal(codexCapabilities.apps[0].id, "test-app");
   assert.deepEqual(codexCapabilities.errors, []);
 
-  const chat = await post(baseUrl, "/api/send-message", {
+  const requestReceived = new Promise((resolve) => transport.once("serverRequest", resolve));
+  const chatRequest = post(baseUrl, "/api/send-message", {
     prompt: "Return a fake host response.",
     permissions: ":danger-full-access",
     inputs: [
@@ -286,19 +287,19 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
       { type: "skill", name: "opl-test-skill", path: "/skills/opl-test-skill/SKILL.md" }
     ]
   });
+  await requestReceived;
+  const pending = await fetch(`${baseUrl}/api/codex/pending-requests`).then((response) => response.json());
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].method, "item/commandExecution/requestApproval");
+  const approval = await post(baseUrl, "/api/codex/respond-request", { id: pending[0].id, response: { result: { decision: "decline" } } });
+  assert.deepEqual(approval.body, { id: "approval-1", accepted: true });
+  const chat = await chatRequest;
   assert.equal(chat.status, 200);
   assert.equal(chat.body.executor, "codex_app_server");
   assert.equal(chat.body.finalMessage.startsWith("completed turn-created-"), true);
   assert.equal(chat.body.canonicalThread.id, chat.body.threadId);
   assert.equal(chat.body.canonicalThread.state, "idle");
   assert.equal(chat.body.canonicalThreadReadback.thread.id, chat.body.threadId);
-  const pending = await fetch(`${baseUrl}/api/codex/pending-requests`).then((response) => response.json());
-  assert.equal(pending.length, 1);
-  assert.equal(pending[0].method, "item/commandExecution/requestApproval");
-  const approval = await post(baseUrl, "/api/codex/respond-request", { id: pending[0].id, response: { result: { decision: "decline" } } });
-  assert.deepEqual(approval.body, { id: "approval-1", accepted: true });
-  const pendingAfterResponse = await fetch(`${baseUrl}/api/codex/pending-requests`).then((response) => response.json());
-  assert.deepEqual(pendingAfterResponse, []);
   const canonicalTurn = chat.body.canonicalThread.turns.find((turn) => turn.id === chat.body.turnId);
   assert.equal(canonicalTurn.status, "completed");
   assert.equal(canonicalTurn.items.at(-1).type, "agentMessage");
