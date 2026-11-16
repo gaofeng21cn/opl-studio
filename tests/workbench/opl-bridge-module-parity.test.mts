@@ -81,6 +81,7 @@ test("representative normalizers retain their public readback behavior", () => {
       model: "gpt",
       displayName: "gpt",
       isDefault: false,
+      hidden: false,
       defaultReasoningEffort: "high",
       supportedReasoningEfforts: ["low", "high"]
     }]

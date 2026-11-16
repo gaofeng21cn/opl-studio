@@ -129,6 +129,7 @@ export type CodexModelCatalogEntry = {
   model: string;
   displayName: string;
   isDefault: boolean;
+  hidden?: boolean;
   defaultReasoningEffort: string;
   supportedReasoningEfforts: string[];
 };

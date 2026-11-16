@@ -593,6 +593,7 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   const appRepoRoot = resolveAppRepoRoot(root);
   const appProductProfilePath = path.join(appRepoRoot, "contracts", "app-product-profile.json");
   const appProductProfile = JSON.parse(fs.readFileSync(appProductProfilePath, "utf8"));
+  const autoPolicy = appProductProfile.codex.auto_model_policy;
   const profileModels = appProductProfile.gui.home.codex_model_display_options.visible_models;
   const profileReasoning = appProductProfile.gui.home.codex_model_display_options.user_reasoning_effort_options;
   const injectedPolicy = readCodexModelPolicy(appProductProfilePath);
@@ -608,6 +609,9 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(injectedPolicy.defaultReasoningEffort === appProductProfile.default_session_profile.reasoning_effort, "injected default reasoning effort must match the App product profile");
   assert(injectedPolicy.autoLabel.zh === appProductProfile.gui.home.codex_model_display_options.auto_option.label_zh, "injected Chinese Auto label must match the App product profile");
   assert(injectedPolicy.autoLabel.en === appProductProfile.gui.home.codex_model_display_options.auto_option.label_en, "injected English Auto label must match the App product profile");
+  assert(injectedPolicy.acceptUnknownCatalogDefault === (autoPolicy.unknown_default_model_policy === "accept_catalog_default_even_when_not_in_frontier_model_preference_order"), "injected unknown-default policy must match the App auto_model_policy");
+  assert(injectedPolicy.useHighestSupportedReasoningForUnknown === (autoPolicy.unknown_model_reasoning_effort_policy === "highest_supported_reasoning_effort_from_catalog"), "injected unknown reasoning policy must match the App auto_model_policy");
+  assert(injectedPolicy.catalogWithoutDefaultPolicy === autoPolicy.catalog_without_default_policy, "injected catalog-without-default policy must match the App auto_model_policy");
   assert(injectedPolicy.visibleModels.length === profileModels.length, "injected model list length must match the App product profile");
   for (const [index, expected] of profileModels.entries()) {
     const actual = injectedPolicy.visibleModels[index];
@@ -633,14 +637,17 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(evidence.model_list_pagination_regression?.validation_command === "npm run test:webui-host", "candidate evidence must record the model/list pagination command");
   assert(settings.includes('modelAccess: "__auto"'), "settings must default to App-owned Auto model resolution");
   assert(settings.includes("codexModelPolicy.defaultReasoningEffort"), "settings default reasoning must consume the App-derived policy");
-  assert(settingsPanel.includes("modelOptions.map") && slotHost.includes("studio.modelOptions.filter"), "DSH composer and Settings must render the App-derived model list");
+  assert(settingsPanel.includes("modelOptions.filter") && slotHost.includes("studio.modelOptions.filter"), "DSH composer and Settings must render the App preference list plus live catalog models");
   assert(settingsPanel.includes("codexModelPolicy.reasoningOptions.map") && slotHost.includes("studio.reasoningOptions.map"), "DSH composer and Settings must render the App-derived reasoning list");
   assert(policySource.includes('invalidPolicy("policy is missing")'), "missing App model policy injection must fail explicitly");
   assert(!policySource.includes("fallbackModelOptions") && !policySource.includes("fallbackReasoningOptions"), "source model policy must not keep versioned fallback lists");
   assert(app.includes("bridge.readCodexModels()"), "renderer must read app-server model availability");
   assert(app.includes("resolveCodexModelOptions(codexCatalog)"), "renderer must filter fixed alternatives through the app-server catalog");
   assert(app.includes("setCodexCatalog(catalog.models)") && app.includes("setCodexCatalog([])"), "renderer must retain the App default route when model catalog discovery is empty or unavailable");
-  assert(policySource.includes("available: isAppDefault"), "model/list must not veto the App default route");
+  assert(policySource.includes("available: catalogAvailable ? runtimes.length > 0 : isAppDefault"), "an empty model catalog must keep the App default as the offline fallback");
+  assert(policySource.includes("catalogOptions"), "model/list models outside the App frontier list must remain selectable");
+  assert(policySource.includes("item.hidden !== true"), "model/list must exclude hidden rows before grouping and Auto resolution");
+  assert(policySource.includes("codexModelPolicy.acceptUnknownCatalogDefault") && policySource.includes("isCatalogDefault"), "Auto must honor the App unknown-default policy instead of adopting every catalog default");
   assert(app.includes('if ((!text && !pendingSelections.length) || !resolvedModel) return;'), "composer must require text or selected inputs and block unavailable fixed selections before turn/start");
   assert(
     app.includes('if (sendState === "running")')

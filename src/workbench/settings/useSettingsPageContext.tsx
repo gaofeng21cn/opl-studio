@@ -196,7 +196,7 @@ export function useSettingsPageContext({
   const issueList = <div className="settings-issue-list">{issues.length ? issues.map(issue => <div className="settings-issue" key={issue.id}><AlertCircle size={16} aria-hidden="true" /><div><strong>{issue.title}</strong><p>{issue.detail}</p></div><button className="settings-inline-command" type="button" onClick={() => navigate(issue.destination)}>{copy[issue.destination]}</button></div>) : <p className="settings-inline-note">{stateStatus === "ready" ? (startupCheck.status === "unknown" || startupCheck.status === "error" ? (zh ? "启动检查结果尚未确认，请在下方重新检查。" : "Startup checks are not confirmed; retry below.") : (zh ? "当前读取范围内没有发现需要处理的问题。" : "No issues found in the current readback.")) : (zh ? "正在确认状态…" : "Checking status…")}</p>}</div>;
 
   function settingValueLabel(key: SettingKey, value: WorkbenchSettings[SettingKey]): string {
-    if (key === "modelAccess") return value === "__auto" ? (settings.locale === "zh" ? "自动" : "Auto") : modelLabel(value as string, settings.locale);
+    if (key === "modelAccess") return value === "__auto" ? (settings.locale === "zh" ? "自动" : "Auto") : modelLabel(value as string, settings.locale, modelOptions);
     if (key === "reasoningLevel") return reasoningLabel(value as string, settings.locale, true);
     if (key === "defaultWorkspace") return settings.locale === "zh" ? "当前工作区" : "Current workspace";
     if (key === "runtimeProfile") return value === "fast" ? (settings.locale === "zh" ? "快速" : "Fast") : (settings.locale === "zh" ? "完整" : "Full");
@@ -242,11 +242,11 @@ export function useSettingsPageContext({
         <select className="setting-select" data-testid="opl-model-access-entry" aria-label={settings.locale === "zh" ? "会话模型" : "Conversation model"} value={value} onChange={(event) => onSettingChange("modelAccess", event.currentTarget.value)}>
           <option value="__auto">{autoModelLabel(settings.locale)}</option>
           {value !== "__auto" && !modelOptions.some((option) => option.id === value) ? (
-            <option value={value} disabled>{modelLabel(String(value), settings.locale)} ({settings.locale === "zh" ? "不可用" : "Unavailable"})</option>
+            <option value={value} disabled>{modelLabel(String(value), settings.locale, modelOptions)} ({settings.locale === "zh" ? "不可用" : "Unavailable"})</option>
           ) : null}
-          {modelOptions.map((option) => (
+          {modelOptions.filter((option) => option.available || option.id === value).map((option) => (
             <option key={option.id} value={option.id} disabled={!option.available}>
-              {modelLabel(option.id, settings.locale)}{option.available ? "" : ` (${settings.locale === "zh" ? "不可用" : "Unavailable"})`}
+              {modelLabel(option.id, settings.locale, modelOptions)}{option.available ? "" : ` (${settings.locale === "zh" ? "不可用" : "Unavailable"})`}
             </option>
           ))}
         </select>
