@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { flushSync } from "react-dom";
 import { Window } from "happy-dom";
 import { deriveWorkbenchModelFromState } from "../../src/workbench/workbenchModel";
 import { softwareAttentionItems, softwareCanStart } from "../../src/workbench/softwareExperience";
@@ -57,13 +56,18 @@ test("use entry survives the bridge and local use does not require download auth
 
 async function withDom(run: (container: HTMLElement, render: (element: any) => void) => Promise<void>) {
   const browser = new Window();
-  const keys = ["window", "document", "HTMLElement", "Node"] as const;
+  const keys = ["window", "document", "HTMLElement", "Node", "IS_REACT_ACT_ENVIRONMENT"] as const;
   const originals = keys.map(key => Object.getOwnPropertyDescriptor(globalThis, key));
-  keys.forEach(key => Object.defineProperty(globalThis, key, { configurable: true, value: key === "window" ? browser : browser[key] }));
+  keys.forEach(key => Object.defineProperty(globalThis, key, { configurable: true, value: key === "IS_REACT_ACT_ENVIRONMENT" ? true : key === "window" ? browser : browser[key] }));
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container);
-  try { await run(container, element => flushSync(() => root.render(element))); }
-  finally { flushSync(() => root.unmount()); await new Promise(resolve => setTimeout(resolve, 0)); keys.forEach((key, index) => { const original = originals[index]; if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); }); await browser.happyDOM.close(); }
+  try { await run(container, element => act(() => root.render(element))); }
+  finally {
+    // Flush React's scheduled effects before removing the DOM they still use.
+    await act(async () => root.unmount());
+    await browser.happyDOM.close();
+    keys.forEach((key, index) => { const original = originals[index]; if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); });
+  }
 }
 
 test("Start using navigates without dispatching a lifecycle or business action", async () => {
@@ -72,7 +76,7 @@ test("Start using navigates without dispatching a lifecycle or business action",
     render(createElement(DshPluginManagerOwner, { kind: "all", model: model(), settings: { ...settingsDefaults, locale: "en" }, actionBusyKey: null, onAction: action => actions.push(action), onUseSoftware: id => used.push(id) }));
     const row = container.querySelector('[data-plugin-owner-package="example-1"]')!;
     const start = [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Start using")!;
-    expect(start).toBeTruthy(); flushSync(() => start.click());
+    expect(start).toBeTruthy(); act(() => start.click());
     expect(used).toEqual(["example-1"]); expect(actions).toEqual([]);
   });
 });
@@ -86,9 +90,9 @@ test("native folder selection and owner scope defaults complete a first connecti
       available_actions: [{ action_id: "knowledge_source_connect", confirmation_required: true }] })!;
     render(createElement(KnowledgeSourcesSection, { projection, locale: "en", actionBusyKey: null, selectedPackageId: "example-1", onAction: action => actions.push(action), onRefresh() {}, onPickDirectory: async () => "/test/Notes" }));
     const button = (text: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text)!;
-    flushSync(() => button("Connect library").click());
-    flushSync(() => button("Choose folder").click()); await new Promise(resolve => setTimeout(resolve, 0));
-    flushSync(() => container.querySelector("form")!.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })));
+    act(() => button("Connect library").click());
+    act(() => button("Choose folder").click()); await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    act(() => container.querySelector("form")!.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })));
     expect(actions).toHaveLength(1);
     expect(actions[0].payload).toMatchObject({ context_id: "profile", expected_revision: "r1", vault_path: "/test/Notes", scope_ids: ["personal"], consumer_domain_ids: ["example"], write_domain_ids: [] });
     expect(actions[0].confirmationRequired).toBe(true);
@@ -105,16 +109,16 @@ test("software selection reaches the requested MiniApp and refresh preserves a l
     const entry = { resourceUri: "ui://fixture/requested", arguments: { package_id: "software", unknown: "omit" } };
     const props = { bridge: { listMcpApps: async () => ({ apps }), openMcpApp: async (request: any) => { opened.push(request); throw new Error("fixture"); }, closeMcpApp: async () => {}, callMcpAppTool: async () => ({}), readMcpAppResource: async () => ({}) },
       threadId: "thread", locale: "en" as const, preferredEntry: entry, onContext() {}, onMessage() {} };
-    render(createElement(McpAppWorkspace, props as any)); await new Promise(resolve => setTimeout(resolve, 30));
+    render(createElement(McpAppWorkspace, props as any)); await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("requested");
     expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("software");
     expect(opened).toEqual([]);
-    flushSync(() => {
+    act(() => {
       const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Current app"]')!;
       picker.value = "first";
       picker.dispatchEvent(new window.Event("change", { bubbles: true }));
     });
-    render(createElement(McpAppWorkspace, { ...props, revision: 1 } as any)); await new Promise(resolve => setTimeout(resolve, 30));
+    render(createElement(McpAppWorkspace, { ...props, revision: 1 } as any)); await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("first");
   });
 });
@@ -125,7 +129,7 @@ test("ready software opens its declared read-only launcher once and reports fail
     const app = { miniAppId: "requested", server: "fixture", tool: "open", title: "Requested", description: "", resourceUri: "ui://fixture/requested", readOnly: true, readiness: "ready", inputSchema: { properties: { package_id: { type: "string" } } } };
     render(createElement(McpAppWorkspace, { bridge: { listMcpApps: async () => ({ apps: [app] }), openMcpApp: async (request: any) => { opened.push(request); throw new Error("launcher unavailable"); }, closeMcpApp: async () => {} },
       threadId: "thread", locale: "en", preferredEntry: { resourceUri: app.resourceUri, arguments: { package_id: "software" } }, onContext() {}, onMessage() {} } as any));
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
     expect(opened).toEqual([{ threadId: "thread", server: "fixture", tool: "open", miniAppId: "requested", arguments: { package_id: "software" } }]);
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("could not open");
     expect(container.textContent).toContain("launcher unavailable");
@@ -161,7 +165,7 @@ test('background Package tasks are discovered outside Software Center and comple
     } };
     function Probe() { usePackageOperations(bridge as any, () => { completed++; }, false); return null; }
     render(createElement(Probe));
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
     expect(reads).toBeGreaterThanOrEqual(2);
     expect(completed).toBe(1);
   });
