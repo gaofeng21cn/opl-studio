@@ -2,6 +2,7 @@ import { MCP_APP_EXTENSION } from "./mcp-app-protocol.mjs";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import os from "node:os";
+import path from "node:path";
 import { projectCodexThread } from "./thread-adapter.mjs";
 export {
   DEFAULT_PERMISSION_PROFILE,
@@ -34,6 +35,95 @@ import {
   assertChannelThreadReadback,
   assertChannelThreadHost
 } from "./app-server-protocol.mjs";
+
+function assertAbsoluteDirectory(value, label, code = "invalid_request") {
+  if (typeof value !== "string" || value.length === 0 || value.trim() !== value || !path.isAbsolute(value)) {
+    throw new AppServerTransportError(code, `${label} must be an absolute directory path`, { value });
+  }
+  return value;
+}
+
+function responseCwdCandidates(response) {
+  const candidates = [];
+  if (response && typeof response === "object" && response.cwd !== undefined) {
+    candidates.push(["cwd", response.cwd]);
+  }
+  const thread = response?.thread;
+  if (!thread || typeof thread !== "object") return candidates;
+  if (thread.cwd !== undefined) candidates.push(["thread.cwd", thread.cwd]);
+  if (Array.isArray(thread.environments)) {
+    for (const [index, environment] of thread.environments.entries()) {
+      if (environment && typeof environment === "object" && environment.cwd !== undefined) {
+        candidates.push([`thread.environments[${index}].cwd`, environment.cwd]);
+      }
+    }
+  }
+  return candidates;
+}
+
+function canonicalCwdFromResponse(response, expectedThreadId, label) {
+  const thread = response?.thread;
+  if (!thread || typeof thread !== "object" || thread.id !== expectedThreadId) {
+    throw new AppServerTransportError(
+      "invalid_app_server_response",
+      `${label} returned a different canonical thread`,
+      { expectedThreadId, actualThreadId: thread?.id }
+    );
+  }
+  const candidates = responseCwdCandidates(response);
+  if (candidates.length === 0) {
+    throw new AppServerTransportError(
+      "invalid_app_server_response",
+      `${label} returned no canonical cwd`,
+      { threadId: expectedThreadId, reason: "missing_cwd" }
+    );
+  }
+  const cwds = [];
+  for (const [field, value] of candidates) {
+    const cwd = assertAbsoluteDirectory(value, `${label} ${field}`, "invalid_app_server_response");
+    if (!cwds.includes(cwd)) cwds.push(cwd);
+  }
+  if (cwds.length !== 1) {
+    throw new AppServerTransportError(
+      "invalid_app_server_response",
+      `${label} returned contradictory canonical cwd`,
+      { threadId: expectedThreadId, cwds }
+    );
+  }
+  return cwds[0];
+}
+
+async function resolveResumedThread(transport, threadId) {
+  const response = await transport.resumeThread(threadId);
+  if (response?.thread !== undefined && response?.thread !== null) {
+    try {
+      return { response, fallback: null, cwd: canonicalCwdFromResponse(response, threadId, "thread/resume") };
+    } catch (error) {
+      if (error?.details?.reason !== "missing_cwd") throw error;
+    }
+  }
+  const fallback = await transport.readThread(threadId);
+  return { response, fallback, cwd: canonicalCwdFromResponse(fallback, threadId, "thread/read") };
+}
+
+async function resolveReadThread(transport, threadId, response) {
+  try {
+    return { response, cwd: canonicalCwdFromResponse(response, threadId, "thread/read") };
+  } catch (error) {
+    if (error?.details?.reason !== "missing_cwd") throw error;
+  }
+  const fallback = await transport.readThread(threadId);
+  return { response: fallback, cwd: canonicalCwdFromResponse(fallback, threadId, "thread/read") };
+}
+
+function assertSameCanonicalCwd(expected, actual, label) {
+  if (expected === actual) return;
+  throw new AppServerTransportError(
+    "invalid_app_server_response",
+    `${label} returned contradictory canonical cwd`,
+    { cwds: [expected, actual] }
+  );
+}
 
 export class CodexAppServerTransport extends EventEmitter {
   constructor(options = {}) {
@@ -518,11 +608,15 @@ export class CodexAppServerTransport extends EventEmitter {
         await bindingStore.assertKnownThread(canonicalThread);
         const readback = await transport.readThread(canonicalThread.canonical_thread_id);
         assertChannelThreadReadback(canonicalThread, readback, "thread/resume readback", transport.host);
-        const response = await transport.resumeThread(canonicalThread.canonical_thread_id, {
-          cwd: transport.cwd,
-          ...threadPermissionOverrides(DEFAULT_PERMISSION_PROFILE, transport.cwd)
-        });
-        assertChannelThreadReadback(canonicalThread, response, "thread/resume", transport.host);
+        const resumed = await resolveResumedThread(transport, canonicalThread.canonical_thread_id);
+        assertChannelThreadReadback(canonicalThread, resumed.fallback ?? resumed.response, "thread/resume", transport.host);
+        if (responseCwdCandidates(readback).length > 0) {
+          assertSameCanonicalCwd(
+            canonicalCwdFromResponse(readback, canonicalThread.canonical_thread_id, "thread/read"),
+            resumed.cwd,
+            "thread/resume"
+          );
+        }
       },
       startTurn: async (request = {}) => {
         const value = requiredChannelObject(request, "startTurn request");
@@ -531,13 +625,15 @@ export class CodexAppServerTransport extends EventEmitter {
         await bindingStore.assertKnownThread(canonicalThread);
         const readback = await transport.readThread(canonicalThread.canonical_thread_id);
         assertChannelThreadReadback(canonicalThread, readback, "turn/start readback", transport.host);
+        const resolved = await resolveReadThread(transport, canonicalThread.canonical_thread_id, readback);
+        assertChannelThreadReadback(canonicalThread, resolved.response, "turn/start readback", transport.host);
         const response = await transport.startTurn(
           canonicalThread.canonical_thread_id,
           requiredChannelText(value.text),
           [],
           {
-            cwd: transport.cwd,
-            ...turnPermissionOverrides(DEFAULT_PERMISSION_PROFILE, transport.cwd)
+            cwd: resolved.cwd,
+            ...turnPermissionOverrides(DEFAULT_PERMISSION_PROFILE, resolved.cwd)
           }
         );
         const turnId = response.turn?.id;
@@ -702,7 +798,7 @@ export class CodexAppServerTransport extends EventEmitter {
 
   async startThread(params = {}) {
     const permissions = params.permissions ?? DEFAULT_PERMISSION_PROFILE;
-    const cwd = params.cwd ?? this.cwd;
+    const cwd = assertAbsoluteDirectory(params.cwd ?? this.cwd, "thread/start cwd");
     const { permissions: _ignored, ...requestParams } = params;
     return this.request("thread/start", {
       cwd,
@@ -724,18 +820,26 @@ export class CodexAppServerTransport extends EventEmitter {
     if (typeof autoReview !== "boolean" || typeof timeContext !== "boolean") {
       throw new AppServerTransportError("invalid_request", "Execution preferences must be booleans");
     }
-    const workingDirectory = cwd ?? this.cwd;
-    const threadPermission = threadPermissionOverrides(permissions, workingDirectory);
-    const turnPermission = { ...turnPermissionOverrides(permissions, workingDirectory), approvalsReviewer: autoReview ? "auto_review" : "user" };
     let activeThreadId = threadId;
+    let workingDirectory;
     const selection = normalizeAgentSelection(agentSelection);
     const turnSelection = normalizeAgentSelection(turnAgentSelection);
     if (activeThreadId && selection) {
       throw new AppServerTransportError("invalid_request", "An existing conversation cannot be rebound to another Agent");
     }
     if (activeThreadId) {
-      await this.resumeThread(activeThreadId, { cwd: workingDirectory, ...threadPermission });
+      if (cwd !== undefined) {
+        throw new AppServerTransportError(
+          "invalid_request",
+          "An existing conversation workspace is owned by its canonical thread"
+        );
+      }
+      // The canonical thread owns its workspace. Resume without a cwd override,
+      // then route this turn - and its sandbox roots - to the resumed cwd.
+      const resumed = await resolveResumedThread(this, activeThreadId);
+      workingDirectory = resumed.cwd;
     } else {
+      workingDirectory = assertAbsoluteDirectory(cwd ?? this.cwd, "selected workspace");
       const started = await this.startThread({
         model: model || undefined,
         developerInstructions: threadDeveloperInstructions(selection, additionalInstructions),
@@ -747,6 +851,7 @@ export class CodexAppServerTransport extends EventEmitter {
     if (!activeThreadId) {
       throw new AppServerTransportError("invalid_app_server_response", "thread/start returned no thread id");
     }
+    const turnPermission = { ...turnPermissionOverrides(permissions, workingDirectory), approvalsReviewer: autoReview ? "auto_review" : "user" };
     const contextualPrompt = timeContext ? `[Application time context: ${new Date().toISOString()}; timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}]\n\n${prompt ?? ""}` : prompt;
     const startedTurn = await this.startTurn(activeThreadId, contextualPrompt, inputs, {
       cwd: workingDirectory,

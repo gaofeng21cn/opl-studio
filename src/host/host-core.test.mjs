@@ -354,11 +354,11 @@ test("channel binding restart recovers the exact thread and rejects unknown or m
   };
   restarted.readThread = async (threadId) => {
     calls.push(`read:restart:${threadId}`);
-    return { thread: { id: threadId } };
+    return { thread: { id: threadId, cwd: "/tmp/channel-restart-workspace" } };
   };
   restarted.resumeThread = async (threadId) => {
     calls.push(`resume:restart:${threadId}`);
-    return { thread: { id: threadId } };
+    return { thread: { id: threadId, cwd: "/tmp/channel-restart-workspace" } };
   };
   const recovered = await restarted.createChannelCallbackAdapter().startThread(identity);
   assert.deepEqual(recovered, created);

@@ -9,6 +9,7 @@ import type { OplInitializeReadback } from "../bridge/oplBridge";
 import type { OplContributionSlotOwner, OplUiContributionsProjection } from "./contributionProjection";
 import type { OplStudioDetailTab } from "./clientCordis";
 import type { PackageActivity } from '../workbench/packageOperations';
+import type { WorkspaceView } from "@deepseek-ai/dsh-api-workspace-controller/client";
 
 export type OplSetupOperationResult = {
   status: "completed" | "cancelled" | "error";
@@ -28,6 +29,8 @@ export type OplStudioSurface = {
   sessionTitle: string;
   agentPermissions: OplAgentPermission;
   workspacePath: string;
+  pendingWorkspacePath?: string;
+  directoryPickerAvailable: boolean;
   prompt: string;
   promptRevision: number;
   conversationBlank: boolean;
@@ -93,13 +96,15 @@ export type OplStudioSurface = {
   detailsRequestRevision: number;
   startSession(): void;
   startSessionInProject(projectId?: string): void;
+  selectSessionWorkspace(workspaceId: string): void;
+  pickDirectory(): Promise<string | null>;
   openThread(threadId: string): void;
   renameSession(threadId: string, title: string): Promise<void>;
   renameWorkspace(workspaceId: string, title: string): Promise<void>;
   deleteWorkspace(workspaceId: string): Promise<void>;
   insertWorkspaceBefore(workspaceId: string, beforeWorkspaceId?: string): Promise<void>;
   insertSessionBefore(workspaceId: string, threadId: string, beforeThreadId?: string): Promise<void>;
-  createWorkspace(path: string): Promise<void>;
+  createWorkspace(path: string): Promise<WorkspaceView>;
   forkThread(threadId: string): void;
   archiveThread(threadId: string): Promise<void>;
   searchThreads(query: string): Promise<Array<{ sessionId: string; snippet?: string }>>;
