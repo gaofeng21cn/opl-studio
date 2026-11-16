@@ -69,6 +69,14 @@ output rebuilds normally; `build-release.mjs --skip-vite` explicitly requires a
 verified hit. This cache never substitutes for signing, packaging or acceptance.
 The App workflow uses one cache transport path for Standard and Full.
 
+The Standard and Preview carriers keep the unpacked Host dependency graph
+because the Electron main process and standalone Host execute from that physical
+tree. Their builder file filters remove dependency source maps, TypeScript
+authoring files, package tests/examples/benchmarks/docs and changelogs from both
+carriers. The production dependency closure remains unpacked and is verified by
+the packaged Host startup check; a smaller directory alone does not qualify an
+installer or release.
+
 Full provides operation-resolved Codex npm/platform archives as a first-install
 seed. Studio validates their manifest digests and delegates installation and
 activation to Framework before creating the persistent App Server. A usable

@@ -22,6 +22,14 @@ files:
   - dist/desktop/**/*
   - src/host/**/*
   - package.json
+  # Keep the unpacked Host dependency graph executable while removing files
+  # that are never loaded by the production carrier. Source maps and package
+  # authoring/test material were the largest safe non-runtime payload class.
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/*.ts"
+  - "!node_modules/**/*.tsx"
+  - "!node_modules/**/{test,tests,__tests__,example,examples,benchmark,benchmarks,docs,doc}/**"
+  - "!node_modules/**/{README.md,CHANGELOG.md,CHANGES.md}"
 extraResources:
   - from: resources/opl-official-profile
     to: opl-official-profile
