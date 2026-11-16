@@ -9,7 +9,7 @@ import { CapabilitiesSettingsPage } from "../../src/workbench/settings/pages/Cap
 import { ServicesSettingsPage } from "../../src/workbench/settings/pages/ServicesSettingsPage";
 import { ResourcesSettingsPage } from "../../src/workbench/settings/pages/ResourcesSettingsPage";
 import { ProjectedContribution } from "../../src/composition/contributionComponents";
-import { readUiContributionsProjection, settingsEntriesForDestination, type OplContributionSlotOwner } from "../../src/composition/contributionProjection";
+import { readUiContributionsProjection, settingsEntriesForDestination, settingsEntriesForNativeAppSurface, type OplContributionSlotOwner } from "../../src/composition/contributionProjection";
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
@@ -57,6 +57,23 @@ test('remote Settings retains an actionable setup path without any provider', as
   const button = [...document.querySelectorAll('button')].find(button => button.textContent === '管理远程扩展')!;
   await act(async () => button.click());
   expect(opened).toBe('applications');
+});
+
+test('native OPL Link owns the Settings entry while Weixin unavailable state remains actionable', async () => {
+  const remoteEntry = readUiContributionsProjection({ ui_contributions: { surface_kind: 'opl_app_ui_contributions_projection.v1', entries: [{
+    contribution_key: 'legacy-remote:opl-link', contribution_id: 'opl-link', package_id: 'legacy-remote', slot: 'settings.section', contribution_kind: 'view', trust_tier: 'declarative', scope: 'root',
+    view: { view_id: 'opl-link', view_type: 'remote_companion_access', title_i18n: { 'zh-CN': 'OPL Link' }, data_ref: 'opl-link#state' }, commands: [], badges: []
+  }] } }).entries;
+  expect(settingsEntriesForNativeAppSurface([...entries, ...remoteEntry], 'resources')).toEqual(entries);
+  const unavailable = { schema_version: 'opl-app-channel-access.v1', status: 'unavailable', channel_id: 'weixin', unavailable_reason: 'provider_absent' };
+  let opened = 0;
+  const owner = { locale: 'zh', actionAvailable: true, refreshRevision: 0, readData: async () => unavailable, onAction: () => {}, openSoftwareCenter: () => { opened += 1; } } as OplContributionSlotOwner;
+  await act(async () => root.render(<ProjectedContribution entry={entries[0]!} owner={owner} />));
+  expect(document.body.textContent).toContain('微信当前不可用');
+  expect(document.body.textContent).toContain('软件中心');
+  const button = [...document.querySelectorAll('button')].find(button => button.textContent === '管理远程扩展')!;
+  await act(async () => button.click());
+  expect(opened).toBe(1);
 });
 
 test('PIN form preserves leading zeroes and never sends PIN values in subsequent reads', async () => {

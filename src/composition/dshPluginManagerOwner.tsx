@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { settingsEntriesForDestination } from "./contributionProjection";
+import { settingsEntriesForNativeAppSurface } from "./contributionProjection";
 import { latestPackageOperations, packageStagePresentation, type PackageOperation } from "../workbench/packageOperations";
 import { softwareCanStart } from "../workbench/softwareExperience";
 import { SoftwareArtwork } from "../workbench/SoftwareArtwork";
@@ -163,7 +163,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
           {props.onConfigureSoftware ? <Button size="sm" variant="outline" onClick={() => props.onConfigureSoftware?.(item.packageId)}>{isZh ? "管理共享资源" : "Manage shared resources"}</Button> : null}
         </section>
         {shortcuts(item)}
-        {item.appEnabled && props.onOpenSettings ? (["resources", "services"] as const).filter(destination => settingsEntriesForDestination(model.uiContributions.entries.filter(entry => entry.packageId === item.packageId), destination, settings.developerDetails).length > 0).map(destination => <section key={destination} className="opl-dsh-owner-section"><Button size="sm" variant="outline" onClick={() => props.onOpenSettings?.(destination)}>{destination === 'resources' ? (isZh ? '配置远程连接' : 'Configure remote connection') : (isZh ? '打开服务状态' : 'Open service status')}</Button></section>) : null}
+        {item.appEnabled && props.onOpenSettings ? (["resources", "services"] as const).filter(destination => settingsEntriesForNativeAppSurface(model.uiContributions.entries.filter(entry => entry.packageId === item.packageId), destination, settings.developerDetails).length > 0).map(destination => <section key={destination} className="opl-dsh-owner-section"><Button size="sm" variant="outline" onClick={() => props.onOpenSettings?.(destination)}>{destination === 'resources' ? (isZh ? '配置远程连接' : 'Configure remote connection') : (isZh ? '打开服务状态' : 'Open service status')}</Button></section>) : null}
         {settings.developerDetails ? <section className="opl-dsh-owner-section"><h4>{isZh ? "技术详情" : "Technical details"}</h4><p>{agentAvailabilityDetail(item, locale)}</p><dl>{item.details.map(detail => <div key={detail.label}><dt>{detail.label}</dt><dd>{detail.value}</dd></div>)}</dl></section> : null}
       </>,
     };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Smartphone, RefreshCw, X } from "lucide-react";
 import type { LinkDeviceReadback, LinkPairing } from "../../bridge/oplBridge-types-platform-events";
@@ -12,8 +12,52 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [clock, setClock] = useState(Date.now());
+  const recoveryTimer = useRef<number | null>(null);
+  const recoveryAttempt = useRef(0);
+  const recoveryInFlight = useRef(false);
+  const latestConnection = useRef<LinkDeviceReadback["internet"]>(undefined);
   async function refresh() { if (bridge) setState(await bridge.readDevices()); }
   const connection = state?.internet?.status ?? "disabled";
+  latestConnection.current = state?.internet;
+
+  function clearRecoveryTimer() {
+    if (recoveryTimer.current === null) return;
+    window.clearTimeout(recoveryTimer.current);
+    recoveryTimer.current = null;
+  }
+
+  function recoveryDelay() {
+    return [3000, 10000, 30000][Math.min(recoveryAttempt.current, 2)] ?? 30000;
+  }
+
+  function scheduleRecovery(delay = 0) {
+    if (!bridge || recoveryTimer.current !== null || recoveryInFlight.current) return;
+    recoveryTimer.current = window.setTimeout(() => {
+      recoveryTimer.current = null;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        scheduleRecovery(30000);
+        return;
+      }
+      recoveryInFlight.current = true;
+      void bridge.reconnectInternet()
+        .then((next) => {
+          setState((current) => current ? { ...current, internet: next } : current);
+          if (next.status === "ready") {
+            recoveryAttempt.current = 0;
+            setError("");
+          } else if (next.status === "error" || next.status === "reconnecting") {
+            recoveryAttempt.current = Math.min(recoveryAttempt.current + 1, 3);
+          }
+        })
+        .catch(() => { recoveryAttempt.current = Math.min(recoveryAttempt.current + 1, 3); })
+        .finally(() => {
+          recoveryInFlight.current = false;
+          const status = latestConnection.current?.status;
+          if (status === "error" || status === "reconnecting") scheduleRecovery(recoveryDelay());
+        });
+    }, delay);
+  }
+
   useEffect(() => {
     let alive = true;
     const read = () => bridge?.readDevices().then(value => { if (alive) setState(value); }).catch(() => { if (alive) setError(zh ? "连接状态读取失败，请刷新。" : "Could not read connection status. Refresh to try again."); });
@@ -21,6 +65,30 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
     const timer = window.setInterval(() => { void read(); }, 3000);
     return () => { alive = false; window.clearInterval(timer); };
   }, [bridge, zh]);
+  useEffect(() => {
+    if (!bridge) return;
+    if (["ready", "disabled", "account_required"].includes(connection)) {
+      recoveryAttempt.current = 0;
+      clearRecoveryTimer();
+      return;
+    }
+    if (connection === "error" || connection === "reconnecting") {
+      scheduleRecovery(connection === "error" && recoveryAttempt.current === 0 ? 0 : recoveryDelay());
+    }
+    return clearRecoveryTimer;
+  }, [bridge, connection]);
+  useEffect(() => {
+    if (!bridge || typeof document === "undefined") return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void refresh().catch(() => undefined);
+      const status = latestConnection.current?.status;
+      if (status === "error" || status === "reconnecting") scheduleRecovery(0);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [bridge]);
+  useEffect(() => () => clearRecoveryTimer(), []);
   useEffect(() => { if (!pairing) return; const timer = window.setInterval(() => setClock(Date.now()), 1000); return () => window.clearInterval(timer); }, [pairing]);
   const expiresIn = pairing ? Math.max(0, Math.ceil((Date.parse(pairing.expiresAt) - clock) / 1000)) : 0;
   useEffect(() => { if (pairing && expiresIn === 0) setPairing(null); }, [pairing, expiresIn]);
@@ -31,15 +99,15 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
     catch { setError(zh ? "操作未完成。请查看连接状态后重试。" : "Could not complete the action. Check the connection status and try again."); await refresh().catch(() => {}); }
     finally { setBusy(false); }
   }
-  const statusText = ({ disabled: zh ? "尚未开启" : "Not enabled", account_required: zh ? "请先登录 OPL 账号" : "Sign in to your OPL account", connecting: zh ? "正在连接" : "Connecting", reconnecting: zh ? "正在重新连接" : "Reconnecting", ready: zh ? "手机访问已就绪" : "Phone access is ready", error: zh ? "连接需要处理" : "Connection needs attention" })[connection];
+  const statusText = ({ disabled: zh ? "尚未开启" : "Not enabled", account_required: zh ? "请先登录 OPL 账号" : "Sign in to your OPL account", connecting: zh ? "正在连接" : "Connecting", reconnecting: zh ? "正在自动恢复" : "Automatically recovering", ready: zh ? "手机访问已就绪" : "Phone access is ready", error: zh ? "正在自动恢复" : "Automatically recovering" })[connection];
   return <SettingsGroup title="OPL Link">
     <SettingRow label={zh ? "在 iPhone 或 iPad 上继续" : "Continue on iPhone or iPad"} detail={zh ? "继续此 App 的对话、处理请求、发送附件和查看结果。电脑需保持联网并运行 OPL App。" : "Continue this App’s conversations, answer requests, send attachments and review results. Keep this computer online with OPL App running."}>
       {connection === "disabled" || connection === "account_required" ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { await bridge!.enableInternet(); await refresh(); })}><Smartphone size={14} aria-hidden="true" />{zh ? "开启手机访问" : "Enable phone access"}</button> : <button className="settings-action-button" type="button" disabled={busy || connection !== "ready"} onClick={() => void run(async () => { const value = await bridge!.createPairing(); setClock(Date.now()); setPairing(value); })}><Smartphone size={14} aria-hidden="true" />{zh ? "生成连接码" : "Create pairing code"}</button>}
     </SettingRow>
     <SettingRow label={zh ? "连接状态" : "Connection status"}>
-      <span role="status">{statusText}</span>
+      <span role="status" aria-live="polite">{statusText}</span>
       {connection === "account_required" && onOpenAccount ? <button className="settings-inline-command" type="button" onClick={onOpenAccount}>{zh ? "打开 OPL 账号" : "Open OPL account"}</button> : null}
-      {connection === "error" || connection === "reconnecting" ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { await bridge!.reconnectInternet(); await refresh(); })}><RefreshCw size={13} aria-hidden="true" />{zh ? "重新连接" : "Reconnect"}</button> : null}
+      {connection === "error" || connection === "reconnecting" ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { recoveryAttempt.current = 0; clearRecoveryTimer(); await bridge!.reconnectInternet(); await refresh(); })}><RefreshCw size={13} aria-hidden="true" />{zh ? "立即重连" : "Reconnect now"}</button> : null}
     </SettingRow>
     {pairing && expiresIn > 0 ? <div className="opl-link-pairing" style={{ display: "grid", justifyItems: "start", gap: 12, padding: "12px 0 20px" }}>
       <div style={{ background: "white", padding: 16, borderRadius: 12 }}><QRCodeSVG value={pairing.pairingURL} size={184} title={zh ? "用 OPL Link 扫描连接码" : "Scan in OPL Link"} /></div>
