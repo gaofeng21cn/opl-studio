@@ -20,6 +20,11 @@ type CodexCatalogCapability = {
 };
 
 export type ResolvedCodexModelOption = ModelOption & {
+  /**
+   * The executable model name advertised by the live catalog. A catalog row
+   * may use a display/identity id that differs from the wire model name.
+   */
+  wireModel: CodexModelId;
   available: boolean;
   known: boolean;
   isCatalogDefault: boolean;
@@ -203,6 +208,7 @@ export function resolveCodexModelOptions(catalogInput: CodexCatalogCapability[])
       ?? (isAppDefault ? codexModelPolicy.defaultReasoningEffort : undefined);
     return {
       ...option,
+      wireModel: runtime?.model ?? runtime?.id ?? option.id,
       // An empty catalog means discovery is unavailable, so the App default
       // stays the offline fallback. A non-empty catalog is authoritative for
       // availability and may omit the App default entirely.
@@ -262,6 +268,7 @@ export function resolveCodexModelOptions(catalogInput: CodexCatalogCapability[])
         : codexModelPolicy.defaultReasoningEffort;
     catalogOptions.push({
       id,
+      wireModel: representative.model ?? representative.id ?? id,
       label_zh: label,
       label_en: label,
       available: true,

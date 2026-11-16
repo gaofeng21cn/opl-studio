@@ -1958,7 +1958,7 @@ export function App({
         agentSelection: codexThreadId ? undefined : selectedAgentSnapshot(),
         turnAgentSelection: codexThreadId ? selectedAgentSnapshot() : undefined,
         additionalInstructions: codexThreadId ? undefined : additionalConversationInstructions,
-        model: resolvedModel.id,
+        model: resolvedModel.wireModel,
         reasoningEffort: resolvedReasoning,
         permissions: settings.agentPermissions,
         autoReview: settings.autoReview,
