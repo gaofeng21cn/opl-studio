@@ -6,7 +6,7 @@ import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { inspectProfile, packSourcePlugins } from "./dsh-profile-plugins.mjs";
+import { ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions } from "./dsh-profile-plugins.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pnpmAvailable = spawnSync("pnpm", ["--version"], { encoding: "utf8" }).status === 0;
@@ -59,50 +59,41 @@ test("source plugin selection rejects static renderer, unknown and duplicate pac
   assert.deepEqual(await fs.readdir(temp), []);
 });
 
-test("update-registry writes .npmrc with scope mapping and optional auth token", async t => {
-  // Import the internal helpers via dynamic import to test ensureProfileNpmrc
+test("registry authentication survives a later update without a new token", async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-npmrc-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
-
-  // ensureProfileNpmrc is not exported; exercise it through the CLI by
-  // calling update-registry with a fake token and a temp home. The registry
-  // query will fail (no network / no published packages in test), but the
-  // .npmrc must be written before the query runs.
-  const home = path.join(temp, "home");
-  const anchor = path.join(root, "package.json");
-  const result = spawnSync(process.execPath, [
-    path.join(root, "scripts/dsh-profile-plugins.mjs"), "update-registry",
-    "--package", "opl-superagent", "--token", "test-token-value",
-    "--home", home, "--install-anchor", anchor
-  ], { encoding: "utf8", timeout: 30000 });
-
-  // The command exits non-zero because no published packages are found,
-  // but the .npmrc must have been written to the profile dir before the query.
-  const profileDir = path.join(home, "profiles", "opl-studio");
-  const npmrcPath = path.join(profileDir, ".npmrc");
+  const npmrcPath = path.join(temp, ".npmrc");
+  await fs.writeFile(npmrcPath, "registry=https://registry.npmjs.org/\n", { mode: 0o644 });
+  ensureProfileNpmrc(temp, "test-token-value");
+  ensureProfileNpmrc(temp);
   const npmrc = await fs.readFile(npmrcPath, "utf8");
-  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"),
-    ".npmrc must map @one-person-lab scope to GitHub Packages");
-  assert.ok(npmrc.includes("//npm.pkg.github.com/:_authToken=test-token-value"),
-    ".npmrc must contain the provided auth token");
+  assert.ok(npmrc.includes("registry=https://registry.npmjs.org/"));
+  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"));
+  assert.ok(npmrc.includes("//npm.pkg.github.com/:_authToken=test-token-value"));
+  assert.equal((await fs.stat(npmrcPath)).mode & 0o777, 0o600);
 });
 
-test("update-registry with --all targets every publishable package", async t => {
-  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-all-"));
-  t.after(() => fs.rm(temp, { recursive: true, force: true }));
-  const home = path.join(temp, "home");
-  const anchor = path.join(root, "package.json");
-  // Run with --all but no token and no network; expect it to write .npmrc
-  // and report no-updates for all packages (none published yet).
-  const result = spawnSync(process.execPath, [
-    path.join(root, "scripts/dsh-profile-plugins.mjs"), "update-registry",
-    "--all", "--home", home, "--install-anchor", anchor
-  ], { encoding: "utf8", timeout: 30000 });
-  // Exit code 0 is expected when no updates are available (graceful no-updates).
-  // If pnpm view fails entirely the command exits non-zero; accept either
-  // as long as .npmrc was written.
-  const npmrcPath = path.join(home, "profiles", "opl-studio", ".npmrc");
-  const npmrc = await fs.readFile(npmrcPath, "utf8");
-  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"),
-    ".npmrc scope mapping must be written for --all");
+test("registry resolution uses the selected carrier cohort and skips newer incompatible versions", async () => {
+  const name = "@one-person-lab/opl-superagent";
+  const queries = [];
+  const view = async (_dir, spec) => {
+    queries.push(spec);
+    const answer = spec === name ? ["0.1.0", "0.1.2", "0.1.1", "0.2.0"] : {
+      name, version: spec.split("@").at(-1),
+      engines: { dsh: spec.endsWith("0.1.2") ? ">=9.0.0" : "0.2.2-rc.3" }
+    };
+    return { exitCode: 0, timedOut: false, stdout: JSON.stringify(answer), stderr: "" };
+  };
+  const result = await resolveRegistryVersions([name], root, path.join(root, "package.json"), view);
+  assert.deepEqual(result[name], { available: true, version: "0.1.1" });
+  assert.deepEqual(queries, [name, name + "@0.1.2", name + "@0.1.1"]);
+});
+
+test("registry lookup failures remain failures instead of a successful no-update result", async () => {
+  const name = "@one-person-lab/opl-superagent";
+  const failure = async () => ({ exitCode: 1, timedOut: true, stdout: "", stderr: "" });
+  const result = await resolveRegistryVersions([name], root, path.join(root, "package.json"), failure);
+  assert.deepEqual(result[name], { available: false, reason: "timeout" });
+  const malformed = async () => ({ exitCode: 0, timedOut: false, stdout: "invalid json", stderr: "" });
+  assert.equal((await resolveRegistryVersions([name], root, path.join(root, "package.json"), malformed))[name].reason, "invalid_registry_response");
 });

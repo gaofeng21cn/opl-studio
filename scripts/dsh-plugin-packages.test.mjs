@@ -17,6 +17,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
   try {
     const manifest = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
     await fs.writeFile(path.join(staging, "package.json"), JSON.stringify(manifest));
+    const registryComposition = process.env.OPL_PLUGIN_COMPOSITION_MODE === "registry";
     // Mirror the installed dependency graph, including CLI/plugin transitive packages.
     // Local delivery plugins below are replaced by their packed bytes.
     for (const entry of await fs.readdir(path.join(root, "node_modules"), { withFileTypes: true })) {
@@ -25,7 +26,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         ? (await fs.readdir(path.join(root, "node_modules", entry.name))).map(name => `${entry.name}/${name}`)
         : [entry.name];
       for (const name of names) {
-        if (manifest.dependencies[name]?.startsWith("file:plugins/")) continue;
+        if (!registryComposition && manifest.dependencies[name]?.startsWith("file:plugins/")) continue;
         const destination = path.join(staging, "node_modules", name);
         await fs.mkdir(path.dirname(destination), { recursive: true });
         await fs.symlink(await fs.realpath(path.join(root, "node_modules", name)), destination, "dir");
@@ -35,7 +36,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     for (const [name, source] of Object.entries(manifest.dependencies)) {
       const destination = path.join(staging, "node_modules", name);
       await fs.mkdir(path.dirname(destination), { recursive: true });
-      if (!source.startsWith("file:plugins/")) {
+      if (registryComposition || !source.startsWith("file:plugins/")) {
         continue;
       }
       const packed = spawnSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", staging], {

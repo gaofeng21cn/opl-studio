@@ -6,9 +6,11 @@ import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { createRuntimeResolution, initProfile, loadProfile, resolveProfileDir } from "@deepseek-ai/dsh-app-boot";
+import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadProfile, resolveProfileDir } from "@deepseek-ai/dsh-app-boot";
 import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
-import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
+import { runPluginCommand, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
+import { classifyInstallFailure } from "@deepseek-ai/dsh-plugin-manager";
+import semver from "semver";
 import { buildDshPlugins } from "./build-dsh-plugins.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -37,49 +39,56 @@ const PUBLISHABLE_PACKAGES = [
  * for that registry host. If the .npmrc already contains correct scope and
  * host entries, only the token line is updated (or added).
  */
-function ensureProfileNpmrc(dir, token) {
+export function ensureProfileNpmrc(dir, token) {
   const npmrcPath = path.join(dir, ".npmrc");
   const scopeLine = `@one-person-lab:registry=${REGISTRY_URL}`;
-  const tokenLine = token ? `${REGISTRY_HOST}:_authToken=${token}` : null;
 
   let existing = "";
   try { existing = fs.readFileSync(npmrcPath, "utf8"); } catch {}
-
   const lines = existing.split("\n").filter(Boolean);
+  const existingTokenLine = lines.find(line => line.startsWith(`${REGISTRY_HOST}:_authToken=`));
+  const tokenLine = token ? `${REGISTRY_HOST}:_authToken=${token}` : existingTokenLine;
   const withoutManaged = lines.filter(l =>
     !l.startsWith("@one-person-lab:registry=") &&
     !l.startsWith(`${REGISTRY_HOST}:_authToken=`));
 
   const updated = [...withoutManaged, scopeLine, ...(tokenLine ? [tokenLine] : [])];
   fs.writeFileSync(npmrcPath, updated.join("\n") + "\n", { mode: 0o600 });
+  fs.chmodSync(npmrcPath, 0o600);
 }
 
-/**
- * Resolve the latest published version of each package that satisfies the
- * caret range based on its local baseline version. Returns a map of
- * packageName → resolvedVersion. Packages not yet published fall back to
- * their local baseline version and are skipped in the registry add.
- */
-function resolveRegistryVersions(names, dir) {
-  const resolved = {};
-  for (const pkgName of names) {
-    const dirName = pkgName.replace("@one-person-lab/", "");
-    const localManifest = JSON.parse(fs.readFileSync(path.join(root, "plugins", dirName, "package.json"), "utf8"));
-    const baseVer = localManifest.version;
-    const range = `${pkgName}@^${baseVer}`;
-    const result = spawnSync("pnpm", ["view", range, "version", "--json",
-      `--registry=${REGISTRY_URL}`, "--config.fetch-retries=0"], {
-      cwd: dir, encoding: "utf8", timeout: 15000
-    });
-    if (result.status !== 0 || !result.stdout.trim()) {
-      resolved[pkgName] = { version: baseVer, available: false };
-      continue;
+/** Resolve published versions against the selected carrier using DSH's own metadata admission. */
+export async function resolveRegistryVersions(names, dir, installAnchor, view = viewProfilePackage) {
+  const carrierRequire = createRequire(installAnchor);
+  const readManifest = name => JSON.parse(fs.readFileSync(carrierRequire.resolve(name + "/package.json"), "utf8"));
+  const runtimeVersion = readManifest("@deepseek-ai/dsh-app-boot").version;
+  const query = async (spec, fields) => {
+    const result = await view(dir, spec, { registry: REGISTRY_URL, fields, timeoutMs: 15000 });
+    if (result.exitCode !== 0 || result.timedOut) {
+      const reason = classifyInstallFailure({ log: result.stderr + result.stdout, cause: result.cause, timedOut: result.timedOut });
+      throw Object.assign(new Error("Registry lookup failed"), { code: reason });
     }
-    // pnpm view may return a string or an array when multiple versions match
-    let versions;
-    try { versions = JSON.parse(result.stdout.trim()); } catch { versions = baseVer; }
-    const latest = Array.isArray(versions) ? versions[versions.length - 1] : versions;
-    resolved[pkgName] = { version: String(latest), available: true };
+    try { return JSON.parse(result.stdout); }
+    catch { throw Object.assign(new Error("Registry returned invalid JSON"), { code: "invalid_registry_response" }); }
+  };
+  const resolved = {};
+  for (const name of names) {
+    try {
+      const baseline = readManifest(name).version;
+      const answer = await query(name, ["versions"]);
+      const listed = Array.isArray(answer) ? answer : typeof answer === "string" ? [answer] : answer?.versions;
+      if (!Array.isArray(listed)) throw Object.assign(new Error("Registry returned no versions"), { code: "invalid_registry_response" });
+      const versions = listed.filter(version => semver.valid(version) && semver.satisfies(version, "^" + baseline)).sort(semver.rcompare);
+      let selected;
+      for (const version of versions) {
+        const manifest = await query(name + "@" + version, ["name", "version", "engines", "peerDependencies"]);
+        if (manifest?.name !== name || manifest.version !== version) throw Object.assign(new Error("Registry package identity mismatch"), { code: "invalid_registry_response" });
+        if (!evaluatePluginCompatibility(manifest, {}, runtimeVersion)) { selected = version; break; }
+      }
+      resolved[name] = selected ? { version: selected, available: true } : { available: false, reason: "no_compatible_version" };
+    } catch (error) {
+      resolved[name] = { available: false, reason: error.code ?? "registry_lookup_failed" };
+    }
   }
   return resolved;
 }
@@ -197,21 +206,23 @@ export async function main(argv = process.argv.slice(2)) {
     ensureProfileNpmrc(dir, token);
 
     // Resolve latest compatible versions from the registry
-    const resolved = resolveRegistryVersions(names, dir);
+    const resolved = await resolveRegistryVersions(names, dir, installAnchor);
     const toInstall = Object.entries(resolved).filter(([, v]) => v.available);
-    const skipped = Object.entries(resolved).filter(([, v]) => !v.available).map(([n]) => n);
+    const failures = Object.fromEntries(Object.entries(resolved).filter(([, v]) => !v.available).map(([name, value]) => [name, value.reason]));
+    const skipped = Object.keys(failures);
 
     if (skipped.length) {
-      process.stderr.write(`Skipped (not yet published): ${skipped.join(", ")}\n`);
+      process.stderr.write(`Registry checks failed: ${skipped.join(", ")}\n`);
     }
     if (!toInstall.length) {
-      console.log(JSON.stringify({ operation, application: "no-updates",
-        skipped, ...await inspectProfile({ installAnchor, home }) }, null, 2));
+      console.log(JSON.stringify({ operation, application: "update-check-failed", failures,
+        ...await inspectProfile({ installAnchor, home }) }, null, 2));
+      process.exitCode = 1;
       return;
     }
 
     // Build the add args: each package at its resolved exact version
-    const addArgs = ["add", ...toInstall.map(([name, v]) => `${name}@${v.version}`),
+    const addArgs = ["add", "--save-exact", ...toInstall.map(([name, v]) => `${name}@${v.version}`),
       `--registry=${REGISTRY_URL}`];
 
     const result = await runPluginCommand({ profile, dir, installAnchor, home, cwd: root }, addArgs, {
@@ -224,7 +235,8 @@ export async function main(argv = process.argv.slice(2)) {
 
     console.log(JSON.stringify({ operation, application: "restart-required",
       installed: Object.fromEntries(toInstall.map(([n, v]) => [n, v.version])),
-      skipped, ...await inspectProfile({ installAnchor, home }) }, null, 2));
+      failures, ...await inspectProfile({ installAnchor, home }) }, null, 2));
+    if (skipped.length) process.exitCode = 1;
     return;
   }
 

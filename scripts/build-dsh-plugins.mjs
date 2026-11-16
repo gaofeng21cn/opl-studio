@@ -42,5 +42,10 @@ export function buildDshPlugins(selected, { skipBuild = false } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log(JSON.stringify({ status: "built", packages: buildDshPlugins() }));
+  // Registry composition installs still run dependency lifecycle scripts
+  // (Electron and native modules need them), while the root prepare hook
+  // must leave the receipt-selected Host package bytes untouched.
+  const registry = process.env.OPL_DSH_REGISTRY_PLUGINS === "1";
+  console.log(JSON.stringify({ status: registry ? "registry_plugins_preserved" : "built",
+    packages: registry ? [] : buildDshPlugins() }));
 }
