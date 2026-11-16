@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { projectCodexThread } from "./thread-adapter.mjs";
+import { TurnLifecycle } from "./app-server-turn-lifecycle.mjs";
 export {
   DEFAULT_PERMISSION_PROFILE,
   CHANNEL_CALLBACK_SCHEMA,
@@ -140,7 +141,7 @@ export class CodexAppServerTransport extends EventEmitter {
     const host = options.host ?? os.hostname();
     const clientVersion = options.clientVersion ?? env.OPL_APP_VERSION ?? "unknown";
     const requestTimeoutMs = options.requestTimeoutMs ?? 45_000;
-    const turnTimeoutMs = options.turnTimeoutMs ?? 180_000;
+    const turnTimeoutMs = options.turnTimeoutMs ?? 300_000;
     this.command = command;
     this.args = args;
     this.cwd = cwd;
@@ -152,7 +153,6 @@ export class CodexAppServerTransport extends EventEmitter {
     this.turnTimeoutMs = turnTimeoutMs;
     this.process = null;
     this.pending = new Map();
-    this.turns = new Map();
     this.channelTurns = new Set();
     this.nextRequestId = 1;
     this.initialized = false;
@@ -160,14 +160,21 @@ export class CodexAppServerTransport extends EventEmitter {
     this.stderrTail = "";
     this.pendingServerRequests = new Map();
     this.activeOperations = 0;
-    this.activeTurns = new Set();
     this.maintenance = null;
     this.disposed = false;
     this.idleWaiters = new Set();
+    this.turnLifecycle = new TurnLifecycle({
+      defaultTimeoutMs: turnTimeoutMs,
+      onIdle: () => this.#notifyIdleIfPossible(),
+      onClearRequests: (requestIds, reason) => this.#clearTurnServerRequests(requestIds, reason)
+    });
+    this.turns = this.turnLifecycle.turns;
+    this.activeTurns = this.turnLifecycle.activeTurns;
   }
 
   isBusy() {
     return this.activeOperations > 0 || this.activeTurns.size > 0
+      || this.turnLifecycle.hasPendingWaits()
       || this.pending.size > 0 || this.pendingServerRequests.size > 0;
   }
 
@@ -237,7 +244,6 @@ export class CodexAppServerTransport extends EventEmitter {
 
   async close() {
     this.disposed = true;
-    this.#notifyIdleIfPossible();
     await this.stop();
   }
 
@@ -260,6 +266,7 @@ export class CodexAppServerTransport extends EventEmitter {
     });
     this.process = child;
     child.once("error", (error) => {
+      if (this.process !== null && this.process !== child) return;
       this.#clearPendingServerRequests("app_server_unavailable");
       this.#failAll(new AppServerTransportError(
         "app_server_unavailable",
@@ -267,6 +274,7 @@ export class CodexAppServerTransport extends EventEmitter {
       ));
     });
     child.once("exit", (code, signal) => {
+      if (this.process !== null && this.process !== child) return;
       this.initialized = false;
       this.process = null;
       this.#clearPendingServerRequests("app_server_exited");
@@ -292,11 +300,11 @@ export class CodexAppServerTransport extends EventEmitter {
       while ((boundary = buffered.indexOf("\n")) !== -1) {
         const line = buffered.slice(0, boundary);
         buffered = buffered.slice(boundary + 1);
-        this.#consumeLine(line);
+        this.#consumeLine(line, child);
       }
     });
     child.stdout.on("end", () => {
-      if (buffered) this.#consumeLine(buffered);
+      if (buffered) this.#consumeLine(buffered, child);
       buffered = "";
     });
 
@@ -319,10 +327,11 @@ export class CodexAppServerTransport extends EventEmitter {
 
   async stop() {
     const child = this.process;
-    if (!child) return;
     this.process = null;
     this.initialized = false;
     this.#clearPendingServerRequests("app_server_stopping");
+    this.#failAll(new AppServerTransportError("app_server_stopping", "Codex App Server is stopping"));
+    if (!child) return;
     child.stdin.end();
     await new Promise((resolve) => {
       if (child.exitCode !== null) return resolve();
@@ -333,6 +342,7 @@ export class CodexAppServerTransport extends EventEmitter {
         clearTimeout(terminateTimer);
         clearTimeout(forceTimer);
         clearTimeout(abandonTimer);
+        child.off("exit", finish);
         resolve();
       };
       const terminateTimer = setTimeout(() => {
@@ -903,33 +913,11 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   waitForTurn(turnId, timeoutMs = this.turnTimeoutMs) {
-    const existing = this.turns.get(turnId);
-    if (existing?.completed) return Promise.resolve(existing.completed);
-    return new Promise((resolve, reject) => {
-      const bucket = existing ?? { events: [], text: "", waiters: [] };
-      bucket.waiters ??= [];
-      const timeout = setTimeout(() => {
-        bucket.waiters = bucket.waiters.filter((waiter) => waiter.resolve !== resolve);
-        reject(new AppServerTransportError("turn_timeout", `Turn timed out: ${turnId}`, { turnId }));
-      }, timeoutMs);
-      bucket.waiters.push({
-        resolve: (value) => {
-          clearTimeout(timeout);
-          resolve(value);
-        },
-        reject
-      });
-      this.turns.set(turnId, bucket);
-    });
+    return this.turnLifecycle.waitForTurn(turnId, timeoutMs);
   }
 
   turnResult(turnId) {
-    const bucket = this.turns.get(turnId);
-    if (!bucket) return undefined;
-    return {
-      finalMessage: bucket.completed?.finalMessage ?? bucket.finalMessage ?? bucket.text,
-      completed: bucket.completed?.notification
-    };
+    return this.turnLifecycle.turnResult(turnId);
   }
 
   #write(frame) {
@@ -939,7 +927,8 @@ export class CodexAppServerTransport extends EventEmitter {
     this.process.stdin.write(`${JSON.stringify(frame)}\n`);
   }
 
-  #consumeLine(line) {
+  #consumeLine(line, child) {
+    if (this.process !== child) return;
     let message;
     try {
       message = JSON.parse(line);
@@ -960,8 +949,8 @@ export class CodexAppServerTransport extends EventEmitter {
         ));
       } else {
         const turn = message.result?.turn;
-        if (pending.method === "turn/start" && turn?.id && !this.turns.get(turn.id)?.completed) {
-          this.activeTurns.add(turn.id);
+        if (pending.method === "turn/start" && turn?.id) {
+          this.turnLifecycle.recordStart(turn.id);
         }
         pending.resolve(message.result ?? {});
       }
@@ -972,12 +961,13 @@ export class CodexAppServerTransport extends EventEmitter {
       void this.#handleServerRequest(message);
       return;
     }
-    this.#recordEvent(message);
+    this.turnLifecycle.recordEvent(message);
     this.emit("event", message);
   }
 
   async #handleServerRequest(message) {
     this.pendingServerRequests.set(message.id, message);
+    this.turnLifecycle.recordServerRequest(message);
     this.emit("serverRequest", {
       id: message.id,
       method: message.method,
@@ -993,6 +983,14 @@ export class CodexAppServerTransport extends EventEmitter {
     this.#notifyIdleIfPossible();
   }
 
+  #clearTurnServerRequests(requestIds, reason) {
+    let count = 0;
+    for (const id of requestIds) {
+      if (this.pendingServerRequests.delete(id)) count += 1;
+    }
+    if (count > 0) this.emit("serverRequestsCleared", { reason, count });
+  }
+
   listPendingServerRequests() {
     return [...this.pendingServerRequests.values()].map((message) => ({
       id: message.id,
@@ -1006,6 +1004,7 @@ export class CodexAppServerTransport extends EventEmitter {
       throw new AppServerTransportError("invalid_request", `Unknown pending app-server request: ${String(id)}`);
     }
     this.pendingServerRequests.delete(id);
+    this.turnLifecycle.recordServerResponse(id);
     try {
       this.#write({ id, ...response });
     } finally {
@@ -1016,46 +1015,13 @@ export class CodexAppServerTransport extends EventEmitter {
     return { id, accepted: true };
   }
 
-  #recordEvent(message) {
-    const params = message.params ?? {};
-    const turnId = params.turnId ?? params.turn?.id;
-    if (!turnId) return;
-    if (message.method === "turn/started") this.activeTurns.add(turnId);
-    if (message.method === "turn/completed") {
-      this.activeTurns.delete(turnId);
-      this.#notifyIdleIfPossible();
-    }
-    const bucket = this.turns.get(turnId) ?? { events: [], text: "", waiters: [] };
-    bucket.events.push(message);
-    if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") {
-      bucket.text += params.delta;
-    }
-    if (message.method === "item/completed" && params.item?.type === "agentMessage") {
-      bucket.finalMessage = params.item.text;
-    }
-    if (message.method === "turn/completed") {
-      bucket.completed = {
-        finalMessage: bucket.finalMessage ?? bucket.text,
-        events: bucket.events,
-        notification: params
-      };
-      for (const waiter of bucket.waiters ?? []) waiter.resolve(bucket.completed);
-      bucket.waiters = [];
-    }
-    this.turns.set(turnId, bucket);
-  }
-
   #failAll(error) {
-    this.activeTurns.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
       pending.reject(error);
     }
     this.pending.clear();
-    for (const bucket of this.turns.values()) {
-      for (const waiter of bucket.waiters ?? []) waiter.reject(error);
-      bucket.waiters = [];
-    }
+    this.turnLifecycle.failAll(error);
     // Notify only after the busy sets are empty so a scheduleWhenIdle waiter
     // wakes into a genuinely idle (or disposed) transport.
     this.#notifyIdleIfPossible();
