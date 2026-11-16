@@ -13,6 +13,11 @@ import { SettingsActionDialog } from "./settings/SettingsActionDialog";
 import { agentAvailabilityDetail } from "./settings/packages";
 import { gatewayAccountErrorMessage } from "./settings/gatewayAccountMessages";
 import { actionReceiptView } from "./actionReceiptView";
+import {
+  appServerUnavailableRequestMessage,
+  isTurnScopedServerRequestsCleanup,
+  removeServerRequests
+} from "./codexServerRequestState";
 import { WorkspaceReviewPreview } from "../composition/workspaceClientPlugin";
 import {
   createConversationWorkspaceView,
@@ -1493,14 +1498,18 @@ export function App({
         setPendingServerRequests((items) => items.some((item) => item.id === request.id)
           ? items
           : [...items, { id: request.id, method: request.method, params: request.params ?? {} }]);
+        setPendingServerRequestError("");
       }
       return;
     }
     if (method === "codex/server-requests-cleared") {
+      const detail = params as import("../bridge/oplBridge").CodexServerRequestsClearedDetail;
+      if (isTurnScopedServerRequestsCleanup(detail.reason)) {
+        setPendingServerRequests((items) => removeServerRequests(items, detail.requestIds ?? []));
+        return;
+      }
       setPendingServerRequests([]);
-      setPendingServerRequestError(settings.locale === "zh"
-        ? "Codex App Server 已退出，待处理请求已清除。"
-        : "The Codex App Server exited; pending requests were cleared.");
+      setPendingServerRequestError(appServerUnavailableRequestMessage(settings.locale));
       return;
     }
     if (method === "turn/started") {
