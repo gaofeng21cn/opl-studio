@@ -46,8 +46,7 @@ export const CODEX_APP_SERVER = {
     ":workspace": { approvalPolicy: "on-request", sandbox: "workspace-write" },
     ":read-only": { approvalPolicy: "on-request", sandbox: "read-only" }
   },
-  requestTimeoutSeconds: 45,
-  turnTimeoutSeconds: 180
+  requestTimeoutSeconds: 45
 } as const;
 
 
