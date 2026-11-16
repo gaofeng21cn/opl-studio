@@ -20,7 +20,8 @@ files:
   - "!node_modules/**/*.map"
   - "!node_modules/**/*.ts"
   - "!node_modules/**/*.tsx"
-  - "!node_modules/**/{test,tests,__tests__,example,examples,benchmark,benchmarks,docs,doc}/**"
+  # Nested directories such as yaml/dist/doc contain runtime code.
+  - "!node_modules/{*,@*/*}/{test,tests,__tests__,example,examples,benchmark,benchmarks,docs,doc}/**"
   - "!node_modules/**/{README.md,CHANGELOG.md,CHANGES.md}"
 extraResources:
   - from: resources/opl-branding

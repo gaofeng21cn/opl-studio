@@ -320,6 +320,7 @@
     "build-mac:arm64": "node scripts/desktop/build-release.mjs arm64",
     "build-mac:x64": "node scripts/desktop/build-release.mjs x64",
     "build:plugins": "node scripts/build-dsh-plugins.mjs",
+    "dsh:plugins": "node scripts/dsh-profile-plugins.mjs",
     "prepare": "npm run build:plugins",
     "test:dsh-plugins": "node --test scripts/dsh-plugin-packages.test.mjs",
     "test:mcp-apps": "node --test src/host/mcp-app-host.test.mjs && bun test tests/workbench/mcp-app-host.test.mts",

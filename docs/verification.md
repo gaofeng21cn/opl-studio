@@ -30,6 +30,8 @@ is the command owner.
 | `npm run headless:install` / `headless:status` / `headless:stop` / `headless:start` / `headless:restart` / `headless:update` / `headless:rollback` / `headless:uninstall` | Current-user macOS/Linux native service lifecycle commands; platform support and public distribution remain separately admitted |
 | `npm run test:threads` | Standard Desktop/WebUI thread lifecycle, pagination, renderer, and Codex subagent projection tests |
 | `npm run test:webui-host` | DSH Host boot/profile/plugin inventory, authenticated DSH-tool MCP, persistent Codex ownership, shared Host core, HTTP/SSE, model/thread pagination, OPL projection, and read-only mutation guard |
+| `node --test scripts/dsh-profile-plugins.test.mjs` | Native profile add/remove, actual Superagent workbench boot with a fixture Codex transport, baseline restoration and source-selection guards |
+| `node --test scripts/desktop-runtime-pruning.test.mjs` | Execute YAML parsing after applying both desktop carriers' dependency pruning filters |
 | `node --test src/host/opl-passthrough.test.mjs` | Fast Host projection compression, managed-update envelope filtering, and bounded state transport |
 | `node --test src/host/link-internet.test.mjs` | Authenticated virtual Link routing, device/thread-scoped chunk receipts, bounded file ranges, version changes, and enrollment identity rejection, actual candidate classification/redaction, and ciphertext counters |
 | `node --test src/host/thread-workspace-service.test.mjs` | Canonical thread-workspace list/read/search behavior, bounds, UTF-8 handling, and traversal/symlink containment |

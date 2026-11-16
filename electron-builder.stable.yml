@@ -28,7 +28,9 @@ files:
   - "!node_modules/**/*.map"
   - "!node_modules/**/*.ts"
   - "!node_modules/**/*.tsx"
-  - "!node_modules/**/{test,tests,__tests__,example,examples,benchmark,benchmarks,docs,doc}/**"
+  # Prune authoring directories only at a package root. Nested names can be
+  # executable code (for example yaml/dist/doc), required by the DSH CLI.
+  - "!node_modules/{*,@*/*}/{test,tests,__tests__,example,examples,benchmark,benchmarks,docs,doc}/**"
   - "!node_modules/**/{README.md,CHANGELOG.md,CHANGES.md}"
 extraResources:
   - from: resources/opl-official-profile

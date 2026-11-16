@@ -75,6 +75,30 @@ Startup is DSH tree and Tool MCP, then Codex App Server, then Framework bridge.
 Shutdown reverses the stateful edges: Framework callback, Codex App Server,
 then the Cordis tree.
 
+### Independent Host Plugin Updates
+
+The bundled profile is a baseline. Compatible native npm packages installed in
+`$DSH_HOME/profiles/opl-studio` can override it without modifying the desktop
+bundle. `npm run dsh:plugins -- inspect` reads native profile resolution;
+`update-source --package opl-superagent` builds and packs only the selected
+Studio package, then uses the official DSH plugin manager/pnpm operation.
+`remove --package @one-person-lab/opl-superagent` removes that override and
+restores the bundled baseline on the next launch. Multiple explicit `--package`
+arguments are supported. Installation reports restart required, not activation.
+
+The operator can select another carrier with `--install-anchor <package.json>`
+and another native home with `--home <directory>`. The default anchor is the
+installed macOS App. This source lane does not publish npm artifacts, configure
+an automatic public update channel, or change Framework Package lifecycle.
+DSH retains package metadata admission, profile resolution and locking; Studio
+adds no package registry, loader or compatibility exemptions.
+
+Electron, DSH core/cohort and the statically compiled Studio renderer still
+require a carrier update. The source lane rejects `opl-studio-client`, whose
+client entry currently bridges that static renderer. Runtime dependency files
+must survive carrier pruning, including nested directories named `doc` such as
+`yaml/dist/doc`; source boot alone cannot verify packaged dependency closure.
+
 `opl-dsh-tool-mcp` exposes the current DSH `ctx.tools` registry through a
 stateful Streamable HTTP MCP endpoint on the Host loopback WebServer. A random
 bearer token is visible only to the Codex child environment. Codex receives the
