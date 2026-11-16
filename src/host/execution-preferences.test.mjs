@@ -4,7 +4,7 @@ import { CodexAppServerTransport } from './app-server-transport.mjs';
 
 class CapturingTransport extends CodexAppServerTransport {
   constructor() { super({ cwd: '/tmp/opl-preferences-test' }); }
-  async resumeThread() {}
+  async resumeThread(threadId) { return { thread: { id: threadId, cwd: '/tmp/opl-preferences-test' } }; }
   async startThread() { return { thread: { id: 'new-thread' } }; }
   async startTurn(threadId, prompt, inputs, options) { this.observed = { threadId, prompt, inputs, options }; throw Error('captured before execution'); }
 }

@@ -300,7 +300,7 @@ test("standard Agent selection starts a thread or adds turn context without rebi
   transport.request = async (method, params) => {
     requests.push({ method, params });
     if (method === "thread/start") return { thread: { id: `thread-${++threadSequence}` } };
-    if (method === "thread/resume") return { thread: { id: params.threadId } };
+    if (method === "thread/resume") return { thread: { id: params.threadId, cwd: "/tmp/opl-studio-agent-fixture" } };
     if (method === "turn/start") {
       const turnId = `turn-${++turnSequence}`;
       turnByThread.set(params.threadId, turnId);
@@ -311,6 +311,7 @@ test("standard Agent selection starts a thread or adds turn context without rebi
       return {
         thread: {
           id: params.threadId,
+          cwd: "/tmp/opl-studio-agent-fixture",
           status: { type: "idle" },
           turns: [{ id: turnByThread.get(params.threadId), status: "completed" }]
         }
@@ -400,7 +401,7 @@ test("App session instructions are injected only when a new Codex conversation i
   transport.request = async (method, params) => {
     requests.push({ method, params });
     if (method === "thread/start") return { thread: { id: "thread-context" } };
-    if (method === "thread/resume") return { thread: { id: params.threadId } };
+    if (method === "thread/resume") return { thread: { id: params.threadId, cwd: "/tmp/opl-studio-context-fixture" } };
     if (method === "turn/start") {
       const turnId = `turn-${requests.length}`;
       turnByThread.set(params.threadId, turnId);
@@ -410,6 +411,7 @@ test("App session instructions are injected only when a new Codex conversation i
       return {
         thread: {
           id: params.threadId,
+          cwd: "/tmp/opl-studio-context-fixture",
           status: { type: "idle" },
           turns: [{ id: turnByThread.get(params.threadId), status: "completed" }]
         }

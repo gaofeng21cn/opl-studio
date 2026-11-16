@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CodexAppServerTransport } from "./app-server-transport.mjs";
+import "./app-server-canonical-cwd.cases.mjs";
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
