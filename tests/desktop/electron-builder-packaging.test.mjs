@@ -37,6 +37,7 @@ test('macOS signing skips binary resource data while retaining native signing ca
   const contents = path.join(app, 'Contents');
   const resources = path.join(contents, 'Resources', 'app.asar.unpacked', 'node_modules');
   const framework = path.join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A');
+  const frameworkRoot = path.join(contents, 'Frameworks', 'Electron Framework.framework');
   const write = (filename, bytes) => {
     fs.mkdirSync(path.dirname(filename), { recursive: true });
     fs.writeFileSync(filename, bytes);
@@ -50,6 +51,8 @@ test('macOS signing skips binary resource data while retaining native signing ca
     write(path.join(framework, 'Resources/icudtl.dat'), Buffer.alloc(512)),
     write(path.join(framework, 'Resources/v8_context_snapshot.arm64.bin'), Buffer.alloc(512)),
   ];
+  fs.symlinkSync('Versions/A/Resources', path.join(frameworkRoot, 'Resources'));
+  data.push(write(path.join(frameworkRoot, 'Resources/uk.lproj/locale.pak'), Buffer.alloc(512)));
   const executable = fs.openSync(process.execPath, 'r');
   const nativeBytes = Buffer.alloc(512);
   fs.readSync(executable, nativeBytes);

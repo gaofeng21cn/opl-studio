@@ -57,7 +57,7 @@ mac:
   # Resource data stays covered by the App seal; only native code needs an
   # individual signature. osx-sign otherwise treats binary fonts/CMaps as code.
   signIgnore:
-    - '/Contents/Frameworks/Electron Framework[.]framework/Versions/[^/]+/Resources/(?:[^/]+[.]lproj/locale[.]pak|(?:chrome_[0-9]+_percent|resources)[.]pak|icudtl[.]dat|v8_context_snapshot[.][^/]+[.]bin)$'
+    - '/Contents/Frameworks/Electron Framework[.]framework(?:/Versions/[^/]+)?/Resources/(?:[^/]+[.]lproj/locale[.]pak|(?:chrome_[0-9]+_percent|resources)[.]pak|icudtl[.]dat|v8_context_snapshot[.][^/]+[.]bin)$'
     - '/Contents/Resources/app[.]asar[.]unpacked/node_modules/(?:katex/dist/fonts/[^/]+[.](?:ttf|woff2?)|pdfjs-dist/cmaps/[^/]+[.]bcmap)$'
   target:
     - dmg
