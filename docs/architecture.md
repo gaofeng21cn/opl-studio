@@ -39,6 +39,29 @@ plugins, GUI, and Codex tool exposure. Framework owns OPL runtime/Package
 composition and projections. The bridge uses public contracts rather than
 sharing registries, currentness, sessions, or internal service graphs.
 
+## OPL Link product boundary
+
+The App-owned [OPL Link product contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-remote-companion.json)
+defines the primary mission: operate the existing OPL App remotely from a
+phone. The companion route must continue to use the existing
+`opl-codex-native` and Codex App Server; it does not create a second executor,
+history store, or permission owner.
+
+The separate [phone extension contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-remote-companion-extensions.json)
+defines optional calendar, location, photo, music, health and alarm adapters.
+They are disabled by default. A paired phone, a granted iOS permission, or a
+phone-origin message is not enough to expose a tool to a conversation. Studio
+may admit only a capability explicitly selected for the current request after
+checking the module grant, device capability, live lease, authenticated source
+and canonical thread owner. The next request starts without that catalog.
+
+The current Codex turn start/steer API has no verified request-scoped dynamic
+tool input. Therefore Studio must not register phone tools globally or emit a
+global `tools/list_changed` when a phone connects. Until that gap is closed and
+ordinary desktop and phone conversations are tested concurrently, the adapter
+remains contract-only and disabled; connector failure must never affect the
+remote companion's pairing, conversations, approvals, files or reconnect.
+
 Pinned MIT upstream GUI source keeps typography, layout, tokens, and ordinary
 interaction in one source cohort. OPL data, identity, and bridge adapters stay
 outside the vendor tree, making upgrades replayable without a parallel design

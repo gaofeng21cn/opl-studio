@@ -5,6 +5,21 @@ continues the same conversations and pending requests on Studio’s existing
 DSH Host and persistent Codex App Server. It does not start another runtime or
 copy conversation history into a mobile backend.
 
+The primary product behavior is remote operation of the existing desktop App:
+conversation reading and continuation, approvals, questions, and workspace
+results. Optional phone connectors are governed by the App-owned
+[extension contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-remote-companion-extensions.json).
+They default to disabled and do not enter ordinary desktop or ordinary phone
+remote conversations. Only an explicit selection for the current request,
+intersected with module permission, device capability, live lease, trusted
+source and canonical owner admission, may expose selected tools. The next
+request does not inherit them.
+
+The current implementation keeps these connectors disabled because Codex's
+public turn start/steer contract has no verified request-scoped dynamic tool
+input. A global DSH registration or prompt keyword would pollute unrelated
+conversations and is not an acceptable fallback.
+
 App owns the [companion wire contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-remote-companion-wire.json)
 and [internet connection contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-remote-companion-internet.json).
 This guide describes their Studio implementation. Source qualification and a

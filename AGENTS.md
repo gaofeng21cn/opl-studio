@@ -37,6 +37,7 @@
 - Candidate evidence must not claim active-shell adoption, release readiness,
   production readiness, domain readiness, or artifact authority.
 - Keep packaged macOS and WebUI on the same renderer and bridge shape.
+- OPL Link's primary mission is remote operation of the existing OPL App from a phone. Optional phone connectors follow the App-owned `contracts/app-remote-companion-extensions.json`: default disabled, explicit current-request selection, and no inherited tool catalog. Do not globally register phone tools or use prompt/keyword inference when request-scoped Codex tool admission is unavailable; connector failures must not affect the primary companion path.
 - Write new GitHub-visible text in English: commit subjects and bodies, pull request and issue
   titles and bodies, comments, and release notes. Product names, code identifiers, paths, commands,
   and verbatim quotations are excepted. When replying to an issue, pull request, or comment written
