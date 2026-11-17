@@ -201,10 +201,10 @@ async function installPayload({ payload, target, platform }) {
       mode: fs.constants.COPYFILE_FICLONE,
       preserveTimestamps: true
     });
-    // Package owners keep independently installed/updated payloads. Refresh the
-    // App's toolchain/wrappers without resetting their runtime or losing an
-    // already verified Framework generation waiting for this restart.
-    for (const name of ["modules", "skills", "opl.pending", "opl.pending.json"]) {
+    // Native Package installations live in their owner-managed carriers, outside
+    // this bootstrap seed. Never merge old seed modules/skills into new bytes.
+    // Keep only Framework's already staged activation transaction for restart.
+    for (const name of ["opl.pending", "opl.pending.json"]) {
       const current = path.join(target, name);
       if (!fs.existsSync(current)) continue;
       await fs.promises.cp(current, path.join(temporary, name), {
