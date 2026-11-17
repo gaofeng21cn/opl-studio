@@ -17,29 +17,35 @@ OPL 自有 DSH 插件统一放在这里，每个目录都是标准 npm/DSH 插�
 | `opl-web-routes` | 认证 HTTP/SSE 路由 |
 | `opl-studio-client` | DSH 客户端中的 OPL 界面入口 |
 
-官方 `ui-sidebar-documentpreview` 不是上表的 OPL 自有插件包，而是固定 DSH cohort 的
-`@deepseek-ai/dsh-client-ui-sidebar-documentpreview@0.1.7-rc.2` 客户端载荷。它由
-`build-renderer.mjs` 复制官方 `./client` 到 `dist/ecosystem/`，不复制源码也不改写
-官方实现。当前文件面板仍只使用 OPL workspace 适配器；完整官方插件所需的 Remote、
+官方 `ui-sidebar-documentpreview` 不是上表的 OPL 自有插件包。当前文件预览实际使用的
+固定 DSH cohort UI 源码与 OPL workspace 适配器一起编入产品 Client Plugin，官方 npm
+`./client` 不再复制到 `dist/ecosystem/` 形成独立载荷。完整官方插件所需的 Remote、
 Resource、Sidebar 与 Session 运行时齐备后，真实调用者才切换到官方 `apply()`。
+
+`dsh-settings-search` 1.14.0 缺少本地搜索 feature-policy hook，既有 SHA-bound 兼容补丁
+保留搜索、索引、快捷键与日志，关闭其独立模型与凭据路径。它作为普通 Vite 构建依赖
+编入 `opl-studio-client`，不作为另一个 discovery row 或静态客户端加载器。
 
 每个包用 `package.json` 声明名称、版本、描述、许可、DSH 兼容版本和 `exports`。
 统一目录为 package.json、src/index.mjs 和生成的 lib/index.mjs；有客户端时增加
-src/client.js 与生成的 lib/client.js。第三方原始资产保存在包内 upstream/。
+客户端源码入口与生成的 lib/client.js。第三方原始资产保存在包内 upstream/。
 Host 入口导出 Cordis `apply` 与 `inject`；客户端声明 `dsh.client` 和 `./client`。
-不要建立第二种 OPL 专用 DSH manifest。插件组合继续由
+不要建立第二种 OPL 专用 DSH manifest。Host 插件启用关系继续由
 [`cordis.yml`](../src/host/dsh/cordis.yml) 和
-[`web.patch.yml`](../src/host/dsh/web.patch.yml) 按包名装载。
+[`web.patch.yml`](../src/host/dsh/web.patch.yml) 按包名装载。官方 `clientModules` 从当前
+启用包的 `dsh.client` 声明生成客户端 graph，由官方 `AppWebEntry` 装载与挂载。
+Electron 只通过受限桥接读取同一 Host graph 的 index injections 和 `/plugins` 资源。
 
 Host 实现在各包 `src/`；跨插件的协议和工具代码在 `src/host/`。
 `npm run build:plugins` 把 Host 本地依赖打入各包 `lib/`，外部 npm 依赖由宿主提供。
 客户端产物遵守 DSH ModuleLoader 格式。`npm install` 的 prepare 与 renderer 构建都会
-生成插件载荷；仅修改源码后跑 Host 测试前也要运行 `build:plugins`。
+生成 Host 插件及客户端载荷；仅修改源码后跑 Host 测试前也要运行 `build:plugins`。
 
 所有插件统一从 `node_modules/<package-name>` 解析。源码开发使用本地 file 依赖；
 Desktop 打包为真实文件，Docker 保留完整插件目录以满足本地依赖链接。可用性用
 DSH inventory 和实际 Host 启动验证，不能只靠目录存在。独立包形态不代表当前已在
-npm 发布，也不改变 App 内置插件随 App 发布的更新责任。
+npm 发布。兼容 Host/Client 包（包括 `opl-studio-client`）可通过原生 profile 独立更新并在
+重启后激活；Electron、DSH core/cohort 和小型 boot shell 仍由 App carrier 更新。
 
 本目录不放 Codex 插件市场的领域能力包；微信等由 Framework 托管的能力通过
 `opl-framework-bridge` 接入。它们有自己的 ABI，不是 DSH 插件。

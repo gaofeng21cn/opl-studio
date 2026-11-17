@@ -56,7 +56,8 @@ DSH services:
 - `dsh-system-prompt` without DSH identity or runtime context;
 - `dsh-tools` in native registry mode;
 - `dsh-host-webserver` and `dsh-host-plugin-inventory`;
-- Web-only frontend static hosting and client modules.
+- `dsh-client-modules` for the official Host-produced client graph;
+- Web-only frontend static hosting for the small boot shell.
 
 The main profile does not load `dsh-base`. The on-demand collaboration profile runs the complete official base/Web
 application through the official CLI. Its private Node IPC transport borrows the
@@ -75,7 +76,7 @@ Startup is DSH tree and Tool MCP, then Codex App Server, then Framework bridge.
 Shutdown reverses the stateful edges: Framework callback, Codex App Server,
 then the Cordis tree.
 
-### Independent Host Plugin Updates
+### Independent Host And Client Plugin Updates
 
 The bundled profile is a baseline. Compatible native npm packages installed in
 `$DSH_HOME/profiles/opl-studio` can override it without modifying the desktop
@@ -91,7 +92,7 @@ arguments are supported. Installation reports restart required, not activation.
 
 The operator can select another carrier with `--install-anchor <package.json>`
 and another native home with `--home <directory>`. The default anchor is the
-installed macOS App. The public plugin channel publishes OPL DSH Host plugins to
+installed macOS App. The public plugin channel publishes OPL DSH Host and Client plugins to
 GitHub Packages via `release-dsh-plugins.yml` CI on push to main; the composition
 compatibility test (`release-plugin-composition-test.yml`) validates combinations
 and emits a composition receipt for the shell-unchanged stable release path.
@@ -102,19 +103,26 @@ than treating them as a successful currentness check. Composition CI installs an
 boots the receipt's exact registry versions; source-package tests alone cannot
 qualify that receipt.
 
-Electron, DSH core/cohort and the statically compiled Studio renderer still
-require a carrier update. The source lane rejects `opl-studio-client`, whose
-client entry currently bridges that static renderer. Runtime dependency files
-must survive carrier pruning, including nested directories named `doc` such as
+The active Cordis profile selects Host plugins. The official `clientModules`
+service scans their `dsh.client` declarations and publishes the module graph,
+revisioned bundles, and index injections. `src/main.tsx` runs the official
+`AppWebEntry` boot for both WebUI and Electron. Electron's restricted bridge
+transports the same Host-owned index injections and advertised `/plugins`
+resources; there is no static second loader or App-owned Bundle Profile.
+
+`opl-studio-client`, Superagent, Team/Bot, and MCP Apps clients carry their own
+bundled UI bytes as standard DSH Client Plugins. Profile overrides select those
+packages on the next launch, so compatible product UI updates do not require
+recompiling the boot shell. Electron, the DSH core/cohort, and the small
+`AppWebEntry` boot shell remain carrier-owned. Runtime dependency files must
+survive carrier pruning, including nested directories named `doc` such as
 `yaml/dist/doc`; source boot alone cannot verify packaged dependency closure.
 
-This is partial plugin delivery. Superagent, Team/Bot and MCP Apps client
-implementations are still imported into `src/main.tsx` and the static renderer;
-updating their Host package alone changes neither those views nor the main UI.
-The remaining cutover must use the official DSH client module graph and Cordis
-lifecycle for the real callers. The registry CLI also remains an operator entry;
-App-integrated update/readback and a production Stable artifact consumer have
-not been qualified. The candidate workflow is not a second release controller.
+The composition receipt records one tested published Host/Client combination.
+It is release evidence rather than a runtime discovery list. App-integrated
+update/readback and production Stable artifact consumption retain their own
+installed and release qualification; the candidate workflow is not a second
+release controller.
 
 `opl-dsh-tool-mcp` exposes the current DSH `ctx.tools` registry through a
 stateful Streamable HTTP MCP endpoint on the Host loopback WebServer. A random
@@ -177,7 +185,7 @@ that machine. No external Source is configured or enabled for work by OPL.
 
 The profile is opt-in and preserves its database/configuration after stopping.
 The main renderer entry uses standard plugin metadata and DSH slots; desktop
-mounts the same client plugin objects through Cordis. Neither feature creates
+loads the same Host graph through `AppWebEntry` and Cordis. Neither feature creates
 another plugin format, loader, task registry or general communication protocol.
 
 ## Client Composition Boundary

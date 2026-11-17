@@ -9,18 +9,16 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
 | DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.2`，MIT，与固定 cohort 同步 | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备和状态内容，不装载其模型或凭据 controller |
-| DSH Client Modules | 与 Studio DSH cohort 同步，MIT | 直接使用官方 `createClientModuleSystem` 装载客户端 factory，React 由 Studio 单实例提供 |
+| DSH Client Modules | 与 Studio DSH cohort 同步，MIT | Host 扫描当前启用包的 `dsh.client` 声明生成 graph，官方 `AppWebEntry` 装载与挂载；React 等平台模块由官方 boot 单实例提供 |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
-| DSH `ui-sidebar-documentpreview` | npm `0.2.2-rc.2`，MIT，固定 DSH cohort | 官方 npm `./client` 已作为静态客户端载荷登记；完整 `apply()` 仍等待文件面板提供官方 Remote、Resource、Sidebar 与 Session 运行时，当前面板使用窄工作区适配器 |
-| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | 保留官方本地设置搜索、索引、快捷键与日志；经 Studio 既有桥接访问日志 |
+| DSH `ui-sidebar-documentpreview` | 固定 DSH cohort 的 MIT 官方源码 | 当前预览 UI 源码编入产品 Client Plugin，文件面板仍使用窄工作区适配器；完整 `apply()` 等待官方 Remote、Resource、Sidebar 与 Session 运行时 |
+| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | SHA-bound 本地搜索兼容补丁作为普通 Vite 构建依赖编入产品 Client Plugin，保留搜索、索引、快捷键与日志，经 Studio 既有桥接访问日志 |
 
-设置搜索使用 1.14.0，功能范围仍是本地设置检索。该版本没有公开的客户端 transport 或 feature-policy 扩展点，却默认提供独立模型、API Key 和直连推理界面。Studio 在构建时应用明确记录的 `settings-search-studio.patch`：保留官方搜索、索引、快捷键与日志，关闭第二套模型与凭据读写，并将固定日志请求交给既有 WebUI/桌面桥。补丁清单同时核对包版本、原始载荷、补丁及结果的 SHA-256；不修改安装的 npm 包，输入漂移会阻止构建。日志沿用官方 `createLogStore` 和 `createLogRoute`，存储在当前 DSH home 的独立日志目录，WebUI 保留认证与请求上限，打开目录仅允许本机桌面。App/Codex 继续持有模型和凭据。原许可证、上游源码来源与兼容补丁随源码和载体保留。
+设置搜索使用 1.14.0，功能范围仍是本地设置检索。该版本没有公开的本地搜索 feature-policy hook，却默认提供独立模型、API Key 和直连推理界面。Studio 在 Vite 构建时应用明确记录的 `settings-search-studio.patch`，作为普通构建依赖编入 `opl-studio-client`，不再单独发现或加载一个客户端 graph row。补丁保留官方搜索、索引、快捷键与日志，关闭第二套模型与凭据读写，并将固定日志请求交给既有 WebUI/桌面桥。补丁清单同时核对包版本、原始载荷、补丁及结果的 SHA-256；不修改安装的 npm 包，输入漂移会阻止构建。日志沿用官方 `createLogStore` 和 `createLogRoute`，存储在当前 DSH home 的独立日志目录，WebUI 保留认证与请求上限，打开目录仅允许本机桌面。App/Codex 继续持有模型和凭据。原许可证、上游源码来源与兼容补丁随源码和产品 Client Plugin 保留。
 
-`EcosystemFilePreview` 将当前 canonical thread 的相对路径交给 OPL workspace 适配器。Markdown、HTML、图片和普通文本由窄适配器呈现；官方 `ui-sidebar-documentpreview` 的 npm 客户端独立随载体提供，但只有完整的 `remote.workspaceFiles`、`resources`、`sidebarRightTabs`、Session 生命周期和 `apply()` 注入链到位后才切换真实调用者。当前 Office/Excel/PDF 等格式明确返回不可用；每次 DSH 升级必须重新评估并优先接入官方完整路径。
+`EcosystemFilePreview` 将当前 canonical thread 的相对路径交给 OPL workspace 适配器。Markdown、HTML、图片和普通文本由窄适配器呈现，实际使用的 UI 源码与适配器一起编入产品 Client Plugin。官方 `ui-sidebar-documentpreview` 的 npm 客户端不再静态复制为独立载荷；只有完整的 `remote.workspaceFiles`、`resources`、`sidebarRightTabs`、Session 生命周期和 `apply()` 注入链到位后才切换完整官方调用者。当前 Office/Excel/PDF 等格式明确返回不可用；每次 DSH 升级必须重新评估并优先接入官方完整路径。
 
-加载器使用显式审阅的随包客户端列表。它不自动扫描、安装或激活任意外部 npm 包，也不替代 Framework 管理的 OPL Package 图。后续插件应先核对许可证、真实注入依赖和 owner 边界，再加入载体并验证真实界面。
-
-客户端静态构建从 `ecosystem/` 加载；`plugins/` 路由由 DSH Host 的插件服务占用。通用文档预览源码随固定 DSH cohort vendored，OPL 不再维护平行社区 viewer 载荷。
+客户端发现与装载直接复用官方 Host graph 和 `AppWebEntry`。Host 从当前启用的 Cordis Loader entries 扫描 `dsh.client`，不扫描磁盘上的所有 npm 包；原生 profile 继续持有启用和依赖解析。Electron 只转发官方 index injections 和 `/plugins` 资源，没有 `dist/ecosystem/` 静态第二加载器。settings-search 与当前预览源码属于产品 Client Plugin 的构建依赖，不各自制造独立发现清单，也不替代 Framework 管理的 OPL Package 图。后续插件仍须核对许可证、真实注入依赖和 owner 边界，并验证实际界面。
 
 社区检索也确认 [AKS1st/dock-git](https://github.com/AKS1st/dock-git) 提供 Git 历史、差异、暂存、提交、推送和分支功能，采用 MIT。它依赖 `dock-base` 的工作台布局和另一组 Cordis/React peer，目前保留为可选适配候选，尚未集成或完成 Studio 运行验收。Git 不需要由 OPL 从头开发，但包存在与可直接安装是两个不同结论。
 
@@ -29,7 +27,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 ## 客户端扩展与设置生命周期
 
 `opl-studio-client` 在现有 Cordis context 中安装官方 `SlotRegistry` 和 renderer。
-静态界面与 Framework contribution 共用原生注册入口；store、factory occurrence、
+产品界面与 Framework contribution 共用原生注册入口；store、factory occurrence、
 声明依赖和卸载由 DSH 负责。每个客户端实例独立，不再使用模块级 slot host、空 store
 实现。官方 renderer 所需的 session scope 由当前 canonical Codex 线程的薄投影提供，
 未选择线程时为空，切换时销毁旧视图 fiber；不维护第二套 session 数据。
