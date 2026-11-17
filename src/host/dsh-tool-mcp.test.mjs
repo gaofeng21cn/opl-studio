@@ -3,6 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { initProfile } from "@deepseek-ai/dsh-app-boot";
+import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { codexArgsWithDshToolMcp } from "../../plugins/opl-codex-native/src/service.mjs";
@@ -26,6 +29,64 @@ function emptyOpl() {
     executeAction: async () => ({})
   };
 }
+
+test("native profile plugins contribute to the official client graph and disappear when disabled", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-studio-client-profile-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const dshHome = path.join(directory, "dsh");
+  const profileDir = path.join(dshHome, "profiles", "opl-studio");
+  const packageDir = path.join(directory, "source", "opl-dsh-test-client");
+  const nestedDir = path.join(packageDir, "nested");
+  await mkdir(nestedDir, { recursive: true });
+  await writeFile(path.join(packageDir, "package.json"), JSON.stringify({
+    name: "opl-dsh-test-client",
+    version: "1.0.0",
+    type: "module",
+    exports: { ".": "./index.mjs", "./client": "./client.js", "./package.json": "./package.json" },
+    dsh: { manifestVersion: 1, client: { platform: "web", inject: ["@one-person-lab/opl-studio-client"] } }
+  }, null, 2));
+  await writeFile(path.join(packageDir, "index.mjs"), "export function apply() {}\n");
+  await writeFile(path.join(packageDir, "client.js"),
+    'window.__ModuleLoader__.load({id:"opl-dsh-test-client",factory:()=>({apply(){}})});\n');
+  await writeFile(path.join(nestedDir, "package.json"), JSON.stringify({ name: "opl-dsh-test-nested", type: "module" }));
+  await writeFile(path.join(nestedDir, "index.mjs"), "export function apply() {}\n");
+  await writeFile(path.join(nestedDir, "cordis.yml"), "- id: nested-client-proof\n  name: ./index.mjs\n");
+
+  initProfile(profileDir, []);
+  const installation = await runPluginCommand({
+    profile: "opl-studio",
+    dir: profileDir,
+    installAnchor: fileURLToPath(new URL("../../package.json", import.meta.url)),
+    home: dshHome,
+    cwd: directory
+  }, ["add", "--save-exact", packageDir], { execution: "service", activateNewBundles: false });
+  assert.equal(installation.exitCode, 0, installation.output);
+  await writeFile(path.join(profileDir, "cordis.patch.yml"), `
+- insert:
+    - id: profile-client-proof
+      name: opl-dsh-test-client
+    - id: nested-proof
+      name: cordis:include
+      config:
+        path: ${JSON.stringify(path.join(nestedDir, "cordis.yml"))}
+`);
+  const { context, core } = await bootOplStudioHost({ dshHome, transport: fakeTransport, opl: emptyOpl(), webPort: 0 });
+  t.after(() => core.close());
+
+  const entry = context.loader.entries().find((entry) => entry.options.id === "profile-client-proof");
+  const nested = context.loader.entries().find((entry) => entry.options.id === "nested-client-proof");
+  const modules = context.get("clientModules");
+  assert.equal(entry?.fiber?.state, 2);
+  assert.equal(nested?.fiber?.state, 2);
+  assert.equal(nested.parent.tree.ctx.baseUrl, pathToFileURL(`${nestedDir}${path.sep}`).href);
+  assert.ok(modules.graph().entries.some((row) => row.id === "opl-dsh-test-client"));
+
+  await entry.update({ disabled: true });
+  await context.loader.await();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(entry.disabled, true);
+  assert.ok(!modules.graph().entries.some((row) => row.id === "opl-dsh-test-client"));
+});
 
 async function writeProfileTool(dshHome) {
   const profileDir = path.join(dshHome, "profiles", "opl-studio");

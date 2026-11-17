@@ -36,6 +36,7 @@ export function resolveWebBindAddress(host = "127.0.0.1", interfaces = os.networ
 export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   const dshHome = resolveDshHome(options.dshHome, options.env ?? process.env);
   const profileDir = resolveProfileDir(profileName, dshHome);
+  const profileBaseUrl = pathToFileURL(path.join(profileDir, "package.json")).href;
   initProfile(profileDir, []);
   const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
   const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
@@ -49,6 +50,16 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
     profilePath,
     patches,
     async (ctx) => {
+      // DSH's packaged Include imports bare names from the profile anchor, but
+      // its tree keeps the shipped config directory as baseUrl. Keep metadata
+      // consumers (including the official client graph) on that same anchor.
+      // Nested Includes retain the resolution base of their own config file.
+      ctx.on("loader/patch-context", async (entry, next) => {
+        await next();
+        if (entry.parent.tree.filename === profilePath) {
+          entry.parent.tree.ctx.baseUrl = profileBaseUrl;
+        }
+      });
       ctx.provide(OPL_STUDIO_HOST_OPTIONS_SERVICE, Object.freeze({
         ...options,
         webHost: resolveWebBindAddress(options.webHost),
@@ -62,7 +73,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
       }));
       await ctx.plugin(PluginPackages, { resolution });
     },
-    pathToFileURL(path.join(profileDir, "package.json")).href
+    profileBaseUrl
   );
   const core = context.get("oplHostCore");
   if (!core) {
