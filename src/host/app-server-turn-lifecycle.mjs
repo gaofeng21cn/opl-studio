@@ -1,6 +1,10 @@
 import { AppServerTransportError } from "./app-server-protocol.mjs";
 
-const isHumanApproval = method => typeof method === "string" && method.endsWith("/requestApproval");
+const requiresHumanResponse = ({ method, params }) => typeof method === "string" && (
+  method.endsWith("/requestApproval")
+  || (method === "item/tool/requestUserInput" && params?.isBlocking !== false)
+  || method === "mcpServer/elicitation/request"
+);
 const eventTurnId = params => params.turnId ?? params.turn?.id;
 
 export class TurnLifecycle {
@@ -11,7 +15,8 @@ export class TurnLifecycle {
     this.turns = new Map();
     this.activeTurns = new Set();
     this.requestTurns = new Map();
-    this.approvalRequests = new Map();
+    this.humanRequests = new Map();
+    this.threadHumanRequests = new Map();
   }
 
   hasPendingWaits() {
@@ -48,24 +53,36 @@ export class TurnLifecycle {
   }
 
   recordServerRequest(message) {
-    const turnId = eventTurnId(message.params ?? {});
+    const params = message.params ?? {};
+    const turnId = eventTurnId(params);
+    // MCP permits a standalone elicitation without a correlated turn. Preserve
+    // its thread scope without inventing a turn identity or clearing it on completion.
+    if (!turnId && message.method === "mcpServer/elicitation/request" && params.threadId) {
+      this.threadHumanRequests.set(message.id, params.threadId);
+      this.#threadActivity(params.threadId);
+    }
     if (!turnId) return;
     this.requestTurns.set(message.id, turnId);
-    if (isHumanApproval(message.method)) {
-      const approvals = this.approvalRequests.get(turnId) ?? new Set();
-      approvals.add(message.id);
-      this.approvalRequests.set(turnId, approvals);
+    if (requiresHumanResponse(message)) {
+      const requests = this.humanRequests.get(turnId) ?? new Set();
+      requests.add(message.id);
+      this.humanRequests.set(turnId, requests);
     }
     this.#activity(turnId, this.#bucket(turnId));
   }
 
   recordServerResponse(requestId) {
+    const threadId = this.threadHumanRequests.get(requestId);
+    if (threadId) {
+      this.threadHumanRequests.delete(requestId);
+      this.#threadActivity(threadId);
+    }
     const turnId = this.requestTurns.get(requestId);
     if (!turnId) return;
     this.requestTurns.delete(requestId);
-    const approvals = this.approvalRequests.get(turnId);
-    approvals?.delete(requestId);
-    if (approvals?.size === 0) this.approvalRequests.delete(turnId);
+    const requests = this.humanRequests.get(turnId);
+    requests?.delete(requestId);
+    if (requests?.size === 0) this.humanRequests.delete(turnId);
     this.#activity(turnId, this.#bucket(turnId));
   }
 
@@ -74,6 +91,7 @@ export class TurnLifecycle {
     const turnId = eventTurnId(params);
     if (!turnId) return;
     const bucket = this.#bucket(turnId);
+    if (params.threadId) bucket.threadId = params.threadId;
     if (message.method === "turn/started" && !bucket.completed) this.activeTurns.add(turnId);
     bucket.events.push(message);
     if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") {
@@ -111,7 +129,8 @@ export class TurnLifecycle {
       for (const waiter of waiters) waiter.reject(error);
     }
     this.requestTurns.clear();
-    this.approvalRequests.clear();
+    this.humanRequests.clear();
+    this.threadHumanRequests.clear();
   }
 
   #bucket(turnId) {
@@ -134,16 +153,27 @@ export class TurnLifecycle {
     this.#arm(turnId, bucket);
   }
 
+  #threadActivity(threadId) {
+    for (const [turnId, bucket] of this.turns) {
+      if (bucket.threadId === threadId) this.#activity(turnId, bucket);
+    }
+  }
+
+  #waitingForHuman(turnId, bucket) {
+    return this.humanRequests.get(turnId)?.size
+      || (bucket.threadId && [...this.threadHumanRequests.values()].includes(bucket.threadId));
+  }
+
   #arm(turnId, bucket) {
     this.#clearTimer(bucket);
-    if (bucket.completed || bucket.waiters.length === 0 || this.approvalRequests.get(turnId)?.size) return;
+    if (bucket.completed || bucket.waiters.length === 0 || this.#waitingForHuman(turnId, bucket)) return;
     const remaining = Math.max(0, bucket.timeoutMs - (Date.now() - bucket.lastActivityAt));
     bucket.timer = setTimeout(() => this.#expire(turnId, bucket), remaining);
   }
 
   #expire(turnId, bucket) {
     bucket.timer = null;
-    if (bucket.completed || bucket.waiters.length === 0 || this.approvalRequests.get(turnId)?.size) return;
+    if (bucket.completed || bucket.waiters.length === 0 || this.#waitingForHuman(turnId, bucket)) return;
     const idle = Date.now() - bucket.lastActivityAt;
     if (idle < bucket.timeoutMs) {
       this.#arm(turnId, bucket);
@@ -169,7 +199,7 @@ export class TurnLifecycle {
       requestIds.push(requestId);
       this.requestTurns.delete(requestId);
     }
-    this.approvalRequests.delete(turnId);
+    this.humanRequests.delete(turnId);
     if (requestIds.length > 0) this.onClearRequests(requestIds, reason);
   }
 

@@ -51,24 +51,96 @@ test("continuous turn activity extends the inactivity window until completion", 
   assert.equal(transport.activeTurns.has("turn-stream"), false);
 });
 
-test("an outstanding human approval pauses inactivity rejection beyond the timeout", async (t) => {
+for (const method of [
+  "item/commandExecution/requestApproval",
+  "item/fileChange/requestApproval",
+  "item/permissions/requestApproval",
+  "item/tool/requestUserInput",
+  "mcpServer/elicitation/request"
+]) test(`an outstanding ${method} pauses inactivity rejection beyond the timeout`, async (t) => {
   const transport = createTransport(t);
   await startTurn(transport, "turn-approval");
   const waiting = outcome(transport.waitForTurn("turn-approval", 80));
   const requestReceived = once(transport, "serverRequest");
   transport.notify("fixture/emit", { steps: [
-    { delay: 20, frame: serverRequest("approval-stream", "turn-approval") }
+    { delay: 20, frame: serverRequest("approval-stream", "turn-approval", method) }
   ] });
   const [request] = await requestReceived;
 
   const early = await Promise.race([waiting, delay(120).then(() => "pending")]);
   assert.equal(early, "pending", "human thinking time must not time out the turn");
+  assert.equal(transport.activeTurns.has("turn-approval"), true);
+  assert.equal(transport.isBusy(), true);
+  assert.deepEqual(transport.listPendingServerRequests().map(item => item.id), [request.id]);
   transport.notify("fixture/respond", {
     requestId: request.id,
     steps: [{ delay: 10, frame: completed("turn-approval") }]
   });
   transport.respondToServerRequest(request.id, { result: { decision: "accept" } });
   assert.equal((await waiting).status, "resolved");
+});
+
+test("all pending human requests must be answered before idle maintenance can run", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-many");
+  const waiting = outcome(transport.waitForTurn("turn-many", 80));
+  const received = [];
+  transport.on("serverRequest", request => received.push(request));
+  transport.notify("fixture/emit", { steps: [
+    { frame: serverRequest("question-many", "turn-many", "item/tool/requestUserInput") },
+    { frame: serverRequest("mcp-many", "turn-many", "mcpServer/elicitation/request") }
+  ] });
+  while (received.length < 2) await delay(5);
+  let idleRuns = 0;
+  const idle = transport.scheduleWhenIdle(() => { idleRuns += 1; });
+  transport.respondToServerRequest("question-many", { result: { answers: {} } });
+  assert.equal(await Promise.race([waiting, delay(120).then(() => "pending")]), "pending");
+  assert.equal(idleRuns, 0);
+  assert.deepEqual(transport.listPendingServerRequests().map(item => item.id), ["mcp-many"]);
+  transport.notify("fixture/respond", {
+    requestId: "mcp-many",
+    steps: [{ frame: completed("turn-many") }]
+  });
+  transport.respondToServerRequest("mcp-many", { result: { action: "accept", content: {} } });
+  assert.equal((await waiting).status, "resolved");
+  await idle;
+  assert.equal(idleRuns, 1);
+});
+
+test("an MCP elicitation without a turn ID pauses only its own thread", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-mcp", { threadId: "thread-mcp" });
+  await startTurn(transport, "turn-unrelated", { threadId: "thread-unrelated" });
+  const received = once(transport, "serverRequest");
+  transport.notify("fixture/emit", { steps: [{ frame: {
+    id: "mcp-standalone", method: "mcpServer/elicitation/request",
+    params: { threadId: "thread-mcp", turnId: null }
+  } }] });
+  await received;
+  const waiting = outcome(transport.waitForTurn("turn-mcp", 80));
+  const unrelated = outcome(transport.waitForTurn("turn-unrelated", 80));
+  assert.equal((await unrelated).error.code, "turn_timeout");
+  assert.equal(await Promise.race([waiting, delay(40).then(() => "pending")]), "pending");
+  // A canonical turn terminal event cannot dispose a standalone MCP request.
+  transport.notify("fixture/emit", { steps: [{ frame: completed("turn-mcp") }] });
+  assert.equal((await waiting).status, "resolved");
+  assert.deepEqual(transport.listPendingServerRequests().map(item => item.id), ["mcp-standalone"]);
+  assert.equal(transport.isBusy(), true);
+  transport.respondToServerRequest("mcp-standalone", { result: { action: "decline" } });
+  assert.equal(transport.isBusy(), false);
+});
+
+test("an explicitly nonblocking question does not suspend inactivity", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-advisory");
+  const received = once(transport, "serverRequest");
+  transport.notify("fixture/emit", { steps: [{ frame: {
+    id: "advisory", method: "item/tool/requestUserInput",
+    params: { turnId: "turn-advisory", isBlocking: false }
+  } }] });
+  await received;
+  const result = await outcome(transport.waitForTurn("turn-advisory", 60));
+  assert.equal(result.error.code, "turn_timeout");
 });
 
 test("turn server requests and their responses re-arm continuous inactivity", async (t) => {
@@ -214,7 +286,7 @@ test("turn timeout emits a turn-scoped cleanup for only the timed-out turn's req
   const received = [];
   transport.on("serverRequest", request => received.push(request));
   transport.notify("fixture/emit", { steps: [
-    { frame: serverRequest("input-expire", "turn-expire", "item/tool/requestUserInput") },
+    { frame: serverRequest("tool-expire", "turn-expire", "item/tool/call") },
     { frame: serverRequest("approval-live", "turn-live") }
   ] });
   while (received.length < 2) await delay(5);
@@ -227,7 +299,7 @@ test("turn timeout emits a turn-scoped cleanup for only the timed-out turn's req
   assert.deepEqual(timeoutDetail, {
     reason: "turn_timeout",
     count: 1,
-    requestIds: ["input-expire"]
+    requestIds: ["tool-expire"]
   });
   assert.deepEqual(
     transport.listPendingServerRequests().map(request => request.id),

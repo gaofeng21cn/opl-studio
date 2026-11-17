@@ -28,7 +28,7 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
     const turnId = params.turnId;
     if (params.eofStarted) eofTurnId = turnId;
     send({ id: frame.id, result: { turn: { id: turnId, status: "inProgress" } } });
-    send({ method: "turn/started", params: { turnId, turn: { id: turnId, status: "inProgress" } } });
+    send({ method: "turn/started", params: { threadId: params.threadId, turnId, turn: { id: turnId, status: "inProgress" } } });
     return;
   }
   if (frame.method === "turn/interrupt") {
