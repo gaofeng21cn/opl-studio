@@ -10,9 +10,11 @@ on:
       - "src/**"
       - "scripts/build-dsh-plugins.mjs"
       - "scripts/vite-build-renderer-entry.mjs"
+      - "scripts/client-runtime-policy.mjs"
       - "scripts/build-dsh-client.mjs"
       - "package.json"
       - "package-lock.json"
+      - ".github/workflows/release-dsh-plugins.yml"
   workflow_dispatch:
     inputs:
       packages:
@@ -42,12 +44,22 @@ jobs:
     outputs:
       matrix: ${{ steps.detect.outputs.matrix }}
       has_plugins: ${{ steps.detect.outputs.has_plugins }}
+      app_sha: ${{ steps.app-source.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
+
+      - name: Resolve App product source
+        id: app-source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          app_sha="$(gh api repos/gaofeng21cn/one-person-lab-app/commits/main --jq .sha)"
+          [[ "$app_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$app_sha" >> "$GITHUB_OUTPUT"
 
       - name: Detect changed plugins
         id: detect
@@ -99,6 +111,8 @@ jobs:
     if: needs.detect.outputs.has_plugins == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      OPL_APP_REPO_ROOT: ${{ github.workspace }}/app-product
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
@@ -106,6 +120,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+
+      - name: Checkout selected App product source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab-app
+          ref: ${{ needs.detect.outputs.app_sha }}
+          path: app-product
           persist-credentials: false
 
       - name: Set up Node.js
@@ -124,6 +146,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Set up pnpm for native profile validation
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          version: "9"
 
       - name: Build plugin
         # buildDshPlugins() accepts a directory name filter.

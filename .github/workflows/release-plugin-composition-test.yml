@@ -39,10 +39,20 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      OPL_APP_REPO_ROOT: ${{ github.workspace }}/app-product
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+
+      - name: Checkout App product source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab-app
+          ref: main
+          path: app-product
           persist-credentials: false
 
       - name: Set up Node.js
@@ -127,6 +137,7 @@ jobs:
         run: |
           node --input-type=module << 'NODE'
           import fs from "node:fs";
+          import { execFileSync } from "node:child_process";
 
           const versions = JSON.parse(process.env.RESOLVED_VERSIONS);
           const dshCohort = process.env.DSH_COHORT;
@@ -139,6 +150,7 @@ jobs:
             plugins: versions,
             tested_at: new Date().toISOString(),
             tested_on_sha: process.env.GITHUB_SHA,
+            app_product_commit: execFileSync("git", ["-C", process.env.OPL_APP_REPO_ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
             registry: "https://npm.pkg.github.com",
           };
 
