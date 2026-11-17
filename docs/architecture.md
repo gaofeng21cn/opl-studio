@@ -131,7 +131,13 @@ updates inspect the selected carrier's baseline and DSH version, retain profile
 authentication, save exact native dependencies, and report lookup failures rather
 than treating them as a successful currentness check. Composition CI installs and
 boots the receipt's exact registry versions; source-package tests alone cannot
-qualify that receipt.
+qualify that receipt. Applying a receipt clears only its selected plugins' old
+local lock records and installed paths before npm refreshes the lockfile; all
+unrelated locked dependencies are retained. Both composition CI and the
+plugin-only candidate consumer then verify non-linked installations, exact
+package identities, registry tarball origins and integrity, and shipped Host
+and Client entrypoints. A matching version number alone does not prove that
+registry bytes were installed.
 
 The active Cordis profile selects Host plugins. The official `clientModules`
 service scans their `dsh.client` declarations and publishes the module graph,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Apply a DSH plugin composition receipt to package.json.
+ * Apply a DSH plugin composition receipt to package.json and invalidate its
+ * selected local plugin resolutions before npm refreshes the lockfile.
  *
  * Replaces file:plugins/<name> deps for OPL Host/client plugins with the exact
  * registry versions from the receipt. After running this script, `npm ci`
@@ -106,12 +107,45 @@ for (const { name, from, to } of changes) {
 }
 
 if (values["dry-run"]) {
-  console.log("\n--dry-run: not writing package.json");
+  console.log("\n--dry-run: not changing manifests, lockfile or installed plugins");
   process.exit(0);
 }
 
+// npm can retain a file: link after a dependency changes to the same registry
+// version, even during `npm install --package-lock-only`. Remove only the
+// selected plugin records and installed paths so npm must resolve their
+// registry tarballs. Keep every unrelated locked dependency unchanged.
+const lockPath = path.join(root, "package-lock.json");
+const lock = fs.existsSync(lockPath) ? JSON.parse(fs.readFileSync(lockPath, "utf8")) : null;
+if (lock && (!lock.packages || !lock.packages[""])) {
+  throw new Error("Composition installation requires a package-lock v2/v3 packages map");
+}
+if (lock) {
+  for (const { name, from, to } of changes) {
+    lock.packages[""].dependencies[name] = to;
+    const installedKey = `node_modules/${name}`;
+    const sourceKey = from.slice("file:".length);
+    for (const key of Object.keys(lock.packages)) {
+      if (key === installedKey || key.startsWith(`${installedKey}/node_modules/`)
+        || key === sourceKey || key.startsWith(`${sourceKey}/node_modules/`)) {
+        delete lock.packages[key];
+      }
+    }
+  }
+}
+
+for (const { name } of changes) {
+  const installedPath = path.join(root, "node_modules", name);
+  const installed = fs.lstatSync(installedPath, { throwIfNoEntry: false });
+  if (!installed) continue;
+  // Unlink explicitly: never follow the old link into plugins/<id>.
+  if (installed.isSymbolicLink()) fs.unlinkSync(installedPath);
+  else fs.rmSync(installedPath, { recursive: true, force: true });
+}
+
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-console.log("\npackage.json patched. Run: npm install --package-lock-only --ignore-scripts && OPL_DSH_REGISTRY_PLUGINS=1 npm ci");
+if (lock) fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
+console.log("\nSelected local plugin resolutions cleared. Run: npm install --package-lock-only --ignore-scripts && OPL_DSH_REGISTRY_PLUGINS=1 npm ci");
 console.log("Then build with: npm run build:desktop -- --registry-plugins");
 console.log("To restore: git checkout package.json package-lock.json");
 

@@ -155,26 +155,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPL_DSH_REGISTRY_PLUGINS: "1"
 
-      - name: Verify no local source compilation occurred
-        shell: bash
-        run: |
-          # Confirm that published plugin lib/ files come from registry
-          # packages in node_modules, not from local plugins/ source dirs.
-          # Product UI is supplied by the same receipt-selected client packages.
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
-          for (const [pkg, version] of Object.entries(receipt.plugins)) {
-            const installed = JSON.parse(
-              fs.readFileSync(`node_modules/${pkg}/package.json`, "utf8")
-            );
-            if (installed.version !== version) {
-              throw new Error(`Expected ${pkg}@${version} but found ${installed.version}`);
-            }
-            console.log(`OK: ${pkg}@${installed.version}`);
-          }
-          console.log("All registry plugin versions match the composition receipt.");
-          NODE
+      - name: Verify exact registry package origins and shipped entrypoints
+        run: node scripts/verify-composition-installation.mjs --receipt composition_receipt.json
 
       - name: Build macOS Desktop candidate (registry-plugins mode)
         run: |

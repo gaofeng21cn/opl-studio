@@ -172,18 +172,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPL_DSH_REGISTRY_PLUGINS: "1"
 
-      - name: Verify exact registry versions
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));
-          for (const [pkg, version] of Object.entries(receipt.plugins)) {
-            const installed = JSON.parse(fs.readFileSync(`node_modules/${pkg}/package.json`, "utf8"));
-            if (installed.version !== version) throw new Error(`Expected ${pkg}@${version}, found ${installed.version}`);
-            console.log(`OK: ${pkg}@${installed.version}`);
-          }
-          NODE
+      - name: Verify exact registry package origins and shipped entrypoints
+        run: node scripts/verify-composition-installation.mjs --receipt composition_receipt.json
 
       - name: Set up pnpm (required by DSH profile resolution)
         uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
