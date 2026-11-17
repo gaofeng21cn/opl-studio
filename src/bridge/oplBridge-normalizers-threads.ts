@@ -1,5 +1,5 @@
 import { asBoolean, asNumber, asRecord, asString } from "./oplBridge-primitives";
-import type { CodexThread, CodexThreadRuntimeStatus, CodexTurn, ThreadListResult } from "../threads/types";
+import type { CodexThread, CodexThreadRuntimeStatus, CodexTurn, ThreadListResult } from "@gaofeng21cn/opl-host-contracts";
 
 function normalizeThreadStatus(value: unknown): CodexThreadRuntimeStatus {
   const record = asRecord(value);

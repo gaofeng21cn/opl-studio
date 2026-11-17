@@ -1,6 +1,6 @@
 import { asRecord, asString, parseJsonValue } from "./oplBridge-primitives";
-import type { OplEventKind } from "./oplBridge-types-state";
-import type { OplBridgeEvent } from "./oplBridge-types-platform-events";
+import type { OplEventKind } from "@gaofeng21cn/opl-host-contracts";
+import type { OplBridgeEvent } from "@gaofeng21cn/opl-host-contracts";
 
 function classifyEventKind(methodOrType: string, payload: Record<string, unknown> | null): OplEventKind {
   const text = methodOrType.toLowerCase();

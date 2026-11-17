@@ -92,6 +92,9 @@
       ],
       "@deepseek-ai/dsh-util-workspace-path": [
         "./src/vendor/deepseek-harness/packages/util/workspace-path/src/index.ts"
+      ],
+      "@gaofeng21cn/opl-host-contracts": [
+        "./packages/host-contracts/src/index.ts"
       ]
     },
     "jsx": "react-jsx",

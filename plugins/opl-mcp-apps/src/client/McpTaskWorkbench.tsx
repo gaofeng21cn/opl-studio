@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { McpAppSession } from "../../../../src/bridge/mcpApps";
+import type { McpAppSession } from "@gaofeng21cn/opl-host-contracts";
 import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
 import { McpAppFrame, type McpAppProps } from "./McpAppWorkspace";
 

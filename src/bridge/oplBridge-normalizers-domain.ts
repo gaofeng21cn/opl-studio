@@ -8,7 +8,7 @@ import type {
   OplDomainDetailViewCondition,
   OplDomainDetailViewReadRequest,
   OplDomainDetailViewReadback
-} from "./oplBridge-types-state";
+} from "@gaofeng21cn/opl-host-contracts";
 
 export function normalizeContributionReadback(
   value: unknown,

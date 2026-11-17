@@ -11,7 +11,7 @@ import type {
   OplInitializeReadback,
   OplStateProfile,
   OplStateReadback
-} from "./oplBridge-types-state";
+} from "@gaofeng21cn/opl-host-contracts";
 
 function normalizeInitializeChecklistItem(value: unknown): OplInitializeChecklistItem | undefined {
   const record = asRecord(value);

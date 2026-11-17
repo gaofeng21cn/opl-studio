@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport, type McpUiStyles } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "../../../../src/bridge/mcpApps";
-import type { OplBridge } from "../../../../src/bridge/oplBridge";
+import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
+import type { OplBridge } from "@gaofeng21cn/opl-host-contracts";
 import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
 import { Input } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Input";
 import buttonCss from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button.module.css";

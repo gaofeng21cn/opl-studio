@@ -7,7 +7,7 @@ import type {
   CodexModelCatalog,
   CodexPermissionProfileCatalog,
   CodexPickedInput
-} from "./oplBridge-types-codex-workspace";
+} from "@gaofeng21cn/opl-host-contracts";
 
 export function normalizeCodexModelCatalog(value: unknown): CodexModelCatalog {
   const record = asRecord(value);

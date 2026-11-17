@@ -1,4 +1,4 @@
-import type { McpAppSession } from "../../../../src/bridge/mcpApps";
+import type { McpAppSession } from "@gaofeng21cn/opl-host-contracts";
 
 export function resolvedMcpTheme(colorScheme: string, prefersDark: boolean): "light" | "dark" {
   return colorScheme === "dark" || colorScheme === "light" ? colorScheme : prefersDark ? "dark" : "light";
@@ -77,7 +77,7 @@ export function modelContextText(server: string, value: unknown): string {
 
 // Display preferences only. Owners supply these launcher arguments through the
 // standard model-context notification and revalidate every reference on reopen.
-export function navigationArguments(app: import("../../../../src/bridge/mcpApps").McpAppDescriptor, value: unknown): Record<string, unknown> {
+export function navigationArguments(app: import("@gaofeng21cn/opl-host-contracts").McpAppDescriptor, value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value) || JSON.stringify(value).length > 8192) return {};
   return Object.fromEntries(Object.entries(value).filter(([key, item]) => {
     if (["__proto__", "constructor", "prototype"].includes(key)) return false;
@@ -89,9 +89,9 @@ export function navigationArguments(app: import("../../../../src/bridge/mcpApps"
 }
 const navigationStorage = "opl.mcp.navigation.v1";
 const navigationKey = (threadId: string, server: string, uri: string) => JSON.stringify([threadId, server, uri]);
-const isContextualTaskNavigation = (app: import("../../../../src/bridge/mcpApps").McpAppDescriptor, args: Record<string, unknown>) =>
+const isContextualTaskNavigation = (app: import("@gaofeng21cn/opl-host-contracts").McpAppDescriptor, args: Record<string, unknown>) =>
   app.resourceUri === "ui://opl/apps.html" && args.package_id === "opl-runtime";
-export function readMcpNavigation(threadId: string, app: import("../../../../src/bridge/mcpApps").McpAppDescriptor): Record<string, unknown> {
+export function readMcpNavigation(threadId: string, app: import("@gaofeng21cn/opl-host-contracts").McpAppDescriptor): Record<string, unknown> {
   try {
     const entries = JSON.parse(localStorage.getItem(navigationStorage) || "[]");
     const value = entries.find((entry: any) => entry.key === navigationKey(threadId, app.server, app.resourceUri));
@@ -101,7 +101,7 @@ export function readMcpNavigation(threadId: string, app: import("../../../../src
     return isContextualTaskNavigation(app, args) ? {} : args;
   } catch { return {}; }
 }
-export function rememberMcpNavigation(threadId: string, app: import("../../../../src/bridge/mcpApps").McpAppDescriptor, value: unknown) {
+export function rememberMcpNavigation(threadId: string, app: import("@gaofeng21cn/opl-host-contracts").McpAppDescriptor, value: unknown) {
   const args = navigationArguments(app, value);
   if (isContextualTaskNavigation(app, args)) return;
   try {
@@ -111,7 +111,7 @@ export function rememberMcpNavigation(threadId: string, app: import("../../../..
     localStorage.setItem(navigationStorage, JSON.stringify([...entries, { key, arguments: args }]));
   } catch { /* Storage is optional; current navigation still works. */ }
 }
-export function resolveMcpNavigation(url: string, apps: import("../../../../src/bridge/mcpApps").McpAppDescriptor[]) {
+export function resolveMcpNavigation(url: string, apps: import("@gaofeng21cn/opl-host-contracts").McpAppDescriptor[]) {
   if (!url.startsWith("ui://") || url.length > 16384) throw new Error("无效的应用入口");
   const [resourceUri, fragment = ""] = url.split("#");
   const matches = apps.filter(app => app.resourceUri === resourceUri && app.readOnly);

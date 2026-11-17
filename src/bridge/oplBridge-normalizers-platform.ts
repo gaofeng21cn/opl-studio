@@ -1,6 +1,6 @@
 import { asBoolean, asNumber, asRecord, asString } from "./oplBridge-primitives";
-import type { AppLogDirectoryUpdateResult, CarrierDiagnosticsReadback } from "./oplBridge-types-state";
-import type { NativeAppUpdateOperation, NativeAppUpdateResult } from "./oplBridge-types-platform-events";
+import type { AppLogDirectoryUpdateResult, CarrierDiagnosticsReadback } from "@gaofeng21cn/opl-host-contracts";
+import type { NativeAppUpdateOperation, NativeAppUpdateResult } from "@gaofeng21cn/opl-host-contracts";
 
 export function unavailableCarrierDiagnostics(
   carrier: CarrierDiagnosticsReadback["carrier"] = "browser_placeholder",

@@ -1,0 +1,20 @@
+{
+  "name": "@gaofeng21cn/opl-host-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared type-only contracts between Studio carriers and DSH plugins.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.3"
+  }
+}

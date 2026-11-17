@@ -19,19 +19,17 @@ import { createPlaceholderDomainDetailViewReadback, normalizeContributionReadbac
 import { createPlaceholderActionReceipt, normalizeActionReceipt } from "./oplBridge-normalizers-action";
 import { normalizeCodexCapabilityCatalog, normalizeCodexModelCatalog, normalizeCodexPermissionProfileCatalog, normalizePickedInputs, normalizeSendMessageResponse } from "./oplBridge-normalizers-codex";
 import { normalizeBridgeEvent } from "./oplBridge-normalizers-events";
-import type { OplBridge, OplStudioSurface } from "./oplBridge-types-platform-events";
-import type { ThreadWorkspaceGit } from "./oplBridge-types-codex-workspace";
+import type { OplBridge, OplStudioSurface } from "@gaofeng21cn/opl-host-contracts";
+import type { ThreadWorkspaceGit } from "@gaofeng21cn/opl-host-contracts";
 import type {
   SetArchivedRequest,
   ThreadForkRequest,
   ThreadListRequest,
   ThreadReadRequest,
   ThreadResumeRequest
-} from "../threads/types";
+} from "@gaofeng21cn/opl-host-contracts";
 
-export * from "./oplBridge-types-state";
-export * from "./oplBridge-types-codex-workspace";
-export * from "./oplBridge-types-platform-events";
+export type * from "@gaofeng21cn/opl-host-contracts";
 
 export {
   OPL_COMMANDS,

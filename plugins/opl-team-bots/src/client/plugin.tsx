@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
 import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/index";
-import type { TeamBotsState } from "./types";
+import type { TeamBotsState } from "@gaofeng21cn/opl-host-contracts";
 import "./team-bots.css";
 
 function appBridge() {
