@@ -46,3 +46,17 @@ export function readStudioSettingsSearchClient() {
   if (sha256(result) !== manifest.resultSha256) throw new Error("Settings search compatibility output changed");
   return result;
 }
+
+/** Link the exact reviewed browser implementation as an ordinary build input. */
+export function readStudioSettingsSearchModule() {
+  const source = readStudioSettingsSearchClient();
+  const registration = "window.__ModuleLoader__.load({\n  id: '@objectivex666/dsh-settings-search',\n  factory: (require) => {";
+  const close = "    return module.exports\n  },\n})";
+  if (source.split(registration).length !== 2 || source.split(close).length !== 2) {
+    throw new Error("The reviewed settings search client factory shape changed");
+  }
+  const linked = source
+    .replace(registration, "return ((require) => {")
+    .replace(close, "    return module.exports\n  })((specifier) => {\n    if (specifier !== 'react') throw new Error('Unexpected settings search dependency: ' + specifier);\n    return React;\n  })");
+  return `import * as React from 'react';\nexport default ${linked}`;
+}

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readStudioSettingsSearchClient } from "../../scripts/settings-search-client.mjs";
+import { readStudioSettingsSearchClient, readStudioSettingsSearchModule } from "../../scripts/settings-search-client.mjs";
 
 function clientFixture() {
   const bridgeCalls = [];
@@ -22,9 +22,14 @@ function clientFixture() {
     fetch: async (...args) => { networkCalls.push(args); throw new Error("Unexpected direct network request"); },
     window: { oplStudio: { async requestSettingsSearchLog(request) {
       bridgeCalls.push(request); return { status: 200, body: JSON.stringify({ ok: true, written: 1, count: 1 }) };
-    } }, __ModuleLoader__: { load(registration) { plugin = registration.factory(() => React); } } },
+    } } },
+    React,
   };
-  runInNewContext(readStudioSettingsSearchClient(), sandbox);
+  const linked = readStudioSettingsSearchModule()
+    .replace("import * as React from 'react';", "")
+    .replace("export default ", "globalThis.plugin = ");
+  runInNewContext(linked, sandbox);
+  plugin = sandbox.plugin;
   return { plugin, bridgeCalls, networkCalls, storageCalls, timers, sandbox };
 }
 

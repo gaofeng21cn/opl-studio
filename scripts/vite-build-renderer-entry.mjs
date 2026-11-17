@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
 import { createRequire } from "node:module";
+import { readStudioSettingsSearchModule } from "./settings-search-client.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -23,6 +24,15 @@ function sourceAliases() {
 
 function nodeModuleStub() {
   return path.join(root, "scripts/vite-node-module-stub.mjs");
+}
+
+function settingsSearchModule() {
+  const id = "virtual:opl-settings-search";
+  return {
+    name: "opl-settings-search-build-input",
+    resolveId(specifier) { return specifier === id ? `\0${id}` : undefined; },
+    load(specifier) { return specifier === `\0${id}` ? readStudioSettingsSearchModule() : undefined; }
+  };
 }
 
 /** Read the module-table baseline from the pinned official boot package. */
@@ -48,7 +58,7 @@ export async function buildRendererEntry(entrypoint, outdir, format = "esm", { e
     publicDir: false,
     base: "./",
     logLevel: "warn",
-    plugins: [react()],
+    plugins: [settingsSearchModule(), react()],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: [

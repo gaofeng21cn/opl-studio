@@ -6,7 +6,6 @@ import {
   type OplClientContributionsService
 } from "./clientCordis";
 import { OplStudioDshSlotHost } from "./dshSlotHost";
-import { adoptEcosystemModuleSystem } from "../integrations/deepseek-harness/ecosystemClients";
 import { McpAppsClientContext } from "./mcpAppsClient";
 import "../integrations/deepseek-harness/theme";
 
@@ -17,8 +16,6 @@ export const name = "opl-studio-client";
 export const inject = ["oplMcpAppsClient"];
 
 export function apply(ctx: Context) {
-  const webLoader = ctx.get("loader") as { internal?: unknown } | undefined;
-  adoptEcosystemModuleSystem(ctx.get("modules") ?? webLoader?.internal);
   const contributions = provideOplStudioClientContributions(ctx);
   const slotHost = new OplStudioDshSlotHost(ctx, contributions);
   ctx.effect(() => slotHost.installWorkspaceClient());

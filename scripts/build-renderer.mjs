@@ -1,7 +1,5 @@
 import { generateSoftwareArtwork } from "./software-artwork.mjs";
-import { readStudioSettingsSearchClient } from "./settings-search-client.mjs";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import { buildDshPlugins } from "./build-dsh-plugins.mjs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -323,19 +321,6 @@ export function buildRenderer({
     console.log("registry-plugins mode: preserved published Host/client bytes; built the private upstream engine");
   } else {
     buildDshPlugins();
-  }
-  const require = createRequire(import.meta.url);
-  const pluginRoot = path.join(outDir, "ecosystem");
-  fs.mkdirSync(pluginRoot, { recursive: true });
-  for (const [id, name] of [
-    ["@deepseek-ai/dsh-client-modules", "dsh-client-modules"],
-    ["@deepseek-ai/dsh-client-ui-sidebar-documentpreview", "dsh-client-ui-sidebar-documentpreview"],
-    ["@objectivex666/dsh-settings-search", "dsh-settings-search"]
-  ]) {
-    const target = path.join(pluginRoot, `${name}.js`);
-    if (id === "@objectivex666/dsh-settings-search") fs.writeFileSync(target, readStudioSettingsSearchClient());
-    else fs.copyFileSync(require.resolve(`${id}/client`), target);
-    fs.copyFileSync(path.join(root, "node_modules", id, "LICENSE"), path.join(pluginRoot, `${name}.LICENSE`));
   }
   const appProductProfile = readAppProductProfile();
   const deepLinkPolicy = createDeepLinkPolicy(
