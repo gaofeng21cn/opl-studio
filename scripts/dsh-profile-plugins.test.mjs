@@ -6,6 +6,7 @@ import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
+import { inc } from "semver";
 import { initProfile, loadOptionalPatches } from "@deepseek-ai/dsh-app-boot";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
@@ -143,10 +144,11 @@ test("registry update projection preserves each failed check while reporting com
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-partial-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const good = "@gaofeng21cn/opl-superagent", bad = "@gaofeng21cn/opl-team-bots";
+  const availableVersion = inc(JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version, "patch");
   const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
     view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
-      : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? ["0.1.1"]
-        : { name: good, version: "0.1.1", engines: { dsh: "0.2.2-rc.3" } }) } });
+      : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? [availableVersion]
+        : { name: good, version: availableVersion, engines: { dsh: "0.2.2-rc.3" } }) } });
   assert.equal(projection.plugins[good].state, "update_available");
   assert.equal(projection.plugins[bad].state, "unavailable");
   assert.equal(projection.plugins[bad].reason, "timeout");
@@ -158,7 +160,7 @@ test("registry updates use the profile scope route without overriding npm's defa
   const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
   const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
-  const nextVersion = "0.1.2";
+  const nextVersion = inc(currentVersion, "patch");
   let managerArgs;
   let managerContext;
   await assert.rejects(updateRegistryPlugins({ installAnchor, home, names: [name],
