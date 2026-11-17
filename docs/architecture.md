@@ -139,6 +139,13 @@ package identities, registry tarball origins and integrity, and shipped Host
 and Client entrypoints. A matching version number alone does not prove that
 registry bytes were installed.
 
+Published package versions are immutable. Plugin and shared build-input changes
+must advance the affected plugin versions before publication. The publish job
+compares an existing version's registry tarball digest with the freshly packed
+package; it skips only identical bytes and fails on a version collision or an
+unavailable registry check. A skipped version is not evidence that current
+source was published.
+
 The active Cordis profile selects Host plugins. The official `clientModules`
 service scans their `dsh.client` declarations and publishes the module graph,
 revisioned bundles, and index injections. `src/main.tsx` runs the official
