@@ -227,7 +227,7 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
     return { operation: "update-registry", application: migration.profileChanged ? "restart-required"
       : Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, ...migration, profile, home };
   }
-  const addArgs = ["add", "--save-exact", ...toInstall.map(([name, value]) => `${name}@${value.available}`), `--registry=${REGISTRY_URL}`];
+  const addArgs = ["add", "--save-exact", ...toInstall.map(([name, value]) => `${name}@${value.available}`)];
   const result = await run({ profile, dir, installAnchor, home, cwd }, addArgs, {
     execution: "service", outputBytes: 16384, lockWaitMs: 120000, lookupTimeoutMs: 30000,
     idleTimeoutMs: 60000, activateNewBundles: false, onOutput: text => process.stderr.write(text),

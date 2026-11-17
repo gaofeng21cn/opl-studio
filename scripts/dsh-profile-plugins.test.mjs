@@ -151,3 +151,24 @@ test("registry update projection preserves each failed check while reporting com
   assert.equal(projection.plugins[bad].state, "unavailable");
   assert.equal(projection.plugins[bad].reason, "timeout");
 });
+
+test("registry updates use the profile scope route without overriding npm's default registry", async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-registry-routing-"));
+  t.after(() => fs.rm(home, { recursive: true, force: true }));
+  const name = "@gaofeng21cn/opl-superagent";
+  const installAnchor = path.join(root, "package.json");
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const nextVersion = "0.1.2";
+  let managerArgs;
+  let managerContext;
+  await assert.rejects(updateRegistryPlugins({ installAnchor, home, names: [name],
+    view: async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
+      ? [currentVersion, nextVersion] : { name, version: nextVersion, engines: { dsh: "0.2.2-rc.3" } }) }),
+    run: async (context, args) => { managerContext = context; managerArgs = args; return { exitCode: 1, timedOut: false, logPath: "fixture" }; }
+  }), /Native DSH package operation failed/);
+  assert.deepEqual(managerArgs, ["add", "--save-exact", `${name}@${nextVersion}`]);
+  assert.equal(managerContext.profile, "opl-studio");
+  assert.equal(managerContext.installAnchor, installAnchor);
+  assert.equal(managerContext.cwd, process.cwd());
+  assert.ok(managerContext.dir.startsWith(home));
+});
