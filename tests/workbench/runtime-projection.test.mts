@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -705,6 +706,7 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
       autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
       knownModelReasoningEffortOverrides: {},
       acceptUnknownCatalogDefault: true,
+      customModelAccess: customModelAccessFixture,
       useHighestSupportedReasoningForUnknown: true
     }
   });

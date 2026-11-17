@@ -42,6 +42,11 @@ type InjectedModelPolicy = {
   knownModelReasoningEffortOverrides?: Record<string, string>;
   acceptUnknownCatalogDefault?: boolean;
   useHighestSupportedReasoningForUnknown?: boolean;
+  customModelAccess?: {
+    defaultEnabled: false;
+    label: { zh: string; en: string };
+    description: { zh: string; en: string };
+  };
 };
 
 declare global {
@@ -123,6 +128,12 @@ if (!Object.entries(policy.knownModelReasoningEffortOverrides)
 const knownModelReasoningEffortOverrides = Object.fromEntries(
   Object.entries(policy.knownModelReasoningEffortOverrides)
 );
+const customModelAccess = policy.customModelAccess;
+if (!customModelAccess || customModelAccess.defaultEnabled !== false
+  || !isModelId(customModelAccess.label?.zh) || !isModelId(customModelAccess.label?.en)
+  || !isModelId(customModelAccess.description?.zh) || !isModelId(customModelAccess.description?.en)) {
+  invalidPolicy("customModelAccess must declare default-off access and localized labels");
+}
 
 export const codexModelPolicy = {
   source: policy.source,
@@ -131,6 +142,7 @@ export const codexModelPolicy = {
   knownModelReasoningEffortOverrides,
   acceptUnknownCatalogDefault: policy.acceptUnknownCatalogDefault,
   useHighestSupportedReasoningForUnknown: policy.useHighestSupportedReasoningForUnknown,
+  customModelAccess: customModelAccess!,
   modelOptions,
   reasoningOptions,
   autoLabel
@@ -164,27 +176,19 @@ function supportedReasoningEffortsOf(catalog: CodexCatalogCapability[]): CodexRe
 }
 
 function automaticModel(options: ResolvedCodexModelOption[]): ResolvedCodexModelOption | undefined {
-  // `catalog_without_default_policy: first_available_known_model_then_first_catalog_model`.
+  // `catalog_without_default_policy: first_available_known_model_otherwise_unavailable`.
   // The App default keeps its route only while the live catalog advertises it.
   const appDefault = options.find((option) =>
     option.id === codexModelPolicy.defaultModel && option.available
   );
   if (appDefault) return appDefault;
-  const known = options.find((option) => option.known && option.available);
-  if (known) return known;
-  // `unknown_default_model_policy` decides whether the catalog's own default
-  // may represent Auto. Under the ignore policy that row is skipped instead of
-  // silently becoming the App route.
-  if (codexModelPolicy.acceptUnknownCatalogDefault) {
-    const accepted = options.find((option) =>
-      !option.known && option.isCatalogDefault && option.available
-    );
-    if (accepted) return accepted;
-  }
-  return options.find((option) => !option.known && option.available && !option.isCatalogDefault);
+  return options.find((option) => option.known && option.available);
 }
 
-export function resolveCodexModelOptions(catalogInput: CodexCatalogCapability[]): ResolvedCodexModelOption[] {
+export function resolveCodexModelOptions(
+  catalogInput: CodexCatalogCapability[],
+  customModelAccessEnabled: boolean = codexModelPolicy.customModelAccess.defaultEnabled
+): ResolvedCodexModelOption[] {
   // Discovery success is decided by the raw response. A response that only
   // contains hidden models is still a successful discovery, but contributes no
   // selectable route; only a truly empty response keeps the App fallback.
@@ -229,10 +233,10 @@ export function resolveCodexModelOptions(catalogInput: CodexCatalogCapability[])
     };
   });
 
-  // The App frontier list is a display preference, not an allowlist. Every
-  // visible model the live Codex catalog advertises remains selectable, so
-  // users on third-party or self-hosted catalogs are not reduced to the App
-  // defaults. Aliases already claimed by a known group are not repeated.
+  // Custom catalog membership grants a fixed choice only after explicit opt-in.
+  // Auto always resolves independently from App-admitted known models.
+  if (!customModelAccessEnabled) return knownOptions;
+  // Aliases already claimed by a known group are not repeated.
   const claimedIds = new Set<string>();
   for (const { option, runtimes } of knownGroups) {
     claimedIds.add(option.id);

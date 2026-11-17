@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { expect, test } from "bun:test";
 import { createCodexModelPolicy } from "../../scripts/build-renderer.mjs";
 import { cloneModelPolicyProfile } from "../../scripts/model-policy-fixture.ts";
@@ -16,6 +17,7 @@ Object.assign(globalThis, {
     autoLabel: { zh: "自动", en: "Auto" },
     knownModelReasoningEffortOverrides: { "app-default": "max" },
     acceptUnknownCatalogDefault: false,
+    customModelAccess: customModelAccessFixture,
     useHighestSupportedReasoningForUnknown: true
   }
 });
@@ -24,9 +26,12 @@ const { normalizeCodexModelCatalog } = await import("../../src/bridge/oplBridge-
 const {
   codexModelPolicy,
   modelLabel,
-  resolveCodexModelOptions,
+  resolveCodexModelOptions: resolveOptions,
   resolveCodexSelection
 } = await import("../../src/workbench/modelPolicy.ts");
+
+// These catalog and alias cases exercise the explicit opt-in path.
+const resolveCodexModelOptions = (catalog: Parameters<typeof resolveOptions>[0]) => resolveOptions(catalog, true);
 
 type CatalogEntry = Parameters<typeof resolveCodexModelOptions>[0][number];
 
@@ -147,7 +152,7 @@ test("hidden alias bridges cannot claim visible catalog models", () => {
   expect(options.find(option => option.id === "app-default")?.available).toBe(false);
   expect(custom?.known).toBe(false);
   expect(custom?.isCatalogDefault).toBe(false);
-  expect(automatic.model?.id).toBe("custom-current");
+  expect(automatic.model).toBeUndefined();
 });
 
 test("visible known aliases collapse without inheriting hidden metadata", () => {
@@ -174,8 +179,8 @@ test("rejected unknown catalog defaults do not win Auto over other visible model
   ]);
   // When resolving Auto.
   const automatic = resolveCodexSelection(options, "__auto", "low");
-  // Then Auto uses the other model while the default remains visible.
-  expect(automatic.model?.id).toBe("custom-other");
+  // Neither catalog default nor other custom rows may become Auto.
+  expect(automatic.model).toBeUndefined();
   expect(options.find(option => option.id === "custom-default")?.available).toBe(true);
 });
 
@@ -203,23 +208,15 @@ test("all visible unknown models remain manually selectable when their default i
   expect(modelLabel("custom-default", "en", options)).toBe("custom-default");
 });
 
-test("accepted unknown catalog defaults use their highest advertised effort after known fallbacks", () => {
-  // Given unknown models and acceptance of the unknown default.
-  const restore = withUnknownCatalogDefaultAcceptance(true);
-  try {
-    const options = resolveCodexModelOptions([
-      catalogEntry("custom-other"),
-      catalogEntry("custom-default", { isDefault: true, defaultReasoningEffort: "low", supportedReasoningEfforts: ["low", "high", "ultra"] })
-    ]);
-    // When resolving Auto.
-    const automatic = resolveCodexSelection(options, "__auto", "low");
-    // Then the unknown default wins over other custom rows and uses highest effort.
-    expect(automatic.model?.id).toBe("custom-default");
-    expect(automatic.reasoningEffort).toBe("ultra");
-    expect(automatic.reasoningOptions).toEqual(["low", "high", "ultra"]);
-  } finally {
-    restore();
-  }
+test("custom fixed selections use catalog reasoning while Auto stays unavailable", () => {
+  const options = resolveCodexModelOptions([
+    catalogEntry("custom-other"),
+    catalogEntry("custom-default", { isDefault: true, defaultReasoningEffort: "low", supportedReasoningEfforts: ["low", "high", "ultra"] })
+  ]);
+  expect(resolveCodexSelection(options, "__auto", "low").model).toBeUndefined();
+  const custom = options.find(option => option.id === "custom-default");
+  expect(custom?.defaultReasoningEffort).toBe("ultra");
+  expect(resolveCodexSelection(options, "custom-default", "ultra").reasoningEffort).toBe("ultra");
 });
 
 test("an available App default precedes frontier and accepted unknown defaults", () => {
@@ -273,8 +270,8 @@ test("visible catalog aliases are claimed once for Auto and fixed options", () =
     const automatic = resolveCodexSelection(options, "__auto", "low");
     // Then one logical custom option represents the alias group.
     expect(options.filter(option => !option.known).map(option => option.id)).toEqual(["custom-current"]);
-    expect(automatic.model?.id).toBe("custom-current");
-    expect(automatic.reasoningEffort).toBe("ultra");
+    expect(automatic.model).toBeUndefined();
+    expect(resolveCodexSelection(options, "custom-current", "ultra").reasoningEffort).toBe("ultra");
   } finally {
     restore();
   }
@@ -306,15 +303,35 @@ test("renderer injection rejects unrecognized Auto policy strings", () => {
   expect(() => createCodexModelPolicy(invalidFallback)).toThrow(/catalog_without_default_policy/);
 });
 
-test("renderer injection preserves both unknown-default policy decisions", () => {
-  // Given the supported ignore and accept policy strings.
-  const acceptedProfile = cloneModelPolicyProfile();
-  acceptedProfile.codex.auto_model_policy.unknown_default_model_policy = "accept_catalog_default_even_when_not_in_frontier_model_preference_order";
-  // When projecting both profiles.
-  const rejected = createCodexModelPolicy(cloneModelPolicyProfile());
-  const accepted = createCodexModelPolicy(acceptedProfile);
-  // Then only the explicit accept string enables unknown-default Auto adoption.
-  expect(rejected.acceptUnknownCatalogDefault).toBe(false);
-  expect(accepted.acceptUnknownCatalogDefault).toBe(true);
-  expect(rejected.useHighestSupportedReasoningForUnknown).toBe(true);
+test("renderer injection rejects custom Auto adoption and unsafe access policy", () => {
+  const profile = cloneModelPolicyProfile();
+  profile.codex.auto_model_policy.unknown_default_model_policy = "accept_catalog_default_even_when_not_in_frontier_model_preference_order";
+  expect(() => createCodexModelPolicy(profile)).toThrow(/unknown_default_model_policy/);
+  const unsafe = cloneModelPolicyProfile();
+  unsafe.codex.auto_model_policy.custom_model_access_policy.default_enabled = true;
+  expect(() => createCodexModelPolicy(unsafe)).toThrow(/custom_model_access_policy/);
+  expect(createCodexModelPolicy(cloneModelPolicyProfile()).customModelAccess.defaultEnabled).toBe(false);
+});
+
+test("ordinary options exclude custom models and opt-in never changes Auto", () => {
+  const catalog = [catalogEntry("app-default"), catalogEntry("custom-default", { isDefault: true }), catalogEntry("custom-hidden", { hidden: true })];
+  const ordinary = resolveOptions(catalog);
+  const advanced = resolveOptions(catalog, true);
+  expect(ordinary.filter(option => option.available).map(option => option.id)).toEqual(["app-default"]);
+  expect(resolveCodexSelection(ordinary, "custom-default", "high").model).toBeUndefined();
+  expect(resolveCodexSelection(advanced, "custom-default", "high").model?.id).toBe("custom-default");
+  expect(advanced.some(option => option.id === "custom-hidden")).toBe(false);
+  for (const options of [ordinary, advanced]) {
+    expect(resolveCodexSelection(options, "__auto", "low").model?.id).toBe("app-default");
+    expect(resolveCodexSelection(options, "__auto", "low").reasoningEffort).toBe("max");
+  }
+});
+
+test("disabling custom access preserves a fixed selection but removes its send route", () => {
+  const catalog = [catalogEntry("custom-local", { model: "custom-wire" })];
+  expect(resolveCodexSelection(resolveOptions(catalog, true), "custom-local", "high").model?.wireModel).toBe("custom-wire");
+  const disabled = resolveCodexSelection(resolveOptions(catalog, false), "custom-local", "high");
+  expect(disabled.effectiveSelection).toBe("custom-local");
+  expect(disabled.model).toBeUndefined();
+  expect(resolveCodexSelection(resolveOptions(catalog, true), "__auto", "high").model).toBeUndefined();
 });

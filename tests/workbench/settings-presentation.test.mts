@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
@@ -12,6 +13,7 @@ Object.assign(globalThis, {
     autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
     knownModelReasoningEffortOverrides: {},
     acceptUnknownCatalogDefault: true,
+    customModelAccess: customModelAccessFixture,
     useHighestSupportedReasoningForUnknown: true
   }
 });

@@ -1,7 +1,7 @@
 import { Switch } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { WorkbenchSettings } from "../../settingsModel";
 
-import { modelLabel } from "../../modelPolicy";
+import { codexModelPolicy, modelLabel } from "../../modelPolicy";
 
 import { SettingRow, SettingsGroup, StatusValue } from "../../settings/primitives";
 
@@ -15,6 +15,13 @@ export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged,
           <SettingRow label={zh ? "推理强度" : "Reasoning effort"} detail={zh ? "更高强度通常需要更长时间并消耗更多令牌；手动更改会切换为固定模型。" : "Higher effort usually takes longer and uses more tokens. A manual change switches to a fixed model."}>{renderSettingControl("reasoningLevel")}</SettingRow>
           <SettingRow label={zh ? "模型访问" : "Model access"} detail={modelAccessState === "current" ? "OPL Gateway" : (zh ? "自定义模型服务" : "Custom model service")}><span className="runtime-setting-control"><StatusValue status={projection?.codex.accessStatus} locale={settings.locale} /><button className="settings-inline-command" type="button" onClick={() => navigate("account")}>{zh ? "管理账户" : "Manage account"}</button></span></SettingRow>
         </SettingsGroup>
+        <details className="settings-secondary-details" id="advanced-model-options" data-testid="settings-models-advanced">
+          <summary>{zh ? "高级模型选项" : "Advanced model options"}</summary>
+          <SettingRow label={codexModelPolicy.customModelAccess.label[settings.locale]} detail={codexModelPolicy.customModelAccess.description[settings.locale]}>
+            <Switch label={codexModelPolicy.customModelAccess.label[settings.locale]} checked={settings.customModelAccessEnabled} onChange={value => onSettingChange("customModelAccessEnabled", value)} />
+          </SettingRow>
+        </details>
+        {unavailableFixedModel && !settings.customModelAccessEnabled && !codexModelPolicy.modelOptions.some(option => option.id === settings.modelAccess) ? <p className="settings-inline-note" role="status">{zh ? "自定义模型支持已关闭，当前固定选择已保留但无法发送。请选择自动或列表中的模型，或在高级模型选项中重新开启。" : "Custom models are disabled. Your fixed selection is preserved, but cannot send. Choose Auto or a listed model, or re-enable access in Advanced model options."}</p> : null}
         <SettingsGroup title={zh ? "执行权限" : "Execution permissions"}>
             <SettingRow label={zh ? "任务权限" : "Task permissions"} detail={zh ? "与输入框权限同步，作用于之后发送的任务。设置中的清理、卸载等操作仍需单独确认。" : "Shared with the composer for subsequent tasks. Cleanup and uninstall still require separate confirmation."}><select className="setting-select" aria-label={zh ? "任务权限" : "Task permissions"} value={settings.agentPermissions} onChange={event => { const next = event.currentTarget.value as WorkbenchSettings["agentPermissions"]; if (next === ":danger-full-access" && settings.agentPermissions !== next) { setPermissionAcknowledged(false); setPermissionConfirmation(true); } else onSettingChange("agentPermissions", next); }}><option value=":read-only">{zh ? "只读" : "Read only"}</option><option value=":workspace">{zh ? "可写工作区" : "Workspace write"}</option><option value=":danger-full-access">{zh ? "完全访问" : "Full access"}</option></select></SettingRow>
         </SettingsGroup>
