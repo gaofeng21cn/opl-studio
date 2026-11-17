@@ -4,6 +4,7 @@
   One Person Lab App on the pinned DeepSeek Harness/Cordis application
   skeleton.
 - Keep product truth in `one-person-lab-app` contracts and docs.
+- Follow App's `app-plugin-composition-taxonomy.json#source_ownership_policy`: shared contracts belong in `packages/host-contracts`, shared Host services in `packages/host-kit`, and plugin behavior in its owning package. Consume public entrypoints or Cordis services; do not add sibling `src`, root `src`, or runtime-to-`scripts` dependencies. Existing root client/Host sources are a documented transition, not an independent-source completion claim.
 - Prefer the pinned official DSH implementation for generic plugin capabilities.
   Before adding or extending an OPL plugin, inspect the official equivalent.
   When it covers the required behavior, switch the real caller and remove the

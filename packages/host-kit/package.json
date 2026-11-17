@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./profile-plugin-updates": "./src/profile-plugin-updates.mjs"
+    "./profile-plugin-updates": "./profile-plugin-updates.mjs"
   }
 }

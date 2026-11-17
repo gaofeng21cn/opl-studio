@@ -211,7 +211,7 @@ Mini App 时释放预览，文件不跨对话共享或落入持久状态。独�
 Host 的个人 Profile 由启动时的 `OPL_PROFILE_WORKSPACE` 固定，当前没有动态 Profile 切换投影；
 不能把 fast/full 状态读取模式当作个人身份。真人麦克风与打包载体的识别服务仍须在目标环境单独验收。
 
-DSH Host 实现在各插件的 `src/`，共用协议与辅助代码在 `src/host`。DSH 插件包统一位于 `plugins/<plugin-id>/`，profile 按 npm 包名加载。`scripts` 只保留启动、构建和验收入口；桌面、WebUI、Docker 加载同一 Host。设置壳位于 `src/workbench/SettingsPanel.tsx`，领域页面位于 `src/workbench/settings/pages`，共享动作、状态、目录和维护组件位于 `src/workbench/settings`。
+DSH Host 实现在各插件的 `src/`；共享纯类型由 `packages/host-contracts` 持有，原生 profile 更新服务由 `packages/host-kit` 持有。Host Core 消费 Cordis 服务，不导入兄弟插件内部 service 或运行时构建脚本。其余 `src/host` 和客户端组合仍是过渡源码位置，按 App 的源码所有权合同收拢。DSH 插件包统一位于 `plugins/<plugin-id>/`，profile 按 npm 包名加载；桌面、WebUI、Docker 加载同一 Host。设置壳仍位于 `src/workbench/SettingsPanel.tsx`，领域页面位于 `src/workbench/settings/pages`。
 
 计划任务使用主导航入口，设置中的后台任务页仅提供运行条件和跳转，两个入口共用同一 Framework 服务及操作确认组件。模型与执行页包含权限、Codex Auto Review 和逐次发送的时间上下文。偏好页包含自定义快捷键和语音输入；语音由运行环境的识别服务提供，未提供时明确说明系统听写替代入口。能力目录提供用途入口、类型筛选与动态 Package 管理，配置表单仍由其唯一功能页持有。
 

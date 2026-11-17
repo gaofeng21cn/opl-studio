@@ -140,6 +140,18 @@ revisioned bundles, and index injections. `src/main.tsx` runs the official
 transports the same Host-owned index injections and advertised `/plugins`
 resources; there is no static second loader or App-owned Bundle Profile.
 
+Shared type-only bridge, thread, MCP Apps and workbench contracts are owned by
+`packages/host-contracts`. `packages/host-kit` owns the native profile update
+service used by Host Core and the operator CLI. Host Core consumes the Codex,
+Framework and MCP Apps services injected by Cordis; it does not import sibling
+plugin service source or runtime modules from `scripts/`. The private shared
+runtime is compiled into its consumer through its public entrypoint, so an
+independent plugin install does not need a second unpublished runtime package.
+App's `source_ownership_policy` records the dependency direction and remaining
+root-source migration. Client composition, Workbench and the other root Host
+helpers remain transitional source locations; package installation boundaries
+alone do not establish source independence.
+
 `opl-studio-client`, Superagent, Team/Bot, and MCP Apps clients carry their own
 bundled UI bytes as standard DSH Client Plugins. Profile overrides select those
 packages on the next launch, so compatible product UI updates do not require

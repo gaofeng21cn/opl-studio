@@ -586,7 +586,8 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   const bridge = [
     read("src/bridge/oplBridge.ts"),
     read("src/bridge/oplBridge-commands.ts"),
-    read("src/bridge/oplBridge-types-codex-workspace.ts")
+    read("packages/host-contracts/src/codex-workspace.ts"),
+    read("packages/host-contracts/src/platform-events.ts")
   ].join("\n");
   const hostTransport = read("src/host/app-server-transport.mjs");
   const codexNative = read("plugins/opl-codex-native/src/service.mjs");

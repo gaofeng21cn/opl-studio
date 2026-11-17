@@ -1,5 +1,5 @@
 import path from "node:path";
-import { checkRegistryUpdates, updateRegistryPlugins } from "../../../packages/host-kit/src/profile-plugin-updates.mjs";
+import { checkRegistryUpdates, updateRegistryPlugins } from "../../../packages/host-kit/profile-plugin-updates.mjs";
 import { createSettingsSearchLog } from "../../../src/host/settings-search-log.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
