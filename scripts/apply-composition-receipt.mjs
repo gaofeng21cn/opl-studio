@@ -65,7 +65,7 @@ if (receipt.dsh_cohort !== pkg.dependencies?.["@deepseek-ai/dsh-app-boot"]) {
 const dirForPackage = new Map(
   Object.entries(pkg.dependencies || {})
     .filter(([, v]) => typeof v === "string" && v.startsWith("file:plugins/"))
-    .map(([name, v]) => [name, v]) // e.g. "@one-person-lab/opl-superagent" → "file:plugins/opl-superagent"
+    .map(([name, v]) => [name, v]) // e.g. "@gaofeng21cn/opl-superagent" → "file:plugins/opl-superagent"
 );
 
 const changes = [];

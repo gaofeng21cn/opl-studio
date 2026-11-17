@@ -33,7 +33,7 @@ function DshPluginUpdates({ locale }: { locale: "zh" | "en" }) {
       const result = await bridge.updateDshPlugins({ all: true });
       setRestartRequired(value => value || result.application === "restart-required");
       const failures = Object.entries(result.failures ?? {});
-      if (failures.length) setError((zh ? "部分插件未完成更新：" : "Some plugins could not be updated: ") + failures.map(([name, reason]) => `${name.replace(/^@one-person-lab\//, "")} (${reason})`).join(", "));
+      if (failures.length) setError((zh ? "部分插件未完成更新：" : "Some plugins could not be updated: ") + failures.map(([name, reason]) => `${name.replace(/^@gaofeng21cn\//, "")} (${reason})`).join(", "));
       setProjection(await bridge.readDshPluginUpdates!());
     } catch (reason) { setError(String(reason)); }
     finally { setBusy(false); }
@@ -43,7 +43,7 @@ function DshPluginUpdates({ locale }: { locale: "zh" | "en" }) {
     <p>{projection ? (updates.length ? (zh ? `${updates.length} 个插件有兼容更新。更新后重启 App 即可加载新 Host 与客户端字节。` : `${updates.length} compatible plugin updates are available. Restart the App after updating to load the new Host and client bytes.`) : unavailable.length ? (zh ? `${unavailable.length} 个插件暂未完成版本检查。` : `${unavailable.length} plugins could not be checked.`) : entries.length ? (zh ? "已检查的插件均为当前 DSH cohort 下的最新兼容版本。" : "All checked plugins are current for this DSH cohort.") : (zh ? "当前没有可独立更新的已装插件。" : "No installed plugins support independent updates.")) : error ? (zh ? "插件版本检查未完成。" : "Plugin update check did not complete.") : (zh ? "正在检查插件版本…" : "Checking plugin versions…")}</p>
     {error ? <p role="alert">{error}</p> : null}
     {entries.map(([name, item]) => <div className="opl-package-update-row" key={name}>
-      <div><strong>{name.replace(/^@one-person-lab\//, "")}</strong><span>{item.installed ?? "—"}{item.available && item.available !== item.installed ? ` → ${item.available}` : ""}</span></div>
+      <div><strong>{name.replace(/^@gaofeng21cn\//, "")}</strong><span>{item.installed ?? "—"}{item.available && item.available !== item.installed ? ` → ${item.available}` : ""}</span></div>
       <span>{item.state === "update_available" ? (zh ? "可更新" : "Update available") : item.state === "unavailable" ? (zh ? "暂不可检查" : "Unavailable") : (zh ? "当前" : "Current")}</span>
     </div>)}
     {updates.length > 0 && bridge.updateDshPlugins ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => void runUpdate()}>{busy ? (zh ? "更新中…" : "Updating…") : (zh ? "更新全部 DSH 插件" : "Update all DSH plugins")}</button> : null}

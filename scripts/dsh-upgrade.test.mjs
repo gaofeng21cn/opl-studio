@@ -141,10 +141,10 @@ test("verification rejects installed version drift and official plugin incompati
   write(file, { name: "@deepseek-ai/dsh-app-boot", version: "0.2.1-alpha.1" });
   await assert.rejects(verifyInstalledCohort(binding), /must match the pinned/);
   write(file, binding.packageSpecs[0]);
-  binding.packageJson.dependencies["@one-person-lab/test-plugin"] = "file:plugins/test-plugin";
-  write(path.join(directory, "plugins/test-plugin/package.json"), { name: "@one-person-lab/test-plugin", version: "1.0.0", engines: { dsh: "0.2.1-alpha.1" } });
+  binding.packageJson.dependencies["@gaofeng21cn/test-plugin"] = "file:plugins/test-plugin";
+  write(path.join(directory, "plugins/test-plugin/package.json"), { name: "@gaofeng21cn/test-plugin", version: "1.0.0", engines: { dsh: "0.2.1-alpha.1" } });
   await assert.rejects(executeReplay(binding, undefined, { run() { assert.fail("incompatible plugins must not reach a gate"); } }), /is incompatible/);
-  write(path.join(directory, "plugins/test-plugin/package.json"), { name: "@one-person-lab/test-plugin", version: "1.0.0", engines: { dsh: binding.version } });
+  write(path.join(directory, "plugins/test-plugin/package.json"), { name: "@gaofeng21cn/test-plugin", version: "1.0.0", engines: { dsh: binding.version } });
   await verifyInstalledCohort(binding);
 });
 

@@ -6,7 +6,9 @@ import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadProfile, resolveProfileDir } from "@deepseek-ai/dsh-app-boot";
+import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadOptionalPatches, loadProfile, readProfileManifest, resolveProfileDir, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
+import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
+import * as yaml from "js-yaml";
 import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
 import { runPluginCommand, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { classifyInstallFailure } from "@deepseek-ai/dsh-plugin-manager";
@@ -19,13 +21,14 @@ const installedAnchor = "/Applications/One Person Lab.app/Contents/Resources/app
 
 const REGISTRY_URL = "https://npm.pkg.github.com";
 const REGISTRY_HOST = "//npm.pkg.github.com/";
+const LEGACY_SCOPE = "@one-person-lab/";
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
 function isPublishableManifest(manifest) {
-  return manifest?.name?.startsWith("@one-person-lab/")
+  return manifest?.name?.startsWith("@gaofeng21cn/")
     && manifest.private !== true
     && manifest.publishConfig?.registry === REGISTRY_URL
     && typeof manifest.version === "string"
@@ -49,7 +52,7 @@ export function discoverPublishablePackages({ installAnchor, sourceRoot = root, 
     const carrierPackage = readJson(installAnchor);
     const carrierRequire = createRequire(installAnchor);
     for (const name of Object.keys(carrierPackage.dependencies ?? {})) {
-      if (!name.startsWith("@one-person-lab/")) continue;
+      if (!name.startsWith("@gaofeng21cn/")) continue;
       try {
         const manifest = readJson(carrierRequire.resolve(`${name}/package.json`));
         if (isPublishableManifest(manifest)) candidates.set(name, manifest);
@@ -66,14 +69,14 @@ export function discoverPublishablePackages({ installAnchor, sourceRoot = root, 
 }
 
 /**
- * Ensure the profile directory has an .npmrc that routes @one-person-lab to
+ * Ensure the profile directory has an .npmrc that routes @gaofeng21cn to
  * GitHub Packages. If a token is provided, it is written as the _authToken
  * for that registry host. If the .npmrc already contains correct scope and
  * host entries, only the token line is updated (or added).
  */
 export function ensureProfileNpmrc(dir, token) {
   const npmrcPath = path.join(dir, ".npmrc");
-  const scopeLine = `@one-person-lab:registry=${REGISTRY_URL}`;
+  const scopeLine = `@gaofeng21cn:registry=${REGISTRY_URL}`;
 
   let existing = "";
   try { existing = fs.readFileSync(npmrcPath, "utf8"); } catch {}
@@ -81,12 +84,66 @@ export function ensureProfileNpmrc(dir, token) {
   const existingTokenLine = lines.find(line => line.startsWith(`${REGISTRY_HOST}:_authToken=`));
   const tokenLine = token ? `${REGISTRY_HOST}:_authToken=${token}` : existingTokenLine;
   const withoutManaged = lines.filter(l =>
+    !l.startsWith("@gaofeng21cn:registry=") &&
     !l.startsWith("@one-person-lab:registry=") &&
     !l.startsWith(`${REGISTRY_HOST}:_authToken=`));
 
   const updated = [...withoutManaged, scopeLine, ...(tokenLine ? [tokenLine] : [])];
   fs.writeFileSync(npmrcPath, updated.join("\n") + "\n", { mode: 0o600 });
   fs.chmodSync(npmrcPath, 0o600);
+}
+
+/** Retire renamed overrides only after their replacement is available in this carrier/profile. */
+export async function retireLegacyOverrides({ installAnchor, home, names, cwd = root, run = runPluginCommand }) {
+  const dir = resolveProfileDir(profile, home);
+  const manifest = readJson(path.join(dir, "package.json"));
+  const available = createRequire(path.join(dir, "package.json"));
+  const carrier = createRequire(installAnchor);
+  const retired = names.filter(name => name.startsWith("@gaofeng21cn/opl-")).map(name => {
+    const old = LEGACY_SCOPE + name.slice("@gaofeng21cn/".length);
+    if (!Object.hasOwn(manifest.dependencies ?? {}, old)) return null;
+    try { available.resolve(`${name}/package.json`); }
+    catch { carrier.resolve(`${name}/package.json`); }
+    return old;
+  }).filter(Boolean);
+  if (retired.length) {
+    const result = await run({ profile, dir, installAnchor, home, cwd }, ["remove", ...retired], {
+      execution: "service", outputBytes: 16384, lockWaitMs: 120000, lookupTimeoutMs: 30000,
+      idleTimeoutMs: 60000, activateNewBundles: false, onOutput: text => process.stderr.write(text)
+    });
+    if (result.exitCode !== 0 || result.timedOut) throw new Error(`Native DSH scope migration failed; inspect ${result.logPath}`);
+  }
+  const selected = readProfileManifest(profile, dir);
+  const bundles = selected.dsh?.profile?.bundles ?? [];
+  const migratedBundles = [...new Set(bundles.map(name => {
+    if (!name.startsWith(LEGACY_SCOPE)) return name;
+    const replacement = "@gaofeng21cn/" + name.slice(LEGACY_SCOPE.length);
+    return names.includes(replacement) ? replacement : name;
+  }))];
+  if (JSON.stringify(bundles) !== JSON.stringify(migratedBundles)) writeProfileBundles(dir, selected, migratedBundles);
+  const patchFile = path.join(dir, "cordis.patch.yml");
+  const patches = loadOptionalPatches(profile, patchFile);
+  let changed = false;
+  const visit = entries => { for (const entry of entries ?? []) {
+    if (typeof entry.name === "string" && entry.name.startsWith(LEGACY_SCOPE)) {
+      const replacement = "@gaofeng21cn/" + entry.name.slice(LEGACY_SCOPE.length);
+      if (names.some(name => replacement === name || replacement.startsWith(name + "/"))) {
+        entry.name = replacement; changed = true;
+      }
+    }
+    visit(entry.insert);
+    if (entry.group && Array.isArray(entry.config)) visit(entry.config);
+  } };
+  visit(patches);
+  if (changed) {
+    const temporary = `${patchFile}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(temporary, yaml.dump(patches, { schema: entryListSchema, noRefs: true }), { mode: 0o600 });
+      fs.renameSync(temporary, patchFile);
+    } finally { fs.rmSync(temporary, { force: true }); }
+  }
+  return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed
+    || JSON.stringify(bundles) !== JSON.stringify(migratedBundles) };
 }
 
 /** Resolve published versions against the selected carrier using DSH's own metadata admission. */
@@ -131,7 +188,7 @@ export async function resolveRegistryVersions(names, dir, installAnchor, view = 
 
 function normalizePluginNames(names, available) {
   return names.map(name => {
-    const full = name.startsWith("@") ? name : `@one-person-lab/${name}`;
+    const full = name.startsWith("@") ? name : `@gaofeng21cn/${name}`;
     if (!available.includes(full)) throw new Error(`Not a publishable plugin: ${name}`);
     return full;
   });
@@ -173,7 +230,12 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
   const projection = await checkRegistryUpdates({ installAnchor, home, names: all ? undefined : names, cwd, view });
   const toInstall = Object.entries(projection.plugins).filter(([, value]) => value.state === "update_available");
   const failures = Object.fromEntries(Object.entries(projection.plugins).filter(([, value]) => value.state === "unavailable").map(([name, value]) => [name, value.reason]));
-  if (!toInstall.length) return { operation: "update-registry", application: Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, profile, home };
+  if (!toInstall.length) {
+    const migration = await retireLegacyOverrides({ installAnchor, home,
+      names: Object.entries(projection.plugins).filter(([, value]) => value.state === "current").map(([name]) => name), cwd, run });
+    return { operation: "update-registry", application: migration.profileChanged ? "restart-required"
+      : Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, ...migration, profile, home };
+  }
   const addArgs = ["add", "--save-exact", ...toInstall.map(([name, value]) => `${name}@${value.available}`), `--registry=${REGISTRY_URL}`];
   const result = await run({ profile, dir, installAnchor, home, cwd }, addArgs, {
     execution: "service", outputBytes: 16384, lockWaitMs: 120000, lookupTimeoutMs: 30000,
@@ -187,7 +249,8 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
     if (saved.get(name) === value.available) installed[name] = value.available;
     else failures[name] = "installed_version_mismatch";
   }
-  return { operation: "update-registry", application: Object.keys(installed).length ? "restart-required" : "update-check-failed", installed, failures, profile, home };
+  const migration = await retireLegacyOverrides({ installAnchor, home, names: Object.keys(installed), cwd, run });
+  return { operation: "update-registry", application: Object.keys(installed).length ? "restart-required" : "update-check-failed", installed, failures, ...migration, profile, home };
 }
 
 export async function inspectProfile({ installAnchor, home }) {
@@ -258,6 +321,7 @@ export async function main(argv = process.argv.slice(2)) {
       "Operations:",
       "  inspect                           Show current profile overrides",
       "  update-source  --package <id>     Build from local source and install",
+      "                 [--all]            Update every publishable source plugin",
       "  update-registry [--all]           Pull latest compatible from GitHub Packages",
       "                 [--package <name>] Pull specific packages only",
       "                 [--token <tok>]    GitHub token with read:packages scope",
@@ -300,8 +364,15 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   // update-source and remove
-  const names = values.package ?? [];
+  const names = operation === "update-source" && values.all ? discoverPublishablePackages() : values.package ?? [];
   if (!names.length) throw new Error("--package is required");
+  if (operation === "update-source") {
+    const selected = normalizePluginNames(names, discoverPublishablePackages());
+    const carrierPackages = discoverPublishablePackages({ installAnchor });
+    if (selected.some(name => !carrierPackages.includes(name))) {
+      throw new Error("The selected carrier does not include these plugin identities; update the App carrier first.");
+    }
+  }
   const args = operation === "update-source"
     ? ["add", ...packSourcePlugins(names, path.resolve(values["cache-root"]))]
     : ["remove", ...names];
@@ -312,7 +383,10 @@ export async function main(argv = process.argv.slice(2)) {
     onOutput: text => process.stderr.write(text)
   });
   if (result.exitCode !== 0 || result.timedOut) throw new Error(`Native DSH package operation failed; inspect ${result.logPath}`);
+  const migration = operation === "update-source" ? await retireLegacyOverrides({ installAnchor, home,
+    names: normalizePluginNames(names, discoverPublishablePackages()) }) : {};
   console.log(JSON.stringify({ operation, application: "restart-required",
+    ...migration,
     ...await inspectProfile({ installAnchor, home }) }, null, 2));
 }
 

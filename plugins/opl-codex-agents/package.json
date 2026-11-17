@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-codex-agents",
+  "name": "@gaofeng21cn/opl-codex-agents",
   "version": "0.1.0",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -39,5 +39,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-codex-agents"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-dsh-tool-mcp",
+  "name": "@gaofeng21cn/opl-dsh-tool-mcp",
   "version": "0.1.0",
   "description": "Authenticated DSH tool registry bridge for Codex.",
   "type": "module",
@@ -28,5 +28,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-dsh-tool-mcp"
   }
 }

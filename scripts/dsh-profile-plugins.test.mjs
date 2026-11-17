@@ -6,6 +6,8 @@ import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
+import { initProfile, loadOptionalPatches } from "@deepseek-ai/dsh-app-boot";
+import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -24,11 +26,24 @@ test("native DSH profile update boots Superagent and removal restores the bundle
     assert.equal(result.status, 0, result.stderr);
     return JSON.parse(result.stdout);
   };
+  const dir = path.join(home, "profiles/opl-studio");
+  const legacyDir = path.join(temp, "legacy");
+  await fs.mkdir(legacyDir);
+  await fs.writeFile(path.join(legacyDir, "package.json"), JSON.stringify({ name: "@one-person-lab/opl-superagent", version: "0.1.0" }));
+  initProfile(dir, []);
+  const legacy = await runPluginCommand({ profile: "opl-studio", dir, installAnchor: anchor, home, cwd: temp }, ["add", legacyDir],
+    { execution: "service", activateNewBundles: false, outputBytes: 16384 });
+  assert.equal(legacy.exitCode, 0, legacy.output);
+  await fs.writeFile(path.join(dir, "cordis.patch.yml"), '- id: opl-superagent\n  name: "@one-person-lab/opl-superagent"\n  disabled: false\n  config:\n    migratedSetting: "retained"\n- id: untouched\n  name: third-party-plugin\n  disabled: true\n');
   const installed = run("update-source", ["opl-superagent"]);
   assert.equal(installed.application, "restart-required");
-  assert.deepEqual(installed.overrides.map(entry => entry.name), ["@one-person-lab/opl-superagent"]);
+  assert.deepEqual(installed.removedLegacyOverrides, ["@one-person-lab/opl-superagent"]);
+  const migratedPatch = loadOptionalPatches("opl-studio", path.join(dir, "cordis.patch.yml"));
+  assert.deepEqual(migratedPatch[0], { id: "opl-superagent", name: "@gaofeng21cn/opl-superagent", disabled: false, config: { migratedSetting: "retained" } });
+  assert.deepEqual(migratedPatch[1], { id: "untouched", name: "third-party-plugin", disabled: true });
+  assert.deepEqual(installed.overrides.map(entry => entry.name), ["@gaofeng21cn/opl-superagent"]);
   const profileManifest = JSON.parse(await fs.readFile(path.join(home, "profiles/opl-studio/package.json")));
-  assert.deepEqual(Object.keys(profileManifest.dependencies), ["@one-person-lab/opl-superagent"]);
+  assert.deepEqual(Object.keys(profileManifest.dependencies), ["@gaofeng21cn/opl-superagent"]);
   const { bootOplStudioHost } = await import("../src/host/dsh/host.mjs");
   const transport = { initialized: false, on() {}, off() {}, createChannelCallbackAdapter: () => null,
     async listModels() { return { data: [{ id: "fixture", displayName: "Fixture" }] }; }, async start() { this.initialized = true; }, async stop() { this.initialized = false; } };
@@ -36,19 +51,20 @@ test("native DSH profile update boots Superagent and removal restores the bundle
     webHost: "127.0.0.1", webPort: 0,
     opl: Object.fromEntries(["readState", "readInitialize", "readFullDrilldown", "readDomainDetailView", "readContribution", "executeAction"].map(name => [name, async () => ({})])) });
   try {
-    const selected = host.context.pluginPackages.packageOf("@one-person-lab/opl-superagent",
+    const selected = host.context.pluginPackages.packageOf("@gaofeng21cn/opl-superagent",
       pathToFileURL(path.join(home, "profiles/opl-studio/package.json")).href);
     assert.ok(selected.dir.startsWith(home), selected.dir);
     const graph = host.core.readClientModuleGraph();
-    assert.ok(graph.entries.some(entry => entry.id === "@one-person-lab/opl-superagent"),
+    assert.ok(graph.entries.some(entry => entry.id === "@gaofeng21cn/opl-superagent"),
       "the official client graph must discover a dsh.client package resolved from the native profile");
+    assert.ok(!graph.entries.some(entry => entry.id.startsWith("@one-person-lab/")));
     assert.equal(host.context.oplSuperagent.read().executor, "codex");
     await host.context.oplSuperagent.start();
     const response = await fetch(new URL("/orchestrator/api/state", host.context.oplSuperagent.read().url), { headers: { "x-orchestrator-request": "1" } });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).setup.problem.code, "repositoryUnset");
   } finally { await host.core.close(); }
-  run("remove", ["@one-person-lab/opl-superagent"]);
+  run("remove", ["@gaofeng21cn/opl-superagent"]);
   assert.deepEqual((await inspectProfile({ installAnchor: anchor, home })).overrides, []);
   assert.equal(createHash("sha256").update(await fs.readFile(anchor)).digest("hex"), baseline);
 });
@@ -56,9 +72,9 @@ test("native DSH profile update boots Superagent and removal restores the bundle
 test("source plugin selection discovers publishable client packages and rejects unknown/duplicate packages", async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-plugin-selection-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
-  assert.ok(discoverPublishablePackages({ sourceRoot: root }).includes("@one-person-lab/opl-studio-client"));
+  assert.ok(discoverPublishablePackages({ sourceRoot: root }).includes("@gaofeng21cn/opl-studio-client"));
   assert.throws(() => packSourcePlugins(["../outside"], temp));
-  assert.throws(() => packSourcePlugins(["opl-superagent", "@one-person-lab/opl-superagent"], temp));
+  assert.throws(() => packSourcePlugins(["opl-superagent", "@gaofeng21cn/opl-superagent"], temp));
   assert.throws(() => packSourcePlugins([], temp));
   assert.deepEqual(await fs.readdir(temp), []);
 });
@@ -67,18 +83,19 @@ test("registry authentication survives a later update without a new token", asyn
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-npmrc-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
   const npmrcPath = path.join(temp, ".npmrc");
-  await fs.writeFile(npmrcPath, "registry=https://registry.npmjs.org/\n", { mode: 0o644 });
+  await fs.writeFile(npmrcPath, "registry=https://registry.npmjs.org/\n@one-person-lab:registry=https://npm.pkg.github.com\n", { mode: 0o644 });
   ensureProfileNpmrc(temp, "test-token-value");
   ensureProfileNpmrc(temp);
   const npmrc = await fs.readFile(npmrcPath, "utf8");
   assert.ok(npmrc.includes("registry=https://registry.npmjs.org/"));
-  assert.ok(npmrc.includes("@one-person-lab:registry=https://npm.pkg.github.com"));
+  assert.ok(npmrc.includes("@gaofeng21cn:registry=https://npm.pkg.github.com"));
+  assert.ok(!npmrc.includes("@one-person-lab:registry="));
   assert.ok(npmrc.includes("//npm.pkg.github.com/:_authToken=test-token-value"));
   assert.equal((await fs.stat(npmrcPath)).mode & 0o777, 0o600);
 });
 
 test("registry resolution uses the selected carrier cohort and skips newer incompatible versions", async () => {
-  const name = "@one-person-lab/opl-superagent";
+  const name = "@gaofeng21cn/opl-superagent";
   const queries = [];
   const view = async (_dir, spec) => {
     queries.push(spec);
@@ -94,7 +111,7 @@ test("registry resolution uses the selected carrier cohort and skips newer incom
 });
 
 test("registry lookup failures remain failures instead of a successful no-update result", async () => {
-  const name = "@one-person-lab/opl-superagent";
+  const name = "@gaofeng21cn/opl-superagent";
   const failure = async () => ({ exitCode: 1, timedOut: true, stdout: "", stderr: "" });
   const result = await resolveRegistryVersions([name], root, path.join(root, "package.json"), failure);
   assert.deepEqual(result[name], { available: false, reason: "timeout" });
@@ -105,7 +122,7 @@ test("registry lookup failures remain failures instead of a successful no-update
 test("current and unavailable registry checks never create an unnecessary profile override", async t => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-check-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
-  const name = "@one-person-lab/opl-superagent";
+  const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
   const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
   const view = async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
@@ -125,7 +142,7 @@ test("current and unavailable registry checks never create an unnecessary profil
 test("registry update projection preserves each failed check while reporting compatible siblings", async t => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-partial-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
-  const good = "@one-person-lab/opl-superagent", bad = "@one-person-lab/opl-team-bots";
+  const good = "@gaofeng21cn/opl-superagent", bad = "@gaofeng21cn/opl-team-bots";
   const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
     view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
       : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? ["0.1.1"]

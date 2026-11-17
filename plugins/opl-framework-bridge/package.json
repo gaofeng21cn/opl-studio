@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-framework-bridge",
+  "name": "@gaofeng21cn/opl-framework-bridge",
   "version": "0.1.0",
   "description": "OPL Framework state, action and channel integration.",
   "type": "module",
@@ -28,5 +28,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-framework-bridge"
   }
 }

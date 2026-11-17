@@ -46,6 +46,10 @@ Desktop 打包为真实文件，Docker 保留完整插件目录以满足本地�
 DSH inventory 和实际 Host 启动验证，不能只靠目录存在。独立包形态不代表当前已在
 npm 发布。兼容 Host/Client 包（包括 `opl-studio-client`）可通过原生 profile 独立更新并在
 重启后激活；Electron、DSH core/cohort 和小型 boot shell 仍由 App carrier 更新。
+发布包名使用仓库 owner 的 `@gaofeng21cn` scope，并在 manifest 中绑定本仓 repository
+及插件目录。改名后的载体基线安装完成后，显式 `update-source` 或 `update-registry`
+会在新包就位后移除对应的旧 `@one-person-lab` profile override，并更新其 patch 包名，
+保留无关配置；只读检查和主 profile 的普通启动不自动迁移。
 
 本目录不放 Codex 插件市场的领域能力包；微信等由 Framework 托管的能力通过
 `opl-framework-bridge` 接入。它们有自己的 ABI，不是 DSH 插件。

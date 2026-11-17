@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-web-routes",
+  "name": "@gaofeng21cn/opl-web-routes",
   "version": "0.1.0",
   "description": "Authenticated HTTP and SSE routes for OPL Studio.",
   "type": "module",
@@ -30,5 +30,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-web-routes"
   }
 }

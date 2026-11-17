@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { mkdir, symlink, readlink, unlink } from "node:fs/promises";
 import path from "node:path";
-import { CodexWorkbenchProfile } from "@one-person-lab/opl-codex-agents/workbench-profile";
+import { CodexWorkbenchProfile } from "@gaofeng21cn/opl-codex-agents/workbench-profile";
 
 export const name = "opl-superagent";
 export const inject = ["oplStudioHostOptions", "oplCodexNative"];

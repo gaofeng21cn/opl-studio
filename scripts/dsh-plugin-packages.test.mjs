@@ -87,7 +87,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       const registrations = new Map();
       browser.__ModuleLoader__ = { load: registration => registrations.set(registration.id, registration) };
       for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-superagent", "opl-team-bots"]) {
-        const name = `@one-person-lab/${id}`;
+        const name = `@gaofeng21cn/${id}`;
         const clientPath = require.resolve(`${name}/client`);
         runInNewContext(await fs.readFile(clientPath, "utf8"), sandbox, { filename: clientPath });
         const registration = registrations.get(name);
@@ -135,7 +135,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     assert.ok(!superagentHtml.includes('"id":"ui-settings-models"'), "Codex profile must not mount a second model sign-in flow");
     await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
-    const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@one-person-lab/"));
+    const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@gaofeng21cn/"));
     assert.equal(own.length, 8);
     assert.equal(host.context.get("agents"), undefined);
     await host.context.oplTeamBots.start();

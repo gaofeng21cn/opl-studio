@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-codex-native",
+  "name": "@gaofeng21cn/opl-codex-native",
   "version": "0.1.0",
   "description": "Persistent Codex App Server integration for the OPL DSH application host.",
   "type": "module",
@@ -25,5 +25,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-codex-native"
   }
 }

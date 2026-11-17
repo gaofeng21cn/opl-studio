@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-superagent",
+  "name": "@gaofeng21cn/opl-superagent",
   "version": "0.1.0",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -22,12 +22,17 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@one-person-lab/opl-studio-client"
+        "@gaofeng21cn/opl-studio-client"
       ]
     }
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-superagent"
   }
 }
