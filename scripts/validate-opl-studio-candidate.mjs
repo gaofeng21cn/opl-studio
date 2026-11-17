@@ -676,7 +676,9 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   for (const marker of ["OPL_APP_OPL_BIN", "OPL_NATIVE_WORKBENCH_READ_ONLY", "blocked_read_only", "candidate_read_only_policy"]) {
     assert(oplPassthrough.includes(marker), `shared host core must preserve launcher/runtime safety marker ${marker}`);
   }
-  assert(rendererBuilder.includes("__OPL_CODEX_MODEL_POLICY__"), "renderer build must inject the App-owned model policy");
+  assert(!rendererBuilder.includes("policyScript"), "static carrier HTML must not inject product policy");
+  assert(read("plugins/opl-studio-client/src/client/plugin.tsx").startsWith('import "virtual:opl-client-runtime-policy";'), "product client must initialize its App-owned policy before UI imports");
+  assert(read("scripts/client-runtime-policy.mjs").includes("__OPL_CODEX_MODEL_POLICY__"), "product client build must compile the App-owned model policy");
   assert(rendererBuilder.includes("resolveAppRepoRoot"), "renderer build must resolve the App repo through the shared helper");
   assert(appRepoResolver.includes('"contracts", "app-product-profile.json"'), "App repo resolver must require the App product profile");
   const alignment = evidence.default_home_layout?.product_layout_contract;

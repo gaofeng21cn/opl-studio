@@ -11,6 +11,8 @@ import { Window } from "happy-dom";
 import { createRequire } from "node:module";
 import { readPluginInventory } from "@deepseek-ai/dsh-host-plugin-inventory";
 import { ThreadAdapterError } from "../src/host/thread-adapter.mjs";
+import { createClientRuntimePolicy } from "./client-runtime-policy.mjs";
+import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -73,13 +75,10 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         window: browser, document: browser.document, navigator: browser.navigator, location: browser.location,
         console, URL, Blob, TextEncoder, TextDecoder, AbortController, crypto: globalThis.crypto,
         setTimeout, clearTimeout, setInterval, clearInterval, performance, structuredClone,
-        __OPL_CODEX_MODEL_POLICY__: {
-          source: "one-person-lab-app/contracts/app-product-profile.json#codex.auto_model_policy",
-          defaultModel: "fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "fixture" }],
-          reasoningEfforts: ["high"], autoLabel: { zh: "Auto", en: "Auto" }, knownModelReasoningEffortOverrides: {},
-          acceptUnknownCatalogDefault: true, useHighestSupportedReasoningForUnknown: true,
-          customModelAccess: { defaultEnabled: false, label: { zh: "自定义模型", en: "Custom models" }, description: { zh: "高级设置", en: "Advanced settings" } }
-        }
+        __OPL_CODEX_MODEL_POLICY__: { source: "stale-renderer-policy" },
+        __OPL_SIDEBAR_DEFAULT_PINS__: ["stale-renderer-panel"],
+        __OPL_CLIENT_COMPOSITION_POLICY__: { source: "stale-renderer-policy" },
+        __OPL_DEEP_LINK_POLICY__: { source: "stale-renderer-policy" }
       };
       const require = createRequire(path.join(staging, "package.json"));
       const seedModule = { exports: {} };
@@ -98,6 +97,13 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
           return modules[specifier];
         });
         assert.equal(typeof (client.default ?? client).apply, "function", name);
+        if (id === "opl-studio-client") {
+          const expected = createClientRuntimePolicy(resolveAppRepoRoot(root));
+          for (const [key, value] of Object.entries(expected)) {
+            assert.equal(JSON.stringify(sandbox[key]), JSON.stringify(value), `${key} must travel with the packed product client`);
+          }
+          assert.notEqual(sandbox.__OPL_CODEX_MODEL_POLICY__.source, "stale-renderer-policy");
+        }
       }
     } finally { await browser.happyDOM.close(); }
     await fs.cp(path.join(root, "src/host/dsh"), path.join(staging, "src/host/dsh"), { recursive: true });
