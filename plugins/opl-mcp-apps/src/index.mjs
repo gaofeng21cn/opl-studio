@@ -1,4 +1,5 @@
 import { McpAppHost } from "./service.mjs";
+export { McpAppHost };
 
 export const name = "opl-mcp-apps";
 export const inject = ["oplCodexNative"];

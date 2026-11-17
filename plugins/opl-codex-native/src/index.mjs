@@ -1,4 +1,5 @@
 import { OplCodexNative } from "./service.mjs";
+export { OplCodexNative };
 
 export const name = "opl-codex-native";
 export const inject = ["oplStudioHostOptions", "oplDshToolMcp"];
