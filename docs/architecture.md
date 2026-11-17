@@ -166,6 +166,13 @@ recompiling the boot shell. Electron, the DSH core/cohort, and the small
 survive carrier pruning, including nested directories named `doc` such as
 `yaml/dist/doc`; source boot alone cannot verify packaged dependency closure.
 
+macOS carrier signing excludes the known Chromium resource data, KaTeX fonts
+and PDF CMaps from individual code-sign operations. Native executables,
+frameworks, libraries and Node addons retain their signatures; the final App
+seal and deep strict verification continue to protect resource bytes. Full
+assembly preserves these Shell exclusions when adding its pre-signed runtime
+exclusion.
+
 The composition receipt records one tested published Host/Client combination.
 It is release evidence rather than a runtime discovery list. App-integrated
 update/readback and production Stable artifact consumption retain their own
