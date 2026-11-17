@@ -33,7 +33,7 @@ function Fixture() {
   const [page, setPage] = useState('capabilities');
   Object.assign(window, {functionalReadCounts: counts, setFunctionalPage: setPage});
   surface = {locale: 'zh', currentThreadId: 'fixture-thread', openPrimaryView: () => setPage('capabilities'), mcpApps: {bridge, onContext: () => {}, onMessage: () => {}, ...(page === 'task' ? {task: {itemId: 'fixture-task', viewId: 'review'}} : {})}};
-  const context: any = {settings: {locale: 'zh'}, zh: true, locale: 'zh-CN', projection: null, runtime: null, actionBusyKey: null, onAction: () => {}, navigate: () => {},
+  const context: any = {resourceFocus: {section: 'remote'}, settings: {locale: 'zh'}, zh: true, locale: 'zh-CN', projection: null, runtime: null, actionBusyKey: null, onAction: () => {}, navigate: () => {},
     onOpenSoftwareCenter: () => {}, onOpenAppWorkspace: () => setPage('workspace'),
     model: {managedCompanions: [], packageLifecycle: []}, capabilityCatalog: {skills: [], plugins: [], apps: [], errors: []},
     renderSettingsContributions: (destination: any) => {const selected = settingsEntriesForDestination(entries, destination); return selected.length ? <>{selected.map(entry => <ProjectedContribution key={entry.contributionKey} entry={entry} owner={owner}/>)}</> : null;}};

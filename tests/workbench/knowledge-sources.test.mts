@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Window } from "happy-dom";
-import { readKnowledgeSourcesProjection, knowledgeSourceNeedsAttention, knowledgeSourceStatus, type KnowledgeSourcesProjection } from "../../src/workbench/knowledgeSources";
+import { readKnowledgeSourcesProjection, knowledgeConsumerGroups, knowledgeLibraryLabel, knowledgeSourceNeedsAttention, knowledgeSourceStatus, type KnowledgeSourcesProjection } from "../../src/workbench/knowledgeSources";
 import { KnowledgeSourcesSection } from "../../src/workbench/KnowledgeSourcesSection";
 import { ApplicationManagementPage } from "../../src/workbench/ApplicationManagementPage";
 import { deriveWorkbenchModelFromState, initialWorkbenchModel, type WorkbenchModel } from "../../src/workbench/workbenchModel";
@@ -32,7 +32,7 @@ function ownerProjection() {
     available_actions: [
       { action_id: "knowledge_source_check", label: "Check", payload_fields: ["resource_id"], confirmation_required: false },
       { action_id: "knowledge_source_connect", label: "Connect", payload_fields: ["context_id", "vault_path", "registry_path", "source_id", "label", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"], confirmation_required: true },
-      { action_id: "knowledge_source_configure", label: "Configure", payload_fields: ["resource_id", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"], confirmation_required: true },
+      { action_id: "knowledge_source_configure", label: "Configure", payload_fields: ["resource_id", "label", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"], confirmation_required: true },
       { action_id: "knowledge_source_disconnect", label: "Disconnect", payload_fields: ["resource_id", "expected_revision"], confirmation_required: true }
     ]
   };
@@ -164,7 +164,7 @@ async function withKnowledgeForm(run: (surface: { container: HTMLElement; browse
 test("knowledge access form dispatches the bound revision and selected reader writer scopes", async () => {
   await withKnowledgeForm(({ container, browser, actions, render, button }) => {
     render(projection());
-    flushSync(() => button("Manage access").click());
+    flushSync(() => button("Manage").click());
     const sourceRows = Array.from(container.querySelectorAll(".opl-resource-consumers > div"));
     const persona = sourceRows[0]!.querySelectorAll<HTMLInputElement>("input");
     const capital = sourceRows[1]!.querySelectorAll<HTMLInputElement>("input");
@@ -178,7 +178,7 @@ test("knowledge access form dispatches the bound revision and selected reader wr
     expect(persona[1]!.checked).toBe(false);
     const scope = container.querySelector<HTMLSelectElement>("select[multiple]")!;
     expect(Array.from(scope.options, option => option.value)).toEqual(["personal.policy", "personal.projects"]);
-    expect(container.querySelector("form input:not([type=checkbox])")).toBeNull();
+    expect(container.querySelector<HTMLInputElement>("form input[maxlength]" )?.value).toBe("Personal Obsidian library");
     flushSync(() => {
       for (const option of scope.options) option.selected = option.value === "personal.projects";
       scope.dispatchEvent(new browser.Event("change", { bubbles: true }) as unknown as Event);
@@ -188,7 +188,7 @@ test("knowledge access form dispatches the bound revision and selected reader wr
     expect(actions[0]).toMatchObject({ actionId: "knowledge_source_configure", confirmationRequired: true, payload: {
       resource_id: "knowledge:personal:notes", expected_revision: "source-revision-11", scope_ids: ["personal.projects"], consumer_domain_ids: ["capital"], write_domain_ids: ["capital"]
     } });
-    expect(Object.keys(actions[0]!.payload).sort()).toEqual(["consumer_domain_ids", "expected_revision", "resource_id", "scope_ids", "write_domain_ids"]);
+    expect(Object.keys(actions[0]!.payload).sort()).toEqual(["consumer_domain_ids", "expected_revision", "label", "resource_id", "scope_ids", "write_domain_ids"]);
   });
 });
 
@@ -234,5 +234,46 @@ test("connecting a library uses the selected context revision and an explicit lo
     expect(actions[0]).toMatchObject({ actionId: "knowledge_source_connect", confirmationRequired: true, payload: {
       context_id: "personal", expected_revision: "context-revision-7", vault_path: "/Users/test/Documents/Notes", scope_ids: ["personal.policy", "personal.projects"], consumer_domain_ids: ["persona"], write_domain_ids: ["persona"]
     } });
+  });
+});
+
+test("application groups preserve individual domain grants and legacy source IDs stay in technical details", async () => {
+  const source = projection();
+  source.consumers.push({ domainId: "persona-extra", label: "OPL Persona", packageId: "opl-persona" });
+  source.entries[0]!.label = source.entries[0]!.sourceId;
+  const groups = knowledgeConsumerGroups(source.consumers, "en");
+  expect(groups).toHaveLength(2);
+  expect(groups[0]!.consumers.map(item => item.domainId)).toEqual(["persona", "persona-extra"]);
+  expect(knowledgeLibraryLabel(source.entries[0]!, source, "en")).toBe("Personal workspace · Library 1");
+  await withKnowledgeForm(({ container, browser, actions, render, button }) => {
+    render(source);
+    expect(container.querySelector("article h3")?.textContent).toBe("Personal workspace · Library 1");
+    flushSync(() => button("Manage").click());
+    const rows = container.querySelectorAll(".opl-resource-consumers > div");
+    expect(rows).toHaveLength(3);
+    expect(rows[1]!.querySelector<HTMLInputElement>("input")?.checked).toBe(false);
+    flushSync(() => container.querySelector("form")!.dispatchEvent(new browser.Event("submit", { bubbles: true, cancelable: true }) as unknown as Event));
+    expect(actions[0]!.payload.consumer_domain_ids).toBeUndefined();
+    expect(actions[0]!.payload.write_domain_ids).toBeUndefined();
+    expect(actions[0]!.payload.scope_ids).toBeUndefined();
+  });
+});
+
+test("renaming a source with complex grants sends no permission or binding edits", async () => {
+  await withKnowledgeForm(({ container, browser, actions, render, button }) => {
+    const source = projection(); source.entries[0]!.accessEditable = false;
+    render(source); flushSync(() => button("Manage").click());
+    expect(container.querySelector("fieldset")?.disabled).toBe(true);
+    const name = container.querySelector<HTMLInputElement>("input[maxlength]")!;
+    Object.assign(name, { attachEvent() {}, detachEvent() {} });
+    flushSync(() => name.focus());
+    flushSync(() => {
+      Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, "value")!.set!.call(name, "Investment notes");
+      name.dispatchEvent(new browser.Event("input", { bubbles: true }) as unknown as Event);
+      name.dispatchEvent(new browser.KeyboardEvent("keyup", { key: "s", bubbles: true }) as unknown as Event);
+    });
+    flushSync(() => container.querySelector("form")!.dispatchEvent(new browser.Event("submit", { bubbles: true, cancelable: true }) as unknown as Event));
+    expect(actions[0]!.payload).toEqual({ resource_id: "knowledge:personal:notes", expected_revision: "source-revision-11", label: "Investment notes" });
+    expect(actions[0]!.confirmationRequired).toBe(true);
   });
 });

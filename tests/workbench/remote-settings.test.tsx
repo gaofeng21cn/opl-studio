@@ -32,7 +32,7 @@ const entries = readUiContributionsProjection({ ui_contributions: { surface_kind
   view: { view_id: 'channel', view_type: 'channel_access', title_i18n: { en: 'Weixin', 'zh-CN': '微信' }, data_ref: 'channel#state', command_ids: ['connect', 'submit'] },
   commands: [{ command_id: 'connect', label_i18n: { en: 'Connect', 'zh-CN': '扫码连接' }, action_ref: 'channel#connect', confirmation_required: false }, { command_id: 'submit', label_i18n: { en: 'Verify', 'zh-CN': '验证并继续' }, action_ref: 'channel#submit', confirmation_required: false }], badges: []
 }] } }).entries;
-const pageProps = { settings: { locale: 'zh' }, zh: true, projection: null, actionBusyKey: null, dockerDiagnostic: null, onAction: () => {} } as any;
+const pageProps = { resourceFocus: { section: 'remote' }, model: { packageLifecycle: [] }, settings: { locale: 'zh' }, zh: true, projection: null, actionBusyKey: null, dockerDiagnostic: null, onAction: () => {} } as any;
 
 test('remote controls mount in Settings even when their package is a runtime component', async () => {
   const reads: unknown[] = [];

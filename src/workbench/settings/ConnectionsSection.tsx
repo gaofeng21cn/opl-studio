@@ -61,25 +61,8 @@ export function ConnectionsSection({ projection, locale, actionBusyKey, onAction
   };
   return <>
     {authorization ? <>
-      {authorization.connections.length ? <SettingsGroup title={zh ? "已连接账户" : "Connected accounts"}>
-        {authorization.connections.map((connection) => {
-          const disabled = connection.disabled === true || connection.status === "disabled";
-          const payload = { connection_id: connection.id };
-          const togglePayload = { ...payload, disabled: !disabled };
-          const isDefault = authorization.defaultConnectionId === connection.id;
-          return <SettingRow key={connection.id} label={connection.displayName} detail={[connection.accountLabel, connection.providerType, isDefault ? (zh ? "默认连接" : "Default connection") : undefined].filter(Boolean).join(" · ")}>
-            <span className="runtime-setting-control">
-              <ConnectionStatusValue status={disabled ? "disabled" : connection.status} locale={locale} />
-              {connection.capabilities.length ? <span>{connection.capabilities.map((capability) => capability.label).join(zh ? "、" : ", ")}</span> : null}
-              {canRunConnectionAction("connection_test", payload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "检查本地连接配置与凭据引用" : "Check local connection configuration and credential references"} onClick={() => submitConnectionAction("connection_test", `connection-test:${connection.id}`, zh ? "检查连接配置" : "Check connection configuration", payload)}><RefreshCw aria-hidden="true" size={13} />{zh ? "检查配置" : "Check configuration"}</button> : null}
-              {canRunConnectionAction("connection_update", togglePayload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "更改共享状态后，应用需要重新获得授权" : "Apps need fresh authorization after changing sharing status"} onClick={() => submitConnectionAction("connection_update", `connection-update:${connection.id}`, disabled ? (zh ? "启用共享连接" : "Enable shared connection") : (zh ? "停用共享连接" : "Disable shared connection"), togglePayload)}>{disabled ? (zh ? "启用共享" : "Enable sharing") : (zh ? "停用共享" : "Disable sharing")}</button> : null}
-              {!isDefault && canRunConnectionAction("connection_delete", payload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "移除共享连接，保留原服务中的登录账户" : "Remove sharing while keeping the account signed in with its provider"} onClick={() => submitConnectionAction("connection_delete", `connection-delete:${connection.id}`, zh ? "移除共享连接" : "Remove shared connection", payload)}><X aria-hidden="true" size={13} />{zh ? "移除共享" : "Remove sharing"}</button> : null}
-            </span>
-          </SettingRow>;
-        })}
-      </SettingsGroup> : null}
-      {authorization.requests.length ? <SettingsGroup title={zh ? "待处理的访问请求" : "Pending access requests"}>
-        {authorization.requests.map((request) => {
+      {authorization.requests.some(request => request.status === "requested") ? <SettingsGroup title={zh ? "待处理的访问请求" : "Pending access requests"}>
+        {authorization.requests.filter(request => request.status === "requested").map((request) => {
           const pending = request.status === "requested";
           const deny = connectionAction("connection_access_request_deny");
           const canDeny = pending && canRunConnectionAction("connection_access_request_deny", { request_id: request.requestId });
@@ -101,7 +84,25 @@ export function ConnectionsSection({ projection, locale, actionBusyKey, onAction
           </div>;
         })}
       </SettingsGroup> : null}
-      {authorization.grants.length ? <SettingsGroup title={zh ? "已授予的访问权限" : "Granted access"}>
+      {authorization.connections.length ? <SettingsGroup title={zh ? "已连接账户" : "Connected accounts"}>
+        {authorization.connections.map((connection) => {
+          const disabled = connection.disabled === true || connection.status === "disabled";
+          const payload = { connection_id: connection.id };
+          const togglePayload = { ...payload, disabled: !disabled };
+          const isDefault = authorization.defaultConnectionId === connection.id;
+          return <SettingRow key={connection.id} label={connection.displayName} detail={[connection.accountLabel, connection.providerType, isDefault ? (zh ? "默认连接" : "Default connection") : undefined].filter(Boolean).join(" · ")}>
+            <span className="runtime-setting-control">
+              <ConnectionStatusValue status={disabled ? "disabled" : connection.status} locale={locale} />
+              {connection.capabilities.length ? <span>{connection.capabilities.map((capability) => capability.label).join(zh ? "、" : ", ")}</span> : null}
+              {canRunConnectionAction("connection_test", payload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "检查本地连接配置与凭据引用" : "Check local connection configuration and credential references"} onClick={() => submitConnectionAction("connection_test", `connection-test:${connection.id}`, zh ? "检查连接配置" : "Check connection configuration", payload)}><RefreshCw aria-hidden="true" size={13} />{zh ? "检查配置" : "Check configuration"}</button> : null}
+              {canRunConnectionAction("connection_update", togglePayload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "更改共享状态后，应用需要重新获得授权" : "Apps need fresh authorization after changing sharing status"} onClick={() => submitConnectionAction("connection_update", `connection-update:${connection.id}`, disabled ? (zh ? "启用共享连接" : "Enable shared connection") : (zh ? "停用共享连接" : "Disable shared connection"), togglePayload)}>{disabled ? (zh ? "启用共享" : "Enable sharing") : (zh ? "停用共享" : "Disable sharing")}</button> : null}
+              {!isDefault && canRunConnectionAction("connection_delete", payload) ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} title={zh ? "移除共享连接，保留原服务中的登录账户" : "Remove sharing while keeping the account signed in with its provider"} onClick={() => submitConnectionAction("connection_delete", `connection-delete:${connection.id}`, zh ? "移除共享连接" : "Remove shared connection", payload)}><X aria-hidden="true" size={13} />{zh ? "移除共享" : "Remove sharing"}</button> : null}
+            </span>
+          </SettingRow>;
+        })}
+      </SettingsGroup> : null}
+      {authorization.requests.some(request => request.status !== "requested") ? <details className="opl-resource-details"><summary>{zh ? "授权请求记录" : "Access request history"}</summary>{authorization.requests.filter(request => request.status !== "requested").map(request => <SettingRow key={request.requestId} label={request.consumer.displayName} detail={request.connection.displayName}><ConnectionStatusValue status={request.status} locale={locale} /></SettingRow>)}</details> : null}
+      {authorization.grants.length ? <details className="opl-resource-details"><summary>{zh ? "查看已授予的访问权限" : "View granted access"}</summary><SettingsGroup title={zh ? "已授予的访问权限" : "Granted access"}>
         {authorization.grants.map((grant) => {
           const revoke = connectionAction("connection_grant_revoke");
           const canRevoke = grant.status === "granted" && canRunConnectionAction("connection_grant_revoke", { grant_id: grant.grantId });
@@ -109,22 +110,22 @@ export function ConnectionsSection({ projection, locale, actionBusyKey, onAction
             <span className="runtime-setting-control"><ConnectionStatusValue status={grant.staleReason ? "stale" : grant.status} locale={locale} />{canRevoke && revoke ? <button className="settings-action-button" type="button" disabled={actionBusyKey !== null} onClick={() => submitConnectionAction(revoke.actionId, `connection-revoke:${grant.grantId}`, zh ? "撤销授权" : "Revoke grant", { grant_id: grant.grantId })}><Undo2 aria-hidden="true" size={13} />{zh ? "撤销" : "Revoke"}</button> : null}</span>
           </SettingRow>;
         })}
-      </SettingsGroup> : null}
-      {authorization.invocations.length ? <SettingsGroup title={zh ? "最近使用" : "Recent use"}>
+      </SettingsGroup></details> : null}
+      {authorization.invocations.length ? <details className="opl-resource-details"><summary>{zh ? "最近使用记录" : "Recent use"}</summary><SettingsGroup title={zh ? "最近使用" : "Recent use"}>
         {authorization.invocations.map((invocation) => <SettingRow key={invocation.invocationId} label={`${invocation.consumerDisplayName} · ${invocation.capabilityLabel}`} detail={`${invocation.connectionDisplayName} · ${invocation.startedAt ?? "--"}`}>
           <ConnectionStatusValue status={invocation.disposition} locale={locale} />
         </SettingRow>)}
-      </SettingsGroup> : null}
+      </SettingsGroup></details> : null}
       {connectionAction("connection_relay_import") ? <SettingsGroup title={zh ? "添加已有邮箱" : "Add an existing mailbox"}>
         {relayAvailable && authorization.availableRelayConnections.length ? <label className="settings-row-label"><span>{zh ? "选择已连接邮箱" : "Select a connected mailbox"}<select className="setting-select" aria-label={zh ? "选择 Relay 邮箱" : "Select Relay mailbox"} value={selectedMailbox?.mailboxRef ?? ""} onChange={(event) => setMailboxRef(event.currentTarget.value)}><option value="">{zh ? "选择邮箱" : "Select a mailbox"}</option>{authorization.availableRelayConnections.map((connection) => <option key={connection.mailboxRef} value={connection.mailboxRef}>{connection.displayName}{connection.accountLabel ? ` · ${connection.accountLabel}` : ""}</option>)}</select></span></label> : <p className="settings-inline-note">{relayAvailable ? (zh ? "还没有可添加的邮箱。请先在 Relay 登录邮箱，再刷新此页面。" : "No mailboxes are available to add. Sign in to a mailbox in Relay, then refresh this page.") : (zh ? "暂时无法读取 Relay 邮箱列表，请检查 Relay 后刷新。" : "The Relay mailbox list is unavailable. Check Relay, then refresh.")}</p>}
         <SettingRow label={zh ? "共享此邮箱连接" : "Share this mailbox connection"} detail={zh ? "选择已在 Relay 登录的邮箱，随后按应用授予所需权限。" : "Choose a mailbox signed in to Relay, then grant the access each app needs."}>
           <button className="settings-action-button" type="button" disabled={actionBusyKey !== null || !relayAvailable || !selectedMailbox} onClick={() => { if (relayAvailable && selectedMailbox) submitConnectionAction("connection_relay_import", "connection-relay-import", zh ? "添加邮箱连接" : "Add mailbox", { mailbox_ref: selectedMailbox.mailboxRef }); }}><Link2 aria-hidden="true" size={13} />{zh ? "添加" : "Add"}</button>
         </SettingRow>
       </SettingsGroup> : null}
-    </> : <SettingsGroup title={zh ? "账号与连接" : "Accounts & connections"}>
+    </> : <>
       <SettingRow label={zh ? "授权状态" : "Authorization status"} detail={zh ? "连接状态尚未返回，请刷新后查看。" : "Connection status has not been returned. Refresh to check again."}>
         <ConnectionStatusValue status="unknown" locale={locale} />
       </SettingRow>
-    </SettingsGroup>}
+    </>}
   </>;
 }

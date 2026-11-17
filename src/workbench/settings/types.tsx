@@ -55,7 +55,11 @@ export type SettingsGroupId =
   | "runtime_maintenance"
   | "preferences";
 
+export type ResourceSettingsFocus = { packageId?: string; resourceId?: string; section?: "libraries" | "remote" };
+
 export type SettingsPanelProps = {
+  resourceFocus?: ResourceSettingsFocus;
+  onPickKnowledgeDirectory?: () => Promise<string | undefined>;
   mobileNavigation?: {
     view: SettingsMobileView;
     setView: (view: SettingsMobileView) => void;

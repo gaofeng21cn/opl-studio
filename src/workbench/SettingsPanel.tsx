@@ -103,7 +103,7 @@ function renderContent() { switch (context.selectedDestination) {
 case "overview": return <OverviewSettingsPage {...context} />;
 case "account": return <AccountSettingsPage {...context} />;
 case "models": return <ModelsSettingsPage {...context} />;
-case "resources": return <ResourcesSettingsPage {...context} />;
+case "resources": return <ResourcesSettingsPage key={`${context.resourceFocus?.section ?? "libraries"}:${context.resourceFocus?.packageId ?? ""}:${context.resourceFocus?.resourceId ?? ""}`} {...context} />;
 case "workspace": return <WorkspaceSettingsPage {...context} />;
 case "storage": return <StorageSettingsPage {...context} />;
 case "agents": return <AgentsSettingsPage {...context} />;

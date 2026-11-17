@@ -387,7 +387,7 @@ export function App({
   const [threadActionError, setThreadActionError] = useState("");
   const [lifecycleConfirmation, setLifecycleConfirmation] = useState<{ thread: WorkbenchThreadItem; action: ThreadLifecycleAction } | null>(null);
   const [settings, setSettings] = useState<WorkbenchSettings>(() => readSettings());
-  const [settingsNavigation, setSettingsNavigation] = useState<{ open: boolean; destination?: SettingsDestinationId; revision: number }>();
+  const [settingsNavigation, setSettingsNavigation] = useState<{ open: boolean; destination?: SettingsDestinationId; resourceFocus?: import("./settings/types").ResourceSettingsFocus; revision: number }>();
   const settingsRef = useRef(settings);
   const voiceInputContextRef = useRef<VoiceInputContext | null>(null);
   const [codexCatalog, setCodexCatalog] = useState<CodexModelCatalogEntry[]>([]);
@@ -2469,6 +2469,8 @@ export function App({
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsPanel
+      resourceFocus={settingsNavigation?.resourceFocus}
+      onPickKnowledgeDirectory={bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined}
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
       onOpenAppWorkspace={() => { onClose?.(); setMcpTaskTarget(undefined); setMcpAppSelectedLaunch(undefined); setPreferredSoftwareEntry(undefined); setPrimaryView("workspace"); }}
       onOpenSoftwareCenter={(section = "applications") => { onClose?.(); setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 })); setApplicationManagementTab(section); setPrimaryView("applications"); }}
@@ -2649,7 +2651,7 @@ export function App({
       onHostAction={(intent) => void runSettingsHostAction(intent)}
       onRefresh={() => void loadState(settings.runtimeProfile)}
       manifestInstallAction={projectedManifestInstallAction}
-      onOpenSettings={(destination) => setSettingsNavigation(current => ({ open: true, destination, revision: (current?.revision ?? 0) + 1 }))}
+      onOpenSettings={(destination, resourceFocus) => setSettingsNavigation(current => ({ open: true, destination, resourceFocus, revision: (current?.revision ?? 0) + 1 }))}
       initialTab={applicationManagementTab}
       onTabChange={setApplicationManagementTab}
       actionFeedback={settingsActionFeedback}

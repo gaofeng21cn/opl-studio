@@ -18,6 +18,7 @@ export type KnowledgeSourceRef = {
 };
 export type KnowledgeSourcesProjection = {
   status: "available" | "not_configured" | "attention_required" | "unknown";
+  renameSupported?: boolean;
   contexts: KnowledgeSourceContext[]; entries: KnowledgeSourceRef[];
   consumers: KnowledgeSourceConsumer[]; actions: SoftwareSourceActionRef[];
 };
@@ -28,7 +29,7 @@ const safePayloadFields = new Set(["resource_id", "context_id", "source_id", "la
 const knowledgeRequiredFields: Record<string, string[]> = {
   knowledge_source_list: [], knowledge_source_check: [],
   knowledge_source_connect: ["context_id", "scope_ids", "consumer_domain_ids", "expected_revision"],
-  knowledge_source_configure: ["resource_id", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"],
+  knowledge_source_configure: ["resource_id", "expected_revision"],
   knowledge_source_disconnect: ["resource_id", "expected_revision"]
 };
 function readKnowledgeHealth(value: unknown): KnowledgeSourceHealth | undefined {
@@ -49,6 +50,7 @@ export function readKnowledgeSourcesProjection(value: unknown): KnowledgeSources
   const input = asRecord(value);
   if (input?.surface_kind !== "opl_knowledge_sources_projection.v1") return undefined;
   return {
+    renameSupported: asRecordArray(input.available_actions).some(action => action.action_id === "knowledge_source_configure" && asStringArray(action.payload_fields).includes("label")),
     status: ["available", "not_configured", "attention_required"].includes(String(input.status)) ? input.status as KnowledgeSourcesProjection["status"] : "unknown",
     contexts: asRecordArray(input.contexts).flatMap(context => {
       const contextId = asString(context.context_id); if (!contextId) return [];
@@ -94,4 +96,22 @@ export function knowledgeSourceNeedsAttention(source: KnowledgeSourceRef): boole
 export function knowledgeSourceStatus(source: KnowledgeSourceRef): string {
   if (knowledgeSourceNeedsAttention(source)) return "attention_needed";
   return source.status === "ready" || source.status === "available" ? "ready" : "unknown";
+}
+
+/** Group display only; each declared domain keeps its own access selection. */
+export function knowledgeConsumerGroups(consumers: KnowledgeSourceConsumer[], locale: "zh" | "en") {
+  const groups = new Map<string, { id: string; label: string; consumers: KnowledgeSourceConsumer[] }>();
+  for (const consumer of consumers) {
+    const id = consumer.packageId ? `package:${consumer.packageId}` : `domain:${consumer.domainId}`;
+    const group = groups.get(id);
+    if (group) group.consumers.push(consumer);
+    else groups.set(id, { id, label: consumer.label !== consumer.domainId ? consumer.label : `${locale === "zh" ? "已授权服务" : "Authorized service"} ${groups.size + 1}`, consumers: [consumer] });
+  }
+  return [...groups.values()];
+}
+
+export function knowledgeLibraryLabel(source: KnowledgeSourceRef, projection: KnowledgeSourcesProjection, locale: "zh" | "en") {
+  if (source.label.trim() && source.label !== source.sourceId) return source.label;
+  const context = projection.contexts.find(item => item.contextId === source.contextId);
+  return `${context?.label ?? (locale === "zh" ? "当前工作区" : "Current workspace")} · ${locale === "zh" ? "资料库" : "Library"} ${projection.entries.filter(item => item.contextId === source.contextId).findIndex(item => item.resourceId === source.resourceId) + 1}`;
 }
