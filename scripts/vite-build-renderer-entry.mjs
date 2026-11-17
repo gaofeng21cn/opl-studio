@@ -5,6 +5,8 @@ import { build } from "vite";
 import react from "@vitejs/plugin-react";
 import { createRequire } from "node:module";
 import { readStudioSettingsSearchModule } from "./settings-search-client.mjs";
+import { clientRuntimePolicyModule } from "./client-runtime-policy.mjs";
+import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -35,6 +37,17 @@ function settingsSearchModule() {
   };
 }
 
+function clientRuntimePolicy() {
+  const id = "virtual:opl-client-runtime-policy";
+  return {
+    name: "opl-client-runtime-policy",
+    resolveId(specifier) { return specifier === id ? `\0${id}` : undefined; },
+    load(specifier) {
+      return specifier === `\0${id}` ? clientRuntimePolicyModule(resolveAppRepoRoot(root)) : undefined;
+    }
+  };
+}
+
 /** Read the module-table baseline from the pinned official boot package. */
 function clientPlatformModules() {
   const require = createRequire(import.meta.url);
@@ -58,7 +71,7 @@ export async function buildRendererEntry(entrypoint, outdir, format = "esm", { e
     publicDir: false,
     base: "./",
     logLevel: "warn",
-    plugins: [settingsSearchModule(), react()],
+    plugins: [clientRuntimePolicy(), settingsSearchModule(), react()],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: [
