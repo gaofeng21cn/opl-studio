@@ -13,7 +13,7 @@ import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
 import { createAppLogDirectoryController } from "./app-log-directory.mjs";
 import { resolveDesktopRuntimeEnvironment } from "./process-environment.mjs";
 import { prepareDesktopCodexRuntime } from "./codex-offline-seed.mjs";
-import { ensureStudioDesktopRuntime, ensureDesktopHostNode, desktopBootstrapFailure } from "./runtime-bootstrap.mjs";
+import { activateInstalledStudioRuntime, ensureStudioDesktopRuntime, ensureDesktopHostNode, desktopBootstrapFailure } from "./runtime-bootstrap.mjs";
 import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
 import { createShutdownController } from "./shutdown.mjs";
 import { createDesktopTray } from "./tray.mjs";
@@ -303,7 +303,7 @@ async function createDesktopHost(appLogDirectory) {
   const officialProfileAdmission = app.isPackaged && stableIdentity && !windowsRuntime && !updaterQualificationEnabled
     ? captureOfficialProfileAdmission({ homeDir, env: process.env }) : null;
   let bootstrapStatus = "available";
-  const runtime = windowsRuntime ? null : await ensureStudioDesktopRuntime({
+  let runtime = windowsRuntime ? null : await ensureStudioDesktopRuntime({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     homeDir,
@@ -317,8 +317,8 @@ async function createDesktopHost(appLogDirectory) {
     console.warn("[OPL:bootstrap] " + JSON.stringify(desktopBootstrapFailure(error)));
     return null;
   });
-  const nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
-  const runtimeEnvironment = nodeHost ? { ...(runtime?.env ?? process.env),
+  let nodeHost = windowsRuntime ? null : await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
+  let runtimeEnvironment = nodeHost ? { ...(runtime?.env ?? process.env),
     PATH: [path.dirname(nodeHost.command), (runtime?.env ?? process.env).PATH].filter(Boolean).join(path.delimiter)
   } : process.env;
   const activationEnvironment = resolveDesktopRuntimeEnvironment({
@@ -326,7 +326,9 @@ async function createDesktopHost(appLogDirectory) {
     homeDir,
     resourcesPath: process.resourcesPath
   });
-  activationEnvironment.OPL_APP_PROCESS_INSTANCE_ID = appProcessInstanceId;
+  // These pre-Host owner CLI processes have no loaded runtime consumers yet.
+  // Give the live Host its stable process identity only after activation.
+  delete activationEnvironment.OPL_APP_PROCESS_INSTANCE_ID;
   const managedUpdatesEnabled = bootstrapStatus === "available" && app.isPackaged && !updaterQualificationEnabled
     && process.env.OPL_STUDIO_MANAGED_UPDATES !== "0"
     && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1";
@@ -335,9 +337,16 @@ async function createDesktopHost(appLogDirectory) {
   if (app.isPackaged && !windowsRuntime && !updaterQualificationEnabled
     && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1") {
     ({ activationStatus, activatedCodexPath } = await prepareDesktopCodexRuntime({
-      env: activationEnvironment, activatePending: managedUpdatesEnabled, onProgress: reportDesktopSetup,
+      env: activationEnvironment, activatePending: managedUpdatesEnabled, refreshUpdates: managedUpdatesEnabled, onProgress: reportDesktopSetup,
       opl: createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] })
     }));
+    if (runtime?.env.OPL_FULL_RUNTIME_HOME) {
+      runtime = activateInstalledStudioRuntime({ homeDir, env: process.env, identity: stableIdentity ? "stable" : "preview" }) ?? runtime;
+    }
+    nodeHost = await ensureDesktopHostNode({ runtime, resourcesPath: process.resourcesPath, homeDir, env: runtime?.env ?? process.env });
+    runtimeEnvironment = { ...(runtime?.env ?? process.env),
+      PATH: [path.dirname(nodeHost.command), (runtime?.env ?? process.env).PATH].filter(Boolean).join(path.delimiter)
+    };
   }
   if (desktopSetupSnapshot?.status === 'running') reportDesktopSetup({ stage: 'checking_components' });
   const hostEnvironment = resolveDesktopRuntimeEnvironment({

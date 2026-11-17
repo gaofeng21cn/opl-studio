@@ -21,6 +21,9 @@ try {
     async stop() { this.initialized = false; }
   };
   const result = await bootOplStudioHost({
+    // The Host also loads Link identity and grants from OPL_DATA_DIR. A
+    // temporary DSH profile alone still opens the user's live Link carrier.
+    env: { ...process.env, OPL_DATA_DIR: directory },
     dshHome: directory,
     workspaceRoot: directory,
     transport,
@@ -35,6 +38,9 @@ try {
   assert.ok(result.context.get("tools"), "packaged DSH tools did not load");
   assert.ok(result.context.get("oplDshToolMcp"), "packaged MCP bridge did not load");
   assert.equal(transport.initialized, true);
+  const link = await core.invoke("readLinkDevices");
+  assert.equal(link.internet?.status, "disabled", "packaged smoke must not connect a live Link identity");
+  assert.deepEqual(link.devices, [], "packaged smoke must not load user device grants");
   process.stdout.write("OPL_PACKAGED_HOST_READY\n");
 } finally {
   await core?.close();

@@ -197,9 +197,20 @@ async function installPayload({ payload, target, platform }) {
     await fs.promises.cp(payload.payloadRoot, temporary, {
       recursive: true,
       dereference: false,
+      verbatimSymlinks: true,
       mode: fs.constants.COPYFILE_FICLONE,
       preserveTimestamps: true
     });
+    // Package owners keep independently installed/updated payloads. Refresh the
+    // App's toolchain/wrappers without resetting their runtime or losing an
+    // already verified Framework generation waiting for this restart.
+    for (const name of ["modules", "skills", "opl.pending", "opl.pending.json"]) {
+      const current = path.join(target, name);
+      if (!fs.existsSync(current)) continue;
+      await fs.promises.cp(current, path.join(temporary, name), {
+        recursive: true, dereference: false, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE, preserveTimestamps: true
+      });
+    }
     await makeOwnerWritable(temporary);
     await removeQuarantine(temporary, platform);
     await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
@@ -498,11 +509,13 @@ export async function ensureStudioDesktopRuntime({
   if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env, identity });
   const payload = resolvePayload(resourcesPath, identity);
   if (payload) {
-    const installed = activateInstalledStudioRuntime({ homeDir, env, identity });
-    // Full supplies a bootstrap seed. Framework remains the update owner for
-    // an existing compatible runtime, including independently updated Packages.
-    if (installed && await supportsRuntimeActivation(installed.env)) return installed;
+    // A different verified Full generation must be adopted at this cold-start
+    // boundary. An older CLI supporting activation says nothing about whether
+    // its wrappers, Node or runtime files contain the current App's fixes.
     const target = runtimeHome(homeDir, identity);
+    if (isUsableRuntime(target) && markerMatches(target, payload.manifestSha256, payload.markerName)) {
+      return activateInstalledStudioRuntime({ homeDir, env, identity });
+    }
     onProgress({ stage: 'installing_offline_runtime', source: 'bundled' });
     await installPayload({ payload, target, platform });
     writePointer(homeDir, target, payload.version, payload.manifestSha256, "packaged_payload", identity);
