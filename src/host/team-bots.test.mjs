@@ -15,6 +15,7 @@ class CodexFixture extends EventEmitter {
   turns = new Map();
   calls = [];
   next = 0;
+  expiredWaits = new Set();
   cancellationReady = new Promise(resolve => { this.markCancellationReady = resolve; });
   createChannelCallbackAdapter() { return null; }
   async start() { this.initialized = true; }
@@ -38,6 +39,10 @@ class CodexFixture extends EventEmitter {
   }
   async waitForTurn(id) {
     const turn = this.turns.get(id);
+    if (turn.prompt.includes("EXPIRE_LOCAL_WAIT") && !this.expiredWaits.has(id)) {
+      this.expiredWaits.add(id);
+      throw Object.assign(new Error("Local observation expired"), { code: "turn_timeout" });
+    }
     if (turn.prompt.includes("WAIT_FOR_CANCEL")) {
       await new Promise(resolve => { this.finishCancelled = resolve; this.markCancellationReady(); });
     }
@@ -127,7 +132,10 @@ test("the official workbench toggles teamwork on the same Codex thread and resto
     await prompt(ctx, root, "Initial acknowledgement");
     const threadId = ctx.oplCodexAgents.state.bindings[root.id].threadId;
     await ctx.agentTeams.setEnabled(root, true);
-    await prompt(ctx, root, "CREATE_SHARED_TASK");
+    await prompt(ctx, root, "EXPIRE_LOCAL_WAIT CREATE_SHARED_TASK");
+    assert.equal(transport.expiredWaits.size, 1);
+    assert.equal(transport.calls.filter(call => call.method === "turn/start").length, 2,
+      "resuming observation must not dispatch another turn");
     assert.equal(transport.toolResponse?.result.success, true, JSON.stringify(transport.toolResponse));
     assert.equal(ctx.agentTeams.listTasks(root).length, 1);
     assert.ok(Array.from({ length: root.session.seq }, (_, index) => root.session.eventAt(index)).some(event => event.type === "tool/call" && event.data.name === "team_task_create"), "official tool cards receive native log events");

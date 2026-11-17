@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
+import { once } from "node:events";
 import { CodexAppServerTransport } from "./app-server-transport.mjs";
 import { createWebUiHost as createHost } from "./http-host.mjs";
 
@@ -19,6 +20,40 @@ async function post(baseUrl, route, value) {
   });
   return { status: response.status, body: await response.json() };
 }
+
+test("HTTP send wait expiry preserves the accepted run and blocks reload until its late result", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-http-wait-expiry-"));
+  const appServerLog = path.join(directory, "app-server.jsonl");
+  const transport = new CodexAppServerTransport({
+    command: process.execPath, args: [fixture], cwd: directory,
+    env: { ...process.env, FAKE_WORKSPACE: directory, FAKE_APP_SERVER_LOG: appServerLog,
+      FAKE_APP_SERVER_TURN_DELAY_MS: "300" },
+    requestTimeoutMs: 2000, turnTimeoutMs: 80
+  });
+  const host = await createWebUiHost({ transport, webRoot: directory,
+    opl: { readState: async () => ({}), readInitialize: async () => ({}), executeAction: async () => ({}) } });
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
+  const started = once(transport, "event").then(([event]) => event);
+  const sending = post(host.url, "/api/send-message", { prompt: "Finish this accepted task" });
+  const event = await started;
+  assert.equal(event.method, "turn/started");
+  const turnId = event.params.turn.id;
+  let reloads = 0;
+  const maintenance = transport.scheduleWhenIdle(() => { reloads += 1; });
+  const response = await sending;
+  assert.equal(response.body.error.code, "turn_timeout");
+  assert.equal(response.body.error.details.waitOnly, true);
+  assert.equal(transport.isBusy(), true);
+  assert.equal(reloads, 0);
+  const late = await transport.waitForTurn(turnId, 2000);
+  assert.equal(late.notification.turn.status, "completed");
+  assert.equal(late.finalMessage, `completed ${turnId}`);
+  await maintenance;
+  assert.equal(reloads, 1);
+  const calls = (await readFile(appServerLog, "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(calls.filter(call => call.direction === "client_to_server" && call.method === "turn/start").length, 1);
+  assert.equal(calls.some(call => call.direction === "client_to_server" && call.method === "turn/interrupt"), false);
+});
 
 test("loopback HTTP host exposes standard thread lifecycle, subagent projection, SSE, and OPL passthrough", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-webui-http-test-"));

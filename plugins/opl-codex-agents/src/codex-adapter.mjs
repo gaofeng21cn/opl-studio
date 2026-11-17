@@ -164,7 +164,17 @@ export class CodexTeamAdapter extends LlmAdapter {
       if (!turnId) throw Error("Codex did not return a Team turn id.");
       await this.commit(agent, "opl/codex-attempt", { ...attempt, status: "running", turnId });
       if (options.signal.aborted) abort();
-      const result = await this.transport.waitForTurn(turnId);
+      let result;
+      for (;;) {
+        try {
+          result = await this.transport.waitForTurn(turnId);
+          break;
+        } catch (error) {
+          // This adapter owns live tool callbacks until Codex is terminal.
+          // A local observer deadline must not dispose them or resend the turn.
+          if (error?.code !== "turn_timeout") throw error;
+        }
+      }
       const status = result.notification?.turn?.status ?? result.notification?.status;
       await this.commit(agent, "opl/codex-inputs", { ids: attempt.ids });
       await this.commit(agent, "opl/codex-attempt", { ...attempt, status: "settled", turnId });

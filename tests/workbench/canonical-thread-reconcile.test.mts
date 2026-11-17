@@ -36,6 +36,12 @@ describe("canonical thread reconcile", () => {
     expect(result.terminalTurn?.id).toBe("turn-old");
   });
 
+  test("empty or partial canonical history does not end an accepted turn", () => {
+    for (const turns of [[], [{ id: "older", status: "completed" as const }]]) {
+      expect(resolveCanonicalTurn({ turns }, "turn-accepted")).toEqual({ activeTurnId: "turn-accepted" });
+    }
+  });
+
   test("streams only events for the visible active turn", () => {
     const active = { threadId: "thread-selected", turnId: "turn-selected" };
     expect(isEventForActiveTurn({ threadId: "thread-selected", turnId: "turn-selected" }, active)).toBe(true);

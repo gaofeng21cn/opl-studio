@@ -15,6 +15,7 @@ import { gatewayAccountErrorMessage } from "./settings/gatewayAccountMessages";
 import { actionReceiptView } from "./actionReceiptView";
 import {
   appServerUnavailableRequestMessage,
+  isAppServerUnavailableCleanup,
   isTurnScopedServerRequestsCleanup,
   removeServerRequests
 } from "./codexServerRequestState";
@@ -314,6 +315,7 @@ export function App({
   const pendingSubmissionSelectionsRef = useRef<{
     expectedThreadId?: string;
     selections: ComposerSelection[];
+    acceptedTurn?: { threadId: string; turnId: string };
   } | null>(null);
   const stagedSelectionsByTurnRef = useRef(new Map<string, TrackedComposerTurn>());
   const ephemeralQueueRef = useRef<EphemeralQueueItem[]>([]);
@@ -1238,6 +1240,13 @@ export function App({
         activeTurnRef.current = null;
         setActiveTurnId(null);
         setSendState("idle");
+        if (terminalTurn) {
+          interruptRequestedForRef.current = null;
+          pendingSubmissionSelectionsRef.current = null;
+          setPendingInputFiles([]);
+          setSelectedAgent(null);
+          setComposerSubmissionError("");
+        }
       }
       messagesRef.current = nextMessages;
       setMessages(nextMessages);
@@ -1508,6 +1517,7 @@ export function App({
         setPendingServerRequests((items) => removeServerRequests(items, detail.requestIds ?? []));
         return;
       }
+      if (!isAppServerUnavailableCleanup(detail.reason)) return;
       setPendingServerRequests([]);
       setPendingServerRequestError(appServerUnavailableRequestMessage(settings.locale));
       return;
@@ -1520,6 +1530,7 @@ export function App({
         trackedTurnIdsRef.current.set(threadId, turnId);
         const pendingSubmission = pendingSubmissionSelectionsRef.current;
         if (pendingSubmission && (!pendingSubmission.expectedThreadId || pendingSubmission.expectedThreadId === threadId)) {
+          pendingSubmission.acceptedTurn = { threadId, turnId };
           trackComposerTurnSelections(stagedSelectionsByTurnRef.current, threadId, turnId, pendingSubmission.selections);
           pendingSubmissionSelectionsRef.current = null;
         }
@@ -1939,10 +1950,11 @@ export function App({
     setPendingInputFiles(pendingSelections.filter((selection) => selection.kind !== "skill").map(composerSelectionArtifact));
     setComposerPaletteOpen(false);
     setSendState("running");
-    pendingSubmissionSelectionsRef.current = {
+    const submission: NonNullable<typeof pendingSubmissionSelectionsRef.current> = {
       ...(codexThreadId ? { expectedThreadId: codexThreadId } : {}),
       selections: pendingSelections
     };
+    pendingSubmissionSelectionsRef.current = submission;
     void bridge
       .sendMessage({
         prompt: mcpAppContext.current && mcpAppContext.current.threadId === codexThreadId ? `${text}\n\n${mcpAppContext.current.text}` : text,
@@ -2035,19 +2047,17 @@ export function App({
           }
           return;
         }
-        const acceptedTurn = activeTurnRef.current;
+        const acceptedTurn = submission.acceptedTurn;
         if (acceptedTurn) {
-          setComposerSubmissionError(settings.locale === "zh" ? "连接已中断，正在从任务记录恢复。" : "Connection interrupted; recovering from the canonical task record.");
+          // A delayed response belongs to this accepted submission even if its
+          // terminal event has already arrived or the user opened another task.
+          const isCurrentRun = () => selectedThreadIdRef.current === acceptedTurn.threadId
+            && activeTurnRef.current?.turnId === acceptedTurn.turnId;
+          if (isCurrentRun()) setComposerSubmissionError(settings.locale === "zh"
+              ? "尚未确认任务结束，正在核对任务记录。你可以继续等待或停止任务。"
+              : "The task has not been confirmed finished. Checking its record; you can keep waiting or stop it.");
           void reconcileCanonicalThread(acceptedTurn.threadId, "send-recover", acceptedTurn.turnId)
-            .then((thread) => {
-              const turn = thread.turns.find((candidate) => candidate.id === acceptedTurn.turnId);
-              if (turn && turn.status !== "inProgress") {
-                setPendingInputFiles([]);
-                setSelectedAgent(null);
-                setComposerSubmissionError("");
-              }
-            })
-            .catch((error) => setComposerSubmissionError(String(error)));
+            .catch((error) => { if (isCurrentRun()) setComposerSubmissionError(String(error)); });
           return;
         }
         const message = t.sendFailed;

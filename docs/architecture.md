@@ -430,6 +430,19 @@ permissions, model catalog, and turn state. Studio consumes the App Server
 thread/turn/event flow; `localStorage` is limited to UI selection, settings,
 and unsent drafts.
 
+Studio's 300-second inactivity window bounds a local `waitForTurn` caller, not
+the Codex turn. Progress and blocking human requests rearm or pause that wait;
+each caller has its own budget, including callers that reconnect after a timeout.
+Expiry rejects only that caller and retains active turns and pending requests.
+It never sends an interrupt or grants idle maintenance. The workbench preserves
+the accepted run and Stop control, then reconciles canonical history without
+resending. Only a Codex terminal event, a matching terminal `thread/read`, or
+actual App Server shutdown releases the run. Missing history and active snapshots
+are not terminal evidence. Explicit Stop uses `turn/interrupt` and still waits for
+canonical terminal confirmation; late output and results remain attached to the
+original turn. This policy is OPL transport code; official DSH/Codex source and
+their provider/tool deadlines stay unchanged.
+
 Studio reads canonical thread identity and history only from Codex App Server
 through the standard adapter. It does not scan or import retired AionUI
 databases, cache files, history, settings, or migration indexes. Existing files

@@ -61,7 +61,8 @@ export function ComposerAccessory({
       <span
         className={`composer-status ${sendState === "error" || unavailableFixedModel ? "error" : sendState}`}
         data-testid="opl-composer-run-state"
-        aria-live="polite"
+        role="status"
+        aria-atomic="true"
       >
         {submissionError || (sendState === "running" ? copy.working : sendState === "error" ? copy.sendFailed : unavailableFixedModel ? copy.modelSelectionUnavailable : "")}
       </span>

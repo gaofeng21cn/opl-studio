@@ -21,13 +21,14 @@ export function resolveCanonicalTurn(
   expectedTurnId?: string
 ): { activeTurnId?: string; terminalTurn?: CodexTurn } {
   const activeTurn = thread.activeTurnId
-    ? thread.turns.find((turn) => turn.id === thread.activeTurnId)
+    ? thread.turns.find((turn) => turn.id === thread.activeTurnId && turn.status === "inProgress")
     : [...thread.turns].reverse().find((turn) => turn.status === "inProgress");
   const expectedTurn = expectedTurnId
     ? thread.turns.find((turn) => turn.id === expectedTurnId)
     : undefined;
   return {
-    ...(activeTurn ? { activeTurnId: activeTurn.id } : {}),
+    ...(activeTurn ? { activeTurnId: activeTurn.id }
+      : expectedTurnId && !expectedTurn ? { activeTurnId: expectedTurnId } : {}),
     ...(expectedTurn && expectedTurn.status !== "inProgress" ? { terminalTurn: expectedTurn } : {})
   };
 }

@@ -3,6 +3,7 @@ import readline from "node:readline";
 const responseSteps = new Map();
 const interruptions = [];
 let eofTurnId;
+let canonicalThread;
 
 const send = frame => process.stdout.write(`${JSON.stringify(frame)}\n`);
 const scheduleSteps = (steps = []) => {
@@ -20,6 +21,14 @@ readline.createInterface({ input: process.stdin }).on("line", line => {
     return;
   }
   const params = frame.params ?? {};
+  if (frame.method === "fixture/thread") {
+    canonicalThread = params.thread;
+    return;
+  }
+  if (frame.method === "thread/read") {
+    send({ id: frame.id, result: { thread: canonicalThread } });
+    return;
+  }
   if (frame.method === "initialize") {
     send({ id: frame.id, result: {} });
     return;

@@ -28,10 +28,7 @@ export class TurnLifecycle {
     if (existing?.completed) return Promise.resolve(existing.completed);
     return new Promise((resolve, reject) => {
       const bucket = this.#bucket(turnId);
-      bucket.timeoutMs = bucket.waiters.length === 0
-        ? timeoutMs
-        : Math.min(bucket.timeoutMs, timeoutMs);
-      bucket.waiters.push({ resolve, reject });
+      bucket.waiters.push({ resolve, reject, timeoutMs, startedAt: Date.now() });
       this.#arm(turnId, bucket);
     });
   }
@@ -45,9 +42,10 @@ export class TurnLifecycle {
     };
   }
 
-  recordStart(turnId) {
+  recordStart(turnId, threadId) {
     const bucket = this.#bucket(turnId);
     if (bucket.completed) return;
+    if (threadId) bucket.threadId = threadId;
     this.activeTurns.add(turnId);
     this.#activity(turnId, bucket);
   }
@@ -68,7 +66,9 @@ export class TurnLifecycle {
       requests.add(message.id);
       this.humanRequests.set(turnId, requests);
     }
-    this.#activity(turnId, this.#bucket(turnId));
+    const bucket = this.#bucket(turnId);
+    if (params.threadId) bucket.threadId = params.threadId;
+    this.#activity(turnId, bucket);
   }
 
   recordServerResponse(requestId) {
@@ -120,6 +120,20 @@ export class TurnLifecycle {
     this.onIdle();
   }
 
+  recordThreadReadback(thread) {
+    // Only a matching canonical terminal result can recover a lost completion
+    // notification. Missing/partial history and repeated active snapshots prove
+    // neither completion nor new provider activity.
+    for (const turn of thread?.turns ?? []) {
+      const bucket = this.turns.get(turn.id);
+      if (!this.activeTurns.has(turn.id) || bucket?.threadId !== thread.id
+        || !["completed", "failed", "interrupted"].includes(turn.status)) continue;
+      const finalMessage = turn.items?.filter(item => item.type === "agentMessage").at(-1)?.text;
+      if (typeof finalMessage === "string") bucket.finalMessage = finalMessage;
+      this.recordEvent({ method: "turn/completed", params: { threadId: thread.id, turn } });
+    }
+  }
+
   failAll(error) {
     this.activeTurns.clear();
     for (const bucket of this.turns.values()) {
@@ -141,7 +155,6 @@ export class TurnLifecycle {
       text: "",
       waiters: [],
       lastActivityAt: Date.now(),
-      timeoutMs: this.defaultTimeoutMs,
       timer: null
     };
     this.turns.set(turnId, bucket);
@@ -167,29 +180,32 @@ export class TurnLifecycle {
   #arm(turnId, bucket) {
     this.#clearTimer(bucket);
     if (bucket.completed || bucket.waiters.length === 0 || this.#waitingForHuman(turnId, bucket)) return;
-    const remaining = Math.max(0, bucket.timeoutMs - (Date.now() - bucket.lastActivityAt));
+    const now = Date.now();
+    const remaining = Math.max(0, Math.min(...bucket.waiters.map(waiter =>
+      waiter.timeoutMs - (now - Math.max(waiter.startedAt, bucket.lastActivityAt)))));
     bucket.timer = setTimeout(() => this.#expire(turnId, bucket), remaining);
   }
 
   #expire(turnId, bucket) {
     bucket.timer = null;
     if (bucket.completed || bucket.waiters.length === 0 || this.#waitingForHuman(turnId, bucket)) return;
-    const idle = Date.now() - bucket.lastActivityAt;
-    if (idle < bucket.timeoutMs) {
-      this.#arm(turnId, bucket);
-      return;
-    }
-    const error = new AppServerTransportError(
-      "turn_timeout",
-      `Turn timed out after ${bucket.timeoutMs}ms without activity: ${turnId}`,
-      { turnId }
-    );
-    this.activeTurns.delete(turnId);
+    const now = Date.now();
     const waiters = bucket.waiters;
     bucket.waiters = [];
-    for (const waiter of waiters) waiter.reject(error);
-    this.#clearRequests(turnId, "turn_timeout");
-    this.onIdle();
+    for (const waiter of waiters) {
+      if (now - Math.max(waiter.startedAt, bucket.lastActivityAt) < waiter.timeoutMs) {
+        bucket.waiters.push(waiter);
+        continue;
+      }
+      waiter.reject(new AppServerTransportError(
+        "turn_timeout",
+        `Stopped waiting after ${waiter.timeoutMs}ms without activity; Codex turn state is unconfirmed: ${turnId}`,
+        { turnId, threadId: bucket.threadId, timeoutMs: waiter.timeoutMs, waitOnly: true }
+      ));
+    }
+    // A local caller's deadline cannot terminate Codex, discard its requests,
+    // or grant a maintenance lease while the provider may still be working.
+    this.#arm(turnId, bucket);
   }
 
   #clearRequests(turnId, reason) {

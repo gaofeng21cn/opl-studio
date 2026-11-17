@@ -1,5 +1,6 @@
 import { appendFileSync } from "node:fs";
 import readline from "node:readline";
+const turnCompletionTimers = new Map();
 
 const workspace = process.env.FAKE_WORKSPACE ?? "/workspace/project-a";
 const configuredProjectKey = process.env.FAKE_PROJECT_KEY ?? "project-a";
@@ -216,8 +217,8 @@ async function handle(frame) {
       : [];
     target.turns.push(turn(turnId, "inProgress", items));
     send({ id, result: { turn: turn(turnId, "inProgress") } });
+    send({ method: 'turn/started', params: { threadId: params.threadId, turn: turn(turnId, 'inProgress') } });
     if (executionDetails) {
-      send({ method: 'turn/started', params: { threadId: params.threadId, turn: turn(turnId, 'inProgress') } });
       const progress = { id: `progress-${turnId}`, type: 'agentMessage', phase: 'commentary', text: '' };
       target.turns.at(-1).items.push({ ...progress, text: 'Streaming progress remains visible after update' });
       send({ method: 'item/started', params: { threadId: params.threadId, turnId, item: progress } });
@@ -229,8 +230,19 @@ async function handle(frame) {
       pendingApprovalTurns.set("approval-1", { threadId: params.threadId, turnId });
       send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
     } else {
-      setTimeout(() => completeTurn(params.threadId, turnId), executionDetails ? 4000 : process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
+      turnCompletionTimers.set(turnId, setTimeout(() => {
+        turnCompletionTimers.delete(turnId);
+        completeTurn(params.threadId, turnId);
+      }, Number(process.env.FAKE_APP_SERVER_TURN_DELAY_MS)
+        || (executionDetails ? 4000 : process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10)));
     }
+    return;
+  }
+  if (method === "turn/interrupt") {
+    clearTimeout(turnCompletionTimers.get(params.turnId));
+    turnCompletionTimers.delete(params.turnId);
+    send({ id, result: {} });
+    setTimeout(() => completeTurn(params.threadId, params.turnId, "interrupted"), 50);
     return;
   }
   if (method === "turn/steer") {

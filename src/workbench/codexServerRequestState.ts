@@ -1,11 +1,18 @@
 import type { CodexPendingServerRequest } from "../bridge/oplBridge";
 
-const TURN_SCOPED_CLEANUP_REASONS: ReadonlySet<string> = new Set(["turn_completed", "turn_timeout"]);
+const TURN_SCOPED_CLEANUP_REASONS: ReadonlySet<string> = new Set(["turn_completed"]);
+const SERVER_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
+  "app_server_unavailable", "app_server_exited", "app_server_stopping"
+]);
 
 // Turn lifecycle events clear only the requests recorded for the turn that
 // finished. App Server availability events still invalidate every request.
 export function isTurnScopedServerRequestsCleanup(reason: string): boolean {
   return TURN_SCOPED_CLEANUP_REASONS.has(reason);
+}
+
+export function isAppServerUnavailableCleanup(reason: string): boolean {
+  return SERVER_UNAVAILABLE_REASONS.has(reason);
 }
 
 export function removeServerRequests(

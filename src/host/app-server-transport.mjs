@@ -383,7 +383,7 @@ export class CodexAppServerTransport extends EventEmitter {
           { method, id, stderr: this.stderrTail }
         ));
       }, timeoutMs);
-      this.pending.set(id, { method, resolve, reject, timeout });
+      this.pending.set(id, { method, threadId: params.threadId, resolve, reject, timeout });
       this.#write({ id, method, params });
     });
   }
@@ -478,8 +478,11 @@ export class CodexAppServerTransport extends EventEmitter {
     if (!includeTurns) return response;
     // Paginated threads must not load the full transcript before paging it again.
     try {
-      if (response.thread?.historyMode === "paginated") return await this.hydrateThreadHistory(response);
-      return await this.request("thread/read", { threadId, includeTurns: true });
+      const readback = response.thread?.historyMode === "paginated"
+        ? await this.hydrateThreadHistory(response)
+        : await this.request("thread/read", { threadId, includeTurns: true });
+      if (readback.thread?.id === threadId) this.turnLifecycle.recordThreadReadback(readback.thread);
+      return readback;
     } catch (error) {
       if (!isUnmaterializedThreadError(error, threadId)) throw error;
       return { ...response, thread: { ...response.thread, turns: [] } };
@@ -950,7 +953,7 @@ export class CodexAppServerTransport extends EventEmitter {
       } else {
         const turn = message.result?.turn;
         if (pending.method === "turn/start" && turn?.id) {
-          this.turnLifecycle.recordStart(turn.id);
+          this.turnLifecycle.recordStart(turn.id, pending.threadId);
         }
         pending.resolve(message.result ?? {});
       }

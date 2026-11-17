@@ -60,12 +60,12 @@ for (const method of [
 ]) test(`an outstanding ${method} pauses inactivity rejection beyond the timeout`, async (t) => {
   const transport = createTransport(t);
   await startTurn(transport, "turn-approval");
-  const waiting = outcome(transport.waitForTurn("turn-approval", 80));
   const requestReceived = once(transport, "serverRequest");
   transport.notify("fixture/emit", { steps: [
     { delay: 20, frame: serverRequest("approval-stream", "turn-approval", method) }
   ] });
   const [request] = await requestReceived;
+  const waiting = outcome(transport.waitForTurn("turn-approval", 80));
 
   const early = await Promise.race([waiting, delay(120).then(() => "pending")]);
   assert.equal(early, "pending", "human thinking time must not time out the turn");
@@ -127,6 +127,10 @@ test("an MCP elicitation without a turn ID pauses only its own thread", async (t
   assert.deepEqual(transport.listPendingServerRequests().map(item => item.id), ["mcp-standalone"]);
   assert.equal(transport.isBusy(), true);
   transport.respondToServerRequest("mcp-standalone", { result: { action: "decline" } });
+  assert.equal(transport.isBusy(), true, "the unrelated expired wait is still an active Codex turn");
+  const unrelatedFinished = transport.waitForTurn("turn-unrelated", 5000);
+  transport.notify("fixture/emit", { steps: [{ frame: completed("turn-unrelated") }] });
+  await unrelatedFinished;
   assert.equal(transport.isBusy(), false);
 });
 
@@ -162,7 +166,7 @@ test("turn server requests and their responses re-arm continuous inactivity", as
   assert.ok(Date.now() - respondedAt >= 80, "the response starts a fresh inactivity window");
 });
 
-test("a started silent turn rejects waiters, releases idle work, and does not interrupt the provider", async (t) => {
+test("a local wait deadline preserves the live turn and defers maintenance until late completion", async (t) => {
   const transport = createTransport(t);
   await startTurn(transport, "turn-silent");
   const waiters = [
@@ -175,8 +179,16 @@ test("a started silent turn rejects waiters, releases idle work, and does not in
   const results = await Promise.allSettled(waiters);
   assert.deepEqual(results.map(result => result.status), ["rejected", "rejected"]);
   assert.ok(results.every(result => result.reason.code === "turn_timeout"));
-  assert.equal(transport.activeTurns.has("turn-silent"), false);
-  assert.equal(transport.isBusy(), false);
+  assert.equal(transport.activeTurns.has("turn-silent"), true);
+  assert.equal(transport.isBusy(), true);
+  assert.equal(idleRuns, 0);
+  assert.equal(transport.turnResult("turn-silent").completed, undefined);
+  const late = transport.waitForTurn("turn-silent", 5000);
+  transport.notify("fixture/emit", { steps: [
+    { delay: 30, frame: delta("turn-silent", "late result") },
+    { delay: 60, frame: completed("turn-silent") }
+  ] });
+  assert.equal((await late).finalMessage, "late result");
   await idle;
   assert.equal(idleRuns, 1);
   assert.deepEqual((await transport.request("fixture/state")).interruptions, []);
@@ -221,7 +233,7 @@ test("one turn timeout preserves unrelated turn activity and approvals", async (
   const [request] = await requestReceived;
 
   assert.equal((await alpha).error.code, "turn_timeout");
-  assert.equal(transport.activeTurns.has("turn-alpha"), false);
+  assert.equal(transport.activeTurns.has("turn-alpha"), true);
   assert.equal(transport.activeTurns.has("turn-beta"), true);
   assert.deepEqual(transport.listPendingServerRequests().map(request => request.id), [request.id]);
   transport.notify("fixture/respond", {
@@ -279,7 +291,7 @@ test("turn completion emits a turn-scoped cleanup that leaves another turn's app
   );
 });
 
-test("turn timeout emits a turn-scoped cleanup for only the timed-out turn's requests", async (t) => {
+test("local wait expiry preserves tool requests and accepts later answers on the same turn", async (t) => {
   const transport = createTransport(t);
   await startTurn(transport, "turn-expire");
   await startTurn(transport, "turn-live");
@@ -291,19 +303,77 @@ test("turn timeout emits a turn-scoped cleanup for only the timed-out turn's req
   ] });
   while (received.length < 2) await delay(5);
 
-  const cleared = once(transport, "serverRequestsCleared");
+  const cleared = [];
+  transport.on("serverRequestsCleared", detail => cleared.push(detail));
   const expired = outcome(transport.waitForTurn("turn-expire", 60));
 
   assert.equal((await expired).error.code, "turn_timeout");
-  const [timeoutDetail] = await cleared;
-  assert.deepEqual(timeoutDetail, {
-    reason: "turn_timeout",
-    count: 1,
-    requestIds: ["tool-expire"]
-  });
+  assert.deepEqual(cleared, []);
   assert.deepEqual(
     transport.listPendingServerRequests().map(request => request.id),
-    ["approval-live"],
-    "another turn's approval survives the timed-out turn's cleanup"
+    ["tool-expire", "approval-live"]
   );
+  transport.respondToServerRequest("tool-expire", { result: { contentItems: [] } });
+  const late = transport.waitForTurn("turn-expire", 5000);
+  transport.notify("fixture/emit", { steps: [{ frame: completed("turn-expire") }] });
+  await late;
+  assert.deepEqual(transport.listPendingServerRequests().map(request => request.id), ["approval-live"]);
+});
+
+test("a short observer cannot expire another caller and a new observer gets a fresh window", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-observers", { threadId: "thread-observers" });
+  const long = outcome(transport.waitForTurn("turn-observers", 300));
+  const short = await outcome(transport.waitForTurn("turn-observers", 40));
+  assert.equal(short.error.code, "turn_timeout");
+  assert.equal(short.error.details.waitOnly, true);
+  assert.equal(short.error.details.threadId, "thread-observers");
+  const renewed = outcome(transport.waitForTurn("turn-observers", 150));
+  assert.equal(await Promise.race([long, delay(35).then(() => "pending")]), "pending");
+  transport.notify("fixture/emit", { steps: [{ delay: 20, frame: completed("turn-observers") }] });
+  assert.equal((await renewed).status, "resolved");
+  assert.equal((await long).status, "resolved");
+});
+
+test("interrupt acknowledgment after wait expiry is not terminal evidence", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-interrupt", { threadId: "thread-interrupt" });
+  await assert.rejects(transport.waitForTurn("turn-interrupt", 30), { code: "turn_timeout" });
+  let idleRuns = 0;
+  const idle = transport.scheduleWhenIdle(() => { idleRuns += 1; });
+  await transport.request("turn/interrupt", { threadId: "thread-interrupt", turnId: "turn-interrupt" });
+  assert.equal(transport.isBusy(), true);
+  assert.equal(idleRuns, 0);
+  const terminal = transport.waitForTurn("turn-interrupt", 5000);
+  transport.notify("fixture/emit", { steps: [{ frame: {
+    method: "turn/completed",
+    params: { threadId: "thread-interrupt", turn: { id: "turn-interrupt", status: "interrupted" } }
+  } }] });
+  assert.equal((await terminal).notification.turn.status, "interrupted");
+  await idle;
+  assert.equal(idleRuns, 1);
+});
+
+test("fresh canonical terminal readback recovers a lost completion without trusting incomplete reads", async (t) => {
+  const transport = createTransport(t);
+  await startTurn(transport, "turn-readback", { threadId: "thread-readback" });
+  await assert.rejects(transport.waitForTurn("turn-readback", 30), { code: "turn_timeout" });
+  let idleRuns = 0;
+  const idle = transport.scheduleWhenIdle(() => { idleRuns += 1; });
+  for (const thread of [
+    { id: "other-thread", turns: [{ id: "turn-readback", status: "completed" }] },
+    { id: "thread-readback", turns: [] },
+    { id: "thread-readback", turns: [{ id: "turn-readback", status: "inProgress" }] }
+  ]) {
+    transport.turnLifecycle.recordThreadReadback(thread);
+    assert.equal(transport.isBusy(), true);
+    assert.equal(idleRuns, 0);
+  }
+  transport.notify("fixture/thread", { thread: { id: "thread-readback", turns: [{
+    id: "turn-readback", status: "completed", items: [{ type: "agentMessage", text: "canonical result" }]
+  }] } });
+  await transport.readThread("thread-readback", true);
+  assert.equal((await transport.waitForTurn("turn-readback")).finalMessage, "canonical result");
+  await idle;
+  assert.equal(idleRuns, 1);
 });
