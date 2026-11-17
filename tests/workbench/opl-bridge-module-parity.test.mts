@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { expect, test } from "bun:test";
 
 Object.assign(globalThis, {
@@ -10,6 +11,7 @@ Object.assign(globalThis, {
     autoLabel: { zh: "Auto", en: "Auto" },
     knownModelReasoningEffortOverrides: {},
     acceptUnknownCatalogDefault: true,
+    customModelAccess: customModelAccessFixture,
     useHighestSupportedReasoningForUnknown: true
   }
 });

@@ -136,6 +136,20 @@ export function settingsEntriesForDestination(entries: readonly OplUiContributio
       || (developerDetails && destination === "services" && entry.view?.viewType === "activity_log")));
 }
 
+/**
+ * The desktop App owns the native OPL Link companion surface. Keep the older
+ * remote_companion_access projection available to typed consumers and history,
+ * but do not mount it beside the native surface in ordinary Settings.
+ */
+export function settingsEntriesForNativeAppSurface(
+  entries: readonly OplUiContribution[],
+  destination: OplSettingsContributionDestination,
+  developerDetails = false
+): OplUiContribution[] {
+  return settingsEntriesForDestination(entries, destination, developerDetails)
+    .filter((entry) => !(destination === "resources" && entry.view?.viewType === "remote_companion_access"));
+}
+
 /** Keeps Package identity as grouping metadata without making it a navigation source. */
 export function groupSettingsContributions(entries: readonly OplUiContribution[]): OplSettingsContributionGroup[] {
   const groups = new Map<string, OplUiContribution[]>();
@@ -181,6 +195,7 @@ export type OplContributionSlotOwner = {
   locale: OplStudioLocale;
   actionAvailable: boolean;
   developerDetails?: boolean;
+  openSoftwareCenter?(): void;
   runtimeDetailIdentity?: OplRuntimeDetailIdentity;
   openRuntimeWorkbench?(): void;
   readData(entry: OplUiContribution, input?: OplContributionInput): Promise<unknown>;

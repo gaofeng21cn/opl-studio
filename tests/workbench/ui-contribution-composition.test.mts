@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { Context } from "@deepseek-ai/cordis";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
@@ -23,6 +24,7 @@ import {
   autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
   knownModelReasoningEffortOverrides: { "codex-fixture": "high" },
   acceptUnknownCatalogDefault: true,
+  customModelAccess: customModelAccessFixture,
   useHighestSupportedReasoningForUnknown: true
 };
 

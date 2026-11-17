@@ -243,7 +243,7 @@
     "codex_app_server_thread_turn": true,
     "codex_command": "codex app-server --stdio",
     "codex_protocol": "JSON-RPC newline transport with initialize, model/list, permissionProfile/list, skills/list, plugin/installed, app/installed, paginated thread/list, thread/read, thread/resume, thread/fork, thread/archive, thread/unarchive, turn/start, turn/steer, thread/status/changed, item/agentMessage/delta, item/completed, and turn/completed",
-    "codex_model_reasoning_controls": "The build dynamically injects the App product profile default, ordered visible-model preference list, labels, and reasoning options; runtime model/list follows cursors through the terminal page, excludes hidden models from Auto and fixed options, keeps every visible catalog model selectable instead of treating App visibility as an allowlist, keeps unavailable fixed alternatives blocked, and keeps the App default route only for an empty catalog; Auto resolves the App default when the catalog advertises it, otherwise the first available frontier-preferred model then the first available catalog model, adopts an unknown catalog default and its highest advertised reasoning only under the App accept policy, manual reasoning pins the resolved model and exits Auto, and turn/start receives model and effort overrides",
+    "codex_model_reasoning_controls": "The build dynamically injects the App product profile default, ordered visible-model preference list, labels, and reasoning options; runtime model/list follows cursors through the terminal page, excludes hidden models from Auto and fixed options, keeps custom fixed alternatives behind default-off advanced access on the Models page, keeps unavailable fixed alternatives blocked, and keeps the App default route only for an empty catalog; Auto resolves the App default when the catalog advertises it, otherwise the first available App-admitted frontier model or unavailable; custom catalog defaults never enter Auto, manual reasoning pins the resolved model and exits Auto, and turn/start receives model and effort overrides",
     "opl_state_bridge": "opl app state --profile fast --json",
     "opl_action_bridge": "opl app action execute --action <action_id> --dry-run --json",
     "native_bridge": "Electron contextBridge window.oplStudio over allowlisted ipcRenderer.invoke",
@@ -269,10 +269,10 @@
     "fixture": "scripts/model-policy-regression.ts",
     "coverage": [
       "arbitrary non-empty App model ids are accepted without candidate source changes and preserve App order",
-      "an empty catalog keeps the App default fallback, while a non-empty catalog that omits it resolves the first available frontier model or catalog model",
+      "an empty catalog keeps the App default fallback; a non-empty catalog uses an available App-admitted model or stays unavailable",
       "hidden catalog rows are excluded before grouping, aliasing, capability projection, claiming and unknown options",
-      "every visible catalog model outside the App preference list stays manually selectable and unavailable fixed selections stay blocked",
-      "the App accept policy decides whether an unknown catalog default represents Auto, and unknown models use their highest advertised reasoning effort",
+      "custom catalog models require an explicit default-off advanced opt-in; disabling access preserves a fixed selection as unavailable and blocks sending",
+      "Auto never adopts custom catalog rows regardless of the advanced switch; custom fixed options retain catalog reasoning and executable wire names",
       "unrecognized App Auto policy strings, empty or duplicate model ids, and defaults outside the App allowlist are rejected",
       "unsupported reasoning efforts and defaults absent from App reasoning options are rejected"
     ]
@@ -1156,7 +1156,7 @@
     "external_cohort": {
       "framework_commit": "ab2fadf5056133a978f3cfae7ec3c37751f83f40",
       "framework_tree": "578a271eb43d05a3e88988a93ac0cf77a5731f73",
-      "app_commit": "f75c861d98f27558d1fb459430969b3c50c804d5",
+      "app_commit": "b06b35295f52fd2ca91248478593446288c637df",
       "app_tree": "e56367cbbd68ad1d871d412acebf7ac1bc9e3a06"
     },
     "framework_producer": "src/read-models/operator/app-state-ui-contributions.ts#buildAppUiContributionsProjection",

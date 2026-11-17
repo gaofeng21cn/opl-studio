@@ -508,6 +508,30 @@ export function channelAttentionMessage(reason: string | undefined, zh: boolean)
   return labels[reason ?? '']?.[zh ? 0 : 1] ?? (zh ? '连接未完成。请重新扫码；若仍失败，在“日志与诊断”中查看连接错误。' : 'Connection did not complete. Retry; if it fails again, check Logs and diagnostics.');
 }
 
+export function channelUnavailableMessage(reason: string | undefined, zh: boolean): string {
+  const setupReasons = new Set([
+    "producer_absent",
+    "provider_absent",
+    "package_missing",
+    "not_installed",
+    "disabled",
+    "implementation_in_progress"
+  ]);
+  if (setupReasons.has(reason ?? "")) {
+    return zh
+      ? '微信能力尚未安装或启用。请打开“软件中心 → 运行组件”，启用微信后刷新此页。'
+      : 'The Weixin capability is not installed or enabled. Open Software Center → Runtime components, enable it, then refresh this page.';
+  }
+  if (["projection_unavailable", "invalid_projection", "state_unavailable"].includes(reason ?? "")) {
+    return zh
+      ? '微信状态暂时无法读取。请刷新此页；如果仍不可用，再到“日志与诊断”查看连接错误。'
+      : 'Weixin status is temporarily unavailable. Refresh this page; if it persists, check Logs and diagnostics.';
+  }
+  return zh
+    ? '微信当前不可用。请在“软件中心 → 运行组件”检查微信能力，完成后刷新此页。'
+    : 'Weixin is currently unavailable. Check the Weixin capability in Software Center → Runtime components, then refresh this page.';
+}
+
 function ChannelAccessView({ entry, owner }: {
   entry: OplUiContribution;
   owner: OplContributionSlotOwner;
@@ -569,7 +593,11 @@ function ChannelAccessView({ entry, owner }: {
     return <p className="opl-contribution-fallback" role="status" title={error}><StateDot state="warning" size={10} />{view.emptyState ? contributionLabel(view.emptyState, owner.locale, "") : (owner.locale === "zh" ? "渠道当前不可用" : "The channel is unavailable")}</p>;
   }
   if (result.status === "unavailable") {
-    return <p className="opl-contribution-fallback" role="status"><StateDot state="warning" size={10} />{owner.locale === "zh" ? "渠道当前不可用" : "The channel is unavailable"}</p>;
+    return <div className="opl-contribution-fallback" role="status" data-testid="opl-channel-unavailable">
+      <p><StateDot state="warning" size={10} /><strong>{owner.locale === "zh" ? "微信当前不可用" : "Weixin is currently unavailable"}</strong></p>
+      <p>{channelUnavailableMessage(result.unavailableReason, owner.locale === "zh")}</p>
+      {owner.openSoftwareCenter ? <button className="settings-action-button" type="button" onClick={owner.openSoftwareCenter}>{owner.locale === "zh" ? "管理远程扩展" : "Manage remote extensions"}</button> : null}
+    </div>;
   }
 
   const qr = ["qr_ready", "authorizing"].includes(result.connection?.state ?? "")

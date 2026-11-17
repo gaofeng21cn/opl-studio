@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -22,6 +23,7 @@ test("carrier diagnostics keep unavailable states human-readable and attention-t
       autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
       knownModelReasoningEffortOverrides: {},
       acceptUnknownCatalogDefault: true,
+      customModelAccess: customModelAccessFixture,
       useHighestSupportedReasoningForUnknown: true
     }
   });
@@ -53,6 +55,7 @@ test("managed update host actions come only from the App-projected action catalo
       autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
       knownModelReasoningEffortOverrides: {},
       acceptUnknownCatalogDefault: true,
+      customModelAccess: customModelAccessFixture,
       useHighestSupportedReasoningForUnknown: true
     }
   });

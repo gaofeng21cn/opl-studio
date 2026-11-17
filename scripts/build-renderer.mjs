@@ -155,6 +155,28 @@ export function createCodexModelPolicy(profile) {
   const home = requireObject(gui.home, "gui.home");
   const display = requireObject(home.codex_model_display_options, "gui.home.codex_model_display_options");
   const autoOption = requireObject(display.auto_option, "gui.home.codex_model_display_options.auto_option");
+  const customAccessPolicy = requireObject(autoPolicy?.custom_model_access_policy, "codex.auto_model_policy.custom_model_access_policy");
+  const customAccessDisplay = requireObject(display.custom_model_access_option, "gui.home.codex_model_display_options.custom_model_access_option");
+  if (customAccessPolicy.default_enabled !== false || customAccessDisplay.default_enabled !== false
+    || customAccessPolicy.surface !== "settings_models_collapsed_advanced_disclosure"
+    || customAccessDisplay.surface !== customAccessPolicy.surface
+    || customAccessPolicy.selection !== "explicit_fixed_model_only"
+    || customAccessPolicy.auto_behavior !== "unchanged"
+    || customAccessPolicy.disabled_selection !== "preserve_as_unavailable_and_block_send_until_auto_admitted_model_or_explicit_reenable"
+    || customAccessPolicy.warning_required !== true) {
+    throw new Error("OPL App custom_model_access_policy must require an explicit default-off advanced fixed selection");
+  }
+  const customModelAccess = {
+    defaultEnabled: false,
+    label: {
+      zh: requireNonEmptyString(customAccessDisplay.label_zh, "custom_model_access_option.label_zh"),
+      en: requireNonEmptyString(customAccessDisplay.label_en, "custom_model_access_option.label_en")
+    },
+    description: {
+      zh: requireNonEmptyString(customAccessDisplay.description_zh, "custom_model_access_option.description_zh"),
+      en: requireNonEmptyString(customAccessDisplay.description_en, "custom_model_access_option.description_en")
+    }
+  };
   const configuredDefault = requireObject(
     autoPolicy?.configured_default,
     "codex.auto_model_policy.configured_default"
@@ -232,18 +254,17 @@ export function createCodexModelPolicy(profile) {
   }
 
   const unknownDefaultPolicies = {
-    ignore_catalog_default_for_app_auto: false,
-    accept_catalog_default_even_when_not_in_frontier_model_preference_order: true
+    ignore_catalog_default_for_app_auto: false
   };
   const unknownReasoningPolicies = {
     highest_supported_reasoning_effort_from_catalog: true
   };
   const catalogWithoutDefaultPolicies = new Set([
-    "first_available_known_model_then_first_catalog_model"
+    "first_available_known_model_otherwise_unavailable"
   ]);
   let acceptUnknownCatalogDefault = true;
   let useHighestSupportedReasoningForUnknown = true;
-  let catalogWithoutDefaultPolicy = "first_available_known_model_then_first_catalog_model";
+  let catalogWithoutDefaultPolicy = "first_available_known_model_otherwise_unavailable";
   if (autoPolicy) {
     const unknownDefaultPolicy = autoPolicy.unknown_default_model_policy;
     if (!Object.hasOwn(unknownDefaultPolicies, unknownDefaultPolicy)) {
@@ -275,6 +296,7 @@ export function createCodexModelPolicy(profile) {
     knownModelReasoningEffortOverrides,
     acceptUnknownCatalogDefault,
     useHighestSupportedReasoningForUnknown,
+    customModelAccess,
     catalogWithoutDefaultPolicy
   };
 }

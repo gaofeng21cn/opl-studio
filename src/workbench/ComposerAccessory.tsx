@@ -2,6 +2,7 @@ import { AlertTriangle, FileText, LoaderCircle, Puzzle, X } from "lucide-react";
 import type { AgentPackageSelectionIntent } from "./workbenchModel";
 import type { ComposerSelection } from "./ComposerCapabilityPalette";
 import { uiCopy } from "./appCopy";
+import { codexModelPolicy } from "./modelPolicy";
 
 type ComposerAccessoryProps = {
   locale: "zh" | "en";
@@ -12,6 +13,7 @@ type ComposerAccessoryProps = {
   sendState: "idle" | "running" | "error";
   submissionError: string;
   unavailableFixedModel: boolean;
+  customModelSelected?: boolean;
   onUpdatePrompt(value: string): void;
   onRemoveSelection(id: string): void;
   onClearAgent(): void;
@@ -26,6 +28,7 @@ export function ComposerAccessory({
   sendState,
   submissionError,
   unavailableFixedModel,
+  customModelSelected,
   onUpdatePrompt,
   onRemoveSelection,
   onClearAgent
@@ -54,6 +57,7 @@ export function ComposerAccessory({
           </span>
         </div>
       ) : null}
+      {customModelSelected ? <p className="settings-inline-note" data-testid="opl-custom-model-notice" role="status">{codexModelPolicy.customModelAccess.description[locale]}</p> : null}
       <span
         className={`composer-status ${sendState === "error" || unavailableFixedModel ? "error" : sendState}`}
         data-testid="opl-composer-run-state"

@@ -1,7 +1,42 @@
 import type { OplInitializeReadback } from '../bridge/oplBridge';
+import type { RuntimeOverviewRef } from './workbenchModel-runtime-contracts';
 
 type Destination = 'account' | 'workspace' | 'services' | 'agents' | 'updates' | 'diagnostics';
 export type StartupIssue = { id: string; title: string; detail: string; destination: Destination };
+
+/**
+ * The initialize checklist and fast runtime projection describe the same
+ * family-runtime provider. Keep one actionable overview item when both reads
+ * report that provider, while retaining the runtime impact in its detail.
+ */
+export function mergeBackgroundTaskIssue(
+  startupIssues: StartupIssue[],
+  temporal: Pick<RuntimeOverviewRef['temporal'], 'serviceReady' | 'workerReady' | 'schedulerReady'> | undefined,
+  zh: boolean,
+): StartupIssue[] {
+  const runtimeUnready = temporal !== undefined
+    && [temporal.serviceReady, temporal.workerReady, temporal.schedulerReady].some((value) => value === false);
+  if (!runtimeUnready) return [...startupIssues];
+
+  const providerIssue = startupIssues.find((issue) => issue.id === 'startup:family_runtime_provider');
+  if (providerIssue) {
+    const impact = zh
+      ? '部分后台执行与定时能力受影响，普通对话可继续。'
+      : 'Some background and scheduling capabilities are affected; chat remains available.';
+    return startupIssues.map((issue) => issue.id === providerIssue.id
+      ? { ...issue, detail: `${issue.detail} ${impact}` }
+      : issue);
+  }
+
+  return [...startupIssues, {
+    id: 'tasks',
+    title: zh ? '后台任务尚未就绪' : 'Background tasks are not ready',
+    detail: zh
+      ? '部分后台执行与定时能力受影响，普通对话可继续。'
+      : 'Some background and scheduling capabilities are affected; chat remains available.',
+    destination: 'services',
+  }];
+}
 
 export function startupCheckPresentation(initialization: OplInitializeReadback | null, readStatus: 'loading' | 'ready' | 'error', zh: boolean) {
   const system = initialization?.systemInitialize;

@@ -1,4 +1,4 @@
-import { startupCheckPresentation } from "../startupCheckPresentation";
+import { mergeBackgroundTaskIssue, startupCheckPresentation } from "../startupCheckPresentation";
 
 import { AlertCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -178,12 +178,10 @@ export function useSettingsPageContext({
     };
   }, [confirmationOpen]);
 
-  const issues: Array<{ id: string; title: string; detail: string; destination: SettingsDestinationId }> = [];
   const zh = settings.locale === "zh";
-  issues.push(...startupCheck.issues);
+  const issues: Array<{ id: string; title: string; detail: string; destination: SettingsDestinationId }> = mergeBackgroundTaskIssue(startupCheck.issues, runtime?.temporal, zh);
   if (stateFailed) issues.push({ id: "state", title: zh ? "状态刷新失败" : "Status refresh failed", detail: zh ? "显示上次成功读取的结果，请重试。" : "Showing the last successful read. Please retry.", destination: "diagnostics" });
   if (projection?.codex.accessStatus && statusTone(projection.codex.accessStatus) === "attention") issues.push({ id: "access", title: zh ? "模型访问需要处理" : "Model access needs attention", detail: zh ? "检查账户连接与模型来源。" : "Check your account and model source.", destination: "account" });
-  if (runtime && [runtime.temporal.serviceReady, runtime.temporal.workerReady, runtime.temporal.schedulerReady].some(value => value === false)) issues.push({ id: "tasks", title: zh ? "后台任务尚未就绪" : "Background tasks are not ready", detail: zh ? "部分后台执行与定时能力受影响，普通对话可继续。" : "Some background and scheduling capabilities are affected; chat remains available.", destination: "services" });
   for (const carrier of runtime?.carriers.items ?? []) {
     if (statusTone(carrier.status) === "attention") issues.push({ id: `runtime:${carrier.packageId}`, title: carrier.label, detail: zh ? "运行环境检查需要处理，可能影响此能力的任务执行。" : "Runtime checks need attention and may affect this capability.", destination: "services" });
   }

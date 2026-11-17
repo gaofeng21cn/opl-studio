@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
@@ -12,13 +13,14 @@ Object.assign(globalThis, {
     autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
     knownModelReasoningEffortOverrides: {},
     acceptUnknownCatalogDefault: true,
+    customModelAccess: customModelAccessFixture,
     useHighestSupportedReasoningForUnknown: true
   }
 });
 
 const presentation = await import("../../src/workbench/SettingsPanel.tsx");
 const workbenchServices = await import("../../src/workbench/plugins/WorkbenchServicesPanel.tsx");
-const { startupCheckPresentation } = await import("../../src/workbench/startupCheckPresentation.ts");
+const { mergeBackgroundTaskIssue, startupCheckPresentation } = await import("../../src/workbench/startupCheckPresentation.ts");
 const { normalizeInitializeReadback } = await import("../../src/bridge/oplBridge.ts");
 const settingsSource = readFileSync(new URL("../../src/workbench/SettingsPanel.tsx", import.meta.url), "utf8") + readdirSync(new URL("../../src/workbench/settings/", import.meta.url), { recursive: true }).filter(file => String(file).endsWith(".tsx")).map(file => readFileSync(new URL(`../../src/workbench/settings/${file}`, import.meta.url), "utf8")).join("\n");
 
@@ -45,6 +47,44 @@ test("startup blockers and maintenance project specific reasons and setting dest
   const unknownReason = startupCheckPresentation(normalizeInitializeReadback({system_initialize: {setup_flow: {ready_to_launch: false}}}), "ready", true);
   assert.equal(unknownReason.issues[0].destination, "diagnostics");
   assert.match(unknownReason.detail, /未返回原因/);
+});
+
+test("background runtime readiness does not duplicate its initialize issue", () => {
+  const startupIssue = {
+    id: "startup:family_runtime_provider",
+    title: "后台任务服务",
+    detail: "检查后台服务与工作进程，按页面提示恢复后重新检查。",
+    destination: "services" as const
+  };
+  const merged = mergeBackgroundTaskIssue([startupIssue], {
+    serviceReady: false,
+    workerReady: false,
+    schedulerReady: false
+  }, true);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]?.id, "startup:family_runtime_provider");
+  assert.match(merged[0]?.detail ?? "", /普通对话可继续/);
+
+  const runtimeOnly = mergeBackgroundTaskIssue([], {
+    serviceReady: false,
+    workerReady: true,
+    schedulerReady: true
+  }, true);
+  assert.deepEqual(runtimeOnly.map((issue) => issue.id), ["tasks"]);
+  assert.deepEqual(mergeBackgroundTaskIssue([], {
+    serviceReady: null,
+    workerReady: null,
+    schedulerReady: null
+  }, true), []);
+
+  const original = [startupIssue];
+  const unchanged = mergeBackgroundTaskIssue(original, {
+    serviceReady: true,
+    workerReady: true,
+    schedulerReady: true
+  }, true);
+  unchanged.push({ id: "state", title: "状态刷新失败", detail: "请重试。", destination: "diagnostics" });
+  assert.deepEqual(original, [startupIssue]);
 });
 
 test("schedule history presents human states rather than internal executor values", () => {

@@ -160,7 +160,7 @@ import type {
   OplUiContributionsProjection,
   RenderOplContributionSlot
 } from "../composition/contributionProjection";
-import { settingsEntriesForDestination } from "../composition/contributionProjection";
+import { settingsEntriesForNativeAppSurface } from "../composition/contributionProjection";
 import { SettingsPluginSections } from "../composition/SettingsPluginSections";
 import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
@@ -592,7 +592,7 @@ export function App({
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | undefined>(previewItems[0]?.id);
   const selectedPreview = previewItems.find((preview) => preview.id === selectedPreviewId) ?? previewItems[0];
   const sidebarSources = runDetail.files.map((file) => ({ id: file.id, label: file.title, summary: file.summary }));
-  const modelOptions = useMemo(() => resolveCodexModelOptions(codexCatalog), [codexCatalog]);
+  const modelOptions = useMemo(() => resolveCodexModelOptions(codexCatalog, settings.customModelAccessEnabled), [codexCatalog, settings.customModelAccessEnabled]);
   const {
     model: resolvedModel,
     reasoningEffort: resolvedReasoning,
@@ -1714,6 +1714,7 @@ export function App({
     openRuntimeWorkbench: selectedRuntimeWorkItem ? () => {
       setMcpTaskTarget({ itemId: selectedRuntimeWorkItem.id, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace");
     } : undefined,
+    openSoftwareCenter: () => setPrimaryView("applications"),
     refreshRevision: contributionRefreshRevision,
     readData: readContributionData,
     onAction: handleContributionAction
@@ -2533,7 +2534,7 @@ export function App({
       onConfirmAction={() => void confirmSettingsAction()}
       onCancelAction={cancelSettingsAction}
       renderSettingsContributions={(destination) => {
-        const entries = settingsEntriesForDestination(model.uiContributions.entries, destination, settings.developerDetails);
+        const entries = settingsEntriesForNativeAppSurface(model.uiContributions.entries, destination, settings.developerDetails);
         if (!entries.length) return null;
         const labels = new Map(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n?.[settings.locale] ?? item.label]));
         return <SettingsPluginSections entries={entries} labels={labels} collapsible={destination !== 'resources'} renderEntry={entry => renderContribution?.({ only: entry.contributionKey }) ?? null} />;
@@ -2685,6 +2686,7 @@ export function App({
       sendState={sendState}
       submissionError={composerSubmissionError}
       unavailableFixedModel={unavailableFixedModel}
+      customModelSelected={Boolean(resolvedModel && !resolvedModel.known)}
       onUpdatePrompt={updatePrompt}
       onRemoveSelection={removeComposerSelection}
       onClearAgent={() => setSelectedAgent(null)}

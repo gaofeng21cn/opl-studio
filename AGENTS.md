@@ -42,6 +42,12 @@
   and verbatim quotations are excepted. When replying to an issue, pull request, or comment written
   by someone else, reply in that author's language instead of converting the thread to English;
   commits already recorded in another language stay in history as they are.
+- Treat third-party pull requests as proposals, not product authority. Before merging a change that
+  affects a default model, Auto resolution, fallback, visibility, or ordinary user behavior, verify
+  the current App-owned contract and the original product intent. A passing CI run, mergeability, or
+  a plausible compatibility fix does not prove that a default behavior change is necessary. Keep
+  optional behavior behind an explicit, default-off advanced setting, add a regression proving the
+  ordinary path is unchanged, and add a separate test for the opt-in path before merging.
 - Follow the topic owners and lifecycle in `docs/README.md`. Fold completed
   implementation facts into their reference, remove obsolete checklists and
   prompts, and preserve only history with a durable decision or provenance role.

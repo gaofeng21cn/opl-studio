@@ -227,7 +227,7 @@ async function handle(frame) {
     return;
   }
   if (method === "model/list") {
-    return send({ id, result: { data: [{ id: "gpt-test", model: "gpt-test", isDefault: true }], nextCursor: null } });
+    return send({ id, result: { data: process.env.FAKE_APP_SERVER_MODELS_JSON ? JSON.parse(process.env.FAKE_APP_SERVER_MODELS_JSON) : [{ id: "gpt-test", model: "gpt-test", isDefault: true }], nextCursor: null } });
   }
   if (method === "permissionProfile/list") {
     return send({ id, result: { data: [
