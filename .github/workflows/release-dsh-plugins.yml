@@ -12,6 +12,7 @@ on:
       - "scripts/vite-build-renderer-entry.mjs"
       - "scripts/client-runtime-policy.mjs"
       - "scripts/build-dsh-client.mjs"
+      - "scripts/check-plugin-publication.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/release-dsh-plugins.yml"
@@ -172,9 +173,19 @@ jobs:
           PKG_VERSION=$(node -p "require('./plugins/${{ matrix.plugin }}/package.json').version")
           echo "pkg_name=$PKG_NAME" >> "$GITHUB_OUTPUT"
           echo "pkg_version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          if npm view "${PKG_NAME}@${PKG_VERSION}" version --registry https://npm.pkg.github.com 2>/dev/null; then
+          set +e
+          publication=$(NPM_REGISTRY=https://npm.pkg.github.com node scripts/check-plugin-publication.mjs "plugins/${{ matrix.plugin }}")
+          status=$?
+          set -e
+          if [[ "$status" -ne 0 ]]; then
+            echo "$publication" >&2
+            exit "$status"
+          fi
+          echo "$publication"
+          publication_status=$(node -e 'console.log(JSON.parse(process.argv[1]).status)' "$publication")
+          if [[ "$publication_status" == "published" ]]; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::${PKG_NAME}@${PKG_VERSION} is already published — skipping."
+            echo "::notice::${PKG_NAME}@${PKG_VERSION} has identical registry bytes — skipping."
           else
             echo "already_published=false" >> "$GITHUB_OUTPUT"
           fi

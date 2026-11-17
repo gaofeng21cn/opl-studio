@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-web-routes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Authenticated HTTP and SSE routes for OPL Studio.",
   "type": "module",
   "main": "./lib/index.mjs",
