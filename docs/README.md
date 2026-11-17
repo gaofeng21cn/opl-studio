@@ -17,7 +17,7 @@ below explains one part of that arrangement without becoming another authority.
 | Build and qualify macOS distribution | [Desktop distribution](delivery/desktop-distribution.md) | Desktop bundle, updater, bootstrap, release qualification, and carrier transition constraints |
 | Operate the OCI carrier | [OCI distribution](oci-distribution.md) | Immutable-image lifecycle, authentication, and Cloud handoff |
 | Evaluate carrier and migration evidence | [Adoption gaps](active/current-state-vs-ideal-gap.md) | Owner decisions and exact evidence still to check |
-| Review custom model access | [Custom model opt-in plan](active/model-custom-access-opt-in-plan.md) | Default-safe live-catalog access and the #106 repair boundary |
+| Review custom model access | [Custom model access](active/model-custom-access-opt-in-plan.md) | Default model list, explicit advanced access, Settings placement, and the #106 repair |
 | Contribute safely | [AGENTS.md](../AGENTS.md) | Repository working rules |
 | Inspect third-party provenance | [Third-party notices](../THIRD_PARTY_NOTICES.md) | Source identity and license obligations |
 

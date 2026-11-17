@@ -592,7 +592,7 @@ export function App({
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | undefined>(previewItems[0]?.id);
   const selectedPreview = previewItems.find((preview) => preview.id === selectedPreviewId) ?? previewItems[0];
   const sidebarSources = runDetail.files.map((file) => ({ id: file.id, label: file.title, summary: file.summary }));
-  const modelOptions = useMemo(() => resolveCodexModelOptions(codexCatalog), [codexCatalog]);
+  const modelOptions = useMemo(() => resolveCodexModelOptions(codexCatalog, settings.customModelAccessEnabled), [codexCatalog, settings.customModelAccessEnabled]);
   const {
     model: resolvedModel,
     reasoningEffort: resolvedReasoning,
@@ -2686,6 +2686,7 @@ export function App({
       sendState={sendState}
       submissionError={composerSubmissionError}
       unavailableFixedModel={unavailableFixedModel}
+      customModelSelected={Boolean(resolvedModel && !resolvedModel.known)}
       onUpdatePrompt={updatePrompt}
       onRemoveSelection={removeComposerSelection}
       onClearAgent={() => setSelectedAgent(null)}

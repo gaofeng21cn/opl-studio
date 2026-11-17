@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { describe, expect, test } from "bun:test";
 
 (globalThis as typeof globalThis & { __OPL_CODEX_MODEL_POLICY__?: unknown }).__OPL_CODEX_MODEL_POLICY__ = {
@@ -9,6 +10,7 @@ import { describe, expect, test } from "bun:test";
   autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" },
   knownModelReasoningEffortOverrides: { "codex-fixture": "high" },
   acceptUnknownCatalogDefault: true,
+  customModelAccess: customModelAccessFixture,
   useHighestSupportedReasoningForUnknown: true
 };
 

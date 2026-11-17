@@ -126,7 +126,7 @@ const futureCatalog = normalizeCodexModelCatalog({
   }],
   nextCursor: null
 });
-const futureOptions = resolveCodexModelOptions(futureCatalog.models);
+const futureOptions = resolveCodexModelOptions(futureCatalog.models, true);
 const futureAuto = resolveCodexSelection(futureOptions, "__auto", "low");
 assert.equal(futureCatalog.source, "codex_app_server_model_list");
 assert.equal(futureAuto.model?.id, "codex-future-secondary");
@@ -145,8 +145,8 @@ const localProviderDefaultOptions = resolveCodexModelOptions([{
   defaultReasoningEffort: "high",
   supportedReasoningEfforts: ["low", "high"]
 }]);
-assert.equal(localProviderDefaultOptions.some((option) => option.id === "deepseek-flash"), true);
-assert.equal(resolveCodexSelection(localProviderDefaultOptions, "__auto", "low").model?.id, "deepseek-flash");
+assert.equal(localProviderDefaultOptions.some((option) => option.id === "deepseek-flash"), false);
+assert.equal(resolveCodexSelection(localProviderDefaultOptions, "__auto", "low").model, undefined);
 const emptyOptions = resolveCodexModelOptions([]);
 assert.equal(emptyOptions.find((option) => option.id === "codex-future-primary")?.available, true);
 assert.equal(emptyOptions.find((option) => option.id === "codex-future-secondary")?.available, false);

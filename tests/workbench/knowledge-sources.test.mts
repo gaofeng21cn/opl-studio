@@ -1,3 +1,4 @@
+import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -12,7 +13,7 @@ import type { SettingsActionRequest } from "../../src/workbench/settingsActions"
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: "test-fixture", defaultModel: "codex-fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "codex-fixture" }], reasoningEfforts: ["high"],
-  autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, useHighestSupportedReasoningForUnknown: true,
+  autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
 const { settingsDefaults } = await import("../../src/workbench/settingsModel");
 

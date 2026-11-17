@@ -643,12 +643,14 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(policySource.includes('invalidPolicy("policy is missing")'), "missing App model policy injection must fail explicitly");
   assert(!policySource.includes("fallbackModelOptions") && !policySource.includes("fallbackReasoningOptions"), "source model policy must not keep versioned fallback lists");
   assert(app.includes("bridge.readCodexModels()"), "renderer must read app-server model availability");
-  assert(app.includes("resolveCodexModelOptions(codexCatalog)"), "renderer must filter fixed alternatives through the app-server catalog");
+  assert(app.includes("resolveCodexModelOptions(codexCatalog, settings.customModelAccessEnabled)"), "renderer must filter fixed alternatives through the app-server catalog");
   assert(app.includes("setCodexCatalog(catalog.models)") && app.includes("setCodexCatalog([])"), "renderer must retain the App default route when model catalog discovery is empty or unavailable");
   assert(policySource.includes("available: catalogAvailable ? runtimes.length > 0 : isAppDefault"), "an empty model catalog must keep the App default as the offline fallback");
-  assert(policySource.includes("catalogOptions"), "model/list models outside the App frontier list must remain selectable");
+  assert(policySource.includes("if (!customModelAccessEnabled) return knownOptions"), "custom fixed choices must require explicit advanced access");
   assert(policySource.includes("item.hidden !== true"), "model/list must exclude hidden rows before grouping and Auto resolution");
-  assert(policySource.includes("codexModelPolicy.acceptUnknownCatalogDefault") && policySource.includes("isCatalogDefault"), "Auto must honor the App unknown-default policy instead of adopting every catalog default");
+  assert(injectedPolicy.acceptUnknownCatalogDefault === false && policySource.includes("option.known && option.available"), "Auto must stay within App-admitted models regardless of advanced access");
+  assert(settings.includes("customModelAccessEnabled: codexModelPolicy.customModelAccess.defaultEnabled"), "custom access must default from the App policy");
+  assert(settingsPanel.includes('id="advanced-model-options"') && settingsPanel.includes('data-testid="settings-models-advanced"'), "custom access must use the Models advanced disclosure");
   assert(app.includes('if ((!text && !pendingSelections.length) || !resolvedModel) return;'), "composer must require text or selected inputs and block unavailable fixed selections before turn/start");
   assert(
     app.includes('if (sendState === "running")')

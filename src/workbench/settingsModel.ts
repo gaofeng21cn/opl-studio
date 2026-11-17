@@ -21,6 +21,7 @@ export type SettingsSectionId =
 export type SettingKey =
   | "locale"
   | "modelAccess"
+  | "customModelAccessEnabled"
   | "reasoningLevel"
   | "agentPermissions"
   | "defaultWorkspace"
@@ -39,6 +40,7 @@ export type SettingKey =
 export type WorkbenchSettings = {
   locale: "zh" | "en";
   modelAccess: CodexModelSelection;
+  customModelAccessEnabled: boolean;
   reasoningLevel: CodexReasoningEffort;
   agentPermissions: ":danger-full-access" | ":workspace" | ":read-only";
   defaultWorkspace: "opl_app";
@@ -65,7 +67,7 @@ export type SettingsSection = {
 
 export const settingsSections: SettingsSection[] = [
   { id: "overview", title: "Overview", keys: [] },
-  { id: "account_models", title: "Account & Models", keys: ["modelAccess", "reasoningLevel", "agentPermissions", "autoReview", "timeContext"] },
+  { id: "account_models", title: "Account & Models", keys: ["modelAccess", "reasoningLevel", "customModelAccessEnabled", "agentPermissions", "autoReview", "timeContext"] },
   { id: "connections_deployment", title: "Connections & Deployment", keys: [] },
   { id: "workspace", title: "Workspace", keys: ["defaultWorkspace"] },
   { id: "agents_capabilities", title: "Agents & Capabilities", keys: [] },
@@ -76,6 +78,7 @@ export const settingsSections: SettingsSection[] = [
 export const settingsDefaults: WorkbenchSettings = {
   locale: "zh",
   modelAccess: "__auto",
+  customModelAccessEnabled: codexModelPolicy.customModelAccess.defaultEnabled,
   reasoningLevel: codexModelPolicy.defaultReasoningEffort,
   agentPermissions: ":danger-full-access",
   defaultWorkspace: "opl_app",
@@ -95,6 +98,7 @@ export const settingsDefaults: WorkbenchSettings = {
 const allowedSettingsValues = {
   locale: ["zh", "en"],
   modelAccess: ["__auto", ...codexModelPolicy.modelOptions.map((option) => option.id)],
+  customModelAccessEnabled: [true, false],
   reasoningLevel: codexModelPolicy.reasoningOptions,
   agentPermissions: [":danger-full-access", ":workspace", ":read-only"],
   defaultWorkspace: ["opl_app"],

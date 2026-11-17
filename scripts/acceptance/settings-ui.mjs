@@ -5,7 +5,7 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRenderer } from "../build-renderer.mjs";
+import { readCodexModelPolicy, buildRenderer } from "../build-renderer.mjs";
 import { CodexAppServerTransport } from "../../src/host/app-server-transport.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
 
@@ -18,6 +18,8 @@ const session = `opl-settings-${process.pid}`;
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-settings-acceptance-"));
 const cliRoot = path.join(tempRoot, "playwright");
 const results = {};
+const modelOnly = process.argv.includes("--model-policy-only");
+const defaultModel = readCodexModelPolicy().defaultModel;
 const screenshots = [];
 let host;
 let failure;
@@ -115,7 +117,14 @@ try {
     command: process.execPath,
     args: [fakeAppServer],
     cwd: tempRoot,
-    env: { ...process.env, FAKE_APP_SERVER_INCLUDE_PROJECTLESS: "1" },
+    env: { ...process.env, FAKE_APP_SERVER_INCLUDE_PROJECTLESS: "1", ...(modelOnly ? {
+      FAKE_APP_SERVER_MODELS_JSON: JSON.stringify([
+        { id: defaultModel, model: defaultModel, supportedReasoningEfforts: ["low", "max"] },
+        { id: "custom-ui", model: "custom-wire", displayName: "Custom UI model", isDefault: true, supportedReasoningEfforts: ["low", "high"] },
+        { id: "custom-hidden", model: "hidden-wire", hidden: true, supportedReasoningEfforts: ["high"] }
+      ]),
+      FAKE_APP_SERVER_LOG: path.join(tempRoot, "model-requests.jsonl")
+    } : {}) },
     requestTimeoutMs: 2_000,
     turnTimeoutMs: 2_000,
   });
@@ -125,6 +134,101 @@ try {
   await click('button[aria-haspopup="dialog"]');
   await cli("snapshot");
 
+  if (modelOnly) {
+    const welcome = await evaluate(() => [...document.querySelectorAll("button")].some(button => button.textContent.trim() === "开始使用"));
+    if (welcome) await click("button", "开始使用");
+    await click('button:has(.opl-settings-nav-label)', "账户与模型");
+    await click("#settings-tab-models");
+    const ordinary = await evaluate(() => ({
+      collapsed: !document.querySelector("#advanced-model-options").open,
+      enabled: JSON.parse(localStorage.getItem("opl.studio.settings.v1") ?? "{}").customModelAccessEnabled ?? false,
+      options: [...document.querySelector('[data-testid="opl-model-access-entry"]').options].map(option => option.value),
+      parentHeading: document.querySelector(".settings-page h1").textContent,
+      previousGroup: document.querySelector("#advanced-model-options").previousElementSibling.querySelector("h2").textContent
+    }));
+    assert.equal(ordinary.collapsed, true);
+    assert.equal(ordinary.enabled, false);
+    assert.equal(ordinary.parentHeading, "账户与模型");
+    assert.equal(ordinary.previousGroup, "默认模型");
+    assert.ok(ordinary.options.includes(defaultModel));
+    assert.ok(!ordinary.options.includes("custom-ui"));
+    await screenshot("models-default-1440x900.png", "1440x900");
+    assert.equal(await evaluate(() => { const input = document.querySelector(".sss-input"); input?.focus(); return Boolean(input); }), true);
+    await cli("type", "custom models");
+    const searchResult = await evaluate(async () => {
+      const deadline = Date.now() + 3000;
+      let result;
+      while (Date.now() < deadline) {
+        result = [...document.querySelectorAll(".sss-item")].find(row => row.querySelector(".sss-item-label")?.textContent.trim() === "启用自定义模型");
+        if (result) break;
+        await new Promise(resolve => setTimeout(resolve, 40));
+      }
+      if (!result) return false;
+      result.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); return true;
+    });
+    assert.equal(searchResult, true, "English search must reach the Chinese custom-model setting");
+    await settle();
+    const searchFocus = await evaluate(() => ({ open: document.querySelector("#advanced-model-options").open, focused: document.activeElement?.getAttribute("aria-label") }));
+    assert.deepEqual(searchFocus, { open: true, focused: "启用自定义模型" });
+    await click('#advanced-model-options [role="switch"]');
+    const enabled = await evaluate(() => ({
+      selection: document.querySelector('[data-testid="opl-model-access-entry"]').value,
+      options: [...document.querySelector('[data-testid="opl-model-access-entry"]').options].map(option => option.value),
+      saved: JSON.parse(localStorage.getItem("opl.studio.settings.v1"))
+    }));
+    assert.equal(enabled.selection, "__auto");
+    assert.equal(enabled.saved.customModelAccessEnabled, true);
+    assert.ok(enabled.options.includes("custom-ui"));
+    assert.ok(!enabled.options.includes("custom-hidden"));
+    await screenshot("models-advanced-1440x900.png", "1440x900");
+    await evaluate(() => {
+      const select = document.querySelector('[data-testid="opl-model-access-entry"]');
+      select.value = "custom-ui"; select.dispatchEvent(new Event("change", { bubbles: true })); return true;
+    });
+    await settle();
+    await cli("press", "Escape");
+    await settle();
+    assert.equal(await evaluate(() => Boolean(document.querySelector('[data-testid="opl-custom-model-notice"]')?.getClientRects().length)), true);
+    await evaluate(() => { document.querySelector('[data-composer-input]').focus(); return true; });
+    await cli("type", "Custom model fixture request");
+    await cli("press", "Enter");
+    await evaluate(async () => { const deadline = Date.now() + 3000; while (document.querySelector('[data-composer-input]').innerText.trim() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 30)); return true; });
+    const turns = (await readFile(path.join(tempRoot, "model-requests.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line)).filter(frame => frame.method === "turn/start");
+    assert.equal(turns.at(-1)?.params.model, "custom-wire");
+    await evaluate(() => { document.querySelector('[data-composer-input]').focus(); return true; });
+    await cli("type", "Blocked custom model request");
+    await click('button[aria-haspopup="dialog"]');
+    await click('button:has(.opl-settings-nav-label)', "账户与模型");
+    await click("#settings-tab-models");
+    await click("#advanced-model-options > summary");
+    await click('#advanced-model-options [role="switch"]');
+    const disabled = await evaluate(() => ({
+      selection: document.querySelector('[data-testid="opl-model-access-entry"]').value,
+      optionDisabled: document.querySelector('[data-testid="opl-model-access-entry"] option[value="custom-ui"]').disabled,
+      saved: JSON.parse(localStorage.getItem("opl.studio.settings.v1"))
+    }));
+    assert.equal(disabled.selection, "custom-ui");
+    assert.equal(disabled.optionDisabled, true);
+    assert.equal(disabled.saved.customModelAccessEnabled, false);
+    await cli("press", "Escape");
+    await settle();
+    assert.equal(await evaluate(() => document.querySelector('[data-composer-input]').innerText.trim()), "Blocked custom model request");
+    assert.equal(await evaluate(() => document.querySelector('button[aria-label="发送"]').disabled), true);
+    await cli("press", "Enter");
+    await settle();
+    const blockedTurns = (await readFile(path.join(tempRoot, "model-requests.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line)).filter(frame => frame.method === "turn/start");
+    assert.equal(blockedTurns.length, turns.length);
+    await cli("resize", "400", "800");
+    await click('button[aria-haspopup="dialog"]');
+    await click(".settings-mobile-categories > button", "账户与模型");
+    await click(".settings-mobile-destinations button", "模型与执行");
+    await click("#advanced-model-options > summary");
+    const mobile = await panelState();
+    assert.equal(mobile.destination, "models");
+    assert.equal(mobile.horizontalOverflow, false);
+    await screenshot("models-advanced-400x800.png", "400x800");
+    results.modelPolicy = { ordinary, searchFocus, enabled, disabled, mobile, turnWireModel: turns.at(-1).params.model, blockedTurnCount: blockedTurns.length };
+  } else {
   const desktopRail = await evaluate(() => {
     const rail = document.querySelector('[data-shortcut-modal="settings"] > nav > [class*="navList"]');
     const buttons = [...rail.querySelectorAll(":scope > button")];
@@ -309,6 +413,7 @@ try {
   }));
   assert.deepEqual(scheduled, { settingsClosed: true, workbenchTasks: true, heading: "计划任务" });
   results.scheduledTaskContext = scheduled;
+  }
 } catch (error) {
   failure = error;
 } finally {
@@ -332,6 +437,6 @@ const report = {
   ...(failure ? { error: failure instanceof Error ? failure.message : String(failure) } : {}),
 };
 await mkdir(outputRoot, { recursive: true });
-await writeFile(path.join(outputRoot, "settings-ui-acceptance.json"), `${JSON.stringify(report, null, 2)}\n`);
+await writeFile(path.join(outputRoot, modelOnly ? "model-policy-ui-acceptance.json" : "settings-ui-acceptance.json"), `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 if (failure) throw failure;
