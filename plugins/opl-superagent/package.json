@@ -30,6 +30,11 @@
     "@gaofeng21cn/opl-codex-agents": "0.1.2",
     "dsh-superagent": "0.1.0"
   },
+  "peerDependenciesMeta": {
+    "dsh-superagent": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"

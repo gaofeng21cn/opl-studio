@@ -52,16 +52,27 @@ async function createProfile({ temp, codexAgentsTarball, superagentTarball }) {
   };
   await fs.writeFile(path.join(profile, "package.json"), JSON.stringify(profileManifest, null, 2) + "\n");
   // Match the official profile layout. DSH's resolver supplies declared
-  // carrier peers; this profile contains only the packed OPL overrides.
-  const overrides = [
-    [`'@gaofeng21cn/opl-codex-agents'`, `'file:${codexAgentsTarball}'`]
-  ];
+  // carrier peers; this profile contains only the packed public OPL overrides.
+  // The private Superagent engine stays with the carrier and is never fetched.
   await fs.writeFile(path.join(profile, "pnpm-workspace.yaml"), [
-    "packages:", "  - .", "nodeLinker: hoisted", "autoInstallPeers: false", "strictPeerDependencies: false", "overrides:",
-    ...overrides.map(([name, value]) => `  ${name}: ${value}`), ""
+    "packages:", "  - .", "nodeLinker: hoisted", "autoInstallPeers: false", "strictPeerDependencies: false", ""
   ].join("\n"));
-  await execute("pnpm", ["install", "--ignore-scripts", "--no-frozen-lockfile", "--reporter=append-only"], {
+  // setup-node and `npm test` can inject npm_config_* (including the registry
+  // and peer policy). Use only fixture-owned npm config for this subprocess.
+  const config = path.join(temp, "empty-npmrc");
+  await fs.writeFile(config, "");
+  await fs.writeFile(path.join(profile, ".npmrc"), [
+    "registry=https://registry.npmjs.org/", "node-linker=hoisted",
+    "auto-install-peers=false", "strict-peer-dependencies=false", ""
+  ].join("\n"));
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter(([name]) => !name.toLowerCase().startsWith("npm_config_")));
+  env.npm_config_userconfig = config;
+  env.npm_config_globalconfig = config;
+  const pnpmBin = process.env.PNPM_BIN ?? "pnpm";
+  await execute(pnpmBin, ["install", "--ignore-scripts", "--no-frozen-lockfile", "--reporter=append-only"], {
     cwd: profile,
+    env,
     timeout: 120000,
     maxBuffer: 4 * 1024 * 1024
   });
@@ -121,7 +132,7 @@ test("Superagent child profile boots with the packed Codex Agents dependency clo
     assert.equal(service.read().state, "running");
     assert.equal(service.read().executor, "codex");
     const response = await fetch(new URL("/orchestrator/api/state", service.read().url), { headers: { "x-orchestrator-request": "1" } });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 200, `${await response.clone().text()}\n${service.diagnostic ?? ""}`);
     assert.equal((await response.json()).setup.problem.code, "repositoryUnset");
     assert.equal((await service.stop()).state, "stopped");
     assert.equal(service.read().url, null);

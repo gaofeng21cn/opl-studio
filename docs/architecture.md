@@ -255,6 +255,9 @@ composition gates install packed OPL overrides into a fresh native profile,
 start the real Superagent child CLI, read its management API, and stop it.
 The regression also proves that the former undeclared LLM import fails in the
 same layout, even though the main Host itself can boot.
+The private Superagent engine is an optional package-manager peer supplied by
+the carrier. It is not published or installed into each profile; the workbench
+still requires that carrier-provided engine when the user starts Superagent.
 
 The profile is opt-in and preserves its database/configuration after stopping.
 The main renderer entry uses standard plugin metadata and DSH slots; desktop
