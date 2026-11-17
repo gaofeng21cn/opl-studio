@@ -45,9 +45,21 @@ export async function ensureFullCodexFirstInstall({ env, opl, executable = execu
 
 // Pending updates are optional at launch. Packaged first-install inputs must
 // still reach Framework when update activation fails or automatic updates are off.
-export async function prepareDesktopCodexRuntime({ env, opl, activatePending = true, onProgress = () => {}, executable = executableFile }) {
+export async function prepareDesktopCodexRuntime({ env, opl, activatePending = true, refreshUpdates = false, onProgress = () => {}, executable = executableFile }) {
   let activationStatus = 'disabled';
   let activatedCodexPath;
+  let currentnessError;
+  if (refreshUpdates) {
+    // Run before any Host/plugin/App Server loads runtime bytes. Native owners
+    // select updates; periodic maintenance is not the launch gate.
+    try {
+      await opl.runManagedUpdate('check');
+      const result = await opl.runManagedUpdate('apply');
+      if (!['completed', 'skipped'].includes(result.managed_update?.execution?.status)) {
+        throw Object.assign(new Error('Framework cold-start update did not complete'), { code: 'startup_update_incomplete' });
+      }
+    } catch (error) { currentnessError = error.code ?? 'startup_update_failed'; }
+  }
   if (activatePending) {
     try {
       const activation = await opl.runManagedUpdate('activate');
@@ -63,5 +75,5 @@ export async function prepareDesktopCodexRuntime({ env, opl, activatePending = t
     }
     activatedCodexPath = await ensureFullCodexFirstInstall({ env, opl, executable }) ?? undefined;
   }
-  return { activationStatus, activatedCodexPath };
+  return { activationStatus: currentnessError ?? activationStatus, activatedCodexPath };
 }

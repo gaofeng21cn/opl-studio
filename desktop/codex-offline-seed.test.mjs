@@ -82,3 +82,31 @@ test('failed local installation is returned to startup instead of a false ready 
     opl: { executeAction: async () => ({ status: 'error' }) }
   }), /could not initialize/);
 });
+
+test('each cold start checks native owners and applies before activation even without a pending generation', async () => {
+  const calls = [];
+  const opl = { runManagedUpdate: async operation => {
+    calls.push(operation);
+    return operation === 'apply' ? { managed_update: { execution: { status: 'skipped' } } }
+      : { runtime_activation: { status: 'no_pending_generation' } };
+  } };
+  for (let start = 0; start < 2; start++) {
+    const result = await prepareDesktopCodexRuntime({ env: {}, opl, refreshUpdates: true });
+    assert.equal(result.activationStatus, 'no_pending_generation');
+  }
+  assert.deepEqual(calls, ['check', 'apply', 'activate', 'check', 'apply', 'activate']);
+});
+
+test('failed freshness refresh still activates verified pending bytes and remains visible', async () => {
+  const calls = [];
+  const result = await prepareDesktopCodexRuntime({ env: {}, refreshUpdates: true, executable: () => true,
+    opl: { runManagedUpdate: async operation => {
+      calls.push(operation);
+      if (operation === 'check') throw Object.assign(new Error('offline'), { code: 'startup_channel_unavailable' });
+      return { runtime_activation: { status: 'activated', codex: { runtime_binary_path: '/managed/new-codex' } } };
+    } }
+  });
+  assert.equal(result.activationStatus, 'startup_channel_unavailable');
+  assert.equal(result.activatedCodexPath, '/managed/new-codex');
+  assert.deepEqual(calls, ['check', 'activate']);
+});
