@@ -1,0 +1,8 @@
+{
+  "name": "@gaofeng21cn/opl-host-kit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./profile-plugin-updates": "./src/profile-plugin-updates.mjs"
+  }
+}

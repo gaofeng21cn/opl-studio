@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "plugins/**"
+      - "packages/**"
       - "src/**"
       - "scripts/build-dsh-plugins.mjs"
       - "scripts/vite-build-renderer-entry.mjs"
@@ -76,8 +77,8 @@ jobs:
             if (unknown.length) throw new Error(`Not publishable source packages: ${unknown.join(", ")}`);
           } else {
             const changed = execSync("git diff --name-only HEAD~1 HEAD", { encoding: "utf8" }).trim().split("\n");
-            // Host/client plugins bundle shared adapters from src. A shared
-            // source or build-input change therefore affects every package.
+            // Host/client plugins bundle shared packages and remaining src
+            // adapters. Shared/build-input changes affect every package.
             const sharedChanged = changed.some(file => !file.startsWith("plugins/"));
             selected = sharedChanged ? PUBLISHABLE : PUBLISHABLE.filter(name => changed.some(f => f.startsWith(`plugins/${name}/`)));
           }

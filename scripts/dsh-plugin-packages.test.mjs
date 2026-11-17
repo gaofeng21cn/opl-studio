@@ -58,8 +58,15 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       assert.equal(unpack.status, 0, String(unpack.stderr));
       entrypoints.push([name, pathToFileURL(path.join(destination, JSON.parse(await fs.readFile(path.join(destination, "package.json"), "utf8")).main))]);
     }
+    const publicServices = {
+      "@gaofeng21cn/opl-codex-native": "OplCodexNative",
+      "@gaofeng21cn/opl-framework-bridge": "OplFrameworkBridge",
+      "@gaofeng21cn/opl-mcp-apps": "McpAppHost"
+    };
     for (const [name, entrypoint] of entrypoints) {
-      assert.equal(typeof (await import(entrypoint)).apply, "function", name);
+      const module = await import(entrypoint);
+      assert.equal(typeof module.apply, "function", name);
+      if (publicServices[name]) assert.equal(typeof module[publicServices[name]], "function", name);
     }
     // Materialize the shipped factory bytes outside the checkout. A source
     // import, a non-platform require, or a former static-renderer global fails

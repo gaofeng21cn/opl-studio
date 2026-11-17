@@ -1,10 +1,8 @@
 import path from "node:path";
+import { checkRegistryUpdates, updateRegistryPlugins } from "../../../packages/host-kit/src/profile-plugin-updates.mjs";
 import { createSettingsSearchLog } from "../../../src/host/settings-search-log.mjs";
-import { McpAppHost } from "../../opl-mcp-apps/src/service.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
-import { OplCodexNative } from "../../opl-codex-native/src/service.mjs";
-import { OplFrameworkBridge } from "../../opl-framework-bridge/src/service.mjs";
 import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
 import { createLinkCompanion } from "../../../src/host/link-companion.mjs";
 import { createLinkInternet } from "../../../src/host/link-internet.mjs";
@@ -100,14 +98,16 @@ export class OplHostCore extends EventEmitter {
     threadWorkspace,
     connectionAccessApproval,
     env = process.env
-  } = {}, legacyOptions) {
+  } = {}) {
     super();
-    const options = legacyOptions ?? arguments[0] ?? {};
-    this.codex = codex ?? new OplCodexNative(options);
-    this.framework = framework ?? new OplFrameworkBridge({ ...options, codex: this.codex, connectionAccessApproval });
+    const options = arguments[0] ?? {};
+    if (!codex || !framework || !mcpApps) {
+      throw new TypeError("OPL Host Core requires the Codex, Framework and MCP Apps services from its Cordis profile");
+    }
+    this.codex = codex;
+    this.framework = framework;
     this.transport = this.codex.transport;
-    if (managedByDsh && !mcpApps) throw new Error("DSH MCP Apps service is required");
-    this.mcpApps = mcpApps ?? new McpAppHost(this.transport);
+    this.mcpApps = mcpApps;
     this.threads = this.codex.threads;
     this.threadWorkspace = threadWorkspace ?? createThreadWorkspaceService({ threads: this.threads });
     this.opl = this.framework.opl;
@@ -283,7 +283,6 @@ export class OplHostCore extends EventEmitter {
     if (!options?.dshHome || !options?.dshInstallAnchor) {
       throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
     }
-    const { updateRegistryPlugins } = await import("../../../scripts/dsh-profile-plugins.mjs");
     const names = Array.isArray(payload.packages) ? payload.packages : undefined;
     const result = await updateRegistryPlugins({
       home: options.dshHome,
@@ -341,7 +340,6 @@ export class OplHostCore extends EventEmitter {
       case "readClientModuleBoot": return this.readClientModuleBoot();
       case "readClientModuleBundle": return this.readClientModuleBundle(payload);
       case "readDshPluginUpdates": {
-        const { checkRegistryUpdates } = await import("../../../scripts/dsh-profile-plugins.mjs");
         const options = this.hostContext?.get("oplStudioHostOptions");
         if (!options?.dshHome || !options?.dshInstallAnchor) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
         return checkRegistryUpdates({ home: options.dshHome, installAnchor: options.dshInstallAnchor, cwd: path.dirname(options.dshInstallAnchor) });

@@ -13,15 +13,29 @@ import {
 import { OplHostCore } from "../../plugins/opl-host-core/src/service.mjs";
 import { createOplHostCore as createHostCore } from "./create-host.mjs";
 import { OplCodexNative } from "../../plugins/opl-codex-native/src/service.mjs";
+import { OplFrameworkBridge } from "../../plugins/opl-framework-bridge/src/service.mjs";
+import { McpAppHost } from "../../plugins/opl-mcp-apps/src/service.mjs";
 import { createOplPassthrough } from "./opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 const dshHome = await mkdtemp(path.join(os.tmpdir(), "opl-host-test-dsh-"));
 after(() => rm(dshHome, { recursive: true, force: true }));
 const createOplHostCore = (options) => createHostCore({ ...options, dshHome });
+// Production composition is owned by Cordis. Focused service tests construct
+// the same providers explicitly without adding runtime sibling dependencies.
+function createStandaloneHostCore(options = {}) {
+  const codex = options.codex ?? new OplCodexNative(options);
+  const framework = options.framework ?? new OplFrameworkBridge({ ...options, codex });
+  const mcpApps = options.mcpApps ?? new McpAppHost(codex.transport);
+  return new OplHostCore({ ...options, codex, framework, mcpApps });
+}
+
+test("Host Core requires the providers owned by its Cordis profile", () => {
+  assert.throws(() => new OplHostCore(), /requires the Codex, Framework and MCP Apps services/);
+});
 
 test("Host shutdown waits for a manual update and its Codex refresh", async () => {
-  const core = new OplHostCore();
+  const core = createStandaloneHostCore();
   const events = [];
   let finishUpdate;
   core.opl.executeAction = () => new Promise((resolve) => { finishUpdate = resolve; });
@@ -65,7 +79,7 @@ test("Codex permission profiles stay on the protocol layer that owns them", () =
 });
 
 test("desktop hosts can supply a real working directory instead of the packaged app.asar path", () => {
-  const core = new OplHostCore({ workspaceRoot: "/Users/opl" });
+  const core = createStandaloneHostCore({ workspaceRoot: "/Users/opl" });
   assert.equal(core.transport.cwd, "/Users/opl");
   assert.deepEqual(core.capabilities().oplPassthrough.channelCallback, {
     schema: "opl_channel_canonical_thread_callbacks.v1",
@@ -93,7 +107,7 @@ test("desktop runtime environment drives Codex and Gateway commands from one hos
     OPL_APP_OPL_BIN: oplCommand,
     OPL_APP_VERSION: "1.2.3"
   };
-  const core = new OplHostCore({
+  const core = createStandaloneHostCore({
     workspaceRoot: directory,
     channelBindingFile: path.join(directory, "bindings.json"),
     env
@@ -155,7 +169,7 @@ test("Codex configuration reload keeps the native adapter and serializes concurr
 test("successful Gateway model-access execution reloads the persistent App Server", async () => {
   let reloadCount = 0;
   const actionCalls = [];
-  const core = new OplHostCore({
+  const core = createStandaloneHostCore({
     opl: {
       async executeAction(request) {
         actionCalls.push(request);
@@ -686,7 +700,7 @@ test("a deferred Codex reload never turns a written API key into a reported fail
     reloads.push("reload");
   };
 
-  const core = new OplHostCore({
+  const core = createStandaloneHostCore({
     codex,
     framework: {
       opl: { readState: async () => ({}), executeAction: async () => ({}) },
@@ -721,7 +735,7 @@ test("a deferred Codex reload never turns a written API key into a reported fail
 
 for (const busy of [false, true]) {
   test(`committed model access keeps its success when a ${busy ? "deferred" : "immediate"} reload fails`, async () => {
-    const core = new OplHostCore();
+    const core = createStandaloneHostCore();
     const events = [];
     core.on("event", (event) => events.push(event));
     core.codexApiKeyConfiguration = async () => ({ ok: true, stateRefreshRequired: true });
@@ -823,7 +837,7 @@ test("desktop workspace actions invoke the platform only after canonical path va
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(path.join(directory, "report.pdf"), "%PDF-fixture");
   const calls = [];
-  const core = new OplHostCore({ platform: { accessWorkspacePath: async (request) => { calls.push(request); } } });
+  const core = createStandaloneHostCore({ platform: { accessWorkspacePath: async (request) => { calls.push(request); } } });
   core.threads.readThread = async () => ({ cwd: directory });
   assert.deepEqual(await core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "open" }), { accepted: true });
   await core.invoke("accessThreadWorkspace", { threadId: "thread-1", relativePath: "report.pdf", action: "reveal" });
@@ -841,7 +855,7 @@ test("desktop workspace actions invoke the platform only after canonical path va
 
 test("installation locations are revealed without executing files or accepting relative paths", async (t) => {
   const calls = [];
-  const core = new OplHostCore({ platform: { accessWorkspacePath: async (request) => calls.push(request) } });
+  const core = createStandaloneHostCore({ platform: { accessWorkspacePath: async (request) => calls.push(request) } });
   t.after(() => core.close());
   await core.invoke("revealLocalPath", { path: path.resolve("fixture-installation"), action: "open" });
   assert.deepEqual(calls, [{ path: path.resolve("fixture-installation"), action: "reveal" }]);
