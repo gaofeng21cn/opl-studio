@@ -856,7 +856,8 @@ for (const marker of [
 }
 assert(
   oplStudioClientPluginSource.includes("provideOplStudioClientContributions(ctx)")
-    && oplStudioClientPluginSource.includes("ctx.plugin(oplStudioClientPlugin)"),
+    && read("plugins/opl-studio-client/src/client/plugin.tsx").includes("oplStudioClientPlugin as default")
+    && read("src/main.tsx").includes("bootDesktopDshClient(rootElement)"),
   "OPL Studio client plugin must provide and load the Host-derived Client Cordis composition"
 );
 assert(app.includes("onHostStateChange?.(state)"), "App state caller must feed fresh Host state into Client Cordis");
