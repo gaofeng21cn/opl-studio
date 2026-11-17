@@ -131,23 +131,29 @@ test("packaged Full runtime replaces an incompatible bootstrap during an in-plac
   assert.equal(JSON.parse(fs.readFileSync(path.join(path.dirname(upgraded.runtimeHome), "current.json"))).runtime_version, "0.2.0");
 });
 
-test("Full upgrade refreshes compatible old wrappers while preserving independent Packages and user state", async (t) => {
+test("Full upgrade replaces old seed modules exactly while preserving the native owner's independent newer Package", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-full-owner-update-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const homeDir = path.join(root, "home");
   const initial = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: createPayload(path.join(root, "old"), { version: "0.1.0" }), homeDir, env: { PATH: "/usr/bin" }, platform: "linux" });
   fs.writeFileSync(path.join(initial.runtimeHome, "bin", "opl"), '#!/bin/sh\nprintf \'{"help":{"command":"update activate"}}\\n\'\n');
   fs.mkdirSync(path.join(initial.runtimeHome, "modules", "custom-package"), { recursive: true });
-  fs.writeFileSync(path.join(initial.runtimeHome, "modules", "custom-package", "runtime"), "independent update");
+  fs.writeFileSync(path.join(initial.runtimeHome, "modules", "custom-package", "runtime"), "seed v1");
+  fs.writeFileSync(path.join(initial.runtimeHome, "modules", "custom-package", "deleted-in-v2"), "old file");
   fs.mkdirSync(path.join(homeDir, ".codex", "plugins"), { recursive: true });
-  fs.writeFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "enabled");
+  fs.writeFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "owner-selected v3");
   fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending.json"), "verified pending generation");
-  const upgraded = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: createPayload(path.join(root, "new"), { version: "0.2.0" }), homeDir, env: { PATH: "/usr/bin" }, platform: "linux" });
+  const nextResources = createPayload(path.join(root, "new"), { version: "0.2.0" });
+  const nextModule = path.join(nextResources, "opl-studio-full-runtime", "runtime", "current", "modules", "custom-package");
+  fs.mkdirSync(nextModule, { recursive: true });
+  fs.writeFileSync(path.join(nextModule, "runtime"), "seed v2");
+  const upgraded = await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: nextResources, homeDir, env: { PATH: "/usr/bin" }, platform: "linux" });
   assert.equal(upgraded.source, "packaged_payload");
   assert.notEqual(upgraded.manifestSha256, initial.manifestSha256);
   assert.equal(fs.readFileSync(upgraded.env.OPL_APP_OPL_BIN, "utf8"), "#!/bin/sh\nexit 0\n");
-  assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "utf8"), "independent update");
-  assert.equal(fs.readFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "utf8"), "enabled");
+  assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "utf8"), "seed v2");
+  assert.equal(fs.existsSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "deleted-in-v2")), false);
+  assert.equal(fs.readFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "utf8"), "owner-selected v3");
   assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "opl.pending.json"), "utf8"), "verified pending generation");
   fs.writeFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "later owner update");
   await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: path.join(root, "new", "Resources"), homeDir, env: { PATH: "/usr/bin" }, platform: "linux" });
