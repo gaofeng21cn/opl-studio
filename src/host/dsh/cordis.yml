@@ -17,19 +17,19 @@
     port: !!js ctx.oplStudioHostOptions.webPort ?? 0
 
 - id: opl-dsh-tool-mcp
-  name: '@one-person-lab/opl-dsh-tool-mcp'
+  name: '@gaofeng21cn/opl-dsh-tool-mcp'
 
 - id: opl-codex-native
-  name: '@one-person-lab/opl-codex-native'
+  name: '@gaofeng21cn/opl-codex-native'
 
 - id: opl-framework-bridge
-  name: '@one-person-lab/opl-framework-bridge'
+  name: '@gaofeng21cn/opl-framework-bridge'
 
 - id: opl-mcp-apps
-  name: '@one-person-lab/opl-mcp-apps'
+  name: '@gaofeng21cn/opl-mcp-apps'
 
 - id: opl-host-core
-  name: '@one-person-lab/opl-host-core'
+  name: '@gaofeng21cn/opl-host-core'
 
 # DSH's official client module registry composes the dsh.client declarations
 # from the active profile. Desktop uses its graph through the native bridge;
@@ -38,7 +38,7 @@
   name: '@deepseek-ai/dsh-client-modules'
 
 - id: opl-studio-client
-  name: '@one-person-lab/opl-studio-client'
+  name: '@gaofeng21cn/opl-studio-client'
 
 - id: plugin-inventory
   name: '@deepseek-ai/dsh-host-plugin-inventory'
@@ -46,7 +46,7 @@
 # Collaboration launches the unchanged official base/web application on demand.
 # Its adapter borrows the existing Codex transport; the main profile stays Codex-only.
 - id: opl-team-bots
-  name: '@one-person-lab/opl-team-bots'
+  name: '@gaofeng21cn/opl-team-bots'
 
 - id: opl-superagent
-  name: '@one-person-lab/opl-superagent'
+  name: '@gaofeng21cn/opl-superagent'

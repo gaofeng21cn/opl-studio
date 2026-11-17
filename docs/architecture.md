@@ -84,11 +84,18 @@ bundle. `npm run dsh:plugins -- inspect` reads native profile resolution;
 `update-source --package opl-superagent` builds and packs only the selected
 Studio package, then uses the official DSH plugin manager/pnpm operation.
 `update-registry --all` (or `--package <name>`) pulls the latest compatible
-published version from GitHub Packages (`@one-person-lab` scope) into the native
+published version from GitHub Packages (`@gaofeng21cn` scope) into the native
 profile, with optional `--token <ghp_...>` for registry authentication.
-`remove --package @one-person-lab/opl-superagent` removes that override and
+`remove --package @gaofeng21cn/opl-superagent` removes that override and
 restores the bundled baseline on the next launch. Multiple explicit `--package`
 arguments are supported. Installation reports restart required, not activation.
+
+GitHub Packages uses the repository owner's `@gaofeng21cn` namespace. After a
+replacement is installed, an explicit source/registry update removes its former
+`@one-person-lab` override through the official DSH package manager and updates
+the matching profile patch names; unrelated configuration is preserved. Read-only
+checks and ordinary startup do not migrate the main profile. The carrier baseline
+must already use the new namespace before these plugin updates are applied.
 
 The operator can select another carrier with `--install-anchor <package.json>`
 and another native home with `--home <directory>`. The default anchor is the

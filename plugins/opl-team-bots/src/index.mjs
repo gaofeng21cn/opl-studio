@@ -1,4 +1,4 @@
-import { CodexWorkbenchProfile } from "@one-person-lab/opl-codex-agents/workbench-profile";
+import { CodexWorkbenchProfile } from "@gaofeng21cn/opl-codex-agents/workbench-profile";
 
 export const name = "opl-team-bots";
 export const inject = ["oplStudioHostOptions", "oplCodexNative"];

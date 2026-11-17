@@ -27,7 +27,7 @@ test('independent Superagent profile preserves settings and setup across restart
     assert.equal(first.teamDependency, false);
     assert.equal(first.executor, "codex");
     const manifest = JSON.parse(await readFile(path.join(service.home, "profiles/web/package.json"), "utf8"));
-    assert.ok(manifest.dsh.profile.bundles.includes("@one-person-lab/opl-codex-agents"));
+    assert.ok(manifest.dsh.profile.bundles.includes("@gaofeng21cn/opl-codex-agents"));
     const state = await api('state');
     assert.equal(state.setup.problem.code, 'repositoryUnset');
     assert.equal(state.load.running, 0);

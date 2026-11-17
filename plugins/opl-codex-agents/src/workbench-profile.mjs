@@ -5,7 +5,7 @@ import path from "node:path";
 import { initProfile, readProfileManifest, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
 
 const CHANNEL = "opl-codex-parent.v1";
-const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@one-person-lab/opl-codex-agents"];
+const BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@gaofeng21cn/opl-codex-agents"];
 const METHODS = new Set(["listModels", "startThread", "resumeThread", "readThread", "startTurn", "waitForTurn", "request"]);
 
 /** Complete official application; OPL owns only launch and the executor reference. */
@@ -22,23 +22,24 @@ export class CodexWorkbenchProfile {
     this.turns = new Map(); this.threads = new Set(); this.toolRequests = new Set();
     const require = createRequire(import.meta.url);
     this.cli = path.join(path.dirname(require.resolve("@deepseek-ai/dsh/package.json")), "lib/bin.js");
-    this.engine = path.dirname(require.resolve("@one-person-lab/opl-codex-agents/package.json"));
+    this.engine = path.dirname(require.resolve("@gaofeng21cn/opl-codex-agents/package.json"));
   }
   read() { return { state: this.state, url: this.url, error: this.error, dataDirectory: this.home }; }
   async prepare(defaultModel) {
     const dir = path.join(this.home, "profiles/web");
     initProfile(dir, this.bundles);
     const manifest = readProfileManifest("OPL collaboration", dir);
-    const bundles = [...new Set([...(manifest.dsh?.profile?.bundles ?? []), ...this.bundles])];
+    const bundles = [...new Set([...(manifest.dsh?.profile?.bundles ?? []).map(name =>
+      name === "@one-person-lab/opl-codex-agents" ? "@gaofeng21cn/opl-codex-agents" : name), ...this.bundles])];
     if (JSON.stringify(manifest.dsh?.profile?.bundles) !== JSON.stringify(bundles)) writeProfileBundles(dir, manifest, bundles);
-    const link = path.join(dir, "node_modules/@one-person-lab/opl-codex-agents");
+    const link = path.join(dir, "node_modules/@gaofeng21cn/opl-codex-agents");
     await mkdir(path.dirname(link), { recursive: true });
     try { if (await readlink(link) !== this.engine) { await unlink(link); await symlink(this.engine, link, "dir"); } }
     catch (error) { if (error.code !== "ENOENT") throw error; await symlink(this.engine, link, "dir"); }
     // Deployment facts stay outside the user's native Settings/profile patch.
     const patch = path.join(this.home, "opl-runtime.patch.yml");
     await writeFile(patch, JSON.stringify([
-      { insert: [{ id: "opl-parent-transport", name: "@one-person-lab/opl-codex-agents/parent-transport", config: {
+      { insert: [{ id: "opl-parent-transport", name: "@gaofeng21cn/opl-codex-agents/parent-transport", config: {
         codexEnvironmentStateDir: this.kind === "superagent" ? path.join(this.home, "state") : undefined,
         parentHome: this.options.dshHome, bindingHome: this.kind === "superagent" ? this.home : this.options.dshHome, workspaceRoot: this.options.workspaceRoot, defaultModel } }] },
       { id: "session-persistence-jsonl", config: { root: this.kind === "superagent" ? path.join(this.home, "sessions") : path.join(this.options.dshHome, "opl/sessions") } },

@@ -1,5 +1,5 @@
 {
-  "name": "@one-person-lab/opl-studio-client",
+  "name": "@gaofeng21cn/opl-studio-client",
   "version": "0.1.2",
   "type": "module",
   "main": "./lib/index.mjs",
@@ -12,7 +12,9 @@
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@one-person-lab/opl-mcp-apps"]
+      "inject": [
+        "@gaofeng21cn/opl-mcp-apps"
+      ]
     },
     "manifestVersion": 1
   },
@@ -28,5 +30,10 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-studio-client"
   }
 }

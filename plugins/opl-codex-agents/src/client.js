@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: "@one-person-lab/opl-codex-agents",
+  id: "@gaofeng21cn/opl-codex-agents",
   factory: () => ({
     name: "opl-codex-workbench-navigation",
     inject: ["slots", "layout"],

@@ -43,7 +43,7 @@ test("native profile plugins contribute to the official client graph and disappe
     version: "1.0.0",
     type: "module",
     exports: { ".": "./index.mjs", "./client": "./client.js", "./package.json": "./package.json" },
-    dsh: { manifestVersion: 1, client: { platform: "web", inject: ["@one-person-lab/opl-studio-client"] } }
+    dsh: { manifestVersion: 1, client: { platform: "web", inject: ["@gaofeng21cn/opl-studio-client"] } }
   }, null, 2));
   await writeFile(path.join(packageDir, "index.mjs"), "export function apply() {}\n");
   await writeFile(path.join(packageDir, "client.js"),

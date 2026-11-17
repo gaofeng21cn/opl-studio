@@ -76,7 +76,7 @@ async function boot(home, transport) {
   // integration test covers the shipped CLI process and parent transport.
   const profileHome = path.join(home, "opl-collaboration");
   const dir = path.join(profileHome, "profiles/web");
-  initProfile(dir, ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@one-person-lab/opl-codex-agents"]);
+  initProfile(dir, ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@gaofeng21cn/opl-codex-agents"]);
   const installAnchor = path.resolve("package.json");
   const profile = loadProfile("executor test", "web", installAnchor, profileHome);
   const root = path.join(dir, "cordis.yml");

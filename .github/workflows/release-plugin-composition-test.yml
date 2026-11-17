@@ -13,7 +13,7 @@ on:
       plugin_versions:
         description: >
           Optional JSON object overriding resolved versions for specific plugins,
-          e.g. {"@one-person-lab/opl-superagent":"0.2.1"}.
+          e.g. {"@gaofeng21cn/opl-superagent":"0.2.1"}.
           Leave empty to resolve latest ^x.y.0 from the registry.
         required: false
         default: ""
@@ -52,7 +52,7 @@ jobs:
           check-latest: true
           cache: npm
           registry-url: "https://npm.pkg.github.com"
-          scope: "@one-person-lab"
+          scope: "@gaofeng21cn"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -78,7 +78,7 @@ jobs:
           const localManifests = fs.readdirSync("plugins", { withFileTypes: true })
             .filter(entry => entry.isDirectory())
             .map(entry => JSON.parse(fs.readFileSync(`plugins/${entry.name}/package.json`, "utf8")))
-            .filter(pkg => !pkg.private && pkg.name?.startsWith("@one-person-lab/")
+            .filter(pkg => !pkg.private && pkg.name?.startsWith("@gaofeng21cn/")
               && pkg.publishConfig?.registry === "https://npm.pkg.github.com");
 
           const overrides = JSON.parse(process.env.PLUGIN_VERSIONS_INPUT || "{}");

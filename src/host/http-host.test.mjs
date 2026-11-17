@@ -121,20 +121,20 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
   const inventory = await fetch(`${baseUrl}/api/host/plugins`).then((response) => response.json());
   assert.deepEqual(
     inventory.entries
-      .filter((entry) => entry.moduleName.startsWith("@one-person-lab/opl-") && entry.moduleName !== "@one-person-lab/opl-studio-client")
+      .filter((entry) => entry.moduleName.startsWith("@gaofeng21cn/opl-") && entry.moduleName !== "@gaofeng21cn/opl-studio-client")
       .map((entry) => [entry.moduleName, entry.enabled, entry.fiberPhase]),
     [
-      ["@one-person-lab/opl-dsh-tool-mcp", true, "active"],
-      ["@one-person-lab/opl-codex-native", true, "active"],
-      ["@one-person-lab/opl-framework-bridge", true, "active"],
-      ["@one-person-lab/opl-mcp-apps", true, "active"],
-      ["@one-person-lab/opl-host-core", true, "active"],
-      ["@one-person-lab/opl-team-bots", true, "active"],
-      ["@one-person-lab/opl-superagent", true, "active"],
-      ["@one-person-lab/opl-web-routes", true, "active"]
+      ["@gaofeng21cn/opl-dsh-tool-mcp", true, "active"],
+      ["@gaofeng21cn/opl-codex-native", true, "active"],
+      ["@gaofeng21cn/opl-framework-bridge", true, "active"],
+      ["@gaofeng21cn/opl-mcp-apps", true, "active"],
+      ["@gaofeng21cn/opl-host-core", true, "active"],
+      ["@gaofeng21cn/opl-team-bots", true, "active"],
+      ["@gaofeng21cn/opl-superagent", true, "active"],
+      ["@gaofeng21cn/opl-web-routes", true, "active"]
     ]
   );
-  for (const entry of inventory.entries.filter((item) => item.moduleName.startsWith("@one-person-lab/"))) {
+  for (const entry of inventory.entries.filter((item) => item.moduleName.startsWith("@gaofeng21cn/"))) {
     assert.ok(entry.meta?.description, entry.moduleName);
   }
   const renderer = await fetch(`${baseUrl}/`).then((response) => response.text());
