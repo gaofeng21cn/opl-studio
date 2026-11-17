@@ -17,10 +17,15 @@ test('scheduled turns use the current App Server, explicit permissions and canon
   const ref = await executor.startTask(task, thread);
   assert.equal(calls[0].permissions, ':read-only');
   assert.equal(calls[1][3].sandboxPolicy.type, 'readOnly');
+  assert.equal(calls[1][3].sandboxPolicy.networkAccess, true);
   await executor.startTask({ ...task, permissions: ':workspace' }, thread);
   assert.equal(calls.at(-1)[3].sandboxPolicy.type, 'workspaceWrite');
-  assert.deepEqual(await executor.createThread(task, Date.now() - 600_000), { threadId: '', skipped: true });
-  await assert.rejects(executor.startTask(task, thread, Date.now() - 600_000), /expired/);
+  assert.equal(calls.at(-1)[3].sandboxPolicy.networkAccess, true);
+  // Temporal admitted the run; time spent waiting for a worker is not a second
+  // execution permission or a reason to leave a newly created thread empty.
+  const delayedThread = await executor.createThread(task, Date.now() - 600_000);
+  assert.deepEqual(delayedThread, { threadId: 'canonical' });
+  assert.deepEqual(await executor.startTask(task, delayedThread, Date.now() - 600_000), { threadId: 'canonical', turnId: 'turn' });
   assert.deepEqual(await executor.readTask(ref), { ...ref, status: 'completed', summary: 'done' });
   await executor.interruptTask(ref);
   assert.deepEqual(calls.at(-1), ['canonical', 'turn']);

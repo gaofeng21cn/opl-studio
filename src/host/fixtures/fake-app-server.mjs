@@ -55,6 +55,7 @@ if (executionDetails) {
 let nextThread = 1;
 let nextTurn = 1;
 let lifecycleClosed = false;
+const pendingApprovalTurns = new Map();
 
 function lifecycle(event, detail = {}) {
   if (lifecyclePath) appendFileSync(lifecyclePath, `${JSON.stringify({ event, pid: process.pid, ...detail })}\n`);
@@ -140,7 +141,14 @@ function completeTurn(threadId, turnId, status = "completed") {
 
 async function handle(frame) {
   log({ direction: "client_to_server", ...frame });
-  if (frame.id !== undefined && !frame.method) return;
+  if (frame.id !== undefined && !frame.method) {
+    const pending = pendingApprovalTurns.get(frame.id);
+    if (pending) {
+      pendingApprovalTurns.delete(frame.id);
+      completeTurn(pending.threadId, pending.turnId);
+    }
+    return;
+  }
   const { id, method, params = {} } = frame;
   if (id === undefined) return;
   if (method === "initialize") return send({ id, result: { userAgent: "fake-app-server/0.144.1" } });
@@ -217,8 +225,12 @@ async function handle(frame) {
       setTimeout(() => send({ method: 'item/agentMessage/delta', params: { threadId: params.threadId, turnId, itemId: progress.id, delta: ' after update' } }), 1800);
       send({ id: 'input-1', method: 'item/tool/requestUserInput', params: { threadId: params.threadId, turnId, questions: [{ id: 'fixture-question', header: 'Fixture input', question: 'Choose the synthetic test input' }] } });
     }
-    if (emitPendingApproval) send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
-    setTimeout(() => completeTurn(params.threadId, turnId), executionDetails ? 4000 : process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
+    if (emitPendingApproval) {
+      pendingApprovalTurns.set("approval-1", { threadId: params.threadId, turnId });
+      send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
+    } else {
+      setTimeout(() => completeTurn(params.threadId, turnId), executionDetails ? 4000 : process.env.FAKE_APP_SERVER_HISTORY_PAGES === '1' ? 1200 : 10);
+    }
     return;
   }
   if (method === "turn/steer") {

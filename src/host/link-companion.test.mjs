@@ -166,8 +166,18 @@ test("real DSH HTTP Host pairs a phone to its single Codex transport, streams an
   const reader = events.body.getReader(); assert.equal((await nextFrame(reader)).method, "host/ready");
   const started = await invoke("startTurn", { threadId: "thread-source", prompt: "Continue this same conversation", attachments: [{ name: "context.md", mimeType: "text/markdown", base64: Buffer.from("Research context").toString("base64") }] });
   assert.equal(started.threadId, "thread-source"); assert.ok(started.turnId);
-  let found = false;
-  for (let index = 0; index < 8 && !found; index++) { const frame = await nextFrame(reader); found = frame?.method === "turn/completed"; }
+  let found = false, answered = false;
+  for (let index = 0; index < 12 && !found; index++) {
+    const frame = await nextFrame(reader);
+    if (frame?.method === "codex/server-request") {
+      const requests = await invoke("listPendingServerRequests");
+      assert.equal(requests.length, 1);
+      await invoke("respondToServerRequest", { id: requests[0].id, response: { result: { decision: "accept" } } });
+      answered = true;
+    }
+    found = frame?.method === "turn/completed";
+  }
+  assert.ok(answered);
   assert.ok(found);
   const readback = await invoke("readThread", { threadId: started.threadId }); assert.ok(readback.turns.some(turn => turn.id === started.turnId));
   const desktop = await host.core.invoke("readThread", { threadId: started.threadId, includeTurns: true }); assert.equal(desktop.id, readback.id);

@@ -98,7 +98,8 @@ export function taskOwnerValues(task?: OplScheduledTask): Readonly<Record<string
 
 export function validTaskOwnerValues(values: Readonly<Record<string, unknown>>): boolean {
   return (values.permissions === ":read-only" || values.permissions === ":workspace")
-    && Number.isInteger(values.timeoutMinutes) && Number(values.timeoutMinutes) >= 1 && Number(values.timeoutMinutes) <= 120;
+    && Number.isSafeInteger(values.timeoutMinutes) && Number(values.timeoutMinutes) >= 1
+    && Number.isSafeInteger((Number(values.timeoutMinutes) + 10) * 60_000);
 }
 
 export function applyScheduleEdit(task: OplScheduledTask, request: Record<string, any>, ownerValues = taskOwnerValues(task)): OplScheduledTask {

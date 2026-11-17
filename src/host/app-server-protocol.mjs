@@ -30,7 +30,7 @@ function permissionValues(profile = DEFAULT_PERMISSION_PROFILE, cwd = process.cw
         sandboxPolicy: {
           type: "workspaceWrite",
           writableRoots: [cwd],
-          networkAccess: false,
+          networkAccess: true,
           excludeTmpdirEnvVar: false,
           excludeSlashTmp: false
         }
@@ -39,7 +39,7 @@ function permissionValues(profile = DEFAULT_PERMISSION_PROFILE, cwd = process.cw
       return {
         approvalPolicy: "on-request",
         sandbox: "read-only",
-        sandboxPolicy: { type: "readOnly", networkAccess: false }
+        sandboxPolicy: { type: "readOnly", networkAccess: true }
       };
     default:
       throw new AppServerTransportError("invalid_request", `Unsupported Codex permission profile: ${String(profile)}`);

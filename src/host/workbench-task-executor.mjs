@@ -2,18 +2,16 @@ import { turnPermissionOverrides } from './app-server-transport.mjs';
 
 export function createWorkbenchTaskExecutor(transport) {
   return Object.freeze({
-    async createThread(task, scheduledAt = Date.now()) {
+    async createThread(task) {
       if (![':read-only', ':workspace'].includes(task.permissions)) throw Error('Scheduled tasks require explicit restricted permissions.');
-      if (Date.now() - scheduledAt > 300_000) return { threadId: "", skipped: true };
       const response = await transport.startThread({ cwd: task.cwd, model: task.model, permissions: task.permissions });
       if (!response.thread?.id) throw Error('Canonical thread/start returned no ID.');
       // Rename failure must not lose the newly created canonical thread reference.
       await transport.renameThread(response.thread.id, task.title).catch(() => undefined);
       return { threadId: response.thread.id };
     },
-    async startTask(task, { threadId }, scheduledAt = Date.now()) {
+    async startTask(task, { threadId }) {
       if (![':read-only', ':workspace'].includes(task.permissions)) throw Error('Scheduled tasks require explicit restricted permissions.');
-      if (Date.now() - scheduledAt > 300_000) throw Error("Scheduled start expired. Inspect the empty conversation and run again if needed.");
       const response = await transport.startTurn(threadId, task.prompt, [], {
         cwd: task.cwd, ...turnPermissionOverrides(task.permissions, task.cwd),
         ...(task.model ? { model: task.model } : {}),

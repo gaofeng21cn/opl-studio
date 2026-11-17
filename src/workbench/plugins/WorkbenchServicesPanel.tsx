@@ -193,7 +193,7 @@ export function DshScheduledTasksPanel(props: Props) {
         onChange={event => onChange({ ...values, permissions: event.target.value })}>
         <option value=":read-only">{locale === 'zh' ? '只读' : 'Read only'}</option><option value=":workspace">{locale === 'zh' ? '工作区可写' : 'Workspace write'}</option>
       </select></label>
-      <label>{locale === 'zh' ? '超时（分钟）' : 'Timeout (minutes)'}<input type="number" min={1} max={120} step={1} required disabled={disabled}
+      <label>{locale === 'zh' ? '超时（分钟）' : 'Timeout (minutes)'}<input type="number" min={1} step={1} required disabled={disabled}
         value={Number(values.timeoutMinutes ?? 30)} onChange={event => onChange({ ...values, timeoutMinutes: Number(event.target.value) })} /></label>
       <p>{locale === 'zh' ? '每次运行创建独立对话，使用 Codex 默认模型。App 保持运行时才能按计划执行。' : 'Each run creates a separate conversation with the default Codex model. Keep the App running for scheduled executions.'}</p>
     </div>,

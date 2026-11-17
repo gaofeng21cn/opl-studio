@@ -71,10 +71,14 @@ test("Codex permission profiles stay on the protocol layer that owns them", () =
     sandboxPolicy: {
       type: "workspaceWrite",
       writableRoots: ["/workspace"],
-      networkAccess: false,
+      networkAccess: true,
       excludeTmpdirEnvVar: false,
       excludeSlashTmp: false
     }
+  });
+  assert.deepEqual(turnPermissionOverrides(":read-only", "/workspace"), {
+    approvalPolicy: "on-request",
+    sandboxPolicy: { type: "readOnly", networkAccess: true }
   });
 });
 

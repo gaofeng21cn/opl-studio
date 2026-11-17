@@ -105,7 +105,8 @@ describe("DSH schedule model adapter", () => {
     const edited = applyScheduleEdit(task, update());
     assert.deepEqual({ ...edited, title: task.title }, task);
     assert.deepEqual(taskOwnerValues(edited), { permissions: ":workspace", timeoutMinutes: 75 });
-    for (const values of [{ permissions: ":full-access", timeoutMinutes: 30 }, { permissions: ":workspace", timeoutMinutes: 0 }, { permissions: ":workspace", timeoutMinutes: 121 }]) {
+    assert.equal(validTaskOwnerValues({ permissions: ":workspace", timeoutMinutes: 240 }), true);
+    for (const values of [{ permissions: ":full-access", timeoutMinutes: 30 }, { permissions: ":workspace", timeoutMinutes: 0 }, { permissions: ":workspace", timeoutMinutes: Number.MAX_SAFE_INTEGER }]) {
       assert.equal(validTaskOwnerValues(values), false);
       assert.throws(() => applyScheduleEdit(task, update(), values));
     }
@@ -163,7 +164,7 @@ describe("DSH schedule owner controller", () => {
     const f = fixture();
     const gate = f.deferExecute();
     let settled = false;
-    const pending = f.controller.create(createRequest(), { permissions: ":workspace", timeoutMinutes: 120 }).then(result => { settled = true; return result; });
+    const pending = f.controller.create(createRequest(), { permissions: ":workspace", timeoutMinutes: 180 }).then(result => { settled = true; return result; });
     await Promise.resolve();
     assert.equal(settled, false);
     assert.equal(f.reads.length, 0);
@@ -171,7 +172,7 @@ describe("DSH schedule owner controller", () => {
     assert.equal(f.calls[0].operation, "task_create");
     assert.equal(f.calls[0].input.cwd, "/workspace");
     assert.equal(f.calls[0].input.permissions, ":workspace");
-    assert.equal(f.calls[0].input.timeoutMinutes, 120);
+    assert.equal(f.calls[0].input.timeoutMinutes, 180);
     assert.equal(f.calls[0].input.requestId, "request-1");
     gate.resolve({ status: "executed" });
     const result = await pending;

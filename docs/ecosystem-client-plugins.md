@@ -94,8 +94,8 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 插件：见
 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)
 与 [Architecture](architecture.md#workbench-services)。Studio 侧只渲染投影并派发
-owner action，不维护业务状态表；其执行器要求显式受限权限，并让超过五分钟的调度
-启动过期而不是静默执行。
+owner action，不维护业务状态表；执行器使用用户声明的权限与超时。补跑和重叠策略归
+Temporal，已获准的持久运行不因等待 App worker 超过五分钟而再次过期。
 
 这些能力需要 Framework 的公开 `./cordis-profiles` 导出
 `startCordisWorkbenchServicesHost`；缺少该导出时旧 Framework 会得到明确的升级

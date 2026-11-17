@@ -30,6 +30,7 @@ if (includeProjectlessThread) {
 let nextThread = 1;
 let nextTurn = 1;
 let lifecycleClosed = false;
+const pendingApprovalTurns = new Map();
 
 function lifecycle(event, detail = {}) {
   if (lifecyclePath) appendFileSync(lifecyclePath, `${JSON.stringify({ event, pid: process.pid, ...detail })}\n`);
@@ -115,7 +116,14 @@ function completeTurn(threadId, turnId, status = "completed") {
 
 async function handle(frame) {
   log({ direction: "client_to_server", ...frame });
-  if (frame.id !== undefined && !frame.method) return;
+  if (frame.id !== undefined && !frame.method) {
+    const pending = pendingApprovalTurns.get(frame.id);
+    if (pending) {
+      pendingApprovalTurns.delete(frame.id);
+      completeTurn(pending.threadId, pending.turnId);
+    }
+    return;
+  }
   const { id, method, params = {} } = frame;
   if (id === undefined) return;
   if (method === "initialize") return send({ id, result: { userAgent: "fake-app-server/0.144.1" } });
@@ -169,8 +177,12 @@ async function handle(frame) {
     target.status = { type: "active", activeFlags: [] };
     target.turns.push(turn(turnId, "inProgress"));
     send({ id, result: { turn: turn(turnId, "inProgress") } });
-    if (emitPendingApproval) send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
-    setTimeout(() => completeTurn(params.threadId, turnId), 10);
+    if (emitPendingApproval) {
+      pendingApprovalTurns.set("approval-1", { threadId: params.threadId, turnId });
+      send({ id: "approval-1", method: "item/commandExecution/requestApproval", params: { itemId: `item-${turnId}`, threadId: params.threadId, turnId, command: "echo approval", reason: "fixture approval" } });
+    } else {
+      setTimeout(() => completeTurn(params.threadId, turnId), 10);
+    }
     return;
   }
   if (method === "turn/steer") {
