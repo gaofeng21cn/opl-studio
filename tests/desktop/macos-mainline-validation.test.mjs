@@ -16,6 +16,10 @@ test("default validation is source-only and does not build a release carrier", a
   assert.deepEqual(Object.keys(workflow.jobs), ["source-validation"]);
   const job = workflow.jobs["source-validation"];
   assert.equal(job["runs-on"], "ubuntu-24.04");
+  const pnpmSetupIndex = job.steps.findIndex((step) => step.uses?.startsWith("pnpm/action-setup@"));
+  const validationIndex = job.steps.findIndex((step) => step.run === "npm run test:source");
+  assert.ok(pnpmSetupIndex >= 0 && pnpmSetupIndex < validationIndex);
+  assert.match(job.steps[pnpmSetupIndex].with.version, /^\d+\.\d+\.\d+$/);
   assert.match(JSON.stringify(job), /npm run test:source/);
   assert.match(JSON.stringify(job), /candidateContractEvidence\.json/);
   assert.match(JSON.stringify(job), /gaofeng21cn\/one-person-lab-app/);
