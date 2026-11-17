@@ -77,7 +77,8 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
           source: "one-person-lab-app/contracts/app-product-profile.json#codex.auto_model_policy",
           defaultModel: "fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "fixture" }],
           reasoningEfforts: ["high"], autoLabel: { zh: "Auto", en: "Auto" }, knownModelReasoningEffortOverrides: {},
-          acceptUnknownCatalogDefault: true, useHighestSupportedReasoningForUnknown: true
+          acceptUnknownCatalogDefault: true, useHighestSupportedReasoningForUnknown: true,
+          customModelAccess: { defaultEnabled: false, label: { zh: "自定义模型", en: "Custom models" }, description: { zh: "高级设置", en: "Advanced settings" } }
         }
       };
       const require = createRequire(path.join(staging, "package.json"));
