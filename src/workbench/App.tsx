@@ -2294,7 +2294,7 @@ export function App({
   const studioConversationBody = (
     <div className="opl-dsh-thread" ref={conversationRef as never}>
       {installationProgress}
-      {(threadDirectoryStatus === "error" || modelCatalogStatus === "error") && <div role="status" data-testid="opl-codex-recovery"><p>{threadDirectoryError || modelCatalogError}</p><button type="button" onClick={() => void retryStartup().catch(error => setThreadActionError(String(error)))}>{settings.locale === "zh" ? "重试连接" : "Retry connection"}</button><a href="https://github.com/gaofeng21cn/opl-studio/issues/new" target="_blank" rel="noreferrer">{settings.locale === "zh" ? "报告启动问题" : "Report startup issue"}</a></div>}
+      {modelCatalogStatus === "error" && <div role="status" data-testid="opl-codex-recovery"><p>{modelCatalogError}</p><button type="button" onClick={() => void retryStartup().catch(error => setThreadActionError(String(error)))}>{settings.locale === "zh" ? "重试连接" : "Retry connection"}</button><a href="https://github.com/gaofeng21cn/opl-studio/issues/new" target="_blank" rel="noreferrer">{settings.locale === "zh" ? "报告启动问题" : "Report startup issue"}</a></div>}
       <CodexServerRequestPanel requests={pendingServerRequests} locale={settings.locale} error={pendingServerRequestError} onRespond={(request, response) => void respondToServerRequest(request, response)} />
       {threadActionError ? <p className="thread-read-error" role="alert">{threadActionError}</p> : null}
       <SubagentsPanel key={codexThreadId ?? "new"} threadId={codexThreadId} threads={allThreads} messages={messages} locale={settings.locale} onOpen={openCanonicalThreadRef} />
@@ -2588,6 +2588,8 @@ export function App({
     threadProjects: visibleThreadProjects,
     threadDirectoryStatus,
     threadDirectoryError,
+    codexConnectionStatus: modelCatalogStatus,
+    retryCodexConnection: () => { void retryStartup().catch(error => setThreadActionError(String(error))); },
     currentThreadId: codexThreadId,
     selectedProjectId: uiMetadata.selectedProjectId,
     selectSessionWorkspace,

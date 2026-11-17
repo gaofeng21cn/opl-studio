@@ -47,6 +47,8 @@ export type OplStudioSurface = {
   threadProjects: WorkbenchProjectGroup[];
   threadDirectoryStatus: "loading" | "ready" | "error";
   threadDirectoryError: string;
+  codexConnectionStatus: "loading" | "ready" | "error";
+  retryCodexConnection(): void;
   currentThreadId?: string;
   selectedProjectId?: string;
   modelOptions: ResolvedCodexModelOption[];

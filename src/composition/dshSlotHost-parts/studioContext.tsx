@@ -273,17 +273,19 @@ export const loadStudioQueueImage = async (): Promise<string> => "";
 // authority; no DSH remote/session ACL or lifecycle is created here.
 export function useStudioRemoteAccess(permission: string): boolean {
   const studio = useStudio();
-  return permission === "session/create" && studio.threadDirectoryStatus === "ready";
+  // The thread directory is a secondary history projection. A failed list
+  // must not block creating a new Codex session or submitting a prompt.
+  return permission === "session/create" && studio.codexConnectionStatus === "ready";
 }
 export function useStudioSessionAccess(sessionId: string, permission: string): boolean {
   const studio = useStudio();
   const present = studio.threadProjects.some(project => project.threads.some(thread => thread.id === sessionId));
-  return present && studio.threadDirectoryStatus === "ready"
+  return present && studio.codexConnectionStatus === "ready"
     && ["session/rename", "session/fork", "session/archive", "workspace/insertSessionBefore"].includes(permission);
 }
 export function useStudioWorkspaceAccess(workspaceId: string, permission: string): boolean {
   const studio = useStudio();
-  return studio.threadDirectoryStatus === "ready"
+  return studio.codexConnectionStatus === "ready"
     && studio.threadProjects.some(project => project.id === workspaceId && !project.projectless)
     && ["session/create", "workspace/rename", "workspace/delete", "workspace/insertBefore"].includes(permission);
 }

@@ -276,14 +276,12 @@ export function SidebarWorkspacesSlot({ wide, expandSidebar, useSectionScroller,
   if (studio.threadDirectoryStatus === "loading") {
     return <div className="opl-thread-directory-status" role="status">{studio.locale === "zh" ? "正在读取 Codex 会话..." : "Loading Codex conversations..."}</div>;
   }
-  if (studio.threadDirectoryStatus === "error") {
-    return <div className="opl-thread-directory-error" role="alert">
-      <strong>{studio.locale === "zh" ? "无法连接 Codex App Server" : "Codex App Server is unavailable"}</strong>
-      <span>{studio.threadDirectoryError}</span>
-      <button type="button" onClick={() => studio.reloadThreadDirectory()}><RefreshCw aria-hidden="true" size={14} />{studio.locale === "zh" ? "重试" : "Retry"}</button>
-    </div>;
-  }
   return <div className="opl-workspace-browser-seat">
+    {studio.threadDirectoryStatus === "error" ? <div className="opl-thread-directory-error" role="status">
+      <strong>{studio.locale === "zh" ? "会话历史暂时不可用" : "Conversation history is temporarily unavailable"}</strong>
+      <span>{studio.threadDirectoryError}</span>
+      <button type="button" onClick={() => studio.reloadThreadDirectory()}><RefreshCw aria-hidden="true" size={14} />{studio.locale === "zh" ? "重试历史" : "Retry history"}</button>
+    </div> : null}
   <WorkspaceBrowser
     wide={wide}
     renderFactorySlot={renderFactorySlot}
