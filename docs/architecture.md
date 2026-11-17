@@ -245,6 +245,17 @@ The original management UI handles setup, settings, execution and recovery.
 The listener is loopback only; remote WebUI operators need a port forward to
 that machine. No external Source is configured or enabled for work by OPL.
 
+The Codex adapter and workbench entrypoints declare their pinned DSH runtime
+peers, including LLM, Cordis and App Boot. DSH's native profile resolver reads
+those declarations to reuse the carrier cohort when a profile-installed OPL
+package is linked into the independent workbench profile. Profile peer
+auto-installation remains disabled; the adapter must not install another DSH
+runtime to compensate for an undeclared dependency. Publication and registry
+composition gates install packed OPL overrides into a fresh native profile,
+start the real Superagent child CLI, read its management API, and stop it.
+The regression also proves that the former undeclared LLM import fails in the
+same layout, even though the main Host itself can boot.
+
 The profile is opt-in and preserves its database/configuration after stopping.
 The main renderer entry uses standard plugin metadata and DSH slots; desktop
 loads the same Host graph through `AppWebEntry` and Cordis. Neither feature creates

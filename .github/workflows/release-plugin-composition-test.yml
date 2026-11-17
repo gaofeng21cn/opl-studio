@@ -181,7 +181,7 @@ jobs:
           version: "9"
 
       - name: Run DSH plugin packages boot test
-        run: OPL_PLUGIN_COMPOSITION_MODE=registry node --test scripts/dsh-plugin-packages.test.mjs
+        run: OPL_PLUGIN_COMPOSITION_MODE=registry node --test scripts/dsh-plugin-packages.test.mjs scripts/dsh-child-profile-packages.test.mjs
         timeout-minutes: 5
 
       - name: Upload composition receipt

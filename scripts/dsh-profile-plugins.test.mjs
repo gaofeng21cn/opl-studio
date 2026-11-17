@@ -97,18 +97,20 @@ test("registry authentication survives a later update without a new token", asyn
 
 test("registry resolution uses the selected carrier cohort and skips newer incompatible versions", async () => {
   const name = "@gaofeng21cn/opl-superagent";
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const incompatibleVersion = inc(currentVersion, "patch");
   const queries = [];
   const view = async (_dir, spec) => {
     queries.push(spec);
-    const answer = spec === name ? ["0.1.0", "0.1.2", "0.1.1", "0.2.0"] : {
+    const answer = spec === name ? ["0.1.0", incompatibleVersion, currentVersion, "0.2.0"] : {
       name, version: spec.split("@").at(-1),
-      engines: { dsh: spec.endsWith("0.1.2") ? ">=9.0.0" : "0.2.2-rc.3" }
+      engines: { dsh: spec.endsWith(incompatibleVersion) ? ">=9.0.0" : "0.2.2-rc.3" }
     };
     return { exitCode: 0, timedOut: false, stdout: JSON.stringify(answer), stderr: "" };
   };
   const result = await resolveRegistryVersions([name], root, path.join(root, "package.json"), view);
-  assert.deepEqual(result[name], { available: true, version: "0.1.1" });
-  assert.deepEqual(queries, [name, name + "@0.1.2", name + "@0.1.1"]);
+  assert.deepEqual(result[name], { available: true, version: currentVersion });
+  assert.deepEqual(queries, [name, `${name}@${incompatibleVersion}`, `${name}@${currentVersion}`]);
 });
 
 test("registry lookup failures remain failures instead of a successful no-update result", async () => {

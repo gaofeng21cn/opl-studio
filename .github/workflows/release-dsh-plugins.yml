@@ -163,7 +163,7 @@ jobs:
           NODE
 
       - name: Run plugin package tests
-        run: node --test scripts/dsh-plugin-packages.test.mjs
+        run: node --test scripts/dsh-plugin-packages.test.mjs scripts/dsh-child-profile-packages.test.mjs
 
       - name: Check version not already published
         id: version-check

@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-team-bots",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {
@@ -25,6 +25,9 @@
         "@gaofeng21cn/opl-studio-client"
       ]
     }
+  },
+  "peerDependencies": {
+    "@gaofeng21cn/opl-codex-agents": "0.1.2"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
