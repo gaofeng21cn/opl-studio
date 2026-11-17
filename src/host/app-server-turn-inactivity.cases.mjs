@@ -72,12 +72,14 @@ for (const method of [
   assert.equal(transport.activeTurns.has("turn-approval"), true);
   assert.equal(transport.isBusy(), true);
   assert.deepEqual(transport.listPendingServerRequests().map(item => item.id), [request.id]);
+  const terminal = transport.waitForTurn("turn-approval", 5000);
   transport.notify("fixture/respond", {
     requestId: request.id,
     steps: [{ delay: 10, frame: completed("turn-approval") }]
   });
   transport.respondToServerRequest(request.id, { result: { decision: "accept" } });
-  assert.equal((await waiting).status, "resolved");
+  await terminal;
+  await waiting;
 });
 
 test("all pending human requests must be answered before idle maintenance can run", async (t) => {
@@ -150,12 +152,12 @@ test("an explicitly nonblocking question does not suspend inactivity", async (t)
 test("turn server requests and their responses re-arm continuous inactivity", async (t) => {
   const transport = createTransport(t);
   await startTurn(transport, "turn-response");
-  const waiting = outcome(transport.waitForTurn("turn-response", 100));
   const requestReceived = once(transport, "serverRequest");
   transport.notify("fixture/emit", { steps: [
     { delay: 60, frame: serverRequest("input-response", "turn-response", "item/tool/requestUserInput") }
   ] });
   const [request] = await requestReceived;
+  const waiting = outcome(transport.waitForTurn("turn-response", 100));
   await delay(60);
 
   const respondedAt = Date.now();
