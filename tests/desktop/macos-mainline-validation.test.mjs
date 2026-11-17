@@ -10,6 +10,9 @@ const packageUrl = new URL("../../package.json", import.meta.url);
 
 test("default validation is source-only and does not build a release carrier", async () => {
   const workflow = YAML.parse(await readFile(workflowUrl, "utf8"));
+  assert.deepEqual(workflow.on.push.branches, ["main"]);
+  assert.ok(Object.hasOwn(workflow.on, "pull_request"));
+  assert.ok(Object.hasOwn(workflow.on, "workflow_dispatch"));
   assert.deepEqual(Object.keys(workflow.jobs), ["source-validation"]);
   const job = workflow.jobs["source-validation"];
   assert.equal(job["runs-on"], "ubuntu-24.04");

@@ -20,6 +20,10 @@ Cordis checks, and the candidate validator. It does not construct carrier
 artifacts. Read `package.json` before relying on this summary because the script
 is the command owner.
 
+Source CI runs on pull requests, pushes to `main`, and manual dispatch. Feature
+branches use the pull-request check instead of a second push-triggered copy of
+the same suite. Mainline validation remains required after integration.
+
 ## Focused Commands
 
 | Command | Evidence layer |
