@@ -1,7 +1,1 @@
-export type TeamBotsState = {
-  state: "stopped" | "starting" | "running" | "error";
-  url: string | null;
-  error: string | null;
-  dataDirectory: string;
-};
-export type TeamBotAction = { operation: "start" | "stop" };
+export type { TeamBotAction, TeamBotsState } from "@gaofeng21cn/opl-host-contracts";

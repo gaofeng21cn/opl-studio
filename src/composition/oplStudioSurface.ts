@@ -1,11 +1,11 @@
-import type { SuperagentState } from "../../plugins/opl-superagent/src/client/types";
-import type { TeamBotsState, TeamBotAction } from "../../plugins/opl-team-bots/src/client/types";
-import type { McpAppsBridge, McpAppOpen } from "../bridge/mcpApps";
+import type { SuperagentState } from "@gaofeng21cn/opl-host-contracts";
+import type { TeamBotsState, TeamBotAction } from "@gaofeng21cn/opl-host-contracts";
+import type { McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
 import type { ReactNode } from "react";
 import type { SettingsDestinationId } from "../workbench/SettingsPanel";
 import type { AgentPackageSelectionIntent, WorkbenchProjectGroup } from "../workbench/workbenchModel";
 import type { ResolvedCodexModelOption } from "../workbench/modelPolicy";
-import type { OplInitializeReadback } from "../bridge/oplBridge";
+import type { OplInitializeReadback } from "@gaofeng21cn/opl-host-contracts";
 import type { OplContributionSlotOwner, OplUiContributionsProjection } from "./contributionProjection";
 import type { OplStudioDetailTab } from "./clientCordis";
 import type { PackageActivity } from '../workbench/packageOperations';

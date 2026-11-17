@@ -15,7 +15,7 @@ const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachme
 const main = read("src/main.tsx");
 const bridge = [
   read("src/bridge/oplBridge.ts"),
-  read("src/bridge/oplBridge-types-state.ts")
+  read("packages/host-contracts/src/app-state.ts")
 ].join("\n");
 const passthrough = read("src/host/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");

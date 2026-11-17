@@ -1,7 +1,7 @@
 import type {
   OplActionRequest,
   OplDomainDetailViewReadRequest
-} from "./oplBridge-types-state";
+} from "@gaofeng21cn/opl-host-contracts";
 
 export const OPL_COMMANDS = {
   fastState: "opl app state --profile fast --json",

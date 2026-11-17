@@ -1,4 +1,4 @@
-import type { OplCommandReadback } from "./oplBridge-types-state";
+import type { OplCommandReadback } from "@gaofeng21cn/opl-host-contracts";
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value ? value as Record<string, unknown> : null;

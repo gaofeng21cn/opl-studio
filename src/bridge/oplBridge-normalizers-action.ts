@@ -1,7 +1,7 @@
 import { asBoolean, asNumber, asRecord, asString, parseJsonValue } from "./oplBridge-primitives";
 import { buildActionCommand, buildActionCommandArgs } from "./oplBridge-commands";
 import { normalizeCommandReadback } from "./oplBridge-normalizers-state";
-import type { OplActionMode, OplActionReceipt, OplActionReceiptKind, OplActionReceiptStatus, OplActionRequest } from "./oplBridge-types-state";
+import type { OplActionMode, OplActionReceipt, OplActionReceiptKind, OplActionReceiptStatus, OplActionRequest } from "@gaofeng21cn/opl-host-contracts";
 
 function actionMode(request: OplActionRequest): OplActionMode {
   if (request.mode) return request.mode;
