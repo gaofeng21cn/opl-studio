@@ -142,7 +142,8 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
       fs.renameSync(temporary, patchFile);
     } finally { fs.rmSync(temporary, { force: true }); }
   }
-  return retired;
+  return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed
+    || JSON.stringify(bundles) !== JSON.stringify(migratedBundles) };
 }
 
 /** Resolve published versions against the selected carrier using DSH's own metadata admission. */
@@ -230,10 +231,10 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
   const toInstall = Object.entries(projection.plugins).filter(([, value]) => value.state === "update_available");
   const failures = Object.fromEntries(Object.entries(projection.plugins).filter(([, value]) => value.state === "unavailable").map(([name, value]) => [name, value.reason]));
   if (!toInstall.length) {
-    const removedLegacyOverrides = await retireLegacyOverrides({ installAnchor, home,
+    const migration = await retireLegacyOverrides({ installAnchor, home,
       names: Object.entries(projection.plugins).filter(([, value]) => value.state === "current").map(([name]) => name), cwd, run });
-    return { operation: "update-registry", application: removedLegacyOverrides.length ? "restart-required"
-      : Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, removedLegacyOverrides, profile, home };
+    return { operation: "update-registry", application: migration.profileChanged ? "restart-required"
+      : Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, ...migration, profile, home };
   }
   const addArgs = ["add", "--save-exact", ...toInstall.map(([name, value]) => `${name}@${value.available}`), `--registry=${REGISTRY_URL}`];
   const result = await run({ profile, dir, installAnchor, home, cwd }, addArgs, {
@@ -248,8 +249,8 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
     if (saved.get(name) === value.available) installed[name] = value.available;
     else failures[name] = "installed_version_mismatch";
   }
-  const removedLegacyOverrides = await retireLegacyOverrides({ installAnchor, home, names: Object.keys(installed), cwd, run });
-  return { operation: "update-registry", application: Object.keys(installed).length ? "restart-required" : "update-check-failed", installed, failures, removedLegacyOverrides, profile, home };
+  const migration = await retireLegacyOverrides({ installAnchor, home, names: Object.keys(installed), cwd, run });
+  return { operation: "update-registry", application: Object.keys(installed).length ? "restart-required" : "update-check-failed", installed, failures, ...migration, profile, home };
 }
 
 export async function inspectProfile({ installAnchor, home }) {
@@ -382,10 +383,10 @@ export async function main(argv = process.argv.slice(2)) {
     onOutput: text => process.stderr.write(text)
   });
   if (result.exitCode !== 0 || result.timedOut) throw new Error(`Native DSH package operation failed; inspect ${result.logPath}`);
-  const removedLegacyOverrides = operation === "update-source" ? await retireLegacyOverrides({ installAnchor, home,
-    names: normalizePluginNames(names, discoverPublishablePackages()) }) : [];
+  const migration = operation === "update-source" ? await retireLegacyOverrides({ installAnchor, home,
+    names: normalizePluginNames(names, discoverPublishablePackages()) }) : {};
   console.log(JSON.stringify({ operation, application: "restart-required",
-    removedLegacyOverrides,
+    ...migration,
     ...await inspectProfile({ installAnchor, home }) }, null, 2));
 }
 
