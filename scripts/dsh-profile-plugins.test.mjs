@@ -39,6 +39,9 @@ test("native DSH profile update boots Superagent and removal restores the bundle
     const selected = host.context.pluginPackages.packageOf("@one-person-lab/opl-superagent",
       pathToFileURL(path.join(home, "profiles/opl-studio/package.json")).href);
     assert.ok(selected.dir.startsWith(home), selected.dir);
+    const graph = host.core.readClientModuleGraph();
+    assert.ok(graph.entries.some(entry => entry.id === "@one-person-lab/opl-superagent"),
+      "the official client graph must discover a dsh.client package resolved from the native profile");
     assert.equal(host.context.oplSuperagent.read().executor, "codex");
     await host.context.oplSuperagent.start();
     const response = await fetch(new URL("/orchestrator/api/state", host.context.oplSuperagent.read().url), { headers: { "x-orchestrator-request": "1" } });
