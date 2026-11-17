@@ -57,7 +57,7 @@ test("authorization requests fail closed when owner identity or connection bindi
   expect(model.settingsProjection?.connectionAuthorization?.requests).toEqual([]);
 });
 
-test("shared resources owns connection approval and settings exposes one navigation route", () => {
+test("Settings owns connection approval and excludes unrelated configuration", () => {
   const state = { app_state: {
     actions: [
       { action_id: "connection_access_request_deny", label: "Deny", payload_fields: ["request_id"] },
@@ -80,8 +80,10 @@ test("shared resources owns connection approval and settings exposes one navigat
   } as never;
   const markup = renderToStaticMarkup(createElement(SharedResourcesPage, props));
   const settingsMarkup = renderToStaticMarkup(createElement(ResourcesSettingsPage, props));
-  expect(settingsMarkup).toContain("Shared resources");
-  expect(settingsMarkup).not.toContain("Approve");
+  expect(settingsMarkup).toContain("Libraries &amp; connections");
+  expect(settingsMarkup).toContain("Approve");
+  expect(settingsMarkup).not.toContain("Open Software Center");
+  expect(settingsMarkup).not.toContain("Model account");
 
   expect(markup).toContain("OPL Relay");
   expect(markup).toContain("mail.read");

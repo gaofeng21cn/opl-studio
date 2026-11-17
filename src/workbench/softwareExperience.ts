@@ -1,7 +1,7 @@
 import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
 import { agentPackageNeedsAttention, packagePresentLocally } from "./settings/packages";
 import { nativeCatalogState, packageCatalogState, softwareCatalogPackages, softwareCatalogNativeProducts } from "./softwareCatalog";
-import { knowledgeSourceNeedsAttention } from "./knowledgeSources";
+import { knowledgeLibraryLabel, knowledgeSourceNeedsAttention } from "./knowledgeSources";
 
 /** Navigation only. Installation, permissions and task execution retain their owners. */
 export function softwareCanStart(item: AgentPackageLifecycleRef): boolean {
@@ -35,7 +35,7 @@ export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en
   }
   const knowledge = new Map((model.knowledgeSources?.entries ?? []).map(source => [source.resourceId, source]));
   for (const resource of model.applicationManagement?.sharedResources ?? []) {
-    if (knowledge.has(resource.resourceId)) continue;
+    if (knowledge.has(resource.resourceId) || resource.resourceKind === "model" || resource.resourceKind === "base_capability") continue;
     if (!resource.consumerPackageIds.some(id => packages.some(item => item.packageId === id && packagePresentLocally(item)))) continue;
     if (resource.status !== "attention" && resource.authorization?.status !== "attention" && resource.readiness?.status !== "attention") continue;
     const products = resource.consumerPackageIds.filter(id => packages.some(item => item.packageId === id));
@@ -46,7 +46,7 @@ export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en
     if (!knowledgeSourceNeedsAttention(source)) continue;
     const products = source.consumerPackageIds.filter(id => packages.some(item => item.packageId === id && packagePresentLocally(item)));
     if (!products.length) continue;
-    issues.push({ id: source.resourceId, title: source.label,
+    issues.push({ id: source.resourceId, title: model.knowledgeSources ? knowledgeLibraryLabel(source, model.knowledgeSources, locale) : source.label,
       detail: zh ? "资料或授权需要复核；在原资料库中处理后重新检查。" : "Review the source or its access, then check again.", products: products.map(name), productIds: products, destination: "resources" });
   }
   for (const item of packages) {

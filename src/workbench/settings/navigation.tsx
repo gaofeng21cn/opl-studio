@@ -18,7 +18,7 @@ export const navigationCopy = {
       overview: "概览",
       account: "账户与访问",
       models: "模型与执行",
-      resources: "远程连接与网页访问",
+      resources: "资料与连接",
       workspace: "工作目录",
       storage: "数据与存储",
       agents: "软件中心",
@@ -45,7 +45,7 @@ export const navigationCopy = {
       overview: "Overview",
       account: "Account & Access",
       models: "Models & execution",
-      resources: "Remote connections & web access",
+      resources: "Libraries & connections",
       workspace: "Working Directory",
       storage: "Data & Storage",
       agents: "Software Center",
@@ -139,6 +139,7 @@ export const searchableSettings: Array<{ destination: SettingsDestinationId | "m
   { destination: "models", labels: ["时间上下文", "Time context"], keywords: "时间 时区 timezone" },
   { destination: "preferences", labels: ["快捷键", "Keyboard shortcuts"], keywords: "热键 hotkey" },
   { destination: "preferences", labels: ["语音输入", "Voice input"], keywords: "听写 录音 dictation recording" },
+  { destination: "resources", labels: ["资料库与账户授权", "Libraries and account access"], keywords: "Obsidian Markdown 资料 知识 邮箱 账户 授权 library account access" },
   { destination: "resources", labels: ["微信与远程连接", "Weixin & remote connections"], keywords: "wechat weixin 微信 扫码 PIN 远程 连接 配对 OPL Link companion" },
   { destination: "account", labels: ["余额", "Balance"], keywords: "账户 Gateway" },
   { destination: "account", labels: ["今日用量", "Usage today"], keywords: "令牌 tokens 费用 cost" },
@@ -170,8 +171,8 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Account & models", description: "Choose the model source and reasoning effort. Auto follows the OPL model policy and shows the effective result." }
   },
   resources: {
-    zh: { eyebrow: "连接与部署", description: "打开共享资源，或配置独立网页端的访问方式。" },
-    en: { eyebrow: "Connections & deployment", description: "Open shared resources or configure access to a separate WebUI deployment." }
+    zh: { eyebrow: "连接与部署", description: "管理资料库、业务账户和应用授权；远程访问单独配置。" },
+    en: { eyebrow: "Connections & deployment", description: "Manage libraries, business accounts and app access. Configure remote access separately." }
   },
   workspace: {
     zh: { eyebrow: "工作区", description: "选择工作目录，确定项目文件的保存位置。" },
