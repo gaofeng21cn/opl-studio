@@ -9,6 +9,7 @@ import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
 import { createLinkCompanion } from "../../../src/host/link-companion.mjs";
 import { createLinkInternet } from "../../../src/host/link-internet.mjs";
 import { createThreadWorkspaceService } from "../../../src/host/thread-workspace-service.mjs";
+import { Peer } from "@deepseek-ai/dsh-client-connection";
 
 function unavailablePlatformCapability(capability) {
   return async () => {
@@ -230,6 +231,74 @@ export class OplHostCore extends EventEmitter {
     return inventory.list();
   }
 
+  readClientModuleGraph() {
+    const modules = this.hostContext?.get("clientModules");
+    if (!modules || typeof modules.graph !== "function") {
+      throw new ThreadAdapterError(
+        "client_module_registry_unavailable",
+        "DSH client module registry is unavailable",
+        {},
+        503
+      );
+    }
+    return modules.graph();
+  }
+
+  async readClientModuleBoot() {
+    const webServer = this.hostContext?.get("webServer");
+    if (!webServer || typeof webServer.collectIndexInjections !== "function") {
+      throw new ThreadAdapterError("client_module_registry_unavailable", "DSH client module boot injections are unavailable", {}, 503);
+    }
+    const peer = new Peer(this.hostContext, { principal: { kind: "owner" }, interactions: "none" });
+    try { return webServer.collectIndexInjections(peer); }
+    finally { await peer.dispose(); }
+  }
+
+  async readClientModuleBundle(payload = {}) {
+    const modules = this.hostContext?.get("clientModules");
+    const resource = typeof payload?.url === "string" ? payload.url : "";
+    if (!modules || typeof modules.fetchBundle !== "function") {
+      throw new ThreadAdapterError("client_module_registry_unavailable", "DSH client module registry is unavailable", {}, 503);
+    }
+    const url = new URL(resource || "/", "http://opl-client-modules.local");
+    if (!resource.startsWith("/plugins/") || url.origin !== "http://opl-client-modules.local" || !url.pathname.startsWith("/plugins/")) {
+      throw new ThreadAdapterError("invalid_request", "A DSH client module resource path is required", {}, 400);
+    }
+    if (payload.method !== undefined && !["GET", "HEAD"].includes(payload.method)) {
+      throw new ThreadAdapterError("invalid_request", "A DSH client resource supports GET or HEAD only", {}, 400);
+    }
+    const response = await modules.fetchBundle(new Request(url.href, {
+      method: payload.method ?? "GET",
+      headers: typeof payload.ifNoneMatch === "string" ? { "if-none-match": payload.ifNoneMatch } : {}
+    }));
+    return {
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: Buffer.from(await response.arrayBuffer()).toString("base64")
+    };
+  }
+
+  async updateDshPlugins(payload = {}) {
+    const options = this.hostContext?.get("oplStudioHostOptions");
+    if (!options?.dshHome || !options?.dshInstallAnchor) {
+      throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
+    }
+    const { updateRegistryPlugins } = await import("../../../scripts/dsh-profile-plugins.mjs");
+    const names = Array.isArray(payload.packages) ? payload.packages : undefined;
+    const result = await updateRegistryPlugins({
+      home: options.dshHome,
+      installAnchor: options.dshInstallAnchor,
+      names,
+      all: payload.all === true,
+      token: undefined,
+      cwd: path.dirname(options.dshInstallAnchor)
+    });
+    if (result.application === "restart-required") {
+      this.emit("event", { method: "host/dsh-plugins-updated", params: { installed: result.installed ?? {} } });
+    }
+    return result;
+  }
+
   capabilities() {
     return {
       localHost: true,
@@ -268,6 +337,16 @@ export class OplHostCore extends EventEmitter {
       case "requestSettingsSearchLog": return this.settingsSearchLog(payload);
       case "beginWindowDrag": return this.platform.beginWindowDrag();
       case "readHostPluginInventory": return this.readHostPluginInventory();
+      case "readClientModuleGraph": return this.readClientModuleGraph();
+      case "readClientModuleBoot": return this.readClientModuleBoot();
+      case "readClientModuleBundle": return this.readClientModuleBundle(payload);
+      case "readDshPluginUpdates": {
+        const { checkRegistryUpdates } = await import("../../../scripts/dsh-profile-plugins.mjs");
+        const options = this.hostContext?.get("oplStudioHostOptions");
+        if (!options?.dshHome || !options?.dshInstallAnchor) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
+        return checkRegistryUpdates({ home: options.dshHome, installAnchor: options.dshInstallAnchor, cwd: path.dirname(options.dshInstallAnchor) });
+      }
+      case "updateDshPlugins": return this.updateDshPlugins(payload);
       case "readSuperagent": return this.hostContext.get("oplSuperagent").read();
       case "executeSuperagent": {
         const service = this.hostContext.get("oplSuperagent");

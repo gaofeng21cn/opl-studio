@@ -172,6 +172,9 @@ export function installWebTransport(): void {
       revokeDevice: request => postJson("/api/link-management/revoke", request)
     },
     eventSourceUrl,
+    readClientModuleGraph: () => requestJson("/api/client-modules/graph"),
+    readDshPluginUpdates: () => requestJson("/api/host/plugin-updates"),
+    updateDshPlugins: request => postJson("/api/host/plugin-update", request),
     platformCapabilities: {
       workspaceRootSelection: false,
       nativeWorkspaceFileAccess: false,

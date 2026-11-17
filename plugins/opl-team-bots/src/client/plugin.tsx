@@ -2,15 +2,21 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
 import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/index";
-import { useStudio } from "../../../../src/composition/dshSlotHost-parts/studioContext";
 import type { TeamBotsState } from "./types";
 import "./team-bots.css";
 
+function appBridge() {
+  const bridge = (globalThis as typeof globalThis & { window?: { oplStudio?: { executeTeamBot?: (request: { operation: "start" | "stop" }) => Promise<TeamBotsState> } } }).window?.oplStudio;
+  if (!bridge?.executeTeamBot) throw new Error("Team collaboration bridge is unavailable");
+  return bridge;
+}
+
+function chineseLocale() {
+  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh");
+}
+
 /** Only application launch lives here. All session interactions belong to DSH. */
 export function TeamBotsPanel() {
-  const studio = useStudio();
-  const client = studio.teamBots;
-  const zh = studio.locale === "zh";
   const [state, setState] = useState<TeamBotsState>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -18,11 +24,12 @@ export function TeamBotsPanel() {
   useEffect(() => {
     let active = true;
     setError("");
-    void client.execute({ operation: "start" }).then(value => {
+    void appBridge().executeTeamBot!({ operation: "start" }).then(value => {
       if (active) setState(value as TeamBotsState);
     }, reason => { if (active) setError(reason.message); });
     return () => { active = false; };
-  }, [client.execute, attempt]);
+  }, [attempt]);
+  const zh = chineseLocale();
   return <section className="opl-teams" data-testid="opl-teams">
     {error ? <div className="opl-teams-launch"><p role="alert">{error}</p><Button onClick={() => setAttempt(value => value + 1)}>{zh ? "重试" : "Retry"}</Button></div>
       : state?.url ? (local
@@ -40,3 +47,4 @@ export const teamBotsClientPlugin = {
     slots.register({ name: "main", key: "teams", registrant: "opl-team-bots" }, TeamBotsPanel);
   }
 };
+export default teamBotsClientPlugin;

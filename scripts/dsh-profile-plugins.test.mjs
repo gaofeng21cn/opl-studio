@@ -6,7 +6,7 @@ import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions } from "./dsh-profile-plugins.mjs";
+import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pnpmAvailable = spawnSync("pnpm", ["--version"], { encoding: "utf8" }).status === 0;
@@ -50,12 +50,13 @@ test("native DSH profile update boots Superagent and removal restores the bundle
   assert.equal(createHash("sha256").update(await fs.readFile(anchor)).digest("hex"), baseline);
 });
 
-test("source plugin selection rejects static renderer, unknown and duplicate packages before packing", async t => {
+test("source plugin selection discovers publishable client packages and rejects unknown/duplicate packages", async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-plugin-selection-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
-  for (const names of [["opl-studio-client"], ["../outside"], ["opl-superagent", "@one-person-lab/opl-superagent"], []]) {
-    assert.throws(() => packSourcePlugins(names, temp));
-  }
+  assert.ok(discoverPublishablePackages({ sourceRoot: root }).includes("@one-person-lab/opl-studio-client"));
+  assert.throws(() => packSourcePlugins(["../outside"], temp));
+  assert.throws(() => packSourcePlugins(["opl-superagent", "@one-person-lab/opl-superagent"], temp));
+  assert.throws(() => packSourcePlugins([], temp));
   assert.deepEqual(await fs.readdir(temp), []);
 });
 
@@ -96,4 +97,37 @@ test("registry lookup failures remain failures instead of a successful no-update
   assert.deepEqual(result[name], { available: false, reason: "timeout" });
   const malformed = async () => ({ exitCode: 0, timedOut: false, stdout: "invalid json", stderr: "" });
   assert.equal((await resolveRegistryVersions([name], root, path.join(root, "package.json"), malformed))[name].reason, "invalid_registry_response");
+});
+
+test("current and unavailable registry checks never create an unnecessary profile override", async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-check-"));
+  t.after(() => fs.rm(home, { recursive: true, force: true }));
+  const name = "@one-person-lab/opl-superagent";
+  const installAnchor = path.join(root, "package.json");
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const view = async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
+    ? [currentVersion] : { name, version: currentVersion, engines: { dsh: "0.2.2-rc.3" } }) });
+  let installs = 0;
+  const run = async () => { installs += 1; throw new Error("No install expected"); };
+  const current = await updateRegistryPlugins({ installAnchor, home, names: [name], view, run });
+  assert.equal(current.application, "current");
+  const failed = await updateRegistryPlugins({ installAnchor, home, names: [name], run,
+    view: async () => ({ exitCode: 1, timedOut: true, stdout: "", stderr: "" }) });
+  assert.equal(failed.application, "update-check-failed");
+  assert.equal(failed.failures[name], "timeout");
+  assert.equal(installs, 0);
+  assert.deepEqual((await inspectProfile({ installAnchor, home })).overrides, []);
+});
+
+test("registry update projection preserves each failed check while reporting compatible siblings", async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-partial-"));
+  t.after(() => fs.rm(home, { recursive: true, force: true }));
+  const good = "@one-person-lab/opl-superagent", bad = "@one-person-lab/opl-team-bots";
+  const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
+    view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
+      : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? ["0.1.1"]
+        : { name: good, version: "0.1.1", engines: { dsh: "0.2.2-rc.3" } }) } });
+  assert.equal(projection.plugins[good].state, "update_available");
+  assert.equal(projection.plugins[bad].state, "unavailable");
+  assert.equal(projection.plugins[bad].reason, "timeout");
 });

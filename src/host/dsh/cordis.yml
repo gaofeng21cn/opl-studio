@@ -31,6 +31,15 @@
 - id: opl-host-core
   name: '@one-person-lab/opl-host-core'
 
+# DSH's official client module registry composes the dsh.client declarations
+# from the active profile. Desktop uses its graph through the native bridge;
+# WebUI uses the same service through the static frontend route.
+- id: client-modules
+  name: '@deepseek-ai/dsh-client-modules'
+
+- id: opl-studio-client
+  name: '@one-person-lab/opl-studio-client'
+
 - id: plugin-inventory
   name: '@deepseek-ai/dsh-host-plugin-inventory'
 

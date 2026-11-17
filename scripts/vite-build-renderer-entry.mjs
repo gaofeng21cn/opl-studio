@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -24,8 +25,19 @@ function nodeModuleStub() {
   return path.join(root, "scripts/vite-node-module-stub.mjs");
 }
 
+/** Read the module-table baseline from the pinned official boot package. */
+function clientPlatformModules() {
+  const require = createRequire(import.meta.url);
+  const filename = require.resolve("@deepseek-ai/dsh-client-web/src/platform.ts");
+  const source = fs.readFileSync(filename, "utf8");
+  const body = source.match(/export const PLATFORM_MODULES = \[([\s\S]*?)\] as const/)?.[1];
+  const modules = [...(body?.matchAll(/'([^']+)'/g) ?? [])].map(match => match[1]);
+  if (!body || !modules.length) throw new Error("The pinned DSH boot package declares no static module-table baseline");
+  return modules;
+}
+
 /** Match DSH apps/web's Vite/React pipeline while keeping carrier filenames stable. */
-export async function buildRendererEntry(entrypoint, outdir, format = "esm") {
+export async function buildRendererEntry(entrypoint, outdir, format = "esm", { external = [] } = {}) {
   const formats = { esm: "es", iife: "iife", cjs: "cjs" };
   const outputFormat = formats[format];
   if (!outputFormat) throw new Error(`Unsupported renderer output format: ${format}`);
@@ -70,13 +82,18 @@ export async function buildRendererEntry(entrypoint, outdir, format = "esm") {
         fileName: () => `${name}.js`,
         cssFileName: name
       },
-      rollupOptions: { output: { inlineDynamicImports: true } }
+      rollupOptions: { external, output: { inlineDynamicImports: true } }
     }
   });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [entrypoint, outdir, format] = process.argv.slice(2);
+  const [entrypoint, outdir, format, clientPackage] = process.argv.slice(2);
   if (!entrypoint || !outdir) throw new Error("usage: vite-build-renderer-entry.mjs <entrypoint> <outdir> [format]");
-  await buildRendererEntry(entrypoint, outdir, format);
+  const manifest = clientPackage ? JSON.parse(fs.readFileSync(path.join(clientPackage, "package.json"), "utf8")) : undefined;
+  const extra = manifest?.dsh?.client?.external ?? [];
+  if (!Array.isArray(extra) || extra.some(value => typeof value !== "string")) throw new Error("dsh.client.external must be a string array");
+  await buildRendererEntry(entrypoint, outdir, format, {
+    external: manifest ? [...clientPlatformModules(), ...extra] : []
+  });
 }

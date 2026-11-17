@@ -122,6 +122,20 @@ export type OplBridgeEvent = OplBridgeTypeEvent | OplBridgeMethodEvent;
 export type SettingsSearchLogRequest = { method: "GET" | "POST"; count?: boolean; body?: string };
 export type SettingsSearchLogResponse = { status: number; body: string };
 
+export type DshClientModuleGraph = {
+  rev: string;
+  release?: { version: string; commit?: string };
+  entries: Array<{ id: string; url: string; rev: string; inject?: string[]; external?: string[] }>;
+  batches: Array<{ phase: "bootstrap" | "application"; url: string; rev: string; entries: string[] }>;
+};
+export type DshPluginUpdateProjection = {
+  schema: "opl_dsh_plugin_updates.v1";
+  profile: string;
+  checkedAt: string;
+  plugins: Record<string, { installed: string | null; available: string | null; state: "current" | "update_available" | "unavailable"; reason?: string }>;
+};
+export type DshPluginUpdateResult = Record<string, unknown> & { operation?: string; application?: string; installed?: Record<string, string>; failures?: Record<string, string> };
+
 export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
 export type LinkInternetStatus = { status: "disabled" | "account_required" | "connecting" | "reconnecting" | "ready" | "error"; reasonCode?: string };
 export type LinkDeviceReadback = { schema: "opl_link_studio_wire.v2"; host?: { id: string; name: string }; endpoint?: string | null; internet?: LinkInternetStatus; devices: LinkPairedDevice[]; unavailable?: boolean };
@@ -140,6 +154,10 @@ export type OplStudioSurface = Pick<
 > & Partial<CodexThreadAdapterBridge> & {
   linkCompanion?: LinkCompanionManagement;
   eventSourceUrl?: string;
+  readClientModuleGraph?: () => Promise<DshClientModuleGraph>;
+  readClientModuleBoot?: () => Promise<import("@deepseek-ai/dsh-host-webserver").IndexInjection[]>;
+  readDshPluginUpdates?: () => Promise<DshPluginUpdateProjection>;
+  updateDshPlugins?: (request: { all?: boolean; packages?: string[] }) => Promise<DshPluginUpdateResult>;
   retryDesktopHost?: () => Promise<{ status: string }>;
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;
 };

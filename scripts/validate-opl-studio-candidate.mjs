@@ -329,10 +329,10 @@ function assertApplicationHost(evidence) {
   assert(host.dsh_base_loaded === false, "Application Host must not load dsh-base");
   assert(host.active_shell_adopted === "app_owned" && host.release_ready === false, "Application Host implementation must not claim active-shell adoption or release readiness");
   assert(!profile.includes("dsh-base"), "Studio DSH profile must exclude dsh-base");
-  for (const id of ["system-prompt", "tools", "tool-executor-native", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-mcp-apps", "opl-host-core", "plugin-inventory"]) {
+  for (const id of ["system-prompt", "tools", "tool-executor-native", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-mcp-apps", "opl-host-core", "client-modules", "opl-studio-client", "plugin-inventory"]) {
     assert(profile.includes(`id: ${id}`), `Studio DSH profile is missing ${id}`);
   }
-  for (const id of ["client-modules", "opl-studio-client", "opl-web-routes"]) {
+  for (const id of ["opl-web-routes"]) {
     assert(webOverlay.includes(`id: ${id}`), `Studio web overlay is missing ${id}`);
   }
   assert(!webOverlay.includes("id: frontend-static"), "Studio web overlay must not register an unauthenticated static fallback");
@@ -525,8 +525,8 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   for (const marker of ["return renderShell({", "threadProjects,", "agentPresets:", "modelOptions,", "conversationBody: studioConversationBody", "renderSettings: renderStudioSettings", "detailsRequestRevision"]) {
     assert(appSource.includes(marker), `missing App-to-DSH surface handoff marker ${marker}`);
   }
-  assert(mainSource.includes('import { mountOplStudioClient, oplStudioClientPlugin } from "./composition/oplStudioClientPlugin"'), "main must import the DSH client plugin");
-  assert(mainSource.includes("mountOplStudioClient(rootElement)"), "main must mount the DSH client plugin composition root");
+  assert(mainSource.includes('import { bootDesktopDshClient } from "./composition/dshClientModuleRuntime"'), "main must use the official DSH client boot carrier");
+  assert(mainSource.includes("bootDesktopDshClient(rootElement)"), "main must boot the official DSH client graph");
   assert(sourceManifest.upstream?.ref === alignment.reference_version, "vendor manifest must bind to the pinned DSH ref");
   assert(sourceManifest.upstream?.source_package_version === expectedDshVersion, "vendor manifest must record the pinned source package version");
   assert(sourceManifest.application_host?.role === "deepseek_harness_cordis_application_host", "vendor manifest must bind the DSH Application Host role");

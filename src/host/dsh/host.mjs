@@ -57,6 +57,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
           ?? (options.env ?? process.env).OPL_STUDIO_CODEX_CWD ?? path.dirname(installAnchor),
         dshHome,
         settingsSearchLogOpenAllowed: !web,
+        dshInstallAnchor: installAnchor,
         dshProfileDir: profileDir
       }));
       await ctx.plugin(PluginPackages, { resolution });

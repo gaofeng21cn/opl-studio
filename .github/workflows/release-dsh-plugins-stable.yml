@@ -3,7 +3,7 @@ name: Build DSH Plugin-Only Stable Candidate
 # Shell-unchanged stable release path: builds an App bundle with plugin
 # versions from a composition receipt instead of compiling from local source.
 #
-# Use when Electron, DSH cohort, and opl-studio-client are identical to the
+# Use when Electron, DSH cohort, and the static boot kernel are identical to the
 # previous Stable release. Plugin compilation is skipped; npm ci pulls
 # pre-built packages from GitHub Packages.
 #
@@ -31,6 +31,20 @@ on:
           the ref declared in candidateContractEvidence.json.
         required: false
         default: ""
+  workflow_call:
+    inputs:
+      composition_receipt_run_id:
+        description: "Successful Studio composition-test run containing dsh-plugin-composition-receipt"
+        required: true
+        type: string
+      studio_source_ref:
+        description: "Exact Studio commit whose source is being built"
+        required: false
+        type: string
+      app_repo_ref:
+        description: "Exact one-person-lab-app commit used for the product contract"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -56,6 +70,7 @@ jobs:
       - name: Checkout Studio
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.studio_source_ref || github.sha }}
           persist-credentials: false
 
       - name: Read pinned App product cohort
@@ -99,7 +114,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.0
 
       - name: Download composition receipt
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -145,8 +160,7 @@ jobs:
         run: |
           # Confirm that published plugin lib/ files come from registry
           # packages in node_modules, not from local plugins/ source dirs.
-          # The static carrier entry is generated later by build-renderer and
-          # is intentionally outside this receipt-selected set.
+          # Product UI is supplied by the same receipt-selected client packages.
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           const receipt = JSON.parse(fs.readFileSync("composition_receipt.json", "utf8"));

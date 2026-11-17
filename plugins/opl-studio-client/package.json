@@ -1,7 +1,6 @@
 {
   "name": "@one-person-lab/opl-studio-client",
   "version": "0.1.2",
-  "private": true,
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {
@@ -12,7 +11,8 @@
   "dsh": {
     "client": {
       "platform": "web",
-      "immediately": true
+      "immediately": true,
+      "inject": ["@one-person-lab/opl-mcp-apps"]
     },
     "manifestVersion": 1
   },
@@ -24,5 +24,9 @@
   "engines": {
     "node": ">=20",
     "dsh": "0.2.2-rc.3"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }

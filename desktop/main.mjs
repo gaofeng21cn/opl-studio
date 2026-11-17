@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, shell, Tray } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, protocol, shell, Tray } from "electron";
 import updaterPackage from "electron-updater";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createLocalNodeHost } from "./local-node-host.mjs";
+import { createClientModuleResourceHandler } from "./client-module-resources.mjs";
 import { createOplPassthrough } from "../src/host/opl-passthrough.mjs";
 import { createManagedUpdateMaintenance } from "../src/host/managed-update-maintenance.mjs";
 import { captureDesktopAccessibility } from "./accessibility-qualification.mjs";
@@ -30,6 +31,7 @@ import {
 } from "./updater.mjs";
 
 const { autoUpdater } = updaterPackage;
+protocol.registerSchemesAsPrivileged([{ scheme: "opl-client", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 const desktopRoot = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(desktopRoot, "..");
 const rendererIndex = path.join(repositoryRoot, "dist", "desktop", "index.html");
@@ -592,6 +594,11 @@ app.whenReady().then(async () => {
   }
   const appLogDirectory = createAppLogDirectoryController({ electronApp: app });
   await appLogDirectory.restore();
+  protocol.handle("opl-client", createClientModuleResourceHandler(async (method, payload) => {
+    if (quittingApplication) throw new Error("Application is closing");
+    const activeHost = await desktopHost(appLogDirectory);
+    return activeHost.core.invoke(method, payload);
+  }));
   // Native material follows only the trusted main document's theme preference.
   ipcMain.on("opl:native-theme-source", (event, source) => {
     const owner = mainWindow;

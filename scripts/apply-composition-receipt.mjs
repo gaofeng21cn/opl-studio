@@ -2,7 +2,7 @@
 /**
  * Apply a DSH plugin composition receipt to package.json.
  *
- * Replaces file:plugins/<name> deps for OPL Host plugins with the exact
+ * Replaces file:plugins/<name> deps for OPL Host/client plugins with the exact
  * registry versions from the receipt. After running this script, `npm ci`
  * installs pre-built plugin packages from GitHub Packages instead of
  * compiling them from local source — enabling the shell-unchanged stable
@@ -75,12 +75,12 @@ const publishable = fs.readdirSync(path.join(root, "plugins"), { withFileTypes: 
   .filter(manifest => manifest.publishConfig?.registry === receipt.registry && !manifest.private)
   .map(manifest => manifest.name);
 if (publishable.length !== Object.keys(receipt.plugins).length || publishable.some(name => !Object.hasOwn(receipt.plugins, name))) {
-  throw new Error("Composition receipt must contain the complete published Host plugin set");
+  throw new Error("Composition receipt must contain the complete published DSH plugin set");
 }
 
 for (const [pkgName, version] of Object.entries(receipt.plugins)) {
   if (!dirForPackage.has(pkgName)) {
-    throw new Error(`Receipt package is not a local Host plugin dependency: ${pkgName}`);
+    throw new Error(`Receipt package is not a local DSH plugin dependency: ${pkgName}`);
   }
   // This script runs before dependencies are installed. Reject ranges and
   // install specs here; npm validates the exact version during lock refresh.
@@ -111,7 +111,7 @@ if (values["dry-run"]) {
 }
 
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-console.log("\npackage.json patched. Run: npm install --package-lock-only --ignore-scripts && npm ci --ignore-scripts");
+console.log("\npackage.json patched. Run: npm install --package-lock-only --ignore-scripts && OPL_DSH_REGISTRY_PLUGINS=1 npm ci");
 console.log("Then build with: npm run build:desktop -- --registry-plugins");
 console.log("To restore: git checkout package.json package-lock.json");
 

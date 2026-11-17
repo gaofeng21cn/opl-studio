@@ -30,7 +30,29 @@ export function buildDshPlugins(selected, { skipBuild = false } = {}) {
         if (result.status !== 0) throw new Error(result.stderr || result.stdout);
       }
       const client = path.join(directory, "src/client.js");
-      if (fs.existsSync(client)) fs.copyFileSync(client, path.join(directory, "lib/client.js"));
+      const clientPlugin = path.join(directory, "src/client/plugin.tsx");
+      if (fs.existsSync(clientPlugin)) {
+        // DSH's official client-modules loader consumes one CJS factory per
+        // dsh.client package. The React/Cordis platform singletons stay
+        // external; feature code and its private UI dependencies travel with
+        // this independently published plugin byte set.
+        const staging = fs.mkdtempSync(path.join(root, ".dsh-client-build-"));
+        try {
+          const result = spawnSync(process.execPath, [path.join(root, "scripts/vite-build-renderer-entry.mjs"), clientPlugin, staging, "cjs", directory], { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+          if (result.status !== 0) throw new Error(result.stderr || result.stdout || `Failed to build ${manifest.name} client`);
+          const jsFile = fs.readdirSync(staging).find(file => file.endsWith(".js"));
+          if (!jsFile) throw new Error(`Client build produced no JavaScript for ${manifest.name}`);
+          const cssFile = fs.readdirSync(staging).find(file => file.endsWith(".css"));
+          const js = fs.readFileSync(path.join(staging, jsFile), "utf8");
+          const css = cssFile ? fs.readFileSync(path.join(staging, cssFile), "utf8") : "";
+          const style = css ? `if(typeof document!=="undefined"){var style=document.createElement("style");style.setAttribute("data-plugin",${JSON.stringify(manifest.name)});style.textContent=${JSON.stringify(css)};document.head.append(style);}` : "";
+          fs.writeFileSync(path.join(directory, "lib/client.js"), `window.__ModuleLoader__.load({id:${JSON.stringify(manifest.name)},factory:(require)=>{var module={exports:{}};var exports=module.exports;${js}\n${style}\nreturn module.exports;}});\n`);
+        } finally {
+          fs.rmSync(staging, { recursive: true, force: true });
+        }
+      } else if (fs.existsSync(client)) {
+        fs.copyFileSync(client, path.join(directory, "lib/client.js"));
+      }
     }
     packages.push(manifest.name);
   }

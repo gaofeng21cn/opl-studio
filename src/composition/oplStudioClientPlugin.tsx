@@ -1,6 +1,3 @@
-import { teamBotsClientPlugin } from "../../plugins/opl-team-bots/src/client/plugin";
-import { superagentClientPlugin } from "../../plugins/opl-superagent/src/client/plugin";
-import { McpAppsClientContext, mcpAppsClientPlugin, type McpAppsClient } from "../../plugins/opl-mcp-apps/src/client/plugin";
 import { Context } from "@deepseek-ai/cordis";
 import { createRoot } from "react-dom/client";
 import {
@@ -10,6 +7,8 @@ import {
 } from "./clientCordis";
 import { OplStudioDshSlotHost } from "./dshSlotHost";
 import { adoptEcosystemModuleSystem } from "../integrations/deepseek-harness/ecosystemClients";
+import { McpAppsClientContext } from "./mcpAppsClient";
+import "../integrations/deepseek-harness/theme";
 
 export type { UiRendererService as OplStudioUiRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/index.ts";
 
@@ -18,7 +17,6 @@ export const name = "opl-studio-client";
 export const inject = ["oplMcpAppsClient"];
 
 export function apply(ctx: Context) {
-  const mcpApps = ctx.get("oplMcpAppsClient") as McpAppsClient;
   const webLoader = ctx.get("loader") as { internal?: unknown } | undefined;
   adoptEcosystemModuleSystem(ctx.get("modules") ?? webLoader?.internal);
   const contributions = provideOplStudioClientContributions(ctx);
@@ -27,6 +25,7 @@ export function apply(ctx: Context) {
   ctx.provide("uiRenderer", {
     mount(container: HTMLElement) {
       const root = createRoot(container);
+      const mcpApps = ctx.get("oplMcpAppsClient") as import("./mcpAppsClient").OplMcpAppsClient;
       root.render(<McpAppsClientContext.Provider value={mcpApps}>{slotHost.renderRoot()}</McpAppsClientContext.Provider>);
       return () => root.unmount();
     }
@@ -34,23 +33,3 @@ export function apply(ctx: Context) {
 }
 
 export const oplStudioClientPlugin = { name, inject, apply };
-
-export async function mountOplStudioClient(container: HTMLElement) {
-  const ctx = new Context();
-  await ctx.plugin(mcpAppsClientPlugin);
-  const fiber = await ctx.plugin(oplStudioClientPlugin);
-  await ctx.plugin(teamBotsClientPlugin);
-  await ctx.plugin(superagentClientPlugin);
-  const renderer = ctx.get("uiRenderer");
-  const contributions = ctx.get(OPL_CLIENT_CONTRIBUTIONS_SERVICE) as OplClientContributionsService | undefined;
-  if (!renderer || !contributions) {
-    await ctx.fiber.dispose();
-    throw new Error("opl-studio-client: plugin did not provide the renderer composition");
-  }
-  const unmount = renderer.mount(container);
-  return async () => {
-    unmount();
-    await fiber.dispose();
-    await ctx.fiber.dispose();
-  };
-}

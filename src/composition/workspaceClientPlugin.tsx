@@ -1,4 +1,4 @@
-import { useMcpAppsClient } from "../../plugins/opl-mcp-apps/src/client/plugin";
+import { useMcpAppsClient } from "./mcpAppsClient";
 import { useEffect, useState, type ReactNode } from "react";
 import { Boxes, ChevronLeft, ChevronRight, RefreshCw, Search, X } from "lucide-react";
 import { diffLines } from "diff";

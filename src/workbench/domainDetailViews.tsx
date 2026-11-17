@@ -1,6 +1,6 @@
 import { Route } from "lucide-react";
 import type { DomainDetailViewDescriptor, WorkItemRuntimeItem } from "./workbenchModel";
-import { useMcpAppsClient } from "../../plugins/opl-mcp-apps/src/client/plugin";
+import { useMcpAppsClient } from "../composition/mcpAppsClient";
 import type { McpAppProps } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
 
 export type DomainDetailViewEntryListProps = {

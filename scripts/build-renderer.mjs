@@ -294,12 +294,11 @@ export function buildRenderer({
   fs.mkdirSync(outDir, { recursive: true });
   const registryPlugins = process.argv.includes("--registry-plugins");
   if (registryPlugins) {
-    // Published Host plugins are already present in node_modules at the
-    // receipt-selected versions. The static opl-studio-client package is the
-    // carrier's own host entry and still needs its tiny generated lib so the
-    // DSH profile can resolve it during packaging.
-    buildDshPlugins(["opl-studio-client", "opl-superagent-engine"]);
-    console.log("registry-plugins mode: skipped published Host plugin compilation; built the unpublished carrier and upstream engine");
+    // Published Host and client plugins (including opl-studio-client) are
+    // already installed at the receipt-selected versions. Only the private
+    // upstream engine remains a source input to this carrier build.
+    buildDshPlugins(["opl-superagent-engine"]);
+    console.log("registry-plugins mode: preserved published Host/client bytes; built the private upstream engine");
   } else {
     buildDshPlugins();
   }

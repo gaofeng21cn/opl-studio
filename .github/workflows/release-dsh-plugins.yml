@@ -5,15 +5,13 @@ on:
     branches:
       - main
     paths:
-      - "plugins/opl-codex-agents/**"
-      - "plugins/opl-codex-native/**"
-      - "plugins/opl-dsh-tool-mcp/**"
-      - "plugins/opl-framework-bridge/**"
-      - "plugins/opl-host-core/**"
-      - "plugins/opl-mcp-apps/**"
-      - "plugins/opl-superagent/**"
-      - "plugins/opl-team-bots/**"
-      - "plugins/opl-web-routes/**"
+      - "plugins/**"
+      - "src/**"
+      - "scripts/build-dsh-plugins.mjs"
+      - "scripts/vite-build-renderer-entry.mjs"
+      - "scripts/build-dsh-client.mjs"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
     inputs:
       packages:
@@ -58,17 +56,13 @@ jobs:
           import fs from "node:fs";
           import { execSync } from "node:child_process";
 
-          const PUBLISHABLE = [
-            "opl-codex-agents",
-            "opl-codex-native",
-            "opl-dsh-tool-mcp",
-            "opl-framework-bridge",
-            "opl-host-core",
-            "opl-mcp-apps",
-            "opl-superagent",
-            "opl-team-bots",
-            "opl-web-routes",
-          ];
+          const PUBLISHABLE = fs.readdirSync("plugins", { withFileTypes: true })
+            .filter(entry => entry.isDirectory())
+            .filter(entry => {
+              const pkg = JSON.parse(fs.readFileSync(`plugins/${entry.name}/package.json`, "utf8"));
+              return !pkg.private && pkg.name?.startsWith("@one-person-lab/")
+                && pkg.publishConfig?.registry === "https://npm.pkg.github.com";
+            }).map(entry => entry.name);
 
           const forceAll = process.env.FORCE_ALL === "true";
           const explicitInput = (process.env.PACKAGES_INPUT || "").trim();
@@ -77,11 +71,15 @@ jobs:
           if (forceAll) {
             selected = PUBLISHABLE;
           } else if (explicitInput) {
-            selected = explicitInput.split(",").map(s => s.trim()).filter(s => PUBLISHABLE.includes(s));
-            if (!selected.length) throw new Error(`No valid package names in input: ${explicitInput}`);
+            selected = [...new Set(explicitInput.split(",").map(s => s.trim()))];
+            const unknown = selected.filter(name => !PUBLISHABLE.includes(name));
+            if (unknown.length) throw new Error(`Not publishable source packages: ${unknown.join(", ")}`);
           } else {
             const changed = execSync("git diff --name-only HEAD~1 HEAD", { encoding: "utf8" }).trim().split("\n");
-            selected = PUBLISHABLE.filter(name => changed.some(f => f.startsWith(`plugins/${name}/`)));
+            // Host/client plugins bundle shared adapters from src. A shared
+            // source or build-input change therefore affects every package.
+            const sharedChanged = changed.some(file => !file.startsWith("plugins/"));
+            selected = sharedChanged ? PUBLISHABLE : PUBLISHABLE.filter(name => changed.some(f => f.startsWith(`plugins/${name}/`)));
           }
 
           const matrix = { include: selected.map(name => ({ plugin: name })) };

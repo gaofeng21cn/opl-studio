@@ -6,6 +6,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { once } from "node:events";
+import { runInNewContext } from "node:vm";
+import { Window } from "happy-dom";
+import { createRequire } from "node:module";
 import { readPluginInventory } from "@deepseek-ai/dsh-host-plugin-inventory";
 import { ThreadAdapterError } from "../src/host/thread-adapter.mjs";
 
@@ -56,6 +59,46 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     for (const [name, entrypoint] of entrypoints) {
       assert.equal(typeof (await import(entrypoint)).apply, "function", name);
     }
+    // Materialize the shipped factory bytes outside the checkout. A source
+    // import, a non-platform require, or a former static-renderer global fails
+    // here even though the package's Host half can boot successfully.
+    const seedEntry = path.join(staging, "platform-seed.js");
+    await fs.writeFile(seedEntry, 'export { getStaticModules } from "@deepseek-ai/dsh-client-web";\n');
+    const seedBuild = spawnSync(process.execPath, [path.join(root, "scripts/vite-build-renderer-entry.mjs"), seedEntry, path.join(staging, "platform"), "cjs"], { cwd: root, encoding: "utf8" });
+    assert.equal(seedBuild.status, 0, seedBuild.stderr);
+    const browser = new Window({ url: "http://127.0.0.1/" });
+    browser.document.write("<!doctype html><html><head></head><body></body></html>");
+    try {
+      const sandbox = {
+        window: browser, document: browser.document, navigator: browser.navigator, location: browser.location,
+        console, URL, Blob, TextEncoder, TextDecoder, AbortController, crypto: globalThis.crypto,
+        setTimeout, clearTimeout, setInterval, clearInterval, performance, structuredClone,
+        __OPL_CODEX_MODEL_POLICY__: {
+          source: "one-person-lab-app/contracts/app-product-profile.json#codex.auto_model_policy",
+          defaultModel: "fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "fixture" }],
+          reasoningEfforts: ["high"], autoLabel: { zh: "Auto", en: "Auto" }, knownModelReasoningEffortOverrides: {},
+          acceptUnknownCatalogDefault: true, useHighestSupportedReasoningForUnknown: true
+        }
+      };
+      const require = createRequire(path.join(staging, "package.json"));
+      const seedModule = { exports: {} };
+      runInNewContext(await fs.readFile(path.join(staging, "platform/platform-seed.js"), "utf8"), { ...sandbox, module: seedModule, exports: seedModule.exports, require });
+      const modules = seedModule.exports.getStaticModules();
+      const registrations = new Map();
+      browser.__ModuleLoader__ = { load: registration => registrations.set(registration.id, registration) };
+      for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-superagent", "opl-team-bots"]) {
+        const name = `@one-person-lab/${id}`;
+        const clientPath = require.resolve(`${name}/client`);
+        runInNewContext(await fs.readFile(clientPath, "utf8"), sandbox, { filename: clientPath });
+        const registration = registrations.get(name);
+        assert.ok(registration, name);
+        const client = registration.factory(specifier => {
+          assert.ok(Object.hasOwn(modules, specifier), `${name} requested non-platform module ${specifier}`);
+          return modules[specifier];
+        });
+        assert.equal(typeof (client.default ?? client).apply, "function", name);
+      }
+    } finally { await browser.happyDOM.close(); }
     await fs.cp(path.join(root, "src/host/dsh"), path.join(staging, "src/host/dsh"), { recursive: true });
     const { bootOplStudioHost } = await import(pathToFileURL(path.join(staging, "src/host/dsh/host.mjs")));
     const transport = {
@@ -86,7 +129,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@one-person-lab/"));
-    assert.equal(own.length, 7);
+    assert.equal(own.length, 8);
     assert.equal(host.context.get("agents"), undefined);
     await host.context.oplTeamBots.start();
     const collaboration = host.context.oplTeamBots.read();

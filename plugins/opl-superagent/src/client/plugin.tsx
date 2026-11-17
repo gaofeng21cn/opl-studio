@@ -2,30 +2,37 @@ import { useEffect, useState } from "react";
 import { Hammer } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
 import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/index";
-import { useStudio } from "../../../../src/composition/dshSlotHost-parts/studioContext";
 import type { SuperagentState } from "./types";
 import "./superagent.css";
 
+function appBridge() {
+  const bridge = (globalThis as typeof globalThis & { window?: { oplStudio?: { readSuperagent?: () => Promise<SuperagentState>; executeSuperagent?: (request: { operation: "start" | "stop" }) => Promise<SuperagentState> } } }).window?.oplStudio;
+  if (!bridge?.readSuperagent || !bridge.executeSuperagent) throw new Error("Superagent bridge is unavailable");
+  return bridge;
+}
+
+function chineseLocale() {
+  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh");
+}
+
 export function SuperagentPanel() {
-  const studio = useStudio();
-  const client = studio.superagent;
-  const zh = studio.locale === "zh";
   const [state, setState] = useState<SuperagentState>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const local = location.protocol === "file:" || ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
   useEffect(() => {
     let active = true;
-    const read = () => client.read().then(value => { if (active) { setState(value); setError(""); } }, reason => { if (active) setError(reason.message); });
+    const read = () => appBridge().readSuperagent!().then(value => { if (active) { setState(value); setError(""); } }, reason => { if (active) setError(reason.message); });
     void read(); const timer = setInterval(read, 5000);
     return () => { active = false; clearInterval(timer); };
-  }, [client]);
+  }, []);
   async function execute(operation: "start" | "stop") {
     setBusy(true); setError("");
-    try { setState(await client.execute({ operation })); }
+    try { setState(await appBridge().executeSuperagent!({ operation })); }
     catch (reason) { setError((reason as Error).message); }
     finally { setBusy(false); }
   }
+  const zh = chineseLocale();
   return <section className="opl-superagent" data-testid="opl-superagent">
     <header><div><h1>Superagent</h1><p>{zh ? "按来源和授权策略接收请求，建立工单，并通过 Codex 执行与恢复。" : "Receive requests from Sources under a Policy, create Tickets, and execute or recover each in its own Session."}</p></div>
       <Button disabled={busy || !state} onClick={() => void execute(state?.state === "running" ? "stop" : "start")}>{busy ? (zh ? "处理中…" : "Working…") : state?.state === "running" ? (zh ? "停止" : "Stop") : (zh ? "启动工作台" : "Start workbench")}</Button></header>
@@ -45,3 +52,4 @@ export const superagentClientPlugin = {
     slots.register({ name: "main", key: "superagent", registrant: "opl-superagent" }, SuperagentPanel);
   }
 };
+export default superagentClientPlugin;

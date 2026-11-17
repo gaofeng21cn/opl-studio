@@ -537,8 +537,7 @@ test("Electron desktop hosts the live DeepSeek Harness composition root", () => 
   assert.match(app, /modelOptions,/);
   assert.match(app, /conversationBody: studioConversationBody/);
   assert.match(app, /renderSettings: renderStudioSettings/);
-  assert.match(main, /mountOplStudioClient\(rootElement\)/);
-  assert.match(main, /oplStudioClientPlugin/);
+  assert.match(main, /bootDesktopDshClient\(rootElement\)/);
   assert.match(main, /document\.documentElement\.dataset\.oplHost = desktopTransportInstalled \? "desktop" : "web"/);
   assert.match(desktopMain, /new BrowserWindow\(/);
   assert.match(desktopMain, /titleBarStyle: "hiddenInset"/);
@@ -817,9 +816,8 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
   for (const id of ["system-prompt", "tools", "webserver", "opl-dsh-tool-mcp", "opl-codex-native", "opl-framework-bridge", "opl-host-core", "plugin-inventory"]) {
     assert.match(dshProfile, new RegExp(`id: ${id}`));
   }
-  for (const id of ["client-modules", "opl-studio-client", "opl-web-routes"]) {
-    assert.match(dshWebOverlay, new RegExp(`id: ${id}`));
-  }
+  for (const id of ["client-modules", "opl-studio-client"]) assert.match(dshProfile, new RegExp(`id: ${id}`));
+  assert.match(dshWebOverlay, /id: opl-web-routes/);
   assert.doesNotMatch(dshWebOverlay, /id: frontend-static/);
   assert.match(read("plugins/opl-web-routes/src/frontend-static.mjs"), /frontend\.plugin\(frontendStatic/);
   assert.match(httpRoutes, /webAuth\.requireSession\(req\)/);

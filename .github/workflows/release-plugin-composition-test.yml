@@ -75,17 +75,11 @@ jobs:
           import semver from "semver";
           import { evaluatePluginCompatibility } from "@deepseek-ai/dsh-app-boot";
 
-          const PUBLISHABLE_PACKAGES = [
-            "@one-person-lab/opl-codex-agents",
-            "@one-person-lab/opl-codex-native",
-            "@one-person-lab/opl-dsh-tool-mcp",
-            "@one-person-lab/opl-framework-bridge",
-            "@one-person-lab/opl-host-core",
-            "@one-person-lab/opl-mcp-apps",
-            "@one-person-lab/opl-superagent",
-            "@one-person-lab/opl-team-bots",
-            "@one-person-lab/opl-web-routes",
-          ];
+          const localManifests = fs.readdirSync("plugins", { withFileTypes: true })
+            .filter(entry => entry.isDirectory())
+            .map(entry => JSON.parse(fs.readFileSync(`plugins/${entry.name}/package.json`, "utf8")))
+            .filter(pkg => !pkg.private && pkg.name?.startsWith("@one-person-lab/")
+              && pkg.publishConfig?.registry === "https://npm.pkg.github.com");
 
           const overrides = JSON.parse(process.env.PLUGIN_VERSIONS_INPUT || "{}");
 
@@ -96,10 +90,8 @@ jobs:
 
           // Resolve versions: use override if given, else query registry for latest
           const resolved = {};
-          for (const pkg of PUBLISHABLE_PACKAGES) {
-            // Read baseline version from local plugin package.json (the floor)
-            const dirName = pkg.replace("@one-person-lab/", "");
-            const local = JSON.parse(fs.readFileSync(`plugins/${dirName}/package.json`, "utf8"));
+          for (const local of localManifests) {
+            const pkg = local.name;
             const baseVer = local.version; // e.g. "0.1.0"
             const range = `^${baseVer}`;
             try {
@@ -163,7 +155,7 @@ jobs:
           node scripts/apply-composition-receipt.mjs --receipt composition_receipt.json
           npm install --package-lock-only --ignore-scripts
           npm ci
-          node --input-type=module -e 'import { buildDshPlugins } from "./scripts/build-dsh-plugins.mjs"; buildDshPlugins(["opl-studio-client", "opl-superagent-engine"]);'
+          node --input-type=module -e 'import { buildDshPlugins } from "./scripts/build-dsh-plugins.mjs"; buildDshPlugins(["opl-superagent-engine"]);'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPL_DSH_REGISTRY_PLUGINS: "1"
@@ -189,11 +181,6 @@ jobs:
       - name: Run DSH plugin packages boot test
         run: OPL_PLUGIN_COMPOSITION_MODE=registry node --test scripts/dsh-plugin-packages.test.mjs
         timeout-minutes: 5
-
-      - name: Verify static renderer remains carrier-bound
-        run: |
-          test -f plugins/opl-studio-client/lib/client.js
-          test -f plugins/opl-studio-client/lib/index.mjs
 
       - name: Upload composition receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

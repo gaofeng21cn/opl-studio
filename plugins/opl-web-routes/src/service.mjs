@@ -86,6 +86,18 @@ async function dispatchApi(req, res, hostCore) {
     json(res, 200, await hostCore.invoke("readHostPluginInventory"));
     return;
   }
+  if (req.method === "GET" && url.pathname === "/api/host/plugin-updates") {
+    json(res, 200, await hostCore.invoke("readDshPluginUpdates"));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/client-modules/graph") {
+    json(res, 200, await hostCore.invoke("readClientModuleGraph"));
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/host/plugin-update") {
+    json(res, 200, await hostCore.invoke("updateDshPlugins", await body(req)));
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/opl/state") {
     json(res, 200, await hostCore.invoke("readState", { profile: url.searchParams.get("profile") ?? "fast" }));
     return;
