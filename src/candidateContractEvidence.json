@@ -1154,8 +1154,8 @@
     "receipt_path": "out/qualification/client-conformance.json",
     "receipt_is_git_ignored": true,
     "external_cohort": {
-    "framework_commit": "65a7b877af8ff4409f33c00b32043e55fefb9f9c",
-    "framework_tree": "8033a07d0effbe78f6dec6e997957df550774ef8",
+    "framework_commit": "159d2c92538b934c1f8ab72892d65f643b4c850b",
+    "framework_tree": "8574b492202b171c0a23f00d4bccad5d53875679",
     "app_commit": "3584485b04f9f53494380e0b61ffb8fb5acab9de",
     "app_tree": "394b195d3e0cdb0dbed9297cb24377cc06371f85"
     },
