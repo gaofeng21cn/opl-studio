@@ -14,7 +14,7 @@ import {
   validateFinalizedDmgReceipt
 } from "../../scripts/desktop/macos-distribution.mjs";
 import { buildAppUpdateConfig, writeAppUpdateConfig, verifyPackagedHostStartup, verifyDesktopUpdaterDependencies } from "../../scripts/desktop/write-app-update-config.mjs";
-import { nextPatchVersion, updaterFixtureBuildArgs } from "../../scripts/desktop/qualify-local-updater.mjs";
+import { nextPatchVersion, SQUIRREL_REPLACEMENT_TIMEOUT_MS, updaterFixtureBuildArgs } from "../../scripts/desktop/qualify-local-updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -56,6 +56,10 @@ test('loopback updater fixtures keep signing while avoiding distribution compres
 test("local updater qualification derives exactly one patch-newer target", () => {
   assert.equal(nextPatchVersion("0.1.0"), "0.1.1");
   assert.throws(() => nextPatchVersion("0.1.0-preview.1"), /numeric semver/);
+});
+
+test("local updater qualification allows the macOS replacement helper enough time on cold runners", () => {
+  assert.equal(SQUIRREL_REPLACEMENT_TIMEOUT_MS, 180_000);
 });
 
 test("macOS builder declares hardened runtime, ULFO, and the dedicated Studio update feed", async () => {

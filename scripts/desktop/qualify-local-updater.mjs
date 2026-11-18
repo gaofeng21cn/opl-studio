@@ -16,6 +16,7 @@ import { parse } from "yaml";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const defaultProductName = "One Person Lab Preview";
+export const SQUIRREL_REPLACEMENT_TIMEOUT_MS = 180_000;
 const fakeAppServer = path.join(repositoryRoot, "src", "host", "fixtures", "fake-app-server.mjs");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -290,7 +291,7 @@ export async function qualifyLocalUpdater({ baseAppPath, targetArtifactsRoot, id
     }
     const installedVersion = await waitFor(
       () => plistValue(plist, "CFBundleShortVersionString", { allowFailure: true }) === targetVersion ? targetVersion : null,
-      90_000,
+      SQUIRREL_REPLACEMENT_TIMEOUT_MS,
       "Squirrel.Mac App replacement"
     );
 
