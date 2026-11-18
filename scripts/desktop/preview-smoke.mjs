@@ -282,7 +282,7 @@ export async function openSettingsDialog({ timeoutMs }) {
     if (now >= deadline) return { ...observation, opened: false, panel: false };
     if (firstRunVisible && dismissals.length === 0) {
       const dismiss = [...firstRun.querySelectorAll('button')]
-        .find((node) => ["稍后处理", "Do this later"].includes(node.textContent.trim()) && !node.disabled && visible(node));
+        .find((node) => ["进入 OPL", "Enter OPL", "稍后处理", "Do this later"].includes(node.textContent.trim()) && !node.disabled && visible(node));
       if (dismiss) {
         dismissals.push({ label: dismiss.textContent.trim(), elapsedMs: now - startedAt });
         dismiss.click();

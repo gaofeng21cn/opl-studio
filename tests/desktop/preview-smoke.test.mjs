@@ -54,7 +54,7 @@ function settingsOpeningDom({ neverOpen = false, lateFirstRun = true, openingSta
     disabled: false,
     getClientRects: () => [1],
     closest: () => null,
-    textContent: "稍后处理",
+    textContent: "进入 OPL",
     click() { dismissedAt = now + 100; }
   };
   const panel = {
