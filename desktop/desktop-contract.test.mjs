@@ -16,6 +16,7 @@ test("Electron is a thin, isolated adapter over the shared host core", () => {
   assert.match(main, /workspaceRoot:\s*desktopCodexWorkspaceRoot\(\)/);
   assert.match(main, /app\.getPath\("home"\)/);
   assert.match(main, /ensureStudioDesktopRuntime/);
+  assert.match(main, /desktopHost\.core\.once\("disconnected"[\s\S]+if \(quittingApplication \|\| installingUpdate\) return;/);
   assert.match(main, /createWindow\(\);[\s\S]+desktopHost\(appLogDirectory\)/);
   assert.match(main, /request\?\.method === "retryDesktopHost"/);
   assert.match(main, /contextIsolation: true/);

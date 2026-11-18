@@ -531,6 +531,7 @@ async function desktopHost(appLogDirectory, { retry = false } = {}) {
     hostCore = desktopHost.core;
     desktopUpdater = desktopHost.desktopUpdater;
     desktopHost.core.once("disconnected", () => {
+      if (quittingApplication || installingUpdate) return;
       if (hostCore !== desktopHost.core) return;
       // Future calls boot a fresh Host. The failed request is never replayed.
       desktopHostPromise = undefined;
