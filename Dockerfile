@@ -49,6 +49,7 @@ ENV OPL_APP_REPO_ROOT=/app/one-person-lab-app
 COPY package.json package-lock.json ./
 COPY plugins ./plugins
 COPY vendor ./vendor
+COPY packages ./packages
 RUN npm install --global "bun@${OPL_BUN_VERSION}" \
   && npm ci --ignore-scripts
 COPY LICENSE ./LICENSE

@@ -14,6 +14,8 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(dockerfile, /node:26-bookworm-slim@sha256:[a-f0-9]{64}/);
   const rendererBuilder = dockerfile.slice(dockerfile.indexOf("AS renderer-builder"), dockerfile.indexOf("AS production-dependencies"));
   assert.match(rendererBuilder, /COPY vendor \.\/vendor/);
+  assert.match(rendererBuilder, /COPY packages \.\/packages/);
+  assert.ok(rendererBuilder.indexOf("COPY packages ./packages") < rendererBuilder.indexOf("RUN npm run build:webui"), "the renderer build must receive shared Host package sources");
   assert.ok(rendererBuilder.indexOf("COPY vendor ./vendor") < rendererBuilder.indexOf("RUN npm run build:webui"), "the plugin build must receive the unmodified Superagent source");
   assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec/);
   assert.match(dockerfile, /ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507/);
