@@ -14,6 +14,7 @@ import {
   buildGuestProcessStopCommand,
   buildFullOfflineReadinessExpression,
   prepareRunnerTrustBundle,
+  qualifyCleanVm,
   parseArgs as parseCleanVmArgs
 } from "../../scripts/desktop/qualify-clean-vm.mjs";
 
@@ -135,12 +136,43 @@ test("Full offline App Server handshake waits for Studio mount and rejects simul
   assert.throws(() => buildFullOfflineReadinessExpression(0), /must be positive/);
 });
 
-test("clean VM force-stops a stubborn relaunch process before continuing online qualification", () => {
+test("clean VM force-stops a stubborn process before the offline relaunch", () => {
   const command = buildGuestProcessStopCommand(1234);
   assert.match(command, /kill -TERM 1234/);
   assert.match(command, /kill -KILL 1234/);
   assert.match(command, /kill -KILL 1234[\s\S]*exit 0$/);
   assert.throws(() => buildGuestProcessStopCommand(0), /positive integer/);
+});
+
+test("Full qualifies offline relaunch and online first install from independent clean guests", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-full-guests-"));
+  try {
+    const options = { runtimeProfiles: ["full"], vmName: "full-smoke", dmg: "/tmp/full.dmg", keepVm: true, outPath: path.join(directory, "qualification.json") };
+    const calls = [];
+    const offlineChecks = { vm: { clone: "full-smoke" }, codex: { offlineRelaunch: { status: "passed" } } };
+    const onlineChecks = { vm: { clone: "full-smoke" }, smoke: { status: "passed" } };
+    const receipt = await qualifyCleanVm(options, async (guest, offline) => {
+      calls.push({ guest, offline });
+      return { status: "passed", checks: offline ? offlineChecks : onlineChecks, progressEvents: [] };
+    });
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[0], { guest: { ...options, keepVm: false, skipClone: false }, offline: true });
+    assert.equal(calls[1].guest, options);
+    assert.equal(calls[1].offline, undefined);
+    assert.equal(receipt.checks.offlineVm, offlineChecks.vm);
+    assert.equal(receipt.checks.codex, offlineChecks.codex);
+    assert.equal(receipt.checks.smoke, onlineChecks.smoke);
+
+    calls.length = 0;
+    const failed = await qualifyCleanVm(options, async (_guest, offline) => {
+      calls.push(offline);
+      return { status: "partial", checks: {}, progressEvents: [] };
+    });
+    assert.deepEqual(calls, [true]);
+    assert.equal(failed.status, "partial");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('Full offline installation consumes the quarantined DMG notarization ticket', () => {

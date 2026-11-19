@@ -404,7 +404,43 @@ export async function waitForVmIp(vmName, { vmProcess, timeoutMs = 120_000, poll
   throw new Error(`timed out waiting for Tart IP for ${vmName}${diagnostics.trim() ? `: ${diagnostics.trim()}` : ""}`);
 }
 
-export async function qualifyCleanVm(options) {
+export async function qualifyCleanVm(options, qualifyGuest = qualifyCleanGuest) {
+  let receipt;
+  if (!options.attach && options.runtimeProfiles?.includes("full")) {
+    // Offline restarts can interrupt the one-shot Official Profile install.
+    // Qualify the online first install from the same clean base on a new clone.
+    const offline = await qualifyGuest({
+      ...options,
+      vmName: options.skipClone ? `${options.vmName}-offline` : options.vmName,
+      keepVm: false,
+      skipClone: false
+    }, true);
+    receipt = offline;
+    if (offline.status === "passed") {
+      const online = await qualifyGuest(options);
+      receipt = {
+        ...online,
+        checks: {
+          ...online.checks,
+          codex: offline.checks.codex,
+          offlineVm: offline.checks.vm,
+          offlineInstall: offline.checks.install,
+          offlineDistribution: offline.checks.distribution,
+          offlineNetwork: offline.checks.offlineNetwork,
+          offlineDmgAdmission: offline.checks.offlineDmgAdmission
+        },
+        progressEvents: [...offline.progressEvents, ...online.progressEvents]
+      };
+    }
+  } else {
+    receipt = await qualifyGuest(options);
+  }
+  await mkdir(path.dirname(options.outPath), { recursive: true });
+  await writeFile(options.outPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return receipt;
+}
+
+async function qualifyCleanGuest(options, offline = false) {
   invariant(options.attach || process.platform === "darwin", "Studio clean VM qualification requires macOS host");
   invariant(Number.isInteger(options.cdpPort) && options.cdpPort > 1024, "CDP port must be a valid host port");
   if (!options.attach) {
@@ -427,7 +463,6 @@ export async function qualifyCleanVm(options) {
   const guestMetadataRoot = `/tmp/opl-studio-clean-${process.pid}-public-metadata`;
   const guestApp = `/Applications/${productName}.app`;
   const guestLog = `/tmp/opl-studio-clean-${process.pid}.log`;
-  let networkIsolated = false;
   let tartProcess;
   let tunnel;
   let ip = null;
@@ -439,7 +474,7 @@ export async function qualifyCleanVm(options) {
   );
   const progressEvents = [];
   const progress = (event) => {
-    const value = { ...event, at: event?.at ?? new Date().toISOString() };
+    const value = { ...event, networkMode: offline ? "offline" : "connected", at: event?.at ?? new Date().toISOString() };
     progressEvents.push(value);
     try { options.progress?.(value); } catch {}
     process.stderr.write(`[opl-studio-clean-vm] ${JSON.stringify(value)}\n`);
@@ -496,12 +531,11 @@ export async function qualifyCleanVm(options) {
       checks.vm = { source: options.sourceVm, clone: options.vmName, ip, started: true };
 
       scpToGuest(options, ip, options.dmg, guestDmg);
-      if (fullRuntime) {
+      if (offline) {
         guestRun(options, ip, buildGuestNetworkCommand(true));
-        networkIsolated = true;
         checks.offlineNetwork = { status: 'passed', policy: FULL_OFFLINE_NETWORK_POLICY, publicIpv4Probe: 'blocked' };
       }
-      if (fullRuntime && options.requireGatekeeper) {
+      if (offline && options.requireGatekeeper) {
         // Consume the stapled DMG ticket as a downloaded disk image would.
         // Quarantining only the copied App omits the carrier's offline ticket.
         guestRun(options, ip, buildGuestDmgAdmissionCommand(guestDmg));
@@ -626,12 +660,12 @@ export async function qualifyCleanVm(options) {
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
       };
-      const launch = buildGuestLaunchCommand({ ...launchOptions, managedUpdates: !fullRuntime });
+      const launch = buildGuestLaunchCommand({ ...launchOptions, managedUpdates: !offline });
       progress({ phase: "guest-launch", status: "started" });
       guestAppProcessId = Number(guestRun(options, ip, launch).stdout.trim());
       invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest App launch did not return its process ID");
       tunnel = spawn("ssh", ["-N", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentitiesOnly=yes", "-i", options.sshKey, "-L", `${options.cdpPort}:127.0.0.1:9222`, `${options.guestUser}@${ip}`], { stdio: "ignore" });
-      if (fullRuntime) {
+      if (offline) {
         progress({ phase: "full-offline-first-launch", status: "started" });
         await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
         const protocol = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
@@ -658,102 +692,96 @@ export async function qualifyCleanVm(options) {
           networkPolicy: FULL_OFFLINE_NETWORK_POLICY, gatewayConfigured: false, appVisible: true,
           protocolCalls: ['thread/list'], generationRequested: false };
         progress({ phase: 'full-offline-relaunch', status: 'passed', version });
-        // Continue the existing online Gateway qualification with the same
-        // installed bytes and owner state after proving the clean offline start.
-        guestRun(options, ip, buildGuestNetworkCommand(false));
-        networkIsolated = false;
-        progress({ phase: 'restore_vm_network', status: 'passed', vm_name: options.vmName });
-        guestRun(options, ip, buildGuestProcessStopCommand(guestAppProcessId));
-        guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
-        invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest online relaunch did not return its process ID");
       }
     }
-    progress({ phase: "page-ready", status: "started" });
-    await waitForPageReady({ port: options.cdpPort, timeoutMs: 45_000 });
-    progress({ phase: "page-ready", status: "passed" });
-    smokeInputs = await loadPreviewSmokeInputs(options);
-    const identity = options.attach
-      ? (options.appPath
-        ? await verifyPreviewIdentity({ appPath: options.appPath, productName: options.productName, bundleId: options.bundleId })
+    if (!offline) {
+      progress({ phase: "page-ready", status: "started" });
+      await waitForPageReady({ port: options.cdpPort, timeoutMs: 45_000 });
+      progress({ phase: "page-ready", status: "passed" });
+      smokeInputs = await loadPreviewSmokeInputs(options);
+      const identity = options.attach
+        ? (options.appPath
+          ? await verifyPreviewIdentity({ appPath: options.appPath, productName: options.productName, bundleId: options.bundleId })
+          : {
+            status: "unavailable",
+            reason: "app_path_not_provided",
+            expected: { productName: options.productName, bundleId: options.bundleId },
+            actual: { productName: null, bundleId: null }
+          })
         : {
-          status: "unavailable",
-          reason: "app_path_not_provided",
+          status: checks.install?.passed === true ? "passed" : "partial",
           expected: { productName: options.productName, bundleId: options.bundleId },
-          actual: { productName: null, bundleId: null }
-        })
-      : {
-        status: checks.install?.passed === true ? "passed" : "partial",
-        expected: { productName: options.productName, bundleId: options.bundleId },
-        actual: checks.install?.identity ?? null,
-        app: guestApp
+          actual: checks.install?.identity ?? null,
+          app: guestApp
+        };
+      const smoke = await (options.runSmoke ?? runPreviewSmoke)({
+        readFirstInstallAttempt: async () => {
+          if (!ip || !guestAppProcessId) return null;
+          const output = guestRun(options, ip, 'cat "$HOME/Library/Application Support/OPL/state/.official-profile-first-install-attempt.json"', { allowFailure: true });
+          return parseCurrentFirstInstallAttempt(output.stdout, guestAppProcessId);
+        },
+        evaluate: (expression, timeoutMs = phaseTimeoutMs) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs }),
+        waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: phaseTimeoutMs }),
+        options: {
+          ...options,
+          captureScreenshot: options.screenshotsDir
+            ? async (name) => {
+              await mkdir(options.screenshotsDir, { recursive: true });
+              await writeFile(path.join(options.screenshotsDir, `${name}.png`), await capturePageScreenshot({ port: options.cdpPort, timeoutMs: options.timeoutMs }));
+            }
+            : null
+        },
+        credentials: smokeInputs.credentials,
+        turnRequest: smokeInputs.turnRequest,
+        identity,
+        progress
+      });
+      checks.smoke = smoke;
+      progress({ phase: "smoke", status: smoke.status, phaseTimeoutMs, blockers: smoke.blockers });
+      checks.startup = smoke.checks.startup;
+      checks.runtime = smoke.checks.runtime;
+      if (!fullRuntime && options.frameworkSourceArchive && ip) {
+        const identityResult = guestRun(options, ip, "cat \"$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json\"");
+        const installedIdentity = JSON.parse(identityResult.stdout);
+        const identityPassed = installedIdentity?.schema === "opl_framework_installed_source_identity.v1"
+          && installedIdentity.framework_sha === options.frameworkRef
+          && installedIdentity.install_mode === "archive";
+        checks.framework = {
+          ...checks.framework,
+          status: identityPassed ? "passed" : "partial",
+          installedIdentity
+        };
+        invariant(identityPassed, "Studio Standard Framework bootstrap did not install the exact injected Framework archive");
+      }
+      if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
+        checks.framework.status = 'passed';
+      }
+      if (fullRuntime && ip && smoke.status === "passed") {
+        const guestDriver = `/tmp/opl-framework-temporal-driver-${process.pid}.mjs`;
+        const localDriver = path.join(runRoot, "temporal-driver.mjs");
+        const runtime = `${guestApp}/Contents/Resources/opl-studio-full-runtime/runtime/current`;
+        await writeFile(localDriver, `${collectTemporalServiceSupervisorProof.toString()}\nprocess.stdout.write(JSON.stringify(await collectTemporalServiceSupervisorProof({runtime:${JSON.stringify(runtime)}})));\n`);
+        scpToGuest(options, ip, localDriver, guestDriver);
+        progress({ phase: "full-temporal-lifecycle", status: "started" });
+        const result = guestRun(options, ip, `${shellQuote(runtime + "/node/bin/node")} ${shellQuote(guestDriver)}`);
+        checks.temporal_service_supervisor_proof = JSON.parse(result.stdout);
+        invariant(checks.temporal_service_supervisor_proof.status === "passed", "Full Temporal lifecycle did not pass");
+        progress({ phase: "full-temporal-lifecycle", status: "passed" });
+      }
+      checks.gateway = smoke.checks.gateway;
+      checks.update = {
+        status: await evaluatePage({ port: options.cdpPort, expression: "window.oplStudio.readNativeAppUpdateStatus()", timeoutMs: options.timeoutMs }),
+        publicFeedChecked: false,
+        reason: "clean_vm_harness_does_not_mutate_or_require_public_release"
       };
-    const smoke = await (options.runSmoke ?? runPreviewSmoke)({
-      readFirstInstallAttempt: async () => {
-        if (!ip || !guestAppProcessId) return null;
-        const output = guestRun(options, ip, 'cat "$HOME/Library/Application Support/OPL/state/.official-profile-first-install-attempt.json"', { allowFailure: true });
-        return parseCurrentFirstInstallAttempt(output.stdout, guestAppProcessId);
-      },
-      evaluate: (expression, timeoutMs = phaseTimeoutMs) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs }),
-      waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: phaseTimeoutMs }),
-      options: {
-        ...options,
-        captureScreenshot: options.screenshotsDir
-          ? async (name) => {
-            await mkdir(options.screenshotsDir, { recursive: true });
-            await writeFile(path.join(options.screenshotsDir, `${name}.png`), await capturePageScreenshot({ port: options.cdpPort, timeoutMs: options.timeoutMs }));
-          }
-          : null
-      },
-      credentials: smokeInputs.credentials,
-      turnRequest: smokeInputs.turnRequest,
-      identity,
-      progress
-    });
-    checks.smoke = smoke;
-    progress({ phase: "smoke", status: smoke.status, phaseTimeoutMs, blockers: smoke.blockers });
-    checks.startup = smoke.checks.startup;
-    checks.runtime = smoke.checks.runtime;
-    if (!fullRuntime && options.frameworkSourceArchive && ip) {
-      const identityResult = guestRun(options, ip, "cat \"$HOME/.opl/one-person-lab/.opl-framework-installed-source-identity.json\"");
-      const installedIdentity = JSON.parse(identityResult.stdout);
-      const identityPassed = installedIdentity?.schema === "opl_framework_installed_source_identity.v1"
-        && installedIdentity.framework_sha === options.frameworkRef
-        && installedIdentity.install_mode === "archive";
-      checks.framework = {
-        ...checks.framework,
-        status: identityPassed ? "passed" : "partial",
-        installedIdentity
-      };
-      invariant(identityPassed, "Studio Standard Framework bootstrap did not install the exact injected Framework archive");
     }
-    if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
-      checks.framework.status = 'passed';
-    }
-    if (fullRuntime && ip && smoke.status === "passed") {
-      const guestDriver = `/tmp/opl-framework-temporal-driver-${process.pid}.mjs`;
-      const localDriver = path.join(runRoot, "temporal-driver.mjs");
-      const runtime = `${guestApp}/Contents/Resources/opl-studio-full-runtime/runtime/current`;
-      await writeFile(localDriver, `${collectTemporalServiceSupervisorProof.toString()}\nprocess.stdout.write(JSON.stringify(await collectTemporalServiceSupervisorProof({runtime:${JSON.stringify(runtime)}})));\n`);
-      scpToGuest(options, ip, localDriver, guestDriver);
-      progress({ phase: "full-temporal-lifecycle", status: "started" });
-      const result = guestRun(options, ip, `${shellQuote(runtime + "/node/bin/node")} ${shellQuote(guestDriver)}`);
-      checks.temporal_service_supervisor_proof = JSON.parse(result.stdout);
-      invariant(checks.temporal_service_supervisor_proof.status === "passed", "Full Temporal lifecycle did not pass");
-      progress({ phase: "full-temporal-lifecycle", status: "passed" });
-    }
-    checks.gateway = smoke.checks.gateway;
-    checks.update = {
-      status: await evaluatePage({ port: options.cdpPort, expression: "window.oplStudio.readNativeAppUpdateStatus()", timeoutMs: options.timeoutMs }),
-      publicFeedChecked: false,
-      reason: "clean_vm_harness_does_not_mutate_or_require_public_release"
-    };
   } catch (error) {
     progress({ phase: "clean-vm", status: "failed", error: redactSecrets(error instanceof Error ? error.message : String(error), [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password].filter(Boolean)) });
     const secretValues = [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password, smokeInputs?.turnRequest?.prompt].filter(Boolean);
     checks.failure = { detail: redactSecrets(error instanceof Error ? error.message : String(error), secretValues) };
     if (ip) checks.guestLog = redactSecrets(guestRun(options, ip, `tail -120 ${guestLog}`, { allowFailure: true }).stdout, secretValues);
   } finally {
-    if (ip && (checks.failure || checks.smoke?.status !== "passed")) {
+    if (ip && (checks.failure || (!offline && checks.smoke?.status !== "passed"))) {
       const secretValues = [smokeInputs?.credentials?.email, smokeInputs?.credentials?.password, smokeInputs?.turnRequest?.prompt].filter(Boolean);
       try {
         checks.guestLog = redactSecrets(guestRun(options, ip, `tail -120 ${shellQuote(guestLog)}`, { allowFailure: true }).stdout, secretValues);
@@ -763,7 +791,6 @@ export async function qualifyCleanVm(options) {
         checks.officialProfileDiagnosticsUnavailable = true;
       }
     }
-    if (networkIsolated && ip) guestRun(options, ip, buildGuestNetworkCommand(false), { allowFailure: true });
     if (tunnel && tunnel.exitCode === null) tunnel.kill("SIGTERM");
     if (!options.keepVm && tartProcess && tartProcess.exitCode === null) tartProcess.kill("SIGTERM");
     if (!options.attach && !options.keepVm) run("tart", ["stop", options.vmName], { allowFailure: true });
@@ -771,8 +798,9 @@ export async function qualifyCleanVm(options) {
     await rm(runRoot, { recursive: true, force: true });
   }
   const frameworkPassed = !options.frameworkSourceArchive || checks.framework?.status === "passed";
-  const status = checks.failure ? "partial" : checks.smoke?.status === "passed" && frameworkPassed ? "passed" : "partial";
-  const receipt = {
+  const guestPassed = offline ? checks.codex.offlineRelaunch?.status === "passed" : checks.smoke?.status === "passed" && frameworkPassed;
+  const status = !checks.failure && guestPassed ? "passed" : "partial";
+  return {
     schema: "opl_studio_macos_clean_vm_qualification.v1",
     status,
     candidate: "opl-studio",
@@ -790,9 +818,6 @@ export async function qualifyCleanVm(options) {
       "App_owner_clean_VM_release_admission_is_separate_from_Studio_candidate_qualification"
     ]
   };
-  await mkdir(path.dirname(options.outPath), { recursive: true });
-  await writeFile(options.outPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  return receipt;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
