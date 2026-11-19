@@ -2,14 +2,19 @@ name: DSH Plugin Composition Test
 
 # Verifies that the latest compatible versions of all OPL DSH Host plugins
 # work together against the pinned DSH cohort.
-# On pass, produces a composition_receipt.json artifact that the App stable
-# release can consume on the shell-unchanged path.
+# On pass, produces a composition_receipt.json artifact and an exact
+# dsh-plugin-composition-build-input archive that the App Stable release
+# consumes on the frozen composition path.
 #
 # Design: docs/delivery/dsh-plugin-publication.md (in one-person-lab-app)
 
 on:
   workflow_dispatch:
     inputs:
+      app_ref:
+        description: Exact App product commit to qualify (defaults to main).
+        default: main
+        type: string
       plugin_versions:
         description: >
           Optional JSON object overriding resolved versions for specific plugins,
@@ -37,7 +42,7 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.OPL_DSH_COMPOSITION_RUNNER_LABELS || '["ubuntu-24.04"]') }}
     timeout-minutes: 20
     env:
       OPL_APP_REPO_ROOT: ${{ github.workspace }}/app-product
@@ -51,7 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gaofeng21cn/one-person-lab-app
-          ref: main
+          ref: ${{ inputs.app_ref || 'main' }}
           path: app-product
           persist-credentials: false
 
@@ -167,7 +172,6 @@ jobs:
           node scripts/apply-composition-receipt.mjs --receipt composition_receipt.json
           npm install --package-lock-only --ignore-scripts
           npm ci
-          node --input-type=module -e 'import { buildDshPlugins } from "./scripts/build-dsh-plugins.mjs"; buildDshPlugins(["opl-superagent-engine"]);'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPL_DSH_REGISTRY_PLUGINS: "1"
@@ -184,10 +188,23 @@ jobs:
         run: OPL_PLUGIN_COMPOSITION_MODE=registry node --test scripts/dsh-plugin-packages.test.mjs scripts/dsh-child-profile-packages.test.mjs
         timeout-minutes: 5
 
+      - name: Capture the tested registry tarballs and npm lock
+        run: node scripts/composition-build-input.mjs capture --directory composition-build-input --receipt composition_receipt.json
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload composition receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dsh-plugin-composition-receipt
           path: composition_receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload exact composition build input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dsh-plugin-composition-build-input
+          path: composition-build-input/
           if-no-files-found: error
           retention-days: 90

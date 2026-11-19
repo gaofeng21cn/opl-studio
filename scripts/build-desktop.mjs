@@ -5,6 +5,7 @@ import { rendererCacheKey, verifyRendererCache, sealRendererCache } from './desk
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "dist", "desktop");
+if (process.argv.includes("--registry-plugins")) process.env.OPL_DSH_REGISTRY_PLUGINS = "1";
 let key = null;
 try { key = rendererCacheKey({ studioRoot: root }); }
 catch { console.warn('Renderer cache identity unavailable; compiling from source.'); }

@@ -28,7 +28,7 @@ export function buildRenderer({
 } = {}) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
-  const registryPlugins = process.argv.includes("--registry-plugins");
+  const registryPlugins = process.env.OPL_DSH_REGISTRY_PLUGINS === "1";
   if (registryPlugins) {
     // Published Host and client plugins (including opl-studio-client) are
     // already installed at the receipt-selected versions. Only the private

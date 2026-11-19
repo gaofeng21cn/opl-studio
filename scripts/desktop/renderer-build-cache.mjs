@@ -38,7 +38,8 @@ export function rendererCacheKey({ studioRoot, appRoot = resolveAppRepoRoot(stud
     return [name, hash(fs.readFileSync(file))];
   });
   const contracts = inventory(path.join(appRoot, 'contracts'));
-  const environment = Object.entries(process.env).filter(([name]) => name === 'NODE_ENV' || name.startsWith('VITE_')).sort();
+  const environment = Object.entries(process.env)
+    .filter(([name]) => name === 'NODE_ENV' || name === 'OPL_DSH_REGISTRY_PLUGINS' || name.startsWith('VITE_')).sort();
   return `full-shell-vite-output-v1-${platform}-${arch}-${hash(JSON.stringify({ inputs, contracts, nodeVersion, environment }))}`;
 }
 

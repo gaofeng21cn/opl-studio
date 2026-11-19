@@ -48,7 +48,7 @@ function verifyEntry(packageRoot, value, name, field) {
   }
 }
 
-export function verifyCompositionInstallation({ root, receipt }) {
+export function compositionLockEntries({ lock, receipt }) {
   if (receipt?.schema !== "opl_dsh_plugin_composition_receipt.v1") {
     throw new Error("Unexpected composition receipt schema");
   }
@@ -63,26 +63,14 @@ export function verifyCompositionInstallation({ root, receipt }) {
   if (!["http:", "https:"].includes(registry.protocol)) {
     throw new Error("Composition receipt registry must be an HTTP(S) URL");
   }
-  const realRoot = fs.realpathSync(root);
-  const lock = readJson(path.join(realRoot, "package-lock.json"));
   if (!lock.packages?.[""]) {
     throw new Error("Composition installation requires a package-lock v2/v3 packages map");
   }
 
-  for (const [name, version] of Object.entries(receipt.plugins)) {
+  return Object.entries(receipt.plugins).map(([name, version]) => {
     if (!packageName.test(name)) fail("Composition receipt", "invalid package name");
     if (typeof version !== "string" || !exactVersion.test(version)) {
       fail(name, "receipt version must be exact");
-    }
-    const packageRoot = path.join(realRoot, "node_modules", name);
-    const installed = fs.lstatSync(packageRoot, { throwIfNoEntry: false });
-    if (!installed?.isDirectory() || installed.isSymbolicLink()
-      || fs.realpathSync(packageRoot) !== packageRoot) {
-      fail(name, "installed package must be a registry directory, not a local link");
-    }
-    const manifest = readJson(path.join(packageRoot, "package.json"));
-    if (manifest.name !== name || manifest.version !== version) {
-      fail(name, "installed package name/version differs from the receipt");
     }
     if (lock.packages[""].dependencies?.[name] !== version) {
       fail(name, "root lock dependency differs from the exact receipt version");
@@ -101,6 +89,24 @@ export function verifyCompositionInstallation({ root, receipt }) {
       fail(name, "installed lock tarball does not come from the receipt registry");
     }
     if (!hasIntegrity(entry.integrity)) fail(name, "installed lock integrity is missing or invalid");
+    return { name, version, entry };
+  });
+}
+
+export function verifyCompositionInstallation({ root, receipt }) {
+  const realRoot = fs.realpathSync(root);
+  const lock = readJson(path.join(realRoot, "package-lock.json"));
+  for (const { name, version } of compositionLockEntries({ lock, receipt })) {
+    const packageRoot = path.join(realRoot, "node_modules", name);
+    const installed = fs.lstatSync(packageRoot, { throwIfNoEntry: false });
+    if (!installed?.isDirectory() || installed.isSymbolicLink()
+      || fs.realpathSync(packageRoot) !== packageRoot) {
+      fail(name, "installed package must be a registry directory, not a local link");
+    }
+    const manifest = readJson(path.join(packageRoot, "package.json"));
+    if (manifest.name !== name || manifest.version !== version) {
+      fail(name, "installed package name/version differs from the receipt");
+    }
     if (Object.hasOwn(manifest, "main")) verifyEntry(packageRoot, manifest.main, name, "main");
     if (manifest.dsh && Object.hasOwn(manifest.dsh, "client")) {
       const client = manifest.exports?.["./client"];

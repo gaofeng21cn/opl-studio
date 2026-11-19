@@ -208,7 +208,7 @@ export function prepareWslHostPayload({ root = repositoryRoot, shellRef, appRoot
   if (fs.existsSync(output)) throw new Error('Windows guest Host output already exists');
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-wsl-host-build-'));
   try {
-    buildDshPlugins();
+    buildDshPlugins(process.env.OPL_DSH_REGISTRY_PLUGINS === '1' ? ['opl-superagent-engine'] : undefined);
     const bootstrap = prepareBootstrapRuntime(staging, appRoot, frameworkRef);
     for (const relative of ['package.json', 'package-lock.json', 'plugins', 'src/host', 'desktop/windows-guest-host.mjs', 'desktop/windows-guest-rpc.mjs', 'desktop/guest-host-core.mjs', 'desktop/node-host-runtime.mjs', 'desktop/node-host-policy.json', 'desktop/windows-guest-stage.mjs', 'desktop/windows-runtime.mjs', 'desktop/windows-bootstrap.sh', 'desktop/windows-framework-install.mjs', 'desktop/windows-guest-inspect.mjs', 'desktop/official-profile.mjs']) {
       const destination = path.join(staging, relative);

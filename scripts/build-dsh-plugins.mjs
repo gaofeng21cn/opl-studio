@@ -69,5 +69,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // must leave the receipt-selected Host package bytes untouched.
   const registry = process.env.OPL_DSH_REGISTRY_PLUGINS === "1";
   console.log(JSON.stringify({ status: registry ? "registry_plugins_preserved" : "built",
-    packages: registry ? [] : buildDshPlugins() }));
+    packages: buildDshPlugins(registry ? ["opl-superagent-engine"] : undefined) }));
 }
