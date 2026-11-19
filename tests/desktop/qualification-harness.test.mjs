@@ -12,6 +12,7 @@ import {
   buildGuestDmgAdmissionCommand,
   buildGuestLaunchCommand,
   buildGuestProcessStopCommand,
+  buildFullOfflineReadinessExpression,
   prepareRunnerTrustBundle,
   parseArgs as parseCleanVmArgs
 } from "../../scripts/desktop/qualify-clean-vm.mjs";
@@ -108,6 +109,30 @@ test("Full offline launch isolates VM networking and preserves the Electron sand
   assert.match(launch, /OPL_STUDIO_MANAGED_UPDATES=0/);
   assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
+});
+
+test("Full offline App Server handshake waits for Studio mount and rejects simulated thread results", async () => {
+  const evaluate = new Function("window", "document", "setTimeout", `return ${buildFullOfflineReadinessExpression(500)}`);
+  const root = { mounted: false };
+  const document = { querySelector: () => root.mounted ? {} : null };
+  let calls = 0;
+  const window = { oplStudio: { async listThreads() { calls += 1; return { data: [], simulated: false }; } } };
+  setTimeout(() => { root.mounted = true; }, 20);
+  assert.deepEqual(await evaluate(window, document, setTimeout), {
+    appVisible: true, bridgeReady: true, threadListValid: true, simulated: false
+  });
+  assert.equal(calls, 1);
+
+  root.mounted = true;
+  window.oplStudio.listThreads = async () => ({ data: [], simulated: true });
+  const simulated = await evaluate(window, document, setTimeout);
+  assert.equal(simulated.simulated, true);
+
+  root.mounted = false;
+  const unavailable = await evaluate(window, document, setTimeout);
+  assert.equal(unavailable.appVisible, false);
+  assert.equal(unavailable.threadListValid, false);
+  assert.throws(() => buildFullOfflineReadinessExpression(0), /must be positive/);
 });
 
 test("clean VM force-stops a stubborn relaunch process before continuing online qualification", () => {

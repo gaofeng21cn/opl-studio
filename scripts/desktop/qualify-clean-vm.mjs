@@ -25,6 +25,21 @@ const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 
 export const FULL_OFFLINE_NETWORK_POLICY = 'VM IPv4 and IPv6 public routes rejected; host SSH, loopback, and Electron sandbox preserved';
 
+export function buildFullOfflineReadinessExpression(timeoutMs = 90_000) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error("Full readiness timeout must be positive");
+  return `(async () => {
+    const deadline = Date.now() + ${timeoutMs};
+    const isMounted = () => Boolean(document.querySelector('[data-testid=opl-studio-root]'));
+    while (!isMounted() && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    const appVisible = isMounted();
+    const bridgeReady = typeof window.oplStudio?.listThreads === 'function';
+    const threads = appVisible && bridgeReady ? await window.oplStudio.listThreads({ limit: 1 }) : null;
+    return { appVisible, bridgeReady, threadListValid: Array.isArray(threads?.data), simulated: threads?.simulated === true };
+  })()`;
+}
+
 export function buildGuestNetworkCommand(isolate) {
   const verb = isolate ? 'add' : 'delete';
   const routes = [['-inet', '0.0.0.0/1', '127.0.0.1'], ['-inet', '128.0.0.0/1', '127.0.0.1'],
@@ -620,8 +635,9 @@ export async function qualifyCleanVm(options) {
         progress({ phase: "full-offline-first-launch", status: "started" });
         await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
         const protocol = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
-          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {appVisible:!!document.querySelector('[data-testid=opl-studio-root]'),threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
-        invariant(protocol?.appVisible === true && protocol.threadListValid === true && protocol.simulated === false, "Full offline App Server handshake failed");
+          expression: buildFullOfflineReadinessExpression() });
+        invariant(protocol?.appVisible === true && protocol.threadListValid === true && protocol.simulated === false,
+          `Full offline App Server handshake failed: ${JSON.stringify(protocol)}`);
         const version = guestRun(options, ip, '"$HOME/Library/Application Support/OPL/runtime/current/bin/codex" --version').stdout.trim();
         invariant(!options.codexVersion || version === `codex-cli ${options.codexVersion}`, "Full offline Codex differs from its resolved release identity");
         checks.codex = { status: "passed", expectedVersion: options.codexVersion, verifiedVersion: version,
@@ -635,8 +651,9 @@ export async function qualifyCleanVm(options) {
         invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, 'Guest offline relaunch did not return its process ID');
         await waitForPageReady({ port: options.cdpPort, timeoutMs: 120_000 });
         const offlineRelaunch = await evaluatePageStable({ port: options.cdpPort, timeoutMs: 120_000,
-          expression: "(async()=>{const threads=await window.oplStudio.listThreads({limit:1});return {appVisible:!!document.querySelector('[data-testid=opl-studio-root]'),threadListValid:Array.isArray(threads?.data),simulated:threads?.simulated===true};})()" });
-        invariant(offlineRelaunch?.appVisible === true && offlineRelaunch.threadListValid === true && offlineRelaunch.simulated === false, 'Full offline relaunch failed');
+          expression: buildFullOfflineReadinessExpression() });
+        invariant(offlineRelaunch?.appVisible === true && offlineRelaunch.threadListValid === true && offlineRelaunch.simulated === false,
+          `Full offline relaunch failed: ${JSON.stringify(offlineRelaunch)}`);
         checks.codex.offlineRelaunch = { status: 'passed', automaticUpdatesEnabled: true,
           networkPolicy: FULL_OFFLINE_NETWORK_POLICY, gatewayConfigured: false, appVisible: true,
           protocolCalls: ['thread/list'], generationRequested: false };
