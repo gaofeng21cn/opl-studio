@@ -36,14 +36,20 @@ test("continuous turn activity extends the inactivity window until completion", 
   // Given a started turn with an explicit inactivity window.
   const transport = createTransport(t);
   await startTurn(transport, "turn-stream");
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   const waiting = transport.waitForTurn("turn-stream", 90);
 
   // When deltas keep arriving inside that window but completion exceeds its original deadline.
-  transport.notify("fixture/emit", { steps: [
-    { delay: 50, frame: delta("turn-stream", "research ") },
-    { delay: 100, frame: delta("turn-stream", "continues") },
-    { delay: 150, frame: completed("turn-stream") }
-  ] });
+  for (const frame of [
+    delta("turn-stream", "research "),
+    delta("turn-stream", "continues"),
+    completed("turn-stream")
+  ]) {
+    t.mock.timers.tick(50);
+    const delivered = once(transport, "event");
+    transport.notify("fixture/emit", { steps: [{ frame }] });
+    assert.deepEqual((await delivered)[0], frame);
+  }
 
   // Then the complete streamed result resolves and the turn becomes idle.
   const result = await waiting;
