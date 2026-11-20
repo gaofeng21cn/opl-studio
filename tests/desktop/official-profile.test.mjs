@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { captureOfficialProfileAdmission, readOfficialProfileResources, buildOfficialProfileCommand, startOfficialProfileFirstInstall } from "../../desktop/official-profile.mjs";
+import { captureOfficialProfileAdmission, readOfficialProfileResources, buildOfficialProfileCommand, startOfficialProfileFirstInstall } from "../../packages/host-kit/official-profile.mjs";
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-official-profile-"));

@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const directory = path.join(root, "src/host/vendor/dsh-remote");
+const directory = path.join(root, "vendor/dsh-remote");
 const manifestFile = path.join(directory, "provenance.json");
 const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
 const sha = bytes => crypto.createHash("sha256").update(bytes).digest("hex");

@@ -4,7 +4,7 @@ import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { once } from "node:events";
-import { CodexAppServerTransport } from "./app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost as createHost } from "./http-host.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;

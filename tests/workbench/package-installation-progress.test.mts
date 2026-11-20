@@ -1,11 +1,11 @@
-import { FirstInstallProgress } from '../../src/workbench/FirstInstallProgress';
+import { FirstInstallProgress } from '../../plugins/opl-studio-client/src/client/workbench/FirstInstallProgress';
 import { expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PackageOperations, PackageDownloadPreview, PackageActivityButton } from '../../src/workbench/PackageInstallationProgress';
-import { packageActivity, packageRemainingTime, packageOperationRequest, preparePackageOperationRequest, readPackageOperation } from '../../src/workbench/packageOperations';
-import { SoftwareCenterOverview } from '../../src/workbench/SoftwareCenterOverview';
-import { actionReceiptView } from '../../src/workbench/actionReceiptView';
+import { PackageOperations, PackageDownloadPreview, PackageActivityButton } from '../../plugins/opl-studio-client/src/client/workbench/PackageInstallationProgress';
+import { packageActivity, packageRemainingTime, packageOperationRequest, preparePackageOperationRequest, readPackageOperation } from '../../plugins/opl-studio-client/src/client/workbench/packageOperations';
+import { SoftwareCenterOverview } from '../../plugins/opl-studio-client/src/client/workbench/SoftwareCenterOverview';
+import { actionReceiptView } from '../../plugins/opl-studio-client/src/client/workbench/actionReceiptView';
 
 const operation = { operation_id: 'fixture', package_id: 'mac-media-assets', action_id: 'agent_package_install', status: 'running', stage: 'downloading', can_cancel: true, downloaded_bytes: 250, total_bytes: 1000, bytes_per_second: 50, eta_seconds: 15 };
 const render = (fields = {}) => renderToStaticMarkup(createElement(PackageOperations, { operations: [{ ...operation, ...fields }], locale: 'zh', labels: { 'mac-media-assets': 'MAC Media Assets' }, readError: false, cancelling: null, onCancel() {}, onRetry() {}, onRefresh() {} }));

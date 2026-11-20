@@ -95,7 +95,7 @@ async function validatePayload(root) {
     "package.json",
     "package-lock.json",
     "plugins",
-    path.join("desktop", "official-profile.mjs"),
+    path.join("packages/host-kit", "official-profile.mjs"),
     path.join("desktop", "node-host-runtime.mjs"),
     path.join("desktop", "node-host-policy.json"),
     path.join("src", "host", "packaged-host-smoke.mjs"),
@@ -129,7 +129,7 @@ export async function installHeadlessPayload({ sourceRoot, installRoot }) {
   const recordStaging = `${recordPath}.staging-${process.pid}`;
   await mkdir(staging, { recursive: true });
   try {
-    for (const relative of ["package.json", "package-lock.json", "plugins", "desktop/official-profile.mjs", "desktop/node-host-runtime.mjs", "desktop/node-host-policy.json"]) {
+    for (const relative of ["package.json", "package-lock.json", "plugins", "packages", "desktop/node-host-runtime.mjs", "desktop/node-host-policy.json"]) {
       const destination = path.join(staging, relative);
       await mkdir(path.dirname(destination), { recursive: true });
       await cp(path.join(source, relative), destination, { recursive: true, dereference: true, filter: payloadFilter(source) });

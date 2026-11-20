@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CodexAppServerTransport } from "./app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 
 const HOST_CWD = "/srv/opl/host";
 const THREAD_CWD = "/srv/opl/workspaces/alpha";

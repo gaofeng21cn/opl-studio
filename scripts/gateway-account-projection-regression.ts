@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { deriveWorkbenchModelFromState } from "../src/workbench/workbenchModel";
+import { deriveWorkbenchModelFromState } from "../plugins/opl-studio-client/src/client/workbench/workbenchModel";
 
 function stateWithGateway(overrides: Record<string, unknown> = {}) {
   return {

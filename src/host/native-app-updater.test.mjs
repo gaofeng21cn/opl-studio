@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   createNativeAppUpdater,
   createNativeAppUpdaterFromEnvironment
-} from "./native-app-updater.mjs";
+} from "../../plugins/opl-host-core/src/native-app-updater.mjs";
 
 const commandSet = (executable) => ({
   status: { executable, args: ["status", "--json"] },

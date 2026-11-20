@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { McpAppHost } from '../plugins/opl-mcp-apps/src/service.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { MCP_APP_MIME } from '../src/host/mcp-app-protocol.mjs';
+import { MCP_APP_MIME } from '../packages/host-contracts/mcp-app-protocol.mjs';
 import { frameworkFixture } from './fixtures/mcp-app-framework.mjs';
 
 // Real Studio host service, React workspace, opaque iframe and official SDK;
@@ -117,7 +117,7 @@ const rendererBundle = await bundle('renderer', `import React from ${JSON.string
 import {createRoot} from ${JSON.stringify(path.join(root, 'node_modules/react-dom/client.js'))};
 import {McpAppWorkspace} from ${JSON.stringify(path.join(root, 'plugins/opl-mcp-apps/src/client/McpAppWorkspace.tsx'))};
 import {McpAppsClientContext} from ${JSON.stringify(path.join(root, 'plugins/opl-mcp-apps/src/client/plugin.tsx'))};
-import {installWorkspaceClientPlugin} from ${JSON.stringify(path.join(root, 'src/composition/workspaceClientPlugin.tsx'))};
+import {installWorkspaceClientPlugin} from ${JSON.stringify(path.join(root, 'plugins/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx'))};
 const rpc=async(method,payload)=>{const response=await fetch('/api/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});const value=await response.json();if(!response.ok)throw new Error(value.error);return value};
 const launch=await fetch('/launch').then(response=>response.json());
 const config=await fetch('/config').then(response=>response.json());
@@ -125,8 +125,8 @@ const bridge={listMcpApps:args=>rpc('list',args),openMcpApp:args=>rpc('open',arg
 const surface={locale:'en',workspacePath:'/synthetic',currentThreadId:config.threadId,uiContributions:{entries:[]},contributionOwner:{},openPrimaryView:()=>{},mcpApps:{bridge,launch:launch??undefined,onManage:()=>{document.body.dataset.managed='true'},onContext:()=>{},onMessage:()=>{}}};
 let Page; installWorkspaceClientPlugin({register:(slot,component)=>{if(slot.name==='main')Page=component;return ()=>{}}},()=>surface);
 createRoot(document.querySelector('#root')).render(<McpAppsClientContext.Provider value={{Workspace:McpAppWorkspace}}><Page/></McpAppsClientContext.Provider>);`);
-const officialTheme = await Promise.all(['base.css', 'design-platform.css', 'gradient-shadow-text.css', 'focus.css'].map(name => readFile(path.join(root, 'src/vendor/deepseek-harness/packages/client/ui-theme/src/styles', name), 'utf8')));
-const workspaceCss = officialTheme.join('\n') + '\n' + await readFile(path.join(temporaryRoot, 'renderer-bundle/renderer.css'), 'utf8') + '\n' + await readFile(path.join(root, 'src/composition/workspace.css'), 'utf8');
+const officialTheme = await Promise.all(['base.css', 'design-platform.css', 'gradient-shadow-text.css', 'focus.css'].map(name => readFile(path.join(root, 'vendor/deepseek-harness/packages/client/ui-theme/src/styles', name), 'utf8')));
+const workspaceCss = officialTheme.join('\n') + '\n' + await readFile(path.join(temporaryRoot, 'renderer-bundle/renderer.css'), 'utf8') + '\n' + await readFile(path.join(root, 'plugins/opl-studio-client/src/client/composition/workspace.css'), 'utf8');
 const pageHtml = '<!doctype html><html data-opl-host="desktop"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Studio MCP App acceptance</title><link rel="stylesheet" href="/workspace.css"><style>body{margin:0;font:var(--dsw-font-s-14)}#root{height:100dvh}</style></head><body><div id="root"></div><script type="module" src="/renderer.js"></script></body></html>';
 const server = http.createServer(async (request, response) => {
   const send = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };

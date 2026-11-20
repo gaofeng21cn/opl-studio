@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { McpAppSession } from "@gaofeng21cn/opl-host-contracts";
-import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
-import { McpAppFrame, type McpAppProps } from "./McpAppWorkspace";
+import { Button } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
+import { McpAppFrame } from "./McpAppWorkspace";
+import type { McpAppProps } from "@gaofeng21cn/opl-host-contracts";
 
 export type TaskWorkbenchProps = McpAppProps & { itemId: string; viewId?: string };
 export function McpTaskWorkbench(props: TaskWorkbenchProps) {

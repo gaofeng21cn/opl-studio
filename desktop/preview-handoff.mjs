@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import semver from 'semver';
 import { normalizeStorageSnapshot, HANDOFF_STORAGE_KEYS, mergeShellStorage } from './shell-state.mjs';
-import { validatedChannelBindings } from '../src/host/channel-bindings.mjs';
+import { validatedChannelBindings } from '../packages/host-kit/channel-bindings.mjs';
 export { normalizeStorageSnapshot, HANDOFF_STORAGE_KEYS, mergeShellStorage };
 export const PREVIEW_HANDOFF_SCHEMA = 'opl_studio_preview_handoff.v1';
 export const PREVIEW_BUNDLE_ID = 'cn.onepersonlab.opl.studio.preview';

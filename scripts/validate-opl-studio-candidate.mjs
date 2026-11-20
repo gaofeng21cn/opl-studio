@@ -30,48 +30,48 @@ const requiredFiles = [
   "contracts/opl-studio-profile.json",
   "THIRD_PARTY_NOTICES.md",
   "package.json",
-  "src/bridge/oplBridge.ts",
-  "src/bridge/oplBridge-normalizers-action.ts",
+  "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
+  "plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts",
   "src/bridge/webTransport.ts",
   "src/main.tsx",
-  "src/composition/clientCordis.ts",
-  "src/composition/contributionProjection.ts",
-  "src/composition/contributionComponents.tsx",
-  "src/composition/deepseekHarnessSourceManifest.json",
-  "src/composition/dshSlotHost.tsx",
-  "src/composition/dshSlotHost-parts/studioContext.tsx",
-  "src/composition/dshSlotHost-parts/navigationSlots.tsx",
-  "src/composition/dshSlotHost-parts/composerSlots.tsx",
-  "src/composition/dshSlotHost-parts/shellSettingsSlots.tsx",
-  "src/composition/dshSlotHost-parts/firstRunOnboarding.tsx",
-  "src/integrations/deepseek-harness/oplAdapter.css",
-  "src/integrations/deepseek-harness/runtimeShim.ts",
-  "src/vendor/deepseek-harness/LICENSE",
-  "src/vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-model-selection/src/client/ModelSelect.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.tsx",
-  "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
-  "src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts",
-  "src/vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx",
-  "src/types/use-sync-external-store.d.ts",
+  "plugins/opl-studio-client/src/client/composition/clientCordis.ts",
+  "plugins/opl-studio-client/src/client/composition/contributionProjection.ts",
+  "plugins/opl-studio-client/src/client/composition/contributionComponents.tsx",
+  "packages/dsh-adapters/deepseekHarnessSourceManifest.json",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/composerSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/firstRunOnboarding.tsx",
+  "plugins/opl-studio-client/src/client/integrations/deepseek-harness/oplAdapter.css",
+  "plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts",
+  "vendor/deepseek-harness/LICENSE",
+  "vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx",
+  "vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
+  "vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx",
+  "vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx",
+  "vendor/deepseek-harness/packages/client/ui-model-selection/src/client/ModelSelect.tsx",
+  "vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx",
+  "vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx",
+  "vendor/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.tsx",
+  "vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
+  "vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts",
+  "vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx",
+  "plugins/opl-studio-client/src/client/types/use-sync-external-store.d.ts",
   "src/renderer-shell.html",
-  "src/workbench/App.tsx",
-  "src/workbench/ProjectProgressPanel.tsx",
-  "src/workbench/WorkspaceFilesPanel.tsx",
-  "src/workbench/codexWorkbenchStyles.ts",
-  "src/workbench/modelPolicy.ts",
-  "src/workbench/projectProgress.ts",
-  "src/workbench/workbenchModel.ts",
-  "src/workbench/settingsModel.ts",
-  "src/workbench/gatewayAccountCache.ts",
-  "src/threads/types.ts",
-  "src/workbench/threads/ThreadDetailPopover.tsx",
-  "src/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
+  "plugins/opl-studio-client/src/client/workbench/App.tsx",
+  "plugins/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx",
+  "plugins/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx",
+  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts",
+  "plugins/opl-studio-client/src/client/workbench/modelPolicy.ts",
+  "plugins/opl-studio-client/src/client/workbench/projectProgress.ts",
+  "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
+  "plugins/opl-studio-client/src/client/workbench/settingsModel.ts",
+  "plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts",
+  "plugins/opl-studio-client/src/client/threads/types.ts",
+  "plugins/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx",
+  "plugins/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
   "src/candidateContractEvidence.json",
   "scripts/build-renderer.mjs",
   "scripts/validate-client-conformance.mjs",
@@ -93,9 +93,9 @@ const requiredFiles = [
   "desktop/main.mjs",
   "desktop/preload.cjs",
   "desktop/updater.mjs",
-  "src/host/app-server-protocol.mjs",
-  "src/host/app-server-transport.mjs",
-  "src/host/app-server-turn-lifecycle.mjs",
+  "packages/host-kit/app-server-protocol.mjs",
+  "plugins/opl-codex-native/src/app-server-transport.mjs",
+  "plugins/opl-codex-native/src/app-server-turn-lifecycle.mjs",
   "src/host/dsh/cordis.yml",
   "src/host/dsh/host.mjs",
   "src/host/dsh/web.patch.yml",
@@ -109,9 +109,9 @@ const requiredFiles = [
   "plugins/opl-host-core/src/service.mjs",
   "src/host/host-core.test.mjs",
   "src/host/http-host.mjs",
-  "src/host/thread-adapter.mjs",
+  "plugins/opl-codex-native/src/thread-adapter.mjs",
   "src/host/thread-adapter.test.mjs",
-  "src/host/thread-workspace-service.mjs",
+  "plugins/opl-host-core/src/thread-workspace-service.mjs",
   "src/host/thread-workspace-service.test.mjs",
   "tests/workbench/project-progress.test.mts",
   "tests/renderer/thread-renderer-source.test.mjs"
@@ -164,8 +164,8 @@ const retiredPrivateThreadFiles = [
   "src/coordination/foundation.ts",
   "src/coordination/index.ts",
   "src/coordination/types.ts",
-  "src/workbench/coordination/CoordinationDialog.tsx",
-  "src/workbench/coordination/CoordinationEvents.tsx",
+  "plugins/opl-studio-client/src/client/workbench/coordination/CoordinationDialog.tsx",
+  "plugins/opl-studio-client/src/client/workbench/coordination/CoordinationEvents.tsx",
   "src/host/coordination-host.mjs",
   "src/host/coordination-ledger.mjs",
   "scripts/smoke-coordination-dynamic-tools-live.mjs",
@@ -182,7 +182,7 @@ for (const file of retiredPrivateThreadFiles) {
 const pkg = JSON.parse(read("package.json"));
 const studioProfile = readJson("contracts/opl-studio-profile.json");
 const dshBinding = readDshBinding();
-const dshManifest = readJson("src/composition/deepseekHarnessSourceManifest.json");
+const dshManifest = readJson("packages/dsh-adapters/deepseekHarnessSourceManifest.json");
 const expectedDshRef = dshBinding.ref;
 const expectedDshVersion = dshBinding.version;
 const expectedDshModules = [...dshBinding.packageCohort, "use-sync-external-store@1.7.0"];
@@ -296,7 +296,7 @@ assert(
   "candidate package must use the selected Electron carrier without AionUI, AionCore, or Tauri dependencies"
 );
 
-const app = [read("src/workbench/App.tsx"), read("src/workbench/composerAttachments.ts")].join("\n");
+const app = [read("plugins/opl-studio-client/src/client/workbench/App.tsx"), read("plugins/opl-studio-client/src/client/workbench/composerAttachments.ts")].join("\n");
 const rendererSource = readRendererSource();
 const evidence = readJson("src/candidateContractEvidence.json");
 assert(
@@ -372,7 +372,7 @@ function assertSourceMarkerRequirements(evidence) {
   for (const group of Object.keys(requirements)) {
     assert(Array.isArray(requirements[group]) && requirements[group].length > 0, `missing marker group ${group}`);
     for (const requirement of requirements[group]) {
-      const source = requirement.file === "src/composition/dshSlotHost.tsx"
+      const source = requirement.file === "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx"
         ? readSlotHostSource()
         : read(requirement.file);
       for (const marker of requirement.contains) {
@@ -387,15 +387,15 @@ function assertPrivateThreadLayerRemoved(evidence) {
     "desktop/main.mjs",
     "desktop/preload.cjs",
     "plugins/opl-host-core/src/service.mjs",
-    "src/host/app-server-transport.mjs",
+    "plugins/opl-codex-native/src/app-server-transport.mjs",
     "src/host/http-host.mjs",
-    "src/host/thread-adapter.mjs",
-    "src/bridge/oplBridge.ts",
+    "plugins/opl-codex-native/src/thread-adapter.mjs",
+    "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
     "src/bridge/webTransport.ts",
     "src/main.tsx",
-    "src/workbench/App.tsx",
-    "src/workbench/workbenchModel.ts",
-    "src/workbench/codexWorkbenchStyles.ts"
+    "plugins/opl-studio-client/src/client/workbench/App.tsx",
+    "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
+    "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts"
   ].map(read).join("\n");
   for (const marker of [
     "prepareCoordination",
@@ -440,17 +440,17 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const visualStyle = evidence.default_home_layout?.visual_style_reference;
   const slotHost = readSlotHostSource();
   const rendererShell = read("src/renderer-shell.html");
-  const appSource = read("src/workbench/App.tsx");
+  const appSource = read("plugins/opl-studio-client/src/client/workbench/App.tsx");
   const mainSource = read("src/main.tsx");
-  const themeSource = read("src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css");
-  const sourceManifest = readJson("src/composition/deepseekHarnessSourceManifest.json");
+  const themeSource = read("vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css");
+  const sourceManifest = readJson("packages/dsh-adapters/deepseekHarnessSourceManifest.json");
   const packageJson = readJson("package.json");
   const tsconfig = readJson("tsconfig.json");
   const typecheckConfig = readJson("tsconfig.typecheck.json");
-  const primitiveIndex = read("src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
-  const composerPalette = read("src/workbench/ComposerCapabilityPalette.tsx");
-  const contributionComponents = read("src/composition/contributionComponents.tsx");
-  const runtimeShim = read("src/integrations/deepseek-harness/runtimeShim.ts");
+  const primitiveIndex = read("vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
+  const composerPalette = read("plugins/opl-studio-client/src/client/workbench/ComposerCapabilityPalette.tsx");
+  const contributionComponents = read("plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
+  const runtimeShim = read("plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
   const rendererBuild = read("scripts/vite-build-renderer-entry.mjs");
   const notices = read("THIRD_PARTY_NOTICES.md");
   assert(alignment, "missing DeepSeek Harness GUI source-reuse evidence");
@@ -467,7 +467,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(evidence.webui_parity?.desktop_and_webui_default_home === "chat_first_default_collapsed", "desktop and WebUI must share the chat-first default-collapsed home");
   assert(visualStyle?.reference_version === alignment.reference_version, "visual tokens must bind to the same DeepSeek Harness source ref");
   assert(visualStyle?.scope === "pinned_gui_package_source_trees_with_opl_slot_adapters", "visual source scope must cover the manifest-owned pinned DSH GUI package trees");
-  assert(visualStyle?.token_source === "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css", "DeepSeek Harness token source must be exact");
+  assert(visualStyle?.token_source === "vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css", "DeepSeek Harness token source must be exact");
   for (const marker of ["--dsw-static-deepseek-450", "--dsw-alias-button-primary-fill", "--dsw-alias-tooltip-bg"]) {
     assert(themeSource.includes(marker), `missing vendored DeepSeek Harness design token ${marker}`);
   }
@@ -475,7 +475,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
     assert(slotHost.includes(marker), `missing DeepSeek Harness slot lifecycle marker ${marker}`);
   }
   assert(
-    slotHost.includes('import { createSlotRenderer } from "../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx"'),
+    slotHost.includes('import { createSlotRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx"'),
     "createSlotRenderer must come from the pinned pinned DSH source cohort"
   );
   for (const [component, moduleName] of [
@@ -532,7 +532,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(sourceManifest.application_host?.role === "deepseek_harness_cordis_application_host", "vendor manifest must bind the DSH Application Host role");
   assert(JSON.stringify(sourceManifest.application_host?.package_cohort) === JSON.stringify(expectedDshModules.slice(0, -1)), "vendor manifest must bind the DSH Host package cohort");
   assert(JSON.stringify(sourceManifest.application_host?.excluded_upstream_profiles) === JSON.stringify(["dsh-base"]), "vendor manifest must exclude dsh-base");
-  assert(sourceManifest.snapshot?.local_root === "src/vendor/deepseek-harness", "vendor manifest root must be canonical");
+  assert(sourceManifest.snapshot?.local_root === "vendor/deepseek-harness", "vendor manifest root must be canonical");
   assert(sourceManifest.snapshot?.byte_identical === false && sourceManifest.compatibility_patches?.length > 0, "vendor snapshot must disclose reviewed compatibility patches");
   assert(sourceManifest.snapshot?.provenance === "pinned_upstream_plus_reviewed_compatibility_patches", "vendor provenance must bind upstream and reviewed compatibility patches");
   assert(sourceManifest.snapshot?.file_count === sourceManifest.files?.length, "vendor manifest file inventory must be internally consistent");
@@ -550,7 +550,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   assert(packageJson.dependencies?.["use-sync-external-store"] === "1.7.0", "vendored renderer closure must declare use-sync-external-store directly");
   assert(packageJson.dependencies?.["@deepseek-ai/dsh-client-web-react"] === undefined, "obsolete dsh-client-web-react must stay removed");
   assert(packageJson.dependencies?.["@deepseek-ai/dsh-client-ui-renderer"] === undefined, "ui-renderer must be reused as pinned source, not installed as a package");
-  const primitiveAlias = ["./src/vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
+  const primitiveAlias = ["./vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts"];
   assert(JSON.stringify(tsconfig.compilerOptions?.paths?.["@deepseek-ai/dsh-client-ui-primitives"]) === JSON.stringify(primitiveAlias), "renderer imports must resolve the DSH primitives specifier to the vendored upstream index");
   assert(JSON.stringify(typecheckConfig.compilerOptions?.paths?.["@deepseek-ai/dsh-client-ui-primitives"]) === JSON.stringify(primitiveAlias), "typecheck imports must resolve the DSH primitives specifier to the vendored upstream index");
   assert(!fs.existsSync(path.join(root, "src/integrations/deepseek-harness/uiPrimitives.tsx")), "the handwritten DSH primitive shim must stay absent");
@@ -577,21 +577,21 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
 }
 
 function assertCodexModelControls(evidence, app, rendererSource) {
-  const settings = read("src/workbench/settingsModel.ts");
+  const settings = read("plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
   const settingsPanel = readSettingsSource();
   const slotHost = readSlotHostSource();
-  const policySource = read("src/workbench/modelPolicy.ts");
+  const policySource = read("plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
   const rendererBuilder = read("scripts/build-renderer.mjs");
   const appRepoResolver = read("scripts/resolve-app-repo-root.mjs");
   const bridge = [
-    read("src/bridge/oplBridge.ts"),
-    read("src/bridge/oplBridge-commands.ts"),
+    read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
+    read("plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts"),
     read("packages/host-contracts/src/codex-workspace.ts"),
     read("packages/host-contracts/src/platform-events.ts")
   ].join("\n");
-  const hostTransport = read("src/host/app-server-transport.mjs");
+  const hostTransport = read("plugins/opl-codex-native/src/app-server-transport.mjs");
   const codexNative = read("plugins/opl-codex-native/src/service.mjs");
-  const oplPassthrough = read("src/host/opl-passthrough.mjs");
+  const oplPassthrough = read("plugins/opl-framework-bridge/src/opl-passthrough.mjs");
   const appRepoRoot = resolveAppRepoRoot(root);
   const appProductProfilePath = path.join(appRepoRoot, "contracts", "app-product-profile.json");
   const appProductProfile = JSON.parse(fs.readFileSync(appProductProfilePath, "utf8"));
@@ -710,11 +710,11 @@ function assertCodexModelControls(evidence, app, rendererSource) {
 
 validateNonLiveDeliveryEvidence(evidence);
 assertFallbackBoundaryDowngrades({
-  "src/workbench/App.tsx": app,
-  "src/workbench/SettingsPanel.tsx": readSettingsSource(),
-  "src/bridge/oplBridge.ts": read("src/bridge/oplBridge.ts"),
-  "src/bridge/oplBridge-normalizers-action.ts": read("src/bridge/oplBridge-normalizers-action.ts"),
-  "src/workbench/workbenchModel.ts": read("src/workbench/workbenchModel.ts")
+  "plugins/opl-studio-client/src/client/workbench/App.tsx": app,
+  "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx": readSettingsSource(),
+  "plugins/opl-studio-client/src/client/bridge/oplBridge.ts": read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
+  "plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts": read("plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts"),
+  "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts": read("plugins/opl-studio-client/src/client/workbench/workbenchModel.ts")
 });
 assertFunctionalMvpCloseout(evidence);
 assertSourceMarkerRequirements(evidence);
@@ -726,8 +726,8 @@ assertRendererTestIds(rendererSource, requiredTestIds);
 assertRendererTestIds(rendererSource, deliverySurfaceTestIds(evidence));
 
 const bridge = [
-  read("src/bridge/oplBridge.ts"),
-  read("src/bridge/oplBridge-commands.ts")
+  read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
+  read("plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts")
 ].join("\n");
 for (const command of [
   "opl app state --profile fast --json",
@@ -800,8 +800,8 @@ assert(evidence.reuse_policy.deepseek_harness_package_version === expectedDshVer
 assert(evidence.reuse_policy.application_host_runtime_adopted === true, "DeepSeek Harness Application Host runtime must be adopted");
 assert(evidence.reuse_policy.dsh_product_runtime_authority_adopted === false, "DeepSeek Harness product runtime authority must stay excluded");
 assert(evidence.reuse_policy.deepseek_harness_selected_source_reused === true, "selected DeepSeek Harness source must be declared as reused");
-assert(evidence.reused_oss_module_policy.vendored_source_root === "src/vendor/deepseek-harness", "DeepSeek Harness source must have one explicit vendor root");
-assert(evidence.reused_oss_module_policy.source_manifest === "src/composition/deepseekHarnessSourceManifest.json", "DeepSeek Harness source manifest must be canonical");
+assert(evidence.reused_oss_module_policy.vendored_source_root === "vendor/deepseek-harness", "DeepSeek Harness source must have one explicit vendor root");
+assert(evidence.reused_oss_module_policy.source_manifest === "packages/dsh-adapters/deepseekHarnessSourceManifest.json", "DeepSeek Harness source manifest must be canonical");
   assert(evidence.reused_oss_module_policy.vendored_file_count === dshManifest.snapshot.file_count, "candidate evidence file inventory must match the vendor manifest");
 assert(evidence.reused_oss_module_policy.byte_identical === dshManifest.snapshot.byte_identical, "candidate must disclose vendor patch status");
 assert(JSON.stringify(evidence.reused_oss_module_policy.compatibility_patches) === JSON.stringify(dshManifest.compatibility_patches), "candidate must bind reviewed compatibility patches");
@@ -846,8 +846,8 @@ assert(clientComposition?.shared_product_profile_and_slot_policy === true, "shel
 for (const field of ["independent_host_truth", "second_package_registry", "second_currentness_authority", "second_action_authority", "second_client_composition_graph"]) {
   assert(clientComposition?.[field] === false, `${field} must remain false`);
 }
-const clientCordisSource = read("src/composition/clientCordis.ts");
-const oplStudioClientPluginSource = read("src/composition/oplStudioClientPlugin.tsx");
+const clientCordisSource = read("plugins/opl-studio-client/src/client/composition/clientCordis.ts");
+const oplStudioClientPluginSource = read("plugins/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx");
 for (const marker of [
   "opl.app.client-contributions",
   "opl/app-client-contributions/updated",

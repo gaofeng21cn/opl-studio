@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { ComposerSelection } from "../../src/workbench/ComposerCapabilityPalette";
+import type { ComposerSelection } from "../../plugins/opl-studio-client/src/client/workbench/ComposerCapabilityPalette";
 import {
   composerTurnKey,
   recoverComposerSubmission,
   terminalTrackedComposerTurns,
   trackComposerTurnSelections,
   type TrackedComposerTurn
-} from "../../src/workbench/composerSubmissionLifecycle";
+} from "../../plugins/opl-studio-client/src/client/workbench/composerSubmissionLifecycle";
 
 function attachment(id: string, path: string, cleanupToken?: string): ComposerSelection {
   return {

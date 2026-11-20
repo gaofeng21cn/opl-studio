@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MCP_APP_MIME } from '../../src/host/mcp-app-protocol.mjs';
+import { MCP_APP_MIME } from '../../packages/host-contracts/mcp-app-protocol.mjs';
 
 // The real shared renderer and SDK consume synthetic, read-only owner data.
 export async function frameworkFixture(frameworkRoot, outputRoot) {

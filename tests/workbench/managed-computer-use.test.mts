@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { readManagedCompanions } from "../../src/workbench/managedCompanions.ts";
+import { readManagedCompanions } from "../../plugins/opl-studio-client/src/client/workbench/managedCompanions.ts";
 
 function validAction(actionId: string, overrides: Record<string, unknown> = {}) {
   return {

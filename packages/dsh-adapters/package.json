@@ -1,0 +1,10 @@
+{
+  "name": "@gaofeng21cn/opl-dsh-adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./visual-source": "./deepseekHarnessSourceManifest.json",
+    "./workspace-preview": "./workspace-preview.ts"
+  }
+}

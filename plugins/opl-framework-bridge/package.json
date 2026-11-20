@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-framework-bridge",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OPL Framework state, action and channel integration.",
   "type": "module",
   "main": "./lib/index.mjs",

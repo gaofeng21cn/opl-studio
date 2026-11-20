@@ -1,23 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport, type McpUiStyles } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { McpAppDescriptor, McpAppSession, McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
-import type { OplBridge } from "@gaofeng21cn/opl-host-contracts";
-import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
-import { Input } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Input";
-import buttonCss from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Button.module.css";
-import inputCss from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/Input.module.css";
-import { EcosystemFilePreview } from "../../../../src/integrations/deepseek-harness/EcosystemFilePreview";
+import type { McpAppDescriptor, McpAppSession, McpAppProps, McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
+import { Button } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
+import { Input } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Input";
+import buttonCss from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button.module.css";
+import inputCss from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Input.module.css";
+import { EcosystemFilePreview } from "@gaofeng21cn/opl-dsh-adapters/workspace-preview";
 import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, workspaceArtifactLink, workspaceArtifactPath, type WorkspaceArtifact, readMcpNavigation, rememberMcpNavigation, resolveMcpNavigation } from "./mcpAppHost";
-
-export type McpAppProps = {
-  bridge: McpAppsBridge & Partial<Pick<OplBridge, "readThread" | "listThreadWorkspace" | "readThreadWorkspaceBytes" | "accessThreadWorkspace" | "platformCapabilities">>; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
-  preferredEntry?: { resourceUri: string; arguments: Record<string, string> };
-  onPreferredEntryConsumed?: (entry: NonNullable<McpAppProps["preferredEntry"]>) => void;
-  onManage?: () => void;
-  onConversation?: () => void;
-  onContext(threadId: string, context: string): void;
-  onMessage(threadId: string, text: string): void;
-};
 
 function descriptorId(app: McpAppDescriptor): string {
   return app.miniAppId || `mcp:${app.server}:${app.resourceUri}`;

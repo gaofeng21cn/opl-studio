@@ -79,12 +79,12 @@ install -d -o opl -g opl -m 0700 /home/opl/.codex /home/opl/code
 # upgrades retain their receipt and never enter this path.
 stage profile_admission
 runuser -u opl -- env HOME=/home/opl OPL_STATE_DIR='/home/opl/Library/Application Support/OPL/state' \
-  OPL_STUDIO_OFFICIAL_PROFILE_MODULE="$payload/desktop/official-profile.mjs" \
+  OPL_STUDIO_OFFICIAL_PROFILE_MODULE="$payload/packages/host-kit/official-profile.mjs" \
   /usr/local/bin/node --input-type=module -e 'import { pathToFileURL } from "node:url"; const module = await import(pathToFileURL(process.env.OPL_STUDIO_OFFICIAL_PROFILE_MODULE).href); module.captureOfficialProfileAdmission({ homeDir: "/home/opl", env: process.env });'
 runuser -u opl -- /usr/bin/env HOME=/home/opl CODEX_HOME=/home/opl/.codex \
   /usr/local/bin/node --input-type=module - "$payload" <<'NODE'
 import { pathToFileURL } from 'node:url';
-const {captureOfficialProfileAdmission}=await import(pathToFileURL(process.argv[2]+'/desktop/official-profile.mjs').href);
+const {captureOfficialProfileAdmission}=await import(pathToFileURL(process.argv[2]+'/packages/host-kit/official-profile.mjs').href);
 captureOfficialProfileAdmission({homeDir:'/home/opl',env:{HOME:'/home/opl',CODEX_HOME:'/home/opl/.codex'}});
 NODE
 stage framework_install

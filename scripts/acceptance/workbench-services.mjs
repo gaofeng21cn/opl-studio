@@ -3,10 +3,10 @@ import { mkdtemp, realpath, mkdir, writeFile, readFile, access, rm, utimes } fro
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { CodexAppServerTransport } from '../../src/host/app-server-transport.mjs';
-import { createWorkbenchTaskExecutor } from '../../src/host/workbench-task-executor.mjs';
+import { CodexAppServerTransport } from '../../plugins/opl-codex-native/src/app-server-transport.mjs';
+import { createWorkbenchTaskExecutor } from '../../plugins/opl-framework-bridge/src/workbench-task-executor.mjs';
 import { OplFrameworkBridge } from '../../plugins/opl-framework-bridge/src/service.mjs';
-import { createOplPassthrough } from '../../src/host/opl-passthrough.mjs';
+import { createOplPassthrough } from '../../plugins/opl-framework-bridge/src/opl-passthrough.mjs';
 import { createWebUiHost } from '../../src/host/http-host.mjs';
 import { buildRenderer } from '../build-renderer.mjs';
 

@@ -26,8 +26,10 @@ async function sourceFixture(version, marker) {
   await writeFile(path.join(root, "package-lock.json"), JSON.stringify({ name: manifest.name, version, lockfileVersion: 3, requires: true,
     packages: { "": manifest, "plugins/host-plugin": { version: "1.0.0" }, "node_modules/host-plugin": { resolved: "plugins/host-plugin", link: true } } }), "utf8");
   await mkdir(path.join(root, "desktop"), { recursive: true });
-  for (const file of ["official-profile.mjs", "node-host-runtime.mjs", "node-host-policy.json"]) await writeFile(path.join(root, "desktop", file), file.endsWith(".json") ? "{}" : "export {};\n", "utf8");
-  await writeFile(path.join(root, "src", "host", "packaged-host-smoke.mjs"), "import { ready } from 'host-plugin'; import '../../desktop/official-profile.mjs'; if (!ready) throw Error('missing plugin'); console.log('OPL_PACKAGED_HOST_READY');\n", "utf8");
+  await mkdir(path.join(root, "packages/host-kit"), { recursive: true });
+  await writeFile(path.join(root, "packages/host-kit/official-profile.mjs"), "export {};\n", "utf8");
+  for (const file of [ "node-host-runtime.mjs", "node-host-policy.json"]) await writeFile(path.join(root, "desktop", file), file.endsWith(".json") ? "{}" : "export {};\n", "utf8");
+  await writeFile(path.join(root, "src", "host", "packaged-host-smoke.mjs"), "import { ready } from 'host-plugin'; import '../../packages/host-kit/official-profile.mjs'; if (!ready) throw Error('missing plugin'); console.log('OPL_PACKAGED_HOST_READY');\n", "utf8");
   await writeFile(path.join(root, "dist", "webui", "index.html"), `<main>${marker}</main>`, "utf8");
   await writeFile(path.join(root, "scripts", "headless", "run.mjs"), `export const marker = ${JSON.stringify(marker)};\n`, "utf8");
   await writeFile(path.join(root, "scripts", "headless", "service-manager.mjs"), "export {};\n", "utf8");

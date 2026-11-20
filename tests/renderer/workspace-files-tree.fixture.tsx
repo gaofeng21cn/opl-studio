@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { WorkspaceFilesTree, createWorkspaceTreeListing } from "../../src/integrations/deepseek-harness/WorkspaceFilesTree";
-import type { ThreadWorkspaceListing } from "../../src/bridge/oplBridge";
+import { WorkspaceFilesTree, createWorkspaceTreeListing } from "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/WorkspaceFilesTree";
+import type { ThreadWorkspaceListing } from "../../plugins/opl-studio-client/src/client/bridge/oplBridge";
 
 // Build with scripts/vite-build-renderer-entry.mjs, serve #root plus the generated
 // CSS/module, and pass workspace-files-tree.mount-check.js to Playwright run-code.

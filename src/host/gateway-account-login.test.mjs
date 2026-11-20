@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "./gateway-account-login.mjs";
+import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "../../plugins/opl-framework-bridge/src/gateway-account-login.mjs";
 
 function fakeSpawn(response, observed) {
   return (command, args, options) => {

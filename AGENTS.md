@@ -4,7 +4,7 @@
   One Person Lab App on the pinned DeepSeek Harness/Cordis application
   skeleton.
 - Keep product truth in `one-person-lab-app` contracts and docs.
-- Follow App's `app-plugin-composition-taxonomy.json#source_ownership_policy`: shared contracts belong in `packages/host-contracts`, shared Host services in `packages/host-kit`, and plugin behavior in its owning package. Consume public entrypoints or Cordis services; do not add sibling `src`, root `src`, or runtime-to-`scripts` dependencies. Existing root client/Host sources are a documented transition, not an independent-source completion claim.
+- Follow App's `app-plugin-composition-taxonomy.json#source_ownership_policy`: shared contracts belong in `packages/host-contracts`, shared Host services in `packages/host-kit`, and plugin behavior in its owning package. Consume public entrypoints or Cordis services; do not add sibling `src`, root `src`, or runtime-to-`scripts` dependencies. Carrier boot and profile composition live in desktop/ and src/host/dsh/.
 - Apply Framework's [proportionate boundary policy](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/engineering-boundary-policy.md): justify each retained or new execution restriction with a reachable failure and the smallest affected operation. Old code, contracts, and tests alone do not justify a restriction; optional-service failures and development validation must not inherit global release gates.
 - Prefer the pinned official DSH implementation for generic plugin capabilities.
   Before adding or extending an OPL plugin, inspect the official equivalent.

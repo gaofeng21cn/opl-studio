@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import test from "node:test";
-import { createWebUiAuth } from "./webui-auth.mjs";
+import { createWebUiAuth } from "../../packages/host-kit/webui-auth.mjs";
 
 function request({ cookie = "", csrf = "", address = "127.0.0.1", forwardedFor = "" } = {}) {
   return {

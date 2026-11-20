@@ -6,11 +6,11 @@ import path from "node:path";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile, symlink, copyFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { createLinkCompanion } from "./link-companion.mjs";
-import { LinkLoopback, LINK_VIRTUAL_PORT } from "./link-loopback.mjs";
-import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
-import { createLinkInternet, authorizeLinkHost } from "./link-internet.mjs";
-import { createLinkTransportEvidence } from "./link-transport-evidence.mjs";
+import { createLinkCompanion } from "../../plugins/opl-host-core/src/link-companion.mjs";
+import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../plugins/opl-host-core/src/link-loopback.mjs";
+import { createThreadWorkspaceService } from "../../plugins/opl-host-core/src/thread-workspace-service.mjs";
+import { createLinkInternet, authorizeLinkHost } from "../../plugins/opl-host-core/src/link-internet.mjs";
+import { createLinkTransportEvidence } from "../../plugins/opl-host-core/src/link-transport-evidence.mjs";
 
 async function fixture(t, { now } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-remote-test-"));
@@ -254,7 +254,7 @@ test("Relay evidence counts actual ciphertext frames and distinguishes observed 
 
 test("the shipped RTC bundle creates its required backend without external node_modules or postinstall", async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-packaged-rtc-")); t.after(() => rm(root, { recursive: true, force: true }));
-  const module = path.join(root, "rtc.mjs"); await copyFile(new URL("./vendor/dsh-remote/rtc.mjs", import.meta.url), module);
+  const module = path.join(root, "rtc.mjs"); await copyFile(new URL("../../vendor/dsh-remote/rtc.mjs", import.meta.url), module);
   const result = execFileSync(process.execPath, ["--input-type=module", "-e", `const m=await import(${JSON.stringify(module)});const f=await m.loadWeriftFactory();if(typeof f?.create!=="function")throw new Error("RTC backend unavailable");const pc=f.create({iceServers:[]});await pc.getStats();pc.close();console.log(JSON.stringify({bundledFallbackCreated:true}));`], { encoding: "utf8", timeout: 15000 });
   assert.deepEqual(JSON.parse(result), { bundledFallbackCreated: true });
 });

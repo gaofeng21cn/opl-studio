@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deriveThreadDirectory } from "../../src/workbench/workbenchModel";
+import { deriveThreadDirectory } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
 
 describe("Codex thread directory projection", () => {
   test("keeps canonical projects while flattening temporary and managed scratch workspaces", () => {

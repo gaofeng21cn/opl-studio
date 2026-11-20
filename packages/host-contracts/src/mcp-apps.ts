@@ -1,3 +1,5 @@
+import type { OplBridge } from "./platform-events";
+
 export type McpAppDescriptor = {
   miniAppId: string;
   server: string;
@@ -43,4 +45,14 @@ export type McpAppsBridge = {
   callMcpAppTool(request: McpAppBinding & { name: string; arguments?: Record<string, unknown> }): Promise<any>;
   readMcpAppResource(request: McpAppBinding & { uri: string }): Promise<any>;
   closeMcpApp(request: McpAppBinding): Promise<{ closed: boolean }>;
+};
+
+export type McpAppProps = {
+  bridge: McpAppsBridge & Partial<Pick<OplBridge, "readThread" | "listThreadWorkspace" | "readThreadWorkspaceBytes" | "accessThreadWorkspace" | "platformCapabilities">>; launch?: McpAppOpen; threadId?: string; locale: "zh" | "en"; revision?: number;
+  preferredEntry?: { resourceUri: string; arguments: Record<string, string> };
+  onPreferredEntryConsumed?: (entry: NonNullable<McpAppProps["preferredEntry"]>) => void;
+  onManage?: () => void;
+  onConversation?: () => void;
+  onContext(threadId: string, context: string): void;
+  onMessage(threadId: string, text: string): void;
 };

@@ -13,7 +13,7 @@ import {
   readUiContributionsProjection,
   settingsContributionDestination,
   type OplUiContributionsProjection
-} from "../../src/composition/contributionProjection.ts";
+} from "../../plugins/opl-studio-client/src/client/composition/contributionProjection.ts";
 
 (globalThis as typeof globalThis & { __OPL_CODEX_MODEL_POLICY__?: unknown }).__OPL_CODEX_MODEL_POLICY__ = {
   source: "test-fixture",
@@ -28,7 +28,7 @@ import {
   useHighestSupportedReasoningForUnknown: true
 };
 
-const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../src/bridge/oplBridge.ts");
+const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
 
 test("startup recovers a failed owner read into the real contribution projection", async () => {
   let attempts = 0;
@@ -106,8 +106,8 @@ function createHost() {
   contexts.push(ctx);
   return new OplStudioDshSlotHost(ctx, {} as never);
 }
-const { OplStudioDshSlotHost } = await import("../../src/composition/dshSlotHost.tsx");
-const { installWorkspaceClientPlugin } = await import("../../src/composition/workspaceClientPlugin.tsx");
+const { OplStudioDshSlotHost } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx");
+const { installWorkspaceClientPlugin } = await import("../../plugins/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx");
 test("native slot stores and factories follow the client plugin lifetime", async () => {
   const ctx = new Context();
   contexts.push(ctx);
@@ -135,7 +135,7 @@ test("native slot stores and factories follow the client plugin lifetime", async
   expect(state.getSnapshot()).toEqual({ open: true, activeId: "opl-studio-settings-preferences" });
   expect(rendererHost.storeOf(settings)).toBe(state);
 
-  const { createSettingsShellStore } = await import("../../src/vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts");
+  const { createSettingsShellStore } = await import("../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts");
   const child = await ctx.plugin({ name: "native-factory", inject: ["slots"], apply(child: Context) {
     child.get("slots").registerFactory({ name: "test.settings", scope: "root", store: createSettingsShellStore } as never, (() => null) as never);
   } });
@@ -170,7 +170,7 @@ test("capability workspace installs into DSH main and sidebar panel slots and di
   expect(host.core.entries("sidebar.panellist")).toEqual(beforePanels);
   expect(host.core.entries("main").length).toBe(beforeMain);
 });
-const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../src/composition/contributionComponents.tsx");
+const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
 
 test("channel failures explain the reason and recovery action without exposing raw transport errors", () => {
   expect(channelAttentionMessage("timeout", true)).toContain("超时");
@@ -178,7 +178,7 @@ test("channel failures explain the reason and recovery action without exposing r
   expect(channelAttentionMessage("http_error", true)).toContain("网络或代理");
   expect(channelAttentionMessage(undefined, true)).toContain("日志与诊断");
 });
-const { codexModelPolicy, resolveCodexModelOptions } = await import("../../src/workbench/modelPolicy.ts");
+const { codexModelPolicy, resolveCodexModelOptions } = await import("../../plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
 
 const projectionState = {
   app_state: {
@@ -735,7 +735,7 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("renders non-image channel payloads with the maintained QR component", () => {
     const source = readFileSync(
-      new URL("../../src/composition/contributionComponents.tsx", import.meta.url),
+      new URL("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
       "utf8"
     );
     expect(source).toMatch(/import \{ QRCodeSVG \} from "qrcode\.react"/);
@@ -746,7 +746,7 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("keeps remote pairing material in transient component state and routes actions through the owner bridge", () => {
     const source = readFileSync(
-      new URL("../../src/composition/contributionComponents.tsx", import.meta.url),
+      new URL("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
       "utf8"
     );
     expect(source).toMatch(/viewType === "remote_companion_access"/);
@@ -758,7 +758,7 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(source).not.toMatch(/console\.(log|warn|error)/);
     expect(source).toMatch(/function remoteCompanionActionKey/);
 
-    const appSource = readFileSync(new URL("../../src/workbench/App.tsx", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../../plugins/opl-studio-client/src/client/workbench/App.tsx", import.meta.url), "utf8");
     expect(appSource).toMatch(/function contributionReceiptForDisplay/);
     expect(appSource).toContain("contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))");
   });

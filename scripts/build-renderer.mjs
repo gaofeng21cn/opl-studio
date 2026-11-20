@@ -80,7 +80,7 @@ export function buildRenderer({
   fs.writeFileSync(path.join(outDir, htmlName), html);
   const metadata = {
     status: "source_renderer_build_passed",
-    renderer: "src/workbench/App.tsx",
+    renderer: "plugins/opl-studio-client/src/client/workbench/App.tsx",
     entry: "src/main.tsx",
     html: htmlName,
     script: jsName,

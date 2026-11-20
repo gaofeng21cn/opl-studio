@@ -5,11 +5,11 @@ import {
   OPL_STUDIO_DETAIL_TABS,
   createOplStudioClientCordisComposition,
   readOplClientCompositionPolicy
-} from "../../src/composition/clientCordis.ts";
+} from "../../plugins/opl-studio-client/src/client/composition/clientCordis.ts";
 import {
   createOplContributionActionRequest,
   readUiContributionsProjection
-} from "../../src/composition/contributionProjection.ts";
+} from "../../plugins/opl-studio-client/src/client/composition/contributionProjection.ts";
 
 const compositionModel = {
   package_contribution_slots: ["settings.section", "runtime.detail", "composer.palette"],

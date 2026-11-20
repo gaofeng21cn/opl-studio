@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createEcosystemWorkspaceProvider, type EcosystemWorkspaceBridge } from "../../src/integrations/deepseek-harness/ecosystemWorkspaceProvider";
+import { createEcosystemWorkspaceProvider, type EcosystemWorkspaceBridge } from "../../packages/dsh-adapters/workspace-preview/ecosystemWorkspaceProvider";
 
 function fixture() {
   const bytes = new Uint8Array(700_000).map((_, index) => index % 251);

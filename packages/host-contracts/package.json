@@ -8,10 +8,16 @@
   "exports": {
     ".": {
       "types": "./src/index.ts"
-    }
+    },
+    "./events": "./src/events.ts",
+    "./bridge-primitives": "./src/bridge-primitives.ts",
+    "./mcp-app-protocol": "./mcp-app-protocol.mjs",
+    "./thread-error": "./thread-error.mjs"
   },
   "files": [
-    "src"
+    "src",
+    "mcp-app-protocol.mjs",
+    "thread-error.mjs"
   ],
   "license": "Apache-2.0",
   "peerDependencies": {

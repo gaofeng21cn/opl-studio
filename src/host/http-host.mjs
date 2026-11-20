@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bootOplStudioHost } from "./dsh/host.mjs";
-import { createStagedInputService } from "./staged-inputs.mjs";
-import { createWebUiAuth } from "./webui-auth.mjs";
+import { createStagedInputService } from "../../packages/host-kit/staged-inputs.mjs";
+import { createWebUiAuth } from "../../packages/host-kit/webui-auth.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 

@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import test from "node:test";
-import { ThreadAdapterError } from "./thread-adapter.mjs";
-import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
+import { ThreadAdapterError } from "../../plugins/opl-codex-native/src/thread-adapter.mjs";
+import { createThreadWorkspaceService } from "../../plugins/opl-host-core/src/thread-workspace-service.mjs";
 
 async function fixture() {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "opl-thread-workspace-"));

@@ -171,7 +171,7 @@ docker compose up --build
 ## DSH 上游维护
 
 DSH 源码版本、依赖版本组、纳入仓库的 GUI 源码目录和文件清单统一记录在
-[`deepseekHarnessSourceManifest.json`](./src/composition/deepseekHarnessSourceManifest.json)
+[`deepseekHarnessSourceManifest.json`](./packages/dsh-adapters/deepseekHarnessSourceManifest.json)
 中。Studio 通过可审计的显式重放方式追随上游，而不是维护隐式分叉。
 
 读取当前绑定状态并生成不写入文件的升级计划：

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "../desktop/cdp.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const manifest = JSON.parse(await readFile(path.join(root, "src/composition/deepseekHarnessSourceManifest.json"), "utf8"));
+const manifest = JSON.parse(await readFile(path.join(root, "packages/dsh-adapters/deepseekHarnessSourceManifest.json"), "utf8"));
 const rendererBytes = await readFile(path.join(root, "dist/desktop/renderer.js"));
 const rendererSha256 = createHash("sha256").update(rendererBytes).digest("hex");
 if (process.env.OPL_NATIVE_UI_EXPECTED_RENDERER_SHA256) {

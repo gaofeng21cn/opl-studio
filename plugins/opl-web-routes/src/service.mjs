@@ -1,4 +1,4 @@
-import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
+import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 import { pipeline } from "node:stream/promises";
 
 function json(res, status, value) {

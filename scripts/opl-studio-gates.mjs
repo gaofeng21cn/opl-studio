@@ -14,28 +14,28 @@ export const requiredDeliverySurfaceKeys = [
 ];
 
 export const slotHostSourcePaths = [
-  "src/composition/dshSlotHost.tsx",
-  "src/composition/dshSlotHost-parts/studioContext.tsx",
-  "src/composition/dshSlotHost-parts/studioMenus.tsx",
-  "src/composition/dshSlotHost-parts/navigationSlots.tsx",
-  "src/composition/dshSlotHost-parts/composerSlots.tsx",
-  "src/composition/dshSlotHost-parts/shellSettingsSlots.tsx",
-  "src/composition/dshSlotHost-parts/firstRunOnboarding.tsx"
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioMenus.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/composerSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/firstRunOnboarding.tsx"
 ];
 
 export const rendererSourcePaths = [
   ...slotHostSourcePaths,
-  "src/workbench/App.tsx",
-  "src/workbench/composerAttachments.ts",
-  "src/workbench/ProjectProgressPanel.tsx",
-  "src/workbench/SettingsPanel.tsx",
-  "src/workbench/WorkspaceFilesPanel.tsx",
-  "src/integrations/deepseek-harness/EcosystemFilePreview.tsx",
-  "src/workbench/codexWorkbenchStyles.ts",
-  "src/workbench/threads/ThreadDetailPopover.tsx",
-  "src/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
-  "src/ui/workbenchPrimitives.tsx",
-  "src/renderers/moduleRegistry.ts"
+  "plugins/opl-studio-client/src/client/workbench/App.tsx",
+  "plugins/opl-studio-client/src/client/workbench/composerAttachments.ts",
+  "plugins/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx",
+  "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx",
+  "plugins/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx",
+  "packages/dsh-adapters/workspace-preview/EcosystemFilePreview.tsx",
+  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts",
+  "plugins/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx",
+  "plugins/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
+  "plugins/opl-studio-client/src/client/ui/workbenchPrimitives.tsx",
+  "plugins/opl-studio-client/src/client/renderers/moduleRegistry.ts"
 ];
 
 const falseReadyFields = [
@@ -69,11 +69,11 @@ export function readSlotHostSource() {
 }
 
 export function readSettingsSource() {
-  return [read("src/workbench/SettingsPanel.tsx"), ...fs.readdirSync(path.join(root, "src/workbench/settings"), { recursive: true }).filter(file => file.endsWith(".tsx")).map(file => read(`src/workbench/settings/${file}`))].join("\n");
+  return [read("plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx"), ...fs.readdirSync(path.join(root, "plugins/opl-studio-client/src/client/workbench/settings"), { recursive: true }).filter(file => file.endsWith(".tsx")).map(file => read(`plugins/opl-studio-client/src/client/workbench/settings/${file}`))].join("\n");
 }
 
 export function readRendererSource() {
-  return rendererSourcePaths.map((relativePath) => relativePath === "src/workbench/SettingsPanel.tsx" ? readSettingsSource() : read(relativePath)).join("\n");
+  return rendererSourcePaths.map((relativePath) => relativePath === "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx" ? readSettingsSource() : read(relativePath)).join("\n");
 }
 
 export function assert(condition, message) {
@@ -155,12 +155,12 @@ export function assertNoFalseReadyFields(namedSources) {
 }
 
 export function assertFallbackBoundaryDowngrades(namedSources) {
-  const app = namedSources["src/workbench/App.tsx"] ?? "";
-  const settings = namedSources["src/workbench/SettingsPanel.tsx"] ?? "";
-  const bridge = namedSources["src/bridge/oplBridge.ts"] ?? "";
-  const actionNormalizer = namedSources["src/bridge/oplBridge-normalizers-action.ts"] ?? "";
+  const app = namedSources["plugins/opl-studio-client/src/client/workbench/App.tsx"] ?? "";
+  const settings = namedSources["plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx"] ?? "";
+  const bridge = namedSources["plugins/opl-studio-client/src/client/bridge/oplBridge.ts"] ?? "";
+  const actionNormalizer = namedSources["plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts"] ?? "";
   const bridgeFallbackSource = `${bridge}\n${actionNormalizer}`;
-  const model = namedSources["src/workbench/workbenchModel.ts"] ?? "";
+  const model = namedSources["plugins/opl-studio-client/src/client/workbench/workbenchModel.ts"] ?? "";
 
   assert(!app.includes("Context ready"), "fallback UI must not display Context ready");
   assert(!app.includes('status="connected"'), "fallback UI must not display connected status");

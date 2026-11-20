@@ -343,7 +343,7 @@
   "source_marker_requirements": {
     "chat_runtime": [
       {
-        "file": "src/bridge/oplBridge-commands.ts",
+        "file": "plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts",
         "contains": [
           "codex app-server --stdio",
           "thread/start",
@@ -353,7 +353,7 @@
         ]
       },
       {
-        "file": "src/host/app-server-transport.mjs",
+        "file": "plugins/opl-codex-native/src/app-server-transport.mjs",
         "contains": [
           "initialize",
           "thread/start",
@@ -362,14 +362,14 @@
         ]
       },
       {
-        "file": "src/host/app-server-turn-lifecycle.mjs",
+        "file": "plugins/opl-codex-native/src/app-server-turn-lifecycle.mjs",
         "contains": [
           "item/agentMessage/delta",
           "turn/completed"
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "sendCodexMessage",
           "codexThreadId",
@@ -379,7 +379,7 @@
     ],
     "state_context": [
       {
-        "file": "src/bridge/oplBridge-commands.ts",
+        "file": "plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts",
         "contains": [
           "opl app state --profile fast --json",
           "opl app state --profile full --json",
@@ -387,14 +387,14 @@
         ]
       },
       {
-        "file": "src/bridge/oplBridge.ts",
+        "file": "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
         "contains": [
           "readState",
           "readFullDrilldown"
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "opl-project-progress-panel",
           "opl-project-progress",
@@ -402,7 +402,7 @@
         ]
       },
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "activeProjectLines",
           "candidate_surface_only",
@@ -412,20 +412,20 @@
     ],
     "action_preview_receipt": [
       {
-        "file": "src/bridge/oplBridge-commands.ts",
+        "file": "plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts",
         "contains": [
           "opl app action execute --action",
           "--dry-run"
         ]
       },
       {
-        "file": "src/bridge/oplBridge.ts",
+        "file": "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
         "contains": [
           "executeAction"
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "runDryRun",
           "opl-export-action",
@@ -433,7 +433,7 @@
         ]
       },
       {
-        "file": "src/ui/workbenchPrimitives.tsx",
+        "file": "plugins/opl-studio-client/src/client/ui/workbenchPrimitives.tsx",
         "contains": [
           "opl-renderer-module-registry",
           "candidate adapters only",
@@ -443,7 +443,7 @@
     ],
     "settings_route": [
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "renderShell",
           "renderStudioSettings",
@@ -452,20 +452,20 @@
         ]
       },
       {
-        "file": "src/workbench/SettingsPanel.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx",
         "contains": [
           "opl-settings-panel"
         ]
       },
       {
-        "file": "src/workbench/settings/useSettingsPageContext.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/settings/useSettingsPageContext.tsx",
         "contains": [
           "opl-model-access-entry",
           "opl-locale-toggle"
         ]
       },
       {
-        "file": "src/workbench/settings/pages/AccountSettingsPage.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/settings/pages/AccountSettingsPage.tsx",
         "contains": [
           "opl-settings-gateway-username"
         ]
@@ -473,7 +473,7 @@
     ],
     "settings_persistence": [
       {
-        "file": "src/workbench/settingsModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/settingsModel.ts",
         "contains": [
           "SETTINGS_STORAGE_KEY",
           "settingsSections",
@@ -489,7 +489,7 @@
     ],
     "gateway_account_lkg_cache": [
       {
-        "file": "src/workbench/gatewayAccountCache.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts",
         "contains": [
           "opl.app.gatewayAccount.lkg.v1",
           "sanitizeGatewayAccount",
@@ -499,7 +499,7 @@
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "readGatewayAccountCache",
           "writeGatewayAccountCache",
@@ -509,20 +509,20 @@
     ],
     "execute_confirmation": [
       {
-        "file": "src/workbench/settings/SettingsActionDialog.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/settings/SettingsActionDialog.tsx",
         "contains": [
           "opl-settings-action-confirmation"
         ]
       },
       {
-        "file": "src/workbench/SettingsPanel.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx",
         "contains": [
           "pendingConfirmation",
           "onConfirmAction"
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "runSettingsAction",
           "confirmSettingsAction",
@@ -532,7 +532,7 @@
     ],
     "host_derived_client_cordis": [
       {
-        "file": "src/composition/clientCordis.ts",
+        "file": "plugins/opl-studio-client/src/client/composition/clientCordis.ts",
         "contains": [
           "opl.app.client-contributions",
           "opl/app-client-contributions/updated",
@@ -542,7 +542,7 @@
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "onHostStateChange",
           "createOplContributionActionRequest(entry, command, confirmed)",
@@ -560,7 +560,7 @@
     ],
     "artifact_preview_mvp": [
       {
-        "file": "src/renderers/moduleRegistry.ts",
+        "file": "plugins/opl-studio-client/src/client/renderers/moduleRegistry.ts",
         "contains": [
           "Markdown result preview",
           "Math preview",
@@ -571,7 +571,7 @@
         ]
       },
       {
-        "file": "src/workbench/App.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "opl-artifact-preview-tabs",
           "opl-artifact-preview-panel",
@@ -581,7 +581,7 @@
     ],
     "professional_starters_mvp": [
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "task_action_receipt_preview",
           "task_export_bundle_preview",
@@ -591,7 +591,7 @@
         ]
       },
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "starterPreviewAction"
         ]
@@ -599,7 +599,7 @@
     ],
     "agent_package_lifecycle_display": [
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "appState.agent_packages",
           "canonical_agent_packages",
@@ -614,20 +614,20 @@
         ]
       },
       {
-        "file": "src/workbench/settings/packages.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/settings/packages.tsx",
         "contains": [
           "PackageCatalog"
         ]
       },
       {
-        "file": "src/composition/dshPluginManagerOwner.tsx",
+        "file": "plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx",
         "contains": [
           "PluginManagerOwnerPage",
           "opl-settings-agent-catalog"
         ]
       },
       {
-        "file": "src/workbench/settings/actions.tsx",
+        "file": "plugins/opl-studio-client/src/client/workbench/settings/actions.tsx",
         "contains": [
           "actionPayloadComplete"
         ]
@@ -635,7 +635,7 @@
     ],
     "workbench_model_live_derivation": [
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "settings_control_center",
           "task_drilldowns",
@@ -648,7 +648,7 @@
     ],
     "codex_thread_adapter_and_subagents": [
       {
-        "file": "src/host/thread-adapter.mjs",
+        "file": "plugins/opl-codex-native/src/thread-adapter.mjs",
         "contains": [
           "threadStoreOwner",
           "privateCoordinationLayer: false",
@@ -659,7 +659,7 @@
         ]
       },
       {
-        "file": "src/host/thread-adapter.mjs",
+        "file": "plugins/opl-codex-native/src/thread-adapter.mjs",
         "contains": [
           "class CodexThreadAdapter",
           "listThreads",
@@ -674,7 +674,7 @@
         ]
       },
       {
-        "file": "src/workbench/workbenchModel.ts",
+        "file": "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
         "contains": [
           "deriveThreadDirectory",
           "deriveThreadMessages",
@@ -685,7 +685,7 @@
         ]
       },
       {
-        "file": "src/composition/dshSlotHost.tsx",
+        "file": "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
         "contains": [
           "WorkspaceBrowser",
           "searchSessions",
@@ -821,7 +821,7 @@
       "reference_version": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
       "reference_date": "2026-10-09",
       "scope": "pinned_gui_package_source_trees_with_opl_slot_adapters",
-      "token_source": "src/vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
+      "token_source": "vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
       "palette": {
         "canvas": "#fff",
         "sidebar": "#f7f7f8",
@@ -842,8 +842,8 @@
     }
   },
   "webui_transport": {
-    "renderer": "src/workbench/App.tsx",
-    "composition_host": "src/composition/dshSlotHost.tsx",
+    "renderer": "plugins/opl-studio-client/src/client/workbench/App.tsx",
+    "composition_host": "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
     "host_core": "plugins/opl-host-core/src/service.mjs",
     "application_host_boot": "src/host/dsh/host.mjs",
     "application_host_profile": "src/host/dsh/cordis.yml",
@@ -1017,8 +1017,8 @@
       "@deepseek-ai/dsh-bash-local@0.2.2-rc.3",
       "use-sync-external-store@1.7.0"
     ],
-    "vendored_source_root": "src/vendor/deepseek-harness",
-    "source_manifest": "src/composition/deepseekHarnessSourceManifest.json",
+    "vendored_source_root": "vendor/deepseek-harness",
+    "source_manifest": "packages/dsh-adapters/deepseekHarnessSourceManifest.json",
     "vendored_file_count": 749,
     "byte_identical": false,
     "byte_identical_to_pinned_ref": false,
@@ -1088,25 +1088,25 @@
     "deepseek_harness_package_version": "0.2.2-rc.3",
     "compatibility_patches": [
       {
-        "path": "src/integrations/deepseek-harness/patches/react19.patch",
+        "path": "packages/dsh-adapters/patches/react19.patch",
         "sha256": "9e1cd2fe27a178443856b0a3178e8a171ee93990325a1ad45d3e631d1b4896ba",
         "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
         "reason": "React 19 refs, nullable DOM refs, inert, callback-ref cleanup and convergent menu anchor effects; no runtime authority changes."
       },
       {
-        "path": "src/integrations/deepseek-harness/patches/schedule-owner.patch",
+        "path": "packages/dsh-adapters/patches/schedule-owner.patch",
         "sha256": "b8dbecb15c6f5e3ab021c246174bd1e256e93df8f9881437fa2ffdf6fb6e584c",
         "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
         "reason": "Optional owner view fields, timing limits, manual creation and execution-history slots for Framework/Temporal and canonical Codex tasks; default DSH Schedule behavior retained."
       },
       {
-        "path": "src/integrations/deepseek-harness/patches/plugin-manager-owner.patch",
+        "path": "packages/dsh-adapters/patches/plugin-manager-owner.patch",
         "sha256": "a4c709a0804a753210fe65c9196984c4a4d034af856d5fbcde771d0850b13b4d",
         "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
         "reason": "Render-only owner card/detail projection and contributed tabs reuse the official plugin management page while Framework retains Package lifecycle authority; upstream default behavior is retained."
       },
       {
-        "path": "src/integrations/deepseek-harness/patches/sidebar-customization.patch",
+        "path": "packages/dsh-adapters/patches/sidebar-customization.patch",
         "sha256": "6b6c2be4265f5498588685cd2e17843f5abd3aed241b9a0a00e4b5fed9b9cdde",
         "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
         "reason": "Keep official pin controls available while hiding an empty overflow, restore keyboard focus after the first unpin, and mark the active overflow page. Retire when upstream separates overflow visibility from pin capability."
@@ -1383,7 +1383,7 @@
       "unknown_or_error": "show a neutral loading or unavailable state and preserve any valid public last-known-good account projection; never infer disconnected state"
     },
     "persistence_model": {
-      "file": "src/workbench/settingsModel.ts",
+      "file": "plugins/opl-studio-client/src/client/workbench/settingsModel.ts",
       "storage_key": "opl.studio.settings.v1",
       "storage": "localStorage",
       "system_write_permission": false,
@@ -1405,7 +1405,7 @@
       ]
     },
     "gateway_account_lkg_cache": {
-      "file": "src/workbench/gatewayAccountCache.ts",
+      "file": "plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts",
       "storage_key": "opl.app.gatewayAccount.lkg.v1",
       "scope": "public_gateway_account_read_model_only",
       "fresh_read_replaces_cache": true,
@@ -1487,7 +1487,7 @@
   "webui_parity": {
     "shared_renderer": true,
     "bridge_shape": "window.oplStudio",
-    "product_profile": "src/generated/oplProductProfile.generated.json",
+    "product_profile": "plugins/opl-studio-client/src/client/generated/oplProductProfile.generated.json",
     "desktop_and_webui_default_home": "chat_first_default_collapsed",
     "evidence_status_field": "webui_parity_status",
     "sse_subscription_surface": "subscribeEvents uses GET /api/opl-events and normalizes message payloads to typed bridge events"

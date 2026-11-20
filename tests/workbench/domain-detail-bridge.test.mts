@@ -19,7 +19,7 @@ const {
   createBrowserBridge,
   createPlaceholderDomainDetailViewReadback,
   normalizeDomainDetailViewReadback
-} = await import("../../src/bridge/oplBridge.ts");
+} = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
 
 const request = {
   itemId: "project:one:study-one",

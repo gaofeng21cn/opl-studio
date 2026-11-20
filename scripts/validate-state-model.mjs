@@ -9,15 +9,15 @@ const evidence = JSON.parse(fs.readFileSync(path.join(root, "src/candidateContra
 const stateModel = evidence.active_project_line_state_model;
 const liveDerivationPolicy = evidence.workbench_model_live_derivation;
 const packageLifecyclePolicy = evidence.agent_package_lifecycle_display;
-const workbenchModelSource = fs.readdirSync(path.join(root, "src/workbench"))
+const workbenchModelSource = fs.readdirSync(path.join(root, "plugins/opl-studio-client/src/client/workbench"))
   .filter((file) => /^workbenchModel(?:-.*)?\.ts$/.test(file))
   .sort()
-  .map((file) => fs.readFileSync(path.join(root, "src/workbench", file), "utf8"))
+  .map((file) => fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/workbench", file), "utf8"))
   .join("\n");
-const appSource = ["src/workbench/App.tsx", "src/workbench/composerAttachments.ts"].map(ref => fs.readFileSync(path.join(root, ref), "utf8")).join("\n");
+const appSource = ["plugins/opl-studio-client/src/client/workbench/App.tsx", "plugins/opl-studio-client/src/client/workbench/composerAttachments.ts"].map(ref => fs.readFileSync(path.join(root, ref), "utf8")).join("\n");
 const bridgeSource = [
-  fs.readFileSync(path.join(root, "src/bridge/oplBridge.ts"), "utf8"),
-  fs.readFileSync(path.join(root, "src/bridge/oplBridge-normalizers-action.ts"), "utf8")
+  fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/bridge/oplBridge.ts"), "utf8"),
+  fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts"), "utf8")
 ].join("\n");
 const sampleStatePath = "/tmp/opl-studio-state-final.json";
 const sampleState = loadSampleState();
@@ -125,7 +125,7 @@ assert(workbenchModelSource.includes("nonReadyBoundaryStatusPattern"), "artifact
 assert(workbenchModelSource.includes('"app_canonical"'), "artifactStatus missing explicit canonical ready source");
 assert(!appSource.includes("Context ready"), "fallback UI still displays Context ready");
 assert(!appSource.includes('status="connected"'), "fallback UI still displays connected status");
-const composerSource = fs.readFileSync(path.join(root, "src/workbench/ComposerAccessory.tsx"), "utf8");
+const composerSource = fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/workbench/ComposerAccessory.tsx"), "utf8");
 const composerRunStateSource = composerSource.match(/data-testid="opl-composer-run-state"[\s\S]*?<\/span>/)?.[0];
 assert(composerRunStateSource, "composer run-state surface missing");
 assert(!composerRunStateSource.includes(': "Ready"'), "composer idle state still displays Ready");
@@ -168,7 +168,7 @@ const settingsPanelSource = readSettingsSource();
 for (const marker of ["PackageCatalog", "DshPluginManagerOwner"]) {
   assert(settingsPanelSource.includes(marker), `Settings renderer missing package lifecycle marker ${marker}`);
 }
-assert(fs.readFileSync(path.join(root, "src/composition/dshPluginManagerOwner.tsx"), "utf8").includes("opl-settings-agent-catalog"), "Plugin Manager owner renderer is missing its catalog marker");
+assert(fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx"), "utf8").includes("opl-settings-agent-catalog"), "Plugin Manager owner renderer is missing its catalog marker");
 for (const marker of ["actionPayloadComplete"]) {
   assert(settingsPanelSource.includes(marker), `Settings renderer missing package lifecycle detail marker ${marker}`);
 }

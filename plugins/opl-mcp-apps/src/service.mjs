@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
+import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 
-import { MCP_APP_MIME } from "../../../src/host/mcp-app-protocol.mjs";
+import { MCP_APP_MIME } from "@gaofeng21cn/opl-host-contracts/mcp-app-protocol";
 const object = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const fail = (code, message) => { throw new ThreadAdapterError(code, message, {}, 400); };
 const required = (value, field) => typeof value === "string" && value.trim() ? value : fail("invalid_mcp_app_request", `${field} is required`);

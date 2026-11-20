@@ -8,7 +8,7 @@ import {
   compactInitialize,
   createOplPassthrough,
   mergeChannelProviderState
-} from "./opl-passthrough.mjs";
+} from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
 
 test("App state timeout keeps the interactive default and admits a bounded cold-start override", () => {
   assert.doesNotThrow(() => createOplPassthrough({ readStateTimeoutMs: undefined }));

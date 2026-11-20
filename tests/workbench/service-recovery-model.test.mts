@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { deriveServiceRecoveryModel } from "../../src/workbench/serviceRecoveryModel.ts";
-import { deriveWorkbenchModelFromState } from "../../src/workbench/workbenchModel.ts";
+import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel.ts";
+import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
 const action = (actionId: string, mutates = "none_read_only") => ({
   action_id: actionId,

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { deriveFeatureRefs, featureRefsWithCodexStatus } from '../../src/workbench/featureModel';
-import { deriveWorkbenchModelFromState, deriveThreadMessages } from '../../src/workbench/workbenchModel';
+import { deriveFeatureRefs, featureRefsWithCodexStatus } from '../../plugins/opl-studio-client/src/client/workbench/featureModel';
+import { deriveWorkbenchModelFromState, deriveThreadMessages } from '../../plugins/opl-studio-client/src/client/workbench/workbenchModel';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { FeatureStatusPanel } from '../../src/workbench/FeatureStatusPanel';
+import { FeatureStatusPanel } from '../../plugins/opl-studio-client/src/client/workbench/FeatureStatusPanel';
 
 const feature = (state: unknown, id: string) => deriveWorkbenchModelFromState({ app_state: state }).features.find(row => row.featureId === id)!;
 describe('feature ownership and local degradation', () => {

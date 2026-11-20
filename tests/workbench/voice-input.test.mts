@@ -8,7 +8,7 @@ import {
   type VoiceInputState,
   type VoiceRecognition,
   type VoiceRecognitionResult
-} from "../../src/composition/voiceInputModel";
+} from "../../plugins/opl-studio-client/src/client/composition/voiceInputModel";
 
 class Recognition implements VoiceRecognition {
   static instances: Recognition[] = [];

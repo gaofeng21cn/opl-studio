@@ -159,7 +159,7 @@ async function main() {
     print({ status: "dsh_binding_ready", writes: false,
       upstream: { repo: binding.repo, ref: binding.ref, version: binding.version, branch: binding.branch },
       package_cohort: binding.packageCohort,
-      vendored_gui: { root: "src/vendor/deepseek-harness", package_roots: binding.packageRoots, file_count: binding.fileCount },
+      vendored_gui: { root: "vendor/deepseek-harness", package_roots: binding.packageRoots, file_count: binding.fileCount },
       upgrade_validation: upgradeVerificationSteps(binding).map(step => `${step.command} ${step.args.join(" ")}`),
       next_action: "npm run dsh:preflight -- --source <clean-deepseek-harness-checkout>" });
     return;

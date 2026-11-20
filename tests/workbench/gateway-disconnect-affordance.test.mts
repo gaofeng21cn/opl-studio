@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AccountSettingsPage } from "../../src/workbench/settings/pages/AccountSettingsPage";
-import type { GatewayActionViewModel } from "../../src/workbench/settingsActions";
+import { AccountSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/AccountSettingsPage";
+import type { GatewayActionViewModel } from "../../plugins/opl-studio-client/src/client/workbench/settingsActions";
 
 // The App contract fixes where this control lives and what it must be reachable for:
 //   contracts/app-page-state-matrix.json#pages[19].opl_gateway_account

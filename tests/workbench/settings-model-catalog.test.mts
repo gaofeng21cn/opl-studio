@@ -16,11 +16,11 @@ Object.assign(globalThis, {
   }
 });
 
-const { readSettings, settingsDefaults, writeSettings } = await import("../../src/workbench/settingsModel.ts");
-const { ModelsSettingsPage } = await import("../../src/workbench/settings/pages/ModelsSettingsPage.tsx");
-const { OverviewSettingsPage } = await import("../../src/workbench/settings/pages/OverviewSettingsPage.tsx");
-const { navigationCopy } = await import("../../src/workbench/settings/navigation.tsx");
-const { resolveCodexModelOptions, resolveCodexSelection } = await import("../../src/workbench/modelPolicy.ts");
+const { readSettings, settingsDefaults, writeSettings } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+const { ModelsSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/ModelsSettingsPage.tsx");
+const { OverviewSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/OverviewSettingsPage.tsx");
+const { navigationCopy } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/navigation.tsx");
+const { resolveCodexModelOptions, resolveCodexSelection } = await import("../../plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -136,7 +136,7 @@ test("custom access is a collapsed Models disclosure after defaults and toggles 
   const { createRoot } = await import("react-dom/client");
   const { flushSync } = await import("react-dom");
   const { Window } = await import("happy-dom");
-  const { searchableSettings } = await import("../../src/workbench/settings/navigation.tsx");
+  const { searchableSettings } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/navigation.tsx");
   const browser = new Window({ url: "http://localhost/" });
   const keys = ["window", "document", "HTMLElement", "Node"] as const;
   const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));

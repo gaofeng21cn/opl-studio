@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { declaredItemActions, itemSummary, itemTitle, parseWorkspaceInput, readWorkspaceCollection, workspaceReadInput } from "../../src/composition/workspaceViewModel";
-import type { OplUiContribution } from "../../src/composition/contributionProjection";
-import { contributionActionOutcome } from "../../src/composition/contributionProjection";
+import { declaredItemActions, itemSummary, itemTitle, parseWorkspaceInput, readWorkspaceCollection, workspaceReadInput } from "../../plugins/opl-studio-client/src/client/composition/workspaceViewModel";
+import type { OplUiContribution } from "../../plugins/opl-studio-client/src/client/composition/contributionProjection";
+import { contributionActionOutcome } from "../../plugins/opl-studio-client/src/client/composition/contributionProjection";
 
 const entry: OplUiContribution = {
   contributionKey: "any-package:items", contributionId: "items", packageId: "any-package",

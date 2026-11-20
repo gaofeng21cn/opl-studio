@@ -4,8 +4,8 @@ import test from "node:test";
 import {
   selectProjectProgress,
   type ProjectProgressItemProjection
-} from "../../src/workbench/projectProgress.ts";
-import type { WorkItemRuntimeProjection } from "../../src/workbench/workbenchModel.ts";
+} from "../../plugins/opl-studio-client/src/client/workbench/projectProgress.ts";
+import type { WorkItemRuntimeProjection } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
 const baseItem = (overrides: Partial<ProjectProgressItemProjection> = {}): ProjectProgressItemProjection => ({
   id: "item-1",

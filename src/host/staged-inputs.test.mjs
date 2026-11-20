@@ -4,7 +4,7 @@ import path from "node:path";
 import { access, mkdtemp, mkdir, utimes, writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
 import test from "node:test";
-import { createStagedInputService, MAX_STAGED_FILE_BYTES } from "./staged-inputs.mjs";
+import { createStagedInputService, MAX_STAGED_FILE_BYTES } from "../../packages/host-kit/staged-inputs.mjs";
 
 test("staged inputs preserve directory paths and reject traversal and duplicate writes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-staged-inputs-"));

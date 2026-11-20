@@ -3,9 +3,9 @@ import { mkdtemp, mkdir, rm, readFile, writeFile, truncate } from "node:fs/promi
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createSettingsSearchLog } from "./settings-search-log.mjs";
+import { createSettingsSearchLog } from "../../plugins/opl-host-core/src/settings-search-log.mjs";
 import { createWebUiHost } from "./http-host.mjs";
-import { CodexAppServerTransport } from "./app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 
 const decoded = result => ({ status: result.status, ...JSON.parse(result.body) });
 const post = (action, extra = {}) => ({ method: "POST", body: JSON.stringify({ action, ...extra }) });

@@ -4,6 +4,8 @@ asar: true
 asarUnpack:
   - desktop/**/*
   - src/host/**/*
+  - packages/host-kit/*.mjs
+  - packages/host-contracts/thread-error.mjs
   - node_modules/**/*
   - package.json
 npmRebuild: false
@@ -13,6 +15,8 @@ files:
   - desktop/**/*
   - dist/desktop/**/*
   - src/host/**/*
+  - packages/host-kit/*.mjs
+  - packages/host-contracts/thread-error.mjs
   - package.json
   # Keep the unpacked Host dependency graph executable while removing files
   # that are never loaded by the production carrier. Source maps and package

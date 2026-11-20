@@ -42,7 +42,7 @@ export async function startHeadlessHost({
   let official;
   const resourcesPath = env.OPL_OFFICIAL_PROFILE_RESOURCES;
   if (resourcesPath) {
-    const profile = await import('../../desktop/official-profile.mjs');
+    const profile = await import('../../packages/host-kit/official-profile.mjs');
     const admission = profile.captureOfficialProfileAdmission({ env: {
       ...env, OPL_APP_OPL_BIN: undefined, OPL_COMMAND: undefined, OPL_FRAMEWORK_PACKAGE_ROOT: undefined
     } });

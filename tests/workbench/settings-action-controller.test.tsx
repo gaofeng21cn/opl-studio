@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { useSettingsActions } from "../../src/workbench/useSettingsActions";
+import { useSettingsActions } from "../../plugins/opl-studio-client/src/client/workbench/useSettingsActions";
 
 let browser: Window;
 let root: ReturnType<typeof import("react-dom/client").createRoot>;

@@ -191,7 +191,7 @@ and qualification are described in [desktop distribution](./docs/delivery/deskto
 
 The DSH source ref, package cohort, vendored GUI roots, and file inventory are
 pinned in
-[`deepseekHarnessSourceManifest.json`](./src/composition/deepseekHarnessSourceManifest.json).
+[`deepseekHarnessSourceManifest.json`](./packages/dsh-adapters/deepseekHarnessSourceManifest.json).
 The binding is designed to follow upstream through an explicit replay rather
 than an untracked fork.
 

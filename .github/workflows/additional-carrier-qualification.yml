@@ -524,8 +524,9 @@ jobs:
       - name: Prepare base headless payload
         shell: bash
         run: |
-          mkdir -p "$OPL_HEADLESS_BASE_SOURCE/dist" "$OPL_HEADLESS_BASE_SOURCE/scripts"
-          cp package.json "$OPL_HEADLESS_BASE_SOURCE/package.json"
+          mkdir -p "$OPL_HEADLESS_BASE_SOURCE"/{desktop,dist,src,scripts}
+          cp -R package.json package-lock.json packages plugins "$OPL_HEADLESS_BASE_SOURCE/"
+          cp desktop/node-host-{runtime.mjs,policy.json} "$OPL_HEADLESS_BASE_SOURCE/desktop/"
           cp -R dist/webui "$OPL_HEADLESS_BASE_SOURCE/dist/webui"
           cp -R scripts/headless "$OPL_HEADLESS_BASE_SOURCE/scripts/headless"
           cp -R src/host "$OPL_HEADLESS_BASE_SOURCE/src/host"
@@ -749,8 +750,9 @@ jobs:
       - name: Prepare base headless payload
         shell: bash
         run: |
-          mkdir -p "$OPL_HEADLESS_BASE_SOURCE/dist" "$OPL_HEADLESS_BASE_SOURCE/scripts"
-          cp package.json "$OPL_HEADLESS_BASE_SOURCE/package.json"
+          mkdir -p "$OPL_HEADLESS_BASE_SOURCE"/{desktop,dist,src,scripts}
+          cp -R package.json package-lock.json packages plugins "$OPL_HEADLESS_BASE_SOURCE/"
+          cp desktop/node-host-{runtime.mjs,policy.json} "$OPL_HEADLESS_BASE_SOURCE/desktop/"
           cp -R dist/webui "$OPL_HEADLESS_BASE_SOURCE/dist/webui"
           cp -R scripts/headless "$OPL_HEADLESS_BASE_SOURCE/scripts/headless"
           cp -R src/host "$OPL_HEADLESS_BASE_SOURCE/src/host"

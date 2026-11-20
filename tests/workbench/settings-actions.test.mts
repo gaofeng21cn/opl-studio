@@ -5,8 +5,8 @@ import test from "node:test";
 import {
   buildSettingsActionViewModel,
   readGatewayActionsFromState
-} from "../../src/workbench/settingsActions.ts";
-import { initialWorkbenchModel, type WorkbenchModel } from "../../src/workbench/workbenchModel.ts";
+} from "../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts";
+import { initialWorkbenchModel, type WorkbenchModel } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
 function modelWith(overrides: Partial<WorkbenchModel>): WorkbenchModel {
   return { ...initialWorkbenchModel, ...overrides };
@@ -27,7 +27,7 @@ test("carrier diagnostics keep unavailable states human-readable and attention-t
       useHighestSupportedReasoningForUnknown: true
     }
   });
-  const { carrierLogDetail, statusTone } = await import("../../src/workbench/SettingsPanel.tsx");
+  const { carrierLogDetail, statusTone } = await import("../../plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx");
   const diagnostics = {
     schema: "opl_app_carrier_diagnostics.v1",
     owner: "one-person-lab-app_native_host",
@@ -59,7 +59,7 @@ test("managed update host actions come only from the App-projected action catalo
       useHighestSupportedReasoningForUnknown: true
     }
   });
-  const { readProjectedManagedUpdateActions, readProjectedManifestInstallAction } = await import("../../src/workbench/App.tsx");
+  const { readProjectedManagedUpdateActions, readProjectedManifestInstallAction } = await import("../../plugins/opl-studio-client/src/client/workbench/App.tsx");
   const actions = readProjectedManagedUpdateActions({
     app_state: {
       app_state: {

@@ -1,8 +1,8 @@
-import { createWorkbenchTaskExecutor } from "../../../src/host/workbench-task-executor.mjs";
-import { loadFrameworkCordisProfiles, createFrameworkChannelCallbackRegistrar } from "../../../src/host/framework-channel-bootstrap.mjs";
-import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "../../../src/host/gateway-account-login.mjs";
-import { createConnectionAccessApproval } from "../../../src/host/connection-access-approval.mjs";
-import { createOplPassthrough } from "../../../src/host/opl-passthrough.mjs";
+import { createWorkbenchTaskExecutor } from "./workbench-task-executor.mjs";
+import { loadFrameworkCordisProfiles, createFrameworkChannelCallbackRegistrar } from "./framework-channel-bootstrap.mjs";
+import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "./gateway-account-login.mjs";
+import { createConnectionAccessApproval } from "./connection-access-approval.mjs";
+import { createOplPassthrough } from "./opl-passthrough.mjs";
 
 export class OplFrameworkBridge {
   constructor({

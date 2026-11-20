@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { DomainDetailViews } from "../../src/workbench/domainDetailViews";
-import { McpAppsClientContext } from "../../plugins/opl-mcp-apps/src/client/plugin";
+import { DomainDetailViews } from "../../plugins/opl-studio-client/src/client/workbench/domainDetailViews";
+import { McpAppsClientContext } from "../../plugins/opl-studio-client/src/client/composition/mcpAppsClient";
 
 test("task detail delegates exact item and view to the DSH MCP Apps client", () => {
   let received: any;

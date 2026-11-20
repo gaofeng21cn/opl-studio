@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const manifestPath = path.join(root, "src", "composition", "deepseekHarnessSourceManifest.json");
+export const manifestPath = path.join(root, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json");
 export const packageJsonPath = path.join(root, "package.json");
 export const packageLockPath = path.join(root, "package-lock.json");
 export const profilePath = path.join(root, "contracts", "opl-studio-profile.json");
@@ -63,7 +63,7 @@ function assertPackageAlignment(packageJson, packageLock, cohort) {
 
 export function readDshBinding({ repositoryRoot = root, validatePackages = true, validateProfile = true } = {}) {
   const resolvedRoot = path.resolve(repositoryRoot);
-  const manifest = readJson(path.join(resolvedRoot, "src", "composition", "deepseekHarnessSourceManifest.json"));
+  const manifest = readJson(path.join(resolvedRoot, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json"));
   const { upstream, cohort, parsed } = validateManifest(manifest);
   const packageJson = readJson(path.join(resolvedRoot, "package.json"));
   const packageLock = readJson(path.join(resolvedRoot, "package-lock.json"));
@@ -101,18 +101,19 @@ export function dshPackageNames(binding) {
 
 export function upgradeWriteSet() {
   return [
-    "src/composition/deepseekHarnessSourceManifest.json",
-    "src/composition/dshSlotHost.tsx",
-    "src/integrations/deepseek-harness/**",
-    "src/vendor/deepseek-harness/**",
+    "packages/dsh-adapters/deepseekHarnessSourceManifest.json",
+    "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
+    "plugins/opl-studio-client/src/client/integrations/deepseek-harness/**",
+    "packages/dsh-adapters/patches/**",
+    "vendor/deepseek-harness/**",
     "package.json",
     "package-lock.json",
     "contracts/opl-studio-profile.json",
     "src/candidateContractEvidence.json",
-    "src/workbench/codexWorkbenchStyles.ts",
-    "src/workbench/App.tsx",
-    "src/workbench/SettingsPanel.tsx",
-    "src/workbench/settings/**",
+    "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts",
+    "plugins/opl-studio-client/src/client/workbench/App.tsx",
+    "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx",
+    "plugins/opl-studio-client/src/client/workbench/settings/**",
     "tsconfig.json",
     "scripts/vite-build-renderer-entry.mjs",
     "scripts/vite-node-module-stub.mjs",

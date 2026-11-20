@@ -172,7 +172,7 @@ flow, QR, fingerprint, claimed device, revocation and narrow layout. It does
 not establish public Relay reachability or native iOS qualification; those
 require their corresponding live transport and native-client checks.
 
-`src/host/vendor/dsh-remote/provenance.json` records the exact upstream paths,
+`vendor/dsh-remote/provenance.json` records the exact upstream paths,
 revision and local SHA-256 values. To refresh from a reviewed checkout at the
 contract’s pinned revision, run `node scripts/verify-link-remote.mjs --source /path/to/ds-harness-remote`. The script checks the Git revision, imports the
 unchanged Host bundle and protocol schema, and rebuilds only the schema module.

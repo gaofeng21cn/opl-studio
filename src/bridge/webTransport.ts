@@ -1,4 +1,4 @@
-import { normalizeBridgeEvent, parseEventSourceMessage } from "./oplBridge-normalizers-events";
+import { normalizeBridgeEvent, parseEventSourceMessage } from "@gaofeng21cn/opl-host-contracts/events";
 import type { OplStateReadback, OplBridgeEvent, OplStudioSurface } from "@gaofeng21cn/opl-host-contracts";
 
 type WebSurface = OplStudioSurface;

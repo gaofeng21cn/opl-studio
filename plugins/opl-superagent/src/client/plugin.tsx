@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Hammer } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
-import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/index";
+import { Button } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/index";
 import type { SuperagentState } from "@gaofeng21cn/opl-host-contracts";
 import "./superagent.css";
 

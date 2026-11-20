@@ -10,7 +10,6 @@ coverage
 docs
 tests
 desktop/*
-!desktop/official-profile.mjs
 !desktop/deep-links.mjs
 assets
 electron-builder.yml

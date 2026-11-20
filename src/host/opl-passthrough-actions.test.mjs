@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { compactFastState, createOplPassthrough } from "./opl-passthrough.mjs";
+import { compactFastState, createOplPassthrough } from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
 
 const action = (action_id) => ({ action_id, label: action_id, route: "opl app action execute", internal_trace: "omit" });
 

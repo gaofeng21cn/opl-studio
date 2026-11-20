@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdtemp, mkdir, writeFile, rename, rm } from "node:fs/promises";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
-import { CodexAppServerTransport } from "../../src/host/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 
 // A disposable canonical Host for public WSS/native qualification. Account
 // authorization uses the real Framework bridge; no token is accepted as an argument.

@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { readDshBinding } from "./dsh-upstream.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const vendorRoot = path.join(root, "src", "vendor", "deepseek-harness");
-const manifestPath = path.join(root, "src", "composition", "deepseekHarnessSourceManifest.json");
+const vendorRoot = path.join(root, "vendor", "deepseek-harness");
+const manifestPath = path.join(root, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json");
 
 function fail(message) {
   throw new Error(message);
@@ -52,7 +52,7 @@ function applyPatches(directory, manifest, { reverse = false } = {}) {
   for (const patch of reverse ? [...patches].reverse() : patches) {
     if (patch.upstream_ref !== manifest.upstream.ref) fail(`DSH compatibility patch ref drift: ${patch.path}`);
     const patchPath = path.resolve(root, patch.path);
-    if (!patchPath.startsWith(path.join(root, "src/integrations/deepseek-harness/patches/"))) fail("DSH compatibility patch must have a canonical integration owner");
+    if (!patchPath.startsWith(path.join(root, "packages/dsh-adapters/patches/"))) fail("DSH compatibility patch must have a canonical integration owner");
     if (sha256(patchPath) !== patch.sha256) fail(`DSH compatibility patch hash mismatch: ${patch.path}`);
     // The temporary provenance copy has no .gitattributes. Keep canonical LF
     // bytes even when the host enables core.autocrlf (as Windows runners do).
@@ -178,7 +178,7 @@ function sync(sourceRoot) {
       ]
     },
     snapshot: {
-      local_root: "src/vendor/deepseek-harness",
+      local_root: "vendor/deepseek-harness",
       byte_identical: !(currentManifest.compatibility_patches?.length),
       byte_identical_to_pinned_ref: !(currentManifest.compatibility_patches?.length),
       provenance: "pinned_upstream_plus_reviewed_compatibility_patches",
@@ -187,8 +187,8 @@ function sync(sourceRoot) {
     },
     compatibility_patches: currentManifest.compatibility_patches ?? [],
     opl_delta_roots: [
-      "src/composition",
-      "src/integrations/deepseek-harness",
+      "plugins/opl-studio-client/src/client/composition",
+      "plugins/opl-studio-client/src/client/integrations/deepseek-harness",
       "scripts/build-renderer.mjs",
       "scripts/deepseek-harness-gui-vendor.mjs"
     ],

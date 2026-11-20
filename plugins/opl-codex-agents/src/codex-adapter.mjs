@@ -1,5 +1,5 @@
 import { LlmAdapter, createAssistantMessage } from "@deepseek-ai/dsh-llm";
-import { threadPermissionOverrides, turnPermissionOverrides } from "../../../src/host/app-server-protocol.mjs";
+import { threadPermissionOverrides, turnPermissionOverrides } from "@gaofeng21cn/opl-host-kit/app-server-protocol";
 
 const PROVIDER = "opl-codex";
 const textOf = (content) => (Array.isArray(content) ? content : [])

@@ -5,9 +5,9 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CodexAppServerTransport } from '../../src/host/app-server-transport.mjs';
-import { createWorkbenchTaskExecutor } from '../../src/host/workbench-task-executor.mjs';
-import { createOplPassthrough } from '../../src/host/opl-passthrough.mjs';
+import { CodexAppServerTransport } from '../../plugins/opl-codex-native/src/app-server-transport.mjs';
+import { createWorkbenchTaskExecutor } from '../../plugins/opl-framework-bridge/src/workbench-task-executor.mjs';
+import { createOplPassthrough } from '../../plugins/opl-framework-bridge/src/opl-passthrough.mjs';
 import { createWebUiHost } from '../../src/host/http-host.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

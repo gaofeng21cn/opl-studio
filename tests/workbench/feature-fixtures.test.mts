@@ -1,15 +1,15 @@
 import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts";
 import { expect, test } from 'bun:test';
 import { featureCompletenessFixture } from '../fixtures/feature-completeness.mjs';
-import { agentPackageSelectionIntent, deriveWorkbenchModelFromState } from '../../src/workbench/workbenchModel';
-import { compactFastState } from '../../src/host/opl-passthrough.mjs';
+import { agentPackageSelectionIntent, deriveWorkbenchModelFromState } from '../../plugins/opl-studio-client/src/client/workbench/workbenchModel';
+import { compactFastState } from '../../plugins/opl-framework-bridge/src/opl-passthrough.mjs';
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: 'test-fixture', defaultModel: 'codex-fixture', defaultReasoningEffort: 'high', visibleModels: [{ id: 'codex-fixture' }], reasoningEfforts: ['high'],
   autoLabel: { zh: '自动（推荐）', en: 'Auto (recommended)' }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { normalizeActionReceipt } = await import('../../src/bridge/oplBridge');
-import { actionReceiptView } from '../../src/workbench/actionReceiptView';
-import { readMemoryRefs } from '../../src/workbench/MemoryRefsPanel';
+const { normalizeActionReceipt } = await import('../../plugins/opl-studio-client/src/client/bridge/oplBridge');
+import { actionReceiptView } from '../../plugins/opl-studio-client/src/client/workbench/actionReceiptView';
+import { readMemoryRefs } from '../../plugins/opl-studio-client/src/client/workbench/MemoryRefsPanel';
 
 test('MAS MAG RCA directory, selection, lifecycle actions and Runtime survive real fast projection', () => {
   const model = deriveWorkbenchModelFromState(compactFastState({ app_state: featureCompletenessFixture() }));

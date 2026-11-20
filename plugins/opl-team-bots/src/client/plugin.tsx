@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import type { Context } from "@deepseek-ai/cordis";
-import { Button } from "../../../../src/vendor/deepseek-harness/packages/client/ui-primitives/src/index";
+import { Button } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/index";
 import type { TeamBotsState } from "@gaofeng21cn/opl-host-contracts";
 import "./team-bots.css";
 

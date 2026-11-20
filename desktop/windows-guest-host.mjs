@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { nativeHostOptions, startGuestHostCore } from "./guest-host-core.mjs";
 import { validateWindowsRuntimeIdentity } from "./windows-runtime.mjs";
-import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "./official-profile.mjs";
+import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "../packages/host-kit/official-profile.mjs";
 
 export async function startWindowsGuestHost({ input = process.stdin, output = process.stdout, createCore,
   platform = process.platform, arch = process.arch } = {}) {

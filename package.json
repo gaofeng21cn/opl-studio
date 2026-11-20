@@ -215,6 +215,7 @@
     "@roamhq/wrtc": "0.10.0"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.14",
     "@deepseek-ai/dsh-api-remotes": "0.2.2-rc.3",
     "@deepseek-ai/dsh-api-workspace-controller": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-locale": "0.2.2-rc.3",
@@ -223,6 +224,9 @@
     "@deepseek-ai/dsh-client-ui-session": "0.2.2-rc.3",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.3",
     "@deepseek-ai/dsh-plugin-detail": "0.2.2-rc.3",
+    "@gaofeng21cn/opl-dsh-adapters": "file:packages/dsh-adapters",
+    "@gaofeng21cn/opl-host-contracts": "file:packages/host-contracts",
+    "@gaofeng21cn/opl-host-kit": "file:packages/host-kit",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

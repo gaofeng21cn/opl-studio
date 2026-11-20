@@ -17,13 +17,13 @@ Object.assign(globalThis, {
 });
 
 const [root, commands, action, events, models, platform, threads] = await Promise.all([
-  import("../../src/bridge/oplBridge"),
-  import("../../src/bridge/oplBridge-commands"),
-  import("../../src/bridge/oplBridge-normalizers-action"),
-  import("../../src/bridge/oplBridge-normalizers-events"),
-  import("../../src/bridge/oplBridge-normalizers-codex"),
-  import("../../src/bridge/oplBridge-normalizers-platform"),
-  import("../../src/bridge/oplBridge-normalizers-threads")
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge"),
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-commands"),
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action"),
+  import("../../packages/host-contracts/src/events"),
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-codex"),
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-platform"),
+  import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-threads")
 ]);
 
 test("root facade preserves module export identity", () => {

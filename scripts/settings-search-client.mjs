@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const patchRoot = new URL("../src/integrations/deepseek-harness/patches/", import.meta.url);
+const patchRoot = new URL("../packages/dsh-adapters/patches/", import.meta.url);
 const sha256 = value => createHash("sha256").update(value).digest("hex");
 
 // Exact context only: an upstream update must be deliberately reviewed, never fuzz-applied.

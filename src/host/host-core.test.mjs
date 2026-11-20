@@ -4,18 +4,18 @@ import os from "node:os";
 import path from "node:path";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
-import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "./app-server-transport.mjs";
-import { ChannelBindingStore } from "./channel-bindings.mjs";
+import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
 import {
   createFrameworkChannelCallbackRegistrar,
   loadFrameworkCordisProfiles
-} from "./framework-channel-bootstrap.mjs";
+} from "../../plugins/opl-framework-bridge/src/framework-channel-bootstrap.mjs";
 import { OplHostCore } from "../../plugins/opl-host-core/src/service.mjs";
 import { createOplHostCore as createHostCore } from "./create-host.mjs";
 import { OplCodexNative } from "../../plugins/opl-codex-native/src/service.mjs";
 import { OplFrameworkBridge } from "../../plugins/opl-framework-bridge/src/service.mjs";
 import { McpAppHost } from "../../plugins/opl-mcp-apps/src/service.mjs";
-import { createOplPassthrough } from "./opl-passthrough.mjs";
+import { createOplPassthrough } from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 const dshHome = await mkdtemp(path.join(os.tmpdir(), "opl-host-test-dsh-"));

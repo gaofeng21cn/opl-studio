@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRenderer } from "../build-renderer.mjs";
-import { CodexAppServerTransport } from "../../src/host/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -520,7 +520,7 @@ try {
   await copyFile(narrowScreenshot, narrowOutput);
   const [commit, tree] = (await git("rev-parse", "HEAD", "HEAD^{tree}")).split("\n");
   const sourceStatus = await git("status", "--porcelain", "--untracked-files=no");
-  const vendorManifest = JSON.parse(await readFile(path.join(repositoryRoot, "src", "composition", "deepseekHarnessSourceManifest.json"), "utf8"));
+  const vendorManifest = JSON.parse(await readFile(path.join(repositoryRoot, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json"), "utf8"));
   const receipt = {
     schema: "opl_studio_rendered_ui_acceptance.v1",
     status: "passed",
@@ -530,7 +530,7 @@ try {
     cohort: {
       rendererSha256: await digestFile(path.join(repositoryRoot, "dist", "webui", "renderer.js")),
       packageLockSha256: await digestFile(path.join(repositoryRoot, "package-lock.json")),
-      dshManifestSha256: await digestFile(path.join(repositoryRoot, "src", "composition", "deepseekHarnessSourceManifest.json")),
+      dshManifestSha256: await digestFile(path.join(repositoryRoot, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json")),
       dshUpstreamRef: vendorManifest.upstream.ref,
       dshVendoredFileCount: vendorManifest.snapshot.file_count
     },

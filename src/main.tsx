@@ -1,5 +1,5 @@
 import { AppWebEntry } from "@deepseek-ai/dsh-client-web";
-import type { OplStudioSurface } from "./bridge/oplBridge";
+import type { OplStudioSurface } from "@gaofeng21cn/opl-host-contracts";
 import { installWebTransport } from "./bridge/webTransport";
 import { bootDesktopDshClient } from "./composition/dshClientModuleRuntime";
 

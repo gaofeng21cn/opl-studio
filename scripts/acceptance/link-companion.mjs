@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../src/host/link-loopback.mjs";
+import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../plugins/opl-host-core/src/link-loopback.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildRendererEntry } from "../vite-build-renderer-entry.mjs";
 import { readCodexModelPolicy } from "../build-renderer.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
-import { CodexAppServerTransport } from "../../src/host/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-settings-"));
@@ -49,9 +49,9 @@ try {
   await writeFile(entry, `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
-    import ${JSON.stringify(path.join(root, "src/integrations/deepseek-harness/theme.ts"))};
-    import { LinkCompanionSection } from ${JSON.stringify(path.join(root, "src/workbench/settings/LinkCompanionSection.tsx"))};
-    import { codexWorkbenchStyles } from ${JSON.stringify(path.join(root, "src/workbench/codexWorkbenchStyles.ts"))};
+    import ${JSON.stringify(path.join(root, "plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme.ts"))};
+    import { LinkCompanionSection } from ${JSON.stringify(path.join(root, "plugins/opl-studio-client/src/client/workbench/settings/LinkCompanionSection.tsx"))};
+    import { codexWorkbenchStyles } from ${JSON.stringify(path.join(root, "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts"))};
     import { installWebTransport } from ${JSON.stringify(path.join(root, "src/bridge/webTransport.ts"))};
     installWebTransport();
     const original = window.oplStudio.linkCompanion.createPairing;

@@ -4,6 +4,24 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+function bundledPluginPackageArgs(rootManifest, manifest) {
+  const localLibraries = { ...rootManifest.dependencies, ...rootManifest.devDependencies };
+  const packageNames = new Set([
+    ...Object.keys(rootManifest.dependencies ?? {}),
+    ...Object.keys(rootManifest.devDependencies ?? {}),
+    ...Object.keys(rootManifest.optionalDependencies ?? {}),
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.devDependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}),
+    ...Object.keys(manifest.optionalDependencies ?? {}),
+  ]);
+  return [
+    "--packages=bundle",
+    ...[...packageNames]
+      .filter((name) => !localLibraries[name]?.startsWith("file:packages/"))
+      .flatMap((name) => ["--external", name]),
+  ];
+}
 
 export function buildDshPlugins(selected, { skipBuild = false } = {}) {
   const packages = [];
@@ -11,22 +29,24 @@ export function buildDshPlugins(selected, { skipBuild = false } = {}) {
   if (selected) for (const name of selected) {
     if (!entries.some(entry => entry.name === name)) throw new Error(`Unknown DSH source package: ${name}`);
   }
+  const rootManifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   for (const entry of entries) {
     if (selected && !selected.includes(entry.name)) continue;
     const directory = path.join(root, "plugins", entry.name);
     const manifest = JSON.parse(fs.readFileSync(path.join(directory, "package.json"), "utf8"));
     if (!skipBuild) {
+      const packageArgs = bundledPluginPackageArgs(rootManifest, manifest);
       fs.copyFileSync(path.join(root, entry.name === "opl-superagent-engine" ? "vendor/dsh-superagent/LICENSE" : "LICENSE"), path.join(directory, "LICENSE"));
       const source = path.join(directory, "src/index.mjs");
       if (fs.existsSync(source)) {
         fs.mkdirSync(path.join(directory, "lib"), { recursive: true });
-        const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", "--packages=external", "--minify-syntax", "--outfile", path.join(directory, "lib/index.mjs")], { cwd: root, encoding: "utf8" });
+        const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", ...packageArgs, "--minify-syntax", "--outfile", path.join(directory, "lib/index.mjs")], { cwd: root, encoding: "utf8" });
         if (result.status !== 0) throw new Error(result.stderr || result.stdout || `Failed to build ${manifest.name}`);
       }
       for (const entrypoint of ["parent-transport", "workbench-profile"]) {
         const source = path.join(directory, `src/${entrypoint}.mjs`);
         if (!fs.existsSync(source)) continue;
-        const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", "--packages=external", "--minify-syntax", "--outfile", path.join(directory, `lib/${entrypoint}.mjs`)], { cwd: root, encoding: "utf8" });
+        const result = spawnSync("bun", ["build", source, "--target=node", "--format=esm", ...packageArgs, "--minify-syntax", "--outfile", path.join(directory, `lib/${entrypoint}.mjs`)], { cwd: root, encoding: "utf8" });
         if (result.status !== 0) throw new Error(result.stderr || result.stdout);
       }
       const client = path.join(directory, "src/client.js");

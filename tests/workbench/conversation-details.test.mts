@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { deriveThreadMessages } from "../../src/workbench/workbenchModel";
-import { ConversationMessages } from "../../src/workbench/ConversationMessages";
+import { deriveThreadMessages } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
+import { ConversationMessages } from "../../plugins/opl-studio-client/src/client/workbench/ConversationMessages";
 
 test("only protocol-typed details collapse; failures and final prose stay visible", () => {
   const source = { turns: [{ id: "turn-1", items: [

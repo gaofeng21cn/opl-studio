@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import "../../src/integrations/deepseek-harness/theme";
-import { codexWorkbenchStyles } from "../../src/workbench/codexWorkbenchStyles";
-import { RuntimeOverviewPage } from "../../src/workbench/RuntimeOverviewPage";
-import { deriveServiceRecoveryModel } from "../../src/workbench/serviceRecoveryModel";
+import "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme";
+import { codexWorkbenchStyles } from "../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
+import { RuntimeOverviewPage } from "../../plugins/opl-studio-client/src/client/workbench/RuntimeOverviewPage";
+import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
 // Uses the shipped renderer and DSH theme, with deterministic owner projections.

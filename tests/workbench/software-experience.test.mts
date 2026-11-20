@@ -3,20 +3,20 @@ import { expect, test } from "bun:test";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { Window } from "happy-dom";
-import { deriveWorkbenchModelFromState } from "../../src/workbench/workbenchModel";
-import { softwareAttentionItems, softwareCanStart } from "../../src/workbench/softwareExperience";
-import { DshPluginManagerOwner } from "../../src/composition/dshPluginManagerOwner";
+import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
+import { softwareAttentionItems, softwareCanStart } from "../../plugins/opl-studio-client/src/client/workbench/softwareExperience";
+import { DshPluginManagerOwner } from "../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner";
 import { McpAppWorkspace } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
-import { KnowledgeSourcesSection } from "../../src/workbench/KnowledgeSourcesSection";
-import { readKnowledgeSourcesProjection } from "../../src/workbench/knowledgeSources";
-import { compactPackageRows } from "../../src/host/opl-passthrough-parts/contributions-packages.mjs";
+import { KnowledgeSourcesSection } from "../../plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
+import { readKnowledgeSourcesProjection } from "../../plugins/opl-studio-client/src/client/workbench/knowledgeSources";
+import { compactPackageRows } from "../../plugins/opl-framework-bridge/src/opl-passthrough-parts/contributions-packages.mjs";
 
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: "test-fixture", defaultModel: "codex-fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "codex-fixture" }], reasoningEfforts: ["high"],
   autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { settingsDefaults } = await import("../../src/workbench/settingsModel");
+const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel");
 
 function model() {
   return deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([1, 2, 3].map(id => ({
@@ -156,7 +156,7 @@ test('an active Package task replaces repeat installation controls with its curr
 });
 
 test('background Package tasks are discovered outside Software Center and completion requests fresh state', async () => {
-  const { usePackageOperations } = await import('../../src/workbench/usePackageOperations');
+  const { usePackageOperations } = await import('../../plugins/opl-studio-client/src/client/workbench/usePackageOperations');
   await withDom(async (_container, render) => {
     let reads = 0, completed = 0;
     const bridge = { executeAction: async (request: any) => {

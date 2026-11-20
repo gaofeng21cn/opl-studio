@@ -12,12 +12,12 @@ import {
   validateNonLiveDeliveryEvidence
 } from "./opl-studio-gates.mjs";
 
-const app = read("src/workbench/App.tsx");
+const app = read("plugins/opl-studio-client/src/client/workbench/App.tsx");
 const rendererSource = readRendererSource();
-const model = read("src/workbench/workbenchModel.ts");
-const primitiveSource = read("src/ui/workbenchPrimitives.tsx");
-const moduleRegistry = read("src/renderers/moduleRegistry.ts");
-const settingsModel = read("src/workbench/settingsModel.ts");
+const model = read("plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+const primitiveSource = read("plugins/opl-studio-client/src/client/ui/workbenchPrimitives.tsx");
+const moduleRegistry = read("plugins/opl-studio-client/src/client/renderers/moduleRegistry.ts");
+const settingsModel = read("plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
 const evidenceSource = read("src/candidateContractEvidence.json");
 const desktopBuild = read("scripts/build-desktop.mjs");
 const desktopMain = read("desktop/main.mjs");
@@ -67,11 +67,11 @@ for (const marker of ['<div id="root"></div>']) {
 }
 assert(!rendererShell.includes("branding/opl-app-logo.png"), "renderer shell must keep product identity text-only");
 assertNoFalseReadyFields({
-  "src/workbench/App.tsx": app,
-  "src/workbench/workbenchModel.ts": model,
-  "src/workbench/settingsModel.ts": settingsModel,
-  "src/ui/workbenchPrimitives.tsx": primitiveSource,
-  "src/renderers/moduleRegistry.ts": moduleRegistry,
+  "plugins/opl-studio-client/src/client/workbench/App.tsx": app,
+  "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts": model,
+  "plugins/opl-studio-client/src/client/workbench/settingsModel.ts": settingsModel,
+  "plugins/opl-studio-client/src/client/ui/workbenchPrimitives.tsx": primitiveSource,
+  "plugins/opl-studio-client/src/client/renderers/moduleRegistry.ts": moduleRegistry,
   "src/candidateContractEvidence.json": evidenceSource,
   "src/main.tsx": rendererEntry,
   "scripts/build-desktop.mjs": desktopBuild,

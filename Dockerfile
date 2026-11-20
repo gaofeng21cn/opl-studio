@@ -56,7 +56,6 @@ COPY LICENSE ./LICENSE
 COPY contracts ./contracts
 COPY scripts ./scripts
 COPY desktop/deep-links.mjs ./desktop/deep-links.mjs
-COPY desktop/official-profile.mjs ./desktop/official-profile.mjs
 COPY src ./src
 COPY tsconfig.json tsconfig.typecheck.json ./
 COPY --from=app-product-profile /src/one-person-lab-app/contracts ./one-person-lab-app/contracts
@@ -66,6 +65,7 @@ FROM ${NODE_IMAGE} AS production-dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY plugins ./plugins
+COPY packages ./packages
 RUN npm ci --omit=dev --ignore-scripts \
   && npm cache clean --force
 
@@ -87,7 +87,6 @@ RUN apt-get update \
 COPY --from=framework-builder /opt/opl-framework /opt/opl-framework
 COPY --from=codex-builder /opt/codex /opt/codex
 COPY --from=app-product-profile /opt/opl/resources /opt/opl/resources
-COPY desktop/official-profile.mjs ./desktop/official-profile.mjs
 COPY scripts/headless/image-manifest.mjs /tmp/image-manifest.mjs
 ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
 ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
@@ -100,6 +99,8 @@ COPY --from=renderer-builder --chown=node:node /app/plugins ./plugins
 COPY --from=renderer-builder --chown=node:node /app/dist/webui ./dist/webui
 COPY --from=renderer-builder --chown=node:node /app/scripts/headless ./scripts/headless
 COPY --from=renderer-builder --chown=node:node /app/src/host ./src/host
+COPY --from=renderer-builder --chown=node:node /app/packages/host-kit ./packages/host-kit
+COPY --from=renderer-builder --chown=node:node /app/packages/host-contracts/thread-error.mjs ./packages/host-contracts/thread-error.mjs
 
 ENV NODE_ENV=production \
   NARB_DISABLE_NATIVE_CACHE=1 \

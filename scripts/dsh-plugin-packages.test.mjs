@@ -9,12 +9,51 @@ import { once } from "node:events";
 import { runInNewContext } from "node:vm";
 import { Window } from "happy-dom";
 import { createRequire } from "node:module";
+import { parse } from "@babel/parser";
 import { readPluginInventory } from "@deepseek-ai/dsh-host-plugin-inventory";
-import { ThreadAdapterError } from "../src/host/thread-adapter.mjs";
+import { ThreadAdapterError } from "../plugins/opl-codex-native/src/thread-adapter.mjs";
 import { createClientRuntimePolicy } from "./client-runtime-policy.mjs";
 import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+
+function* importSpecifiers(node) {
+  if (!node || typeof node !== "object") return;
+  const specifier = node.source ?? node.argument
+    ?? (node.type === "CallExpression" && node.callee.name === "require" ? node.arguments[0] : undefined);
+  if (specifier?.type === "StringLiteral"
+      && (/^(Import|Export|TSImportType)/.test(node.type) || node.type === "CallExpression")) {
+    yield specifier.value;
+  }
+  for (const child of Object.values(node)) yield* importSpecifiers(child);
+}
+
+test("plugin sources use public workspace package boundaries", async () => {
+  const pluginsRoot = path.join(root, "plugins");
+  const violations = [];
+  const plugins = await fs.readdir(pluginsRoot, { withFileTypes: true });
+  for (const plugin of plugins.filter((entry) => entry.isDirectory())) {
+    const sourceRoot = path.join(pluginsRoot, plugin.name, "src");
+    const files = await fs.readdir(sourceRoot, { withFileTypes: true, recursive: true });
+    for (const file of files) {
+      if (!file.isFile() || !/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file.name)) continue;
+      const filename = path.join(file.parentPath, file.name);
+      const source = parse(await fs.readFile(filename, "utf8"), { sourceType: "unambiguous",
+        sourceFilename: filename, createImportExpressions: true,
+        plugins: [["typescript", { dts: /\.d\.[cm]?ts$/.test(file.name) }],
+          ...(file.name.endsWith("x") ? ["jsx"] : [])] });
+      for (const specifier of new Set(importSpecifiers(source.program))) {
+        if (!specifier.startsWith(".")) continue;
+        const target = path.relative(root, path.resolve(path.dirname(filename), specifier)).split(path.sep);
+        if (target[0] === "src" || target[0] === "scripts" || target[0] === "packages"
+            || (target[0] === "plugins" && target[1] !== plugin.name)) {
+          violations.push(`${path.relative(root, filename)} -> ${specifier}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(violations, []);
+});
 
 test("packed DSH packages boot outside the checkout and retain native inventory metadata", async () => {
   const staging = await fs.mkdtemp(path.join(os.tmpdir(), "opl-dsh-packages-"));
@@ -31,6 +70,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         ? (await fs.readdir(path.join(root, "node_modules", entry.name))).map(name => `${entry.name}/${name}`)
         : [entry.name];
       for (const name of names) {
+        if (manifest.devDependencies[name]?.startsWith("file:packages/")) continue;
         if (!registryComposition && manifest.dependencies[name]?.startsWith("file:plugins/")) continue;
         const destination = path.join(staging, "node_modules", name);
         await fs.mkdir(path.dirname(destination), { recursive: true });
@@ -88,6 +128,8 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         __OPL_DEEP_LINK_POLICY__: { source: "stale-renderer-policy" }
       };
       const require = createRequire(path.join(staging, "package.json"));
+      const frameworkBridge = await import(pathToFileURL(require.resolve("@gaofeng21cn/opl-framework-bridge")));
+      assert.equal(typeof frameworkBridge.createOplPassthrough, "function", "the carrier consumes the Framework bridge package export");
       const seedModule = { exports: {} };
       runInNewContext(await fs.readFile(path.join(staging, "platform/platform-seed.js"), "utf8"), { ...sandbox, module: seedModule, exports: seedModule.exports, require });
       const modules = seedModule.exports.getStaticModules();
@@ -179,7 +221,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
 });
 
 test("typed HTTP errors preserve the shared ABI across isolated plugin bundles", async () => {
-  const source = await fs.readFile(path.join(root, "src/host/thread-adapter.mjs"), "utf8");
+  const source = await fs.readFile(path.join(root, "packages/host-contracts/thread-error.mjs"), "utf8");
   const copy = await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
   const error = new copy.ThreadAdapterError("invalid_workspace_path", "denied", {}, 400);
   assert.ok(error instanceof ThreadAdapterError);

@@ -521,7 +521,7 @@ Settings persistence remains Shell-local UI state. It does not grant system
 write permission or ownership of App settings policy.
 
 Settings action preview, confirmation, execution, feedback and pending workbench settlement
-are maintained by `src/workbench/useSettingsActions.ts`. `App.tsx` supplies the existing
+are maintained by `plugins/opl-studio-client/src/client/workbench/useSettingsActions.ts`. `App.tsx` supplies the existing
 bridge and readback ports, and keeps the shell composition, conversation and turn state.
 The hook retains one mounted owner for confirmation state and cancels pending workbench
 requests on unmount. Framework remains the owner of App action execution authority.

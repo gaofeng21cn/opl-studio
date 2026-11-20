@@ -1,12 +1,12 @@
 import path from "node:path";
-import { checkRegistryUpdates, updateRegistryPlugins } from "../../../packages/host-kit/profile-plugin-updates.mjs";
-import { createSettingsSearchLog } from "../../../src/host/settings-search-log.mjs";
+import { checkRegistryUpdates, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
+import { createSettingsSearchLog } from "./settings-search-log.mjs";
 import { EventEmitter } from "node:events";
-import { createNativeAppUpdaterFromEnvironment } from "../../../src/host/native-app-updater.mjs";
-import { ThreadAdapterError } from "../../../src/host/thread-adapter.mjs";
-import { createLinkCompanion } from "../../../src/host/link-companion.mjs";
-import { createLinkInternet } from "../../../src/host/link-internet.mjs";
-import { createThreadWorkspaceService } from "../../../src/host/thread-workspace-service.mjs";
+import { createNativeAppUpdaterFromEnvironment } from "./native-app-updater.mjs";
+import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
+import { createLinkCompanion } from "./link-companion.mjs";
+import { createLinkInternet } from "./link-internet.mjs";
+import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
 import { Peer } from "@deepseek-ai/dsh-client-connection";
 
 function unavailablePlatformCapability(capability) {

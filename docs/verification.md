@@ -128,7 +128,7 @@ not override a healthy top-level service state.
 
 ## DSH Upstream Upgrade Gate
 
-The upgrade owner is `src/composition/deepseekHarnessSourceManifest.json`. The
+The upgrade owner is `packages/dsh-adapters/deepseekHarnessSourceManifest.json`. The
 repository now reads the DSH ref, package version, package cohort, GUI roots,
 and file inventory from that manifest through `scripts/dsh-upstream.mjs`; the
 vendor checker and candidate validator no longer carry a second hard-coded

@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { resolveHostNode } from "./node-host-runtime.mjs";
 import { codexOfflineSeedEnvironment } from "./codex-offline-seed.mjs";
-import { safeDesktopErrorMessage } from "./official-profile.mjs";
+import { safeDesktopErrorMessage } from "../packages/host-kit/official-profile.mjs";
 
 const FULL_RUNTIME_RESOURCE_DIR = "opl-studio-full-runtime";
 const FULL_RUNTIME_MANIFEST = "full-package-manifest.json";

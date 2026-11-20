@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { ScheduleCreateRequest, ScheduleEditRequest, ScheduleId } from "@deepseek-ai/dsh-schedule/client";
-import { createDshScheduleController } from "../../src/composition/dshScheduleController.ts";
-import type { DshScheduleClient } from "../../src/composition/dshScheduleController.ts";
+import { createDshScheduleController } from "../../plugins/opl-studio-client/src/client/composition/dshScheduleController.ts";
+import type { DshScheduleClient } from "../../plugins/opl-studio-client/src/client/composition/dshScheduleController.ts";
 import {
   applyScheduleEdit, oplScheduleFromTiming, taskCatalogEntry, taskOwnerValues, timingFromOplDraft, validTaskOwnerValues,
-} from "../../src/composition/dshScheduleAdapterModel.ts";
-import type { OplScheduledTask } from "../../src/composition/dshScheduleAdapterModel.ts";
+} from "../../plugins/opl-studio-client/src/client/composition/dshScheduleAdapterModel.ts";
+import type { OplScheduledTask } from "../../plugins/opl-studio-client/src/client/composition/dshScheduleAdapterModel.ts";
 
 const NOW = Date.parse("2030-01-01T00:00:00Z");
 const baseTask = (overrides: Partial<OplScheduledTask> = {}): OplScheduledTask => ({

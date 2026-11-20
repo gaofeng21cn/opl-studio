@@ -3,8 +3,8 @@ import test from "node:test";
 
 import {
   buildRunDetailViewModel
-} from "../../src/workbench/runDetailModel.ts";
-import type { ArtifactPreview, WorkbenchArtifactRef } from "../../src/workbench/workbenchModel.ts";
+} from "../../plugins/opl-studio-client/src/client/workbench/runDetailModel.ts";
+import type { ArtifactPreview, WorkbenchArtifactRef } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
 const inputFile: WorkbenchArtifactRef = {
   id: "input-a",

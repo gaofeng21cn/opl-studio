@@ -1,9 +1,9 @@
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "../../../src/host/app-server-transport.mjs";
-import { ChannelBindingStore } from "../../../src/host/channel-bindings.mjs";
-import { CodexThreadAdapter } from "../../../src/host/thread-adapter.mjs";
+import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "./app-server-transport.mjs";
+import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
+import { CodexThreadAdapter } from "./thread-adapter.mjs";
 
 const defaultWorkspaceRoot = process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD
   ?? process.env.OPL_STUDIO_CODEX_CWD

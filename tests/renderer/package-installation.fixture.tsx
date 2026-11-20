@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../src/integrations/deepseek-harness/theme';
-import { codexWorkbenchStyles } from '../../src/workbench/codexWorkbenchStyles';
-import { ApplicationManagementPage } from '../../src/workbench/ApplicationManagementPage';
-import { ShellOverlaySlot } from '../../src/composition/dshSlotHost-parts/shellSettingsSlots';
-import { StudioContext, type StudioContextValue } from '../../src/composition/dshSlotHost-parts/studioContext';
-import { SettingsActionDialog } from '../../src/workbench/settings/SettingsActionDialog';
-import { deriveWorkbenchModelFromState } from '../../src/workbench/workbenchModel';
-import { settingsDefaults } from '../../src/workbench/settingsModel';
-import { buildSettingsActionViewModel } from '../../src/workbench/settingsActions';
-import { packageActivity, type PackageOperation } from '../../src/workbench/packageOperations';
+import '../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme';
+import { codexWorkbenchStyles } from '../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles';
+import { ApplicationManagementPage } from '../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage';
+import { ShellOverlaySlot } from '../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots';
+import { StudioContext, type StudioContextValue } from '../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext';
+import { SettingsActionDialog } from '../../plugins/opl-studio-client/src/client/workbench/settings/SettingsActionDialog';
+import { deriveWorkbenchModelFromState } from '../../plugins/opl-studio-client/src/client/workbench/workbenchModel';
+import { settingsDefaults } from '../../plugins/opl-studio-client/src/client/workbench/settingsModel';
+import { buildSettingsActionViewModel } from '../../plugins/opl-studio-client/src/client/workbench/settingsActions';
+import { packageActivity, type PackageOperation } from '../../plugins/opl-studio-client/src/client/workbench/packageOperations';
 
 // Shipped Software Center and Shell controls with deterministic owner projections.
 // All software, transfer values and actions in this fixture are illustrative.

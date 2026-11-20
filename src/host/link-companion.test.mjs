@@ -5,10 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createLinkCompanion, LINK_SCHEMA } from "./link-companion.mjs";
-import { CodexAppServerTransport } from "./app-server-transport.mjs";
+import { createLinkCompanion, LINK_SCHEMA } from "../../plugins/opl-host-core/src/link-companion.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost } from "./http-host.mjs";
-import { createWebUiAuth } from "./webui-auth.mjs";
+import { createWebUiAuth } from "../../packages/host-kit/webui-auth.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 async function post(url, route, body, token, headers = {}) {

@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildRenderer } from "../build-renderer.mjs";
-import { CodexAppServerTransport } from "../../src/host/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
 
 // Isolated UI acceptance for the DSH PluginManager page owner adapter. This
@@ -429,7 +429,7 @@ try {
   const narrowScreenshot = path.join(outputRoot, "light-400x800.png");
   await copyFile(await latestScreenshot(cliRoot), narrowScreenshot);
 
-  const manifestPath = path.join(repositoryRoot, "src", "composition", "deepseekHarnessSourceManifest.json");
+  const manifestPath = path.join(repositoryRoot, "packages", "dsh-adapters", "deepseekHarnessSourceManifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const receipt = {
     schema: "opl_studio_plugin_manager_ui_acceptance.v1", status: "passed", evidenceLayer: "local_rendered_candidate", installed: false,

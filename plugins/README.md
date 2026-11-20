@@ -36,17 +36,17 @@ Host 入口导出 Cordis `apply` 与 `inject`；客户端声明 `dsh.client` 和
 启用包的 `dsh.client` 声明生成客户端 graph，由官方 `AppWebEntry` 装载与挂载。
 Electron 只通过受限桥接读取同一 Host graph 的 index injections 和 `/plugins` 资源。
 
-Host 实现在各包 `src/`。共享纯类型由 `packages/host-contracts` 持有；原生
-profile 更新服务由 `packages/host-kit` 的公开入口持有，并随调用插件一起编译。
-Host Core 通过 Cordis 消费 Codex、Framework 和 MCP Apps 服务，不再引用兄弟插件的
-内部源码或在运行时加载 `scripts/`。CLI 保留构建、打包和操作入口。
-其余 `src/host`、客户端组合及集成代码仍是待收拢的过渡布局，不能据包目录宣称源码已完全独立。
-依赖方向和迁移边界以 App 的
+Host 实现在各包 `src/`。Workbench、客户端组合和 slots 归 `opl-studio-client`。
+共享类型、协议、Host 工具和 DSH 文件预览通过 `packages/host-contracts`、
+`packages/host-kit` 与 `packages/dsh-adapters` 的公开入口消费，并随调用插件编译。
+Host Core 通过 Cordis 消费 Codex、Framework 和 MCP Apps 服务。原生 profile 更新服务
+由 `host-kit` 持有，CLI 通过该服务提供更新并负责开发打包。
+依赖方向以 App 的
 [源码所有权合同](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-plugin-composition-taxonomy.json)
 及[插件组合说明](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/product/gui/plugin-composition-map.md)为准。
 `npm run build:plugins` 把 Host 本地依赖打入各包 `lib/`，外部 npm 依赖由宿主提供。
-客户端产物遵守 DSH ModuleLoader 格式。`npm install` 的 prepare 与 renderer 构建都会
-生成 Host 插件及客户端载荷；仅修改源码后跑 Host 测试前也要运行 `build:plugins`。
+客户端产物遵守 DSH ModuleLoader 格式。修改源码后用 `npm run build:plugins` 生成
+载荷，再运行 `npm run test:dsh-plugins` 检查源码边界和仓库外启动。
 
 所有插件统一从 `node_modules/<package-name>` 解析。源码开发使用本地 file 依赖；
 Desktop 打包为真实文件，Docker 保留完整插件目录以满足本地依赖链接。可用性用

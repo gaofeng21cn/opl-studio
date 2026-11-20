@@ -7,8 +7,8 @@ import {
   mergeManagedUpdateProjections,
   parseDomainDetailViewDescriptors,
   readManagedUpdateProjection
-} from "../../src/workbench/workbenchModel.ts";
-import { compactFastState } from "../../src/host/opl-passthrough.mjs";
+} from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
+import { compactFastState } from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
 
 test("runtime projection keeps component health, carriers, and only App-projected maintenance actions", () => {
   const model = deriveWorkbenchModelFromState({
@@ -710,7 +710,7 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
       useHighestSupportedReasoningForUnknown: true
     }
   });
-  const { normalizeCodexCapabilityCatalog, normalizeStateReadback } = await import("../../src/bridge/oplBridge.ts");
+  const { normalizeCodexCapabilityCatalog, normalizeStateReadback } = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
   const readback = normalizeStateReadback({
     profile: "fast",
     app_state: {
@@ -839,8 +839,8 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
 // The overview must preserve the distinction between task data and service health.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RuntimeOverviewPage } from "../../src/workbench/RuntimeOverviewPage";
-import { deriveServiceRecoveryModel } from "../../src/workbench/serviceRecoveryModel";
+import { RuntimeOverviewPage } from "../../plugins/opl-studio-client/src/client/workbench/RuntimeOverviewPage";
+import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
 function renderOverview(overrides: Record<string, unknown> = {}) {
