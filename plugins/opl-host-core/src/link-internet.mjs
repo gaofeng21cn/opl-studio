@@ -60,6 +60,7 @@ export async function authorizeLinkHost({ device, env }) {
 /** The official Remote carrier feeds only the existing Link owner, with one Noise identity. */
 export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
   const directory = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "link-remote");
+  const deviceName = env.OPL_LINK_HOST_NAME || os.hostname();
   const metadataFile = path.join(directory, "link-host.json");
   const identities = new IdentityStore({ directory, role: "host" });
   const store = new ServerCredentialStore(directory);
@@ -113,7 +114,7 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     if (operation) return operation;
     operation = (async () => {
       errorCode = undefined;
-      identity ??= await identities.loadOrCreate(env.OPL_LINK_HOST_NAME || os.hostname());
+      identity ??= await identities.loadOrCreate(deviceName);
       if (!metadata?.enabled || ACCOUNT_ERRORS.has(connection?.lastError()) || !await store.load(serviceOrigin, identity.deviceId)) {
         const credentials = await authorize({ device: { deviceId: identity.deviceId, name: identity.name, role: "host", platform: process.platform, identityKey: identity.publicKey, clientVersion: "0.6.5" }, env });
         validateCredentials(credentials);
@@ -150,9 +151,8 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? "")) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
     identity = await identities.loadExisting();
     if (!identity || identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
-    // loadExisting verifies the files; loadOrCreate initializes the official
-    // store and restores peer pins needed by trustPeer on the next connection.
-    identity = await identities.loadOrCreate(identity.name);
+    // The official store updates the display name in place and restores peer pins.
+    identity = await identities.loadOrCreate(deviceName);
     if (identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
     if (metadata.enabled) await startCarrier();
   } catch (error) { if (error.code !== "ENOENT") { errorCode = error.code ?? "link_host_identity_invalid"; if (errorCode !== "link_account_required") identityError = error; } }

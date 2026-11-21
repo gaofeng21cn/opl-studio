@@ -106,7 +106,7 @@ test("carrier refuses mismatched enrollment identity before persisting or openin
   await assert.rejects(readFile(path.join(root, ".opl-studio/link-remote/server-credentials.json")), error => error.code === "ENOENT");
 });
 
-test("restarted carrier accepts new peers and preserves existing identity pins", { timeout: 10_000 }, async t => {
+test("restarted carrier refreshes the host name and preserves existing identity pins", { timeout: 10_000 }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-restart-test-"));
   const sockets = []; const created = new EventEmitter(); const peers = new Map();
   class ControlSocket extends EventEmitter {
@@ -154,7 +154,7 @@ test("restarted carrier accepts new peers and preserves existing identity pins",
   await carrier.enable(); const firstSocket = await socketAt(0);
   const known = peer(); await firstSocket.next("connect.accepted", await incoming(firstSocket, known));
   const directory = path.join(root, ".opl-studio/link-remote");
-  const identityBefore = await readFile(path.join(directory, "device.json"), "utf8");
+  const identityBefore = JSON.parse(await readFile(path.join(directory, "device.json"), "utf8"));
   const keyBefore = await readFile(path.join(directory, "device.key"), "utf8");
   const pinsBefore = await readFile(path.join(directory, "trusted-peers.json"), "utf8");
   await carrier.close();
@@ -169,7 +169,8 @@ test("restarted carrier accepts new peers and preserves existing identity pins",
   const savedPins = JSON.parse(await readFile(path.join(directory, "trusted-peers.json"), "utf8")).peers;
   assert.equal(savedPins.find(item => item.deviceId === known.deviceId).publicKey, known.identityKey);
   assert.equal(savedPins.find(item => item.deviceId === fresh.deviceId).publicKey, fresh.identityKey);
-  assert.equal(await readFile(path.join(directory, "device.json"), "utf8"), identityBefore);
+  const identityAfter = JSON.parse(await readFile(path.join(directory, "device.json"), "utf8"));
+  assert.deepEqual(identityAfter, { ...identityBefore, name: "Changed environment name" });
   assert.equal(await readFile(path.join(directory, "device.key"), "utf8"), keyBefore);
   assert.equal(authorizations, 1);
 });
