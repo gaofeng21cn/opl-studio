@@ -61,7 +61,7 @@ jobs:
           bun-version: 1.4.0
 
       - name: Set up pnpm (required by DSH profile resolution)
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: "12.18.0"
 

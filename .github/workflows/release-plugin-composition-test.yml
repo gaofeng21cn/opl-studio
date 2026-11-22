@@ -180,7 +180,7 @@ jobs:
         run: node scripts/verify-composition-installation.mjs --receipt composition_receipt.json
 
       - name: Set up pnpm (required by DSH profile resolution)
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: "9"
 
@@ -194,7 +194,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload composition receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dsh-plugin-composition-receipt
           path: composition_receipt.json
@@ -202,7 +202,7 @@ jobs:
           retention-days: 90
 
       - name: Upload exact composition build input
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dsh-plugin-composition-build-input
           path: composition-build-input/
