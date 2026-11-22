@@ -35,7 +35,9 @@ async function startTurn(transport, turnId, options = {}) {
 test("continuous turn activity extends the inactivity window until completion", async (t) => {
   // Given a started turn with an explicit inactivity window.
   const transport = createTransport(t);
+  const started = once(transport, "event");
   await startTurn(transport, "turn-stream");
+  assert.equal((await started)[0].method, "turn/started");
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   const waiting = transport.waitForTurn("turn-stream", 90);
 
