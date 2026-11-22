@@ -45,6 +45,7 @@ type ApplicationManagementPageProps = {
   };
   onOpenSettings?: (destination: SettingsDestinationId, focus?: ResourceSettingsFocus) => void;
   initialTab?: ApplicationManagementTab;
+  requestedFocus?: { packageId: string; revision: number };
   onTabChange?: (tab: ApplicationManagementTab) => void;
   actionFeedback?: SettingsActionFeedback | null;
   actionReceipt?: ActionReceiptView | null;
@@ -57,7 +58,7 @@ type ApplicationManagementPageProps = {
   onOpenInstallationLocation?: (path: string) => void;
 };
 
-export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
@@ -78,6 +79,7 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
   const [pendingPackageId, setPendingPackageId] = useState<string>();
   const [statusFilter, setStatusFilter] = useState("all");
   const [focus, setFocus] = useState<{ packageId: string; revision: number }>();
+  useEffect(() => { if (requestedFocus) setFocus(requestedFocus); }, [requestedFocus]);
   const pendingPackage = model.packageLifecycle.find(item => item.packageId === pendingPackageId);
   const pendingPackageReady = stateStatus === "ready" && pendingPackage && softwareCanStart(pendingPackage)
     && !packageOperations?.operations.some(operation => operation.status === "running"

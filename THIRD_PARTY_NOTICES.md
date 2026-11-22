@@ -2,10 +2,9 @@
 
 ## Billion Context
 
-The advanced Models setting can launch Codex through the original
-`billion-context` npm package. The version and integrity are pinned in
-`package-lock.json`. Copyright © 2026 ranxianglei, MIT license.
-The package includes its license. <https://github.com/ranxianglei/billion-context>
+The Software Center installs the original `billion-context` npm package in the
+DSH profile. Copyright © 2026 ranxianglei, MIT license. The installed package
+includes its license. <https://github.com/ranxianglei/billion-context>
 
 ## DeepSeek Harness
 

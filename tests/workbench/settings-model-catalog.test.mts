@@ -148,11 +148,11 @@ test("custom access is a collapsed Models disclosure after defaults and toggles 
   const writes: boolean[] = [];
   let enabled = false;
   const billionContext = {
-    readBillionContext: async () => ({ enabled, active: false, startupFailed: false }),
+    readBillionContext: async () => ({ enabled, installed: true, version: "0.1.216", availableVersion: null, activeVersion: null, active: false, startupFailed: false }),
     setBillionContext: async (request: { enabled: boolean }) => {
       enabled = request.enabled;
       writes.push(enabled);
-      return { enabled, active: false, startupFailed: false };
+      return { enabled, installed: true, version: "0.1.216", availableVersion: null, activeVersion: null, active: false, startupFailed: false };
     }
   };
   const render = (locale: "zh" | "en") => {

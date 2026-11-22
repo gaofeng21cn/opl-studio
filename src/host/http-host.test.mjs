@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { once } from "node:events";
 import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
@@ -21,18 +21,37 @@ async function post(baseUrl, route, value) {
   return { status: response.status, body: await response.json() };
 }
 
-test("Billion Context preference is off by default and the running Codex remains native until restart", async (t) => {
+test("Billion Context settings project installation and bundle selection from the native profile", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-billion-context-preference-"));
   const env = { ...process.env, OPL_DATA_DIR: directory };
   const transport = new CodexAppServerTransport({ command: process.execPath, args: [fixture], cwd: directory, env });
-  const host = await createWebUiHost({ transport, env, webRoot: directory, opl: { readState: async () => ({}) } });
+  const host = await createHost({ transport, env, dshHome: directory, webRoot: directory, opl: { readState: async () => ({}) } });
   t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
   const route = "/api/codex/billion-context";
   const read = async () => (await fetch(host.url + route)).json();
-  assert.deepEqual(await read(), { enabled: false, active: false, startupFailed: false });
-  assert.deepEqual((await post(host.url, route, { enabled: true })).body, { enabled: true, active: false, startupFailed: false });
+  const uninstalled = await read();
+  assert.equal(uninstalled.installed, false);
+  assert.equal(uninstalled.enabled, false);
+  assert.equal((await post(host.url, route, { enabled: true })).status, 409);
+  const profile = path.join(directory, "profiles", "opl-studio");
+  const plugin = path.join(profile, "node_modules", "billion-context");
+  await mkdir(path.join(plugin, "dist"), { recursive: true });
+  await writeFile(path.join(plugin, "package.json"), JSON.stringify({
+    name: "billion-context", version: "0.1.216", dsh: { bundle: { patch: "./patch.yml" } }
+  }));
+  await writeFile(path.join(plugin, "dist", "index.js"), "");
+  await writeFile(path.join(plugin, "patch.yml"), "[]");
+  const manifestPath = path.join(profile, "package.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, dependencies: { "billion-context": "0.1.216" } }));
+  assert.equal((await read()).enabled, false);
+  const enabled = (await post(host.url, route, { enabled: true })).body;
+  assert.equal(enabled.installed, true);
+  assert.equal(enabled.enabled, true);
+  assert.equal(enabled.active, false);
   assert.equal(transport.command, process.execPath);
-  assert.deepEqual(await read(), { enabled: true, active: false, startupFailed: false });
+  assert.deepEqual(await read(), enabled);
+  assert.deepEqual(JSON.parse(await readFile(manifestPath, "utf8")).dsh.profile.bundles, ["billion-context"]);
   assert.equal((await post(host.url, route, { enabled: false })).body.enabled, false);
 });
 

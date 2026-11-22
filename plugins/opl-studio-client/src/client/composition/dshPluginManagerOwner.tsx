@@ -14,6 +14,7 @@ import { bindSnapshotSelector } from "../../../../../vendor/deepseek-harness/pac
 import type { AgentPackageLifecycleRef, PackageLifecycleActionRef, WorkbenchModel } from "../workbench/workbenchModel";
 import type { WorkbenchSettings } from "../workbench/settingsModel";
 import type { CodexCapabilityCatalog, CodexSkillCapability } from "../bridge/oplBridge";
+import type { BillionContextPreference } from "@gaofeng21cn/opl-host-contracts";
 import type { SettingsDestinationId } from "../workbench/settings/types";
 import { actionPayloadComplete, type SettingsActionRequest } from "../workbench/settingsActions";
 import type { ResourceSettingsFocus, SettingsPanelProps } from "../workbench/settings/types";
@@ -93,12 +94,41 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const navigation = useMemo(() => createNavigationStore().create(), []);
   const useStore = useMemo(() => bindSnapshotSelector(navigation), [navigation]);
   useEffect(() => {
-    if (!props.focus) return;
-    setScope("opl");
-    setQuery(props.focus.packageId);
-    setTypeFilter("all");
-    setStatusFilter("all");
-  }, [props.focus]);
+    if (props.focus) {
+      const showContextPlugin = props.focus.packageId === "billion-context";
+      setScope(showContextPlugin ? "external" : "opl");
+      setQuery(showContextPlugin ? "" : props.focus.packageId);
+      setTypeFilter(showContextPlugin ? "dsh_plugin" : "all");
+      setStatusFilter("all");
+      if (showContextPlugin) navigation.actions.setView({ kind: "list" });
+    }
+  }, [props.focus, navigation]);
+  const dshBridge = typeof window !== "undefined" ? window.oplStudio : undefined;
+  const [contextPlugin, setContextPlugin] = useState<BillionContextPreference>();
+  const [contextBusy, setContextBusy] = useState(false);
+  const [contextError, setContextError] = useState("");
+  useEffect(() => {
+    if (scope !== "external" || kind !== "all" || (props.selectedTab ?? "installed") !== "installed") return;
+    let mounted = true;
+    dshBridge?.readBillionContext?.().then(item => {
+      if (mounted) { setContextPlugin(item); setContextError(""); }
+    }, error => { if (mounted) setContextError(error instanceof Error ? error.message : String(error)); });
+    return () => { mounted = false; };
+  }, [dshBridge, kind, scope, props.selectedTab]);
+  async function changeContext(operation: "install" | "update" | "remove" | "check" | "enable" | "disable") {
+    setContextBusy(true);
+    setContextError("");
+    try {
+      const result = operation === "enable" || operation === "disable"
+        ? await dshBridge?.setBillionContext?.({ enabled: operation === "enable" })
+        : await dshBridge?.manageBillionContext?.({ operation });
+      if (result) setContextPlugin(result);
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setContextBusy(false);
+    }
+  }
   useEffect(() => {
     if (scope === "external" && props.capabilityStatus === "idle") props.onRefreshCapabilities?.();
   }, [scope, props.capabilityStatus, props.onRefreshCapabilities]);
@@ -276,8 +306,40 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     }
   }
   const sortItems = (items: PluginManagerOwnerItem[]) => items.sort((a, b) => a.title.localeCompare(b.title, isZh ? "zh-CN" : "en"));
+  const hasContextUpdate = contextPlugin?.updateAvailable === true;
+  const contextState: SoftwareCatalogState = !contextPlugin ? "unknown" : contextPlugin.startupFailed ? "attention"
+    : hasContextUpdate ? "update_available" : contextPlugin.installed ? "installed" : "not_installed";
+  const contextTitle = "Billion Context";
+  const contextDescription = isZh ? "通过本机代理压缩 Codex 长对话。" : "Compress long Codex conversations through a local proxy.";
+  const contextItems: PluginManagerOwnerItem[] = kind === "all" && dshBridge?.manageBillionContext
+    && (typeFilter === "all" || typeFilter === "dsh_plugin") && matchesState(contextState)
+    && (contextTitle + " dsh acp 上下文 压缩").toLowerCase().includes(query.trim().toLowerCase())
+    ? [{
+      id: "billion-context", title: contextTitle,
+      icon: <SoftwareArtwork identity="billion-context" label={contextTitle} kind="runtime" />,
+      description: <span className="opl-catalog-row-description">{contextDescription}</span>,
+      tags: <CatalogRowFacts type={isZh ? "DSH 插件" : "DSH plugin"} installedVersion={contextPlugin?.version ?? undefined} availableVersion={contextPlugin?.availableVersion ?? undefined} state={contextState} locale={locale} />,
+      status: <CatalogState state={contextState} locale={locale} label={contextPlugin?.installed && !contextPlugin.enabled && !hasContextUpdate ? (isZh ? "已停用" : "Disabled") : undefined} />,
+      detail: <section className="opl-dsh-owner-section">
+        <h4>{contextTitle}</h4>
+        <p>{contextDescription} <a href="https://github.com/ranxianglei/billion-context" target="_blank" rel="noreferrer">{isZh ? "上游项目" : "Upstream project"}</a></p>
+        {contextError && <p role="alert">{contextError}</p>}
+        {contextPlugin && <>
+          {contextPlugin.activeVersion && <p>{isZh ? "运行版本" : "Running version"} {contextPlugin.activeVersion}</p>}
+          {contextPlugin.active !== contextPlugin.enabled && <p role="status">{isZh ? "重启后应用。" : "Applies after restart."}</p>}
+          {contextPlugin.installed ? <>
+            <Button size="sm" disabled={contextBusy} onClick={() => void changeContext(contextPlugin.enabled ? "disable" : "enable")}>{contextPlugin.enabled ? (isZh ? "停用" : "Disable") : (isZh ? "启用" : "Enable")}</Button>
+            <Button size="sm" variant="outline" disabled={contextBusy} onClick={() => void changeContext("check")}>{isZh ? "检查上游更新" : "Check for updates"}</Button>
+            {hasContextUpdate && <Button size="sm" disabled={contextBusy || contextPlugin.active} onClick={() => void changeContext("update")}>{isZh ? "更新" : "Update"}</Button>}
+            <Button size="sm" variant="outline" disabled={contextBusy || contextPlugin.active} onClick={() => void changeContext("remove")}>{isZh ? "卸载" : "Uninstall"}</Button>
+            {contextPlugin.active && <p>{isZh ? "停用并重启后可更新或卸载。" : "Disable and restart before updating or uninstalling."}</p>}
+          </> : <Button size="sm" disabled={contextBusy} onClick={() => void changeContext("install")}>{isZh ? "安装" : "Install"}</Button>}
+        </>}
+      </section>
+    }] : [];
   const groups = scope === "external"
     ? [
+      { id: "dsh-plugins", label: isZh ? "DSH 插件" : "DSH plugins", items: contextItems },
       { id: "codex-plugins", label: isZh ? "Codex 插件" : "Codex plugins", items: sortItems(visible.filter(item => item.catalogSource?.manager === "codex_plugin_manager").map(packageItem)) },
       { id: "codex-skills", label: isZh ? "独立 Skills" : "Independent Skills", items: sortItems(skillItems) },
       { id: "other-sources", label: isZh ? "其他软件与待确认来源" : "Other software and unconfirmed sources", items: sortItems([...visible.filter(item => item.catalogSource?.manager !== "codex_plugin_manager").map(packageItem), ...visibleNative.map(nativeItem)]) }
@@ -295,7 +357,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const filters = <div className="opl-catalog-controls">
     <div className="opl-catalog-scope"><div className="opl-catalog-scope-options" role="group" aria-label={isZh ? "软件来源" : "Software origin"}>{[{ value: "opl", label: isZh ? "OPL 软件" : "OPL software" }, { value: "external", label: isZh ? "其他来源" : "Other sources" }, { value: "components", label: isZh ? "运行组件" : "Runtime components" }].map(option => <Button key={option.value} id={`opl-catalog-scope-${option.value}`} size="sm" variant="outline" aria-pressed={scope === option.value} onClick={() => changeScope(option.value)}>{option.label}</Button>)}</div>{scopeNote ? <p>{scopeNote}</p> : null}</div>
     <div className="opl-dsh-owner-filters"><Input type="search" aria-label={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} value={query} placeholder={isZh ? "搜索软件或插件" : "Search software or plugins"} onChange={event => setQuery(event.target.value)} />
-      {scope !== "components" ? <select aria-label={isZh ? "按类型筛选" : "Filter by type"} value={typeFilter} onChange={event => setTypeFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部类型" : "All types"}</option>{scope === "external" ? <><option value="plugin">{isZh ? "Codex 插件" : "Codex plugins"}</option><option value="skill">Skills</option></> : null}<option value="application">{isZh ? "应用" : "Applications"}</option><option value="agent">{isZh ? "智能体" : "Agents"}</option><option value="capability">{isZh ? "能力包" : "Capabilities"}</option></select> : null}
+      {scope !== "components" ? <select aria-label={isZh ? "按类型筛选" : "Filter by type"} value={typeFilter} onChange={event => setTypeFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部类型" : "All types"}</option>{scope === "external" ? <><option value="plugin">{isZh ? "Codex 插件" : "Codex plugins"}</option>{dshBridge?.manageBillionContext && <option value="dsh_plugin">{isZh ? "DSH 插件" : "DSH plugins"}</option>}<option value="skill">Skills</option></> : null}<option value="application">{isZh ? "应用" : "Applications"}</option><option value="agent">{isZh ? "智能体" : "Agents"}</option><option value="capability">{isZh ? "能力包" : "Capabilities"}</option></select> : null}
       <select aria-label={isZh ? "按状态筛选" : "Filter by status"} value={statusFilter} onChange={event => setStatusFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部状态" : "All statuses"}</option>{(["installed", "update_available", "not_installed", "attention", "unknown"] as const).map(state => <option key={state} value={state}>{catalogStateLabel(state, locale)}</option>)}</select>
     </div>
     {scope === "external" ? <div className="opl-catalog-external-status"><span>{props.capabilityStatus === "loading" ? (isZh ? "正在读取独立 Skills…" : "Reading independent Skills…") : props.capabilityStatus === "error" ? (props.capabilityError || (isZh ? "Skills 读取失败，请重试。" : "Could not read Skills. Try again.")) : props.capabilityStatus === "ready" ? (isZh ? `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} 个 Codex 插件 · ${looseSkills.length} 个独立 Skills` : `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} Codex plugins · ${looseSkills.length} independent Skills`) : (isZh ? "独立 Skills 尚未读取" : "Independent Skills have not been read")}</span>{props.onRefreshCapabilities ? <Button size="sm" variant="outline" disabled={props.capabilityStatus === "loading"} onClick={props.onRefreshCapabilities}>{isZh ? "刷新 Skills" : "Refresh Skills"}</Button> : null}<Button size="sm" variant="outline" disabled={busy} onClick={() => setInstallOpen(true)}>{isZh ? "从清单导入" : "Import manifest"}</Button></div> : null}

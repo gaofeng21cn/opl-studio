@@ -42,7 +42,9 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
   const patches = [
     ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
-    ...dshProfile.layers.flatMap((layer) => layer.patches),
+    // This bundle also ships an agent-loop integration. Studio consumes its
+    // Codex launcher; applying its DSH model/preset patches would change another host.
+    ...dshProfile.layers.filter(layer => layer.packageName !== "billion-context").flatMap(layer => layer.patches),
     ...dshProfile.patches
   ];
   const context = await boot(
@@ -69,7 +71,8 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
         dshHome,
         settingsSearchLogOpenAllowed: !web,
         dshInstallAnchor: installAnchor,
-        dshProfileDir: profileDir
+        dshProfileDir: profileDir,
+        billionContextAdmitted: dshProfile.layers.some(layer => layer.packageName === "billion-context")
       }));
       await ctx.plugin(PluginPackages, { resolution });
     },

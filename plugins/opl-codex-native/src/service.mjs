@@ -1,11 +1,11 @@
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "./app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
+import { hasContextUpdate, readContextPlugin, setContextPluginEnabled, manageContextPlugin } from "./billion-context.mjs";
+import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 
 const defaultWorkspaceRoot = process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD
   ?? process.env.OPL_STUDIO_CODEX_CWD
@@ -35,6 +35,10 @@ export class OplCodexNative extends EventEmitter {
     channelBindingFile,
     dshToolMcp,
     canonicalThreadHost,
+    billionContextAdmitted = false,
+    dshProfileDir,
+    dshInstallAnchor,
+    dshHome,
     env = process.env
   } = {}) {
     super();
@@ -55,17 +59,23 @@ export class OplCodexNative extends EventEmitter {
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
     this.transport.channelBindingStore ??= channelBindingStore;
-    this.contextPreference = path.join(path.dirname(defaultChannelBindingFile(env)), "billion-context-enabled");
+    this.contextProfile = { dshProfileDir, dshInstallAnchor, dshHome };
     this.contextLaunch = null;
     this.contextError = false;
-    if (!transport && existsSync(this.contextPreference)) {
+    this.contextVersion = null;
+    this.contextAvailable = null;
+    if (!transport && dshProfileDir) {
       try {
-        const entry = fileURLToPath(new URL("./dist/index.js", import.meta.resolve("billion-context/package.json")));
-        const { command, args, env: nativeEnv } = this.transport;
-        const launcherEnv = { ...nativeEnv, BILI_CLIENT_BIN: command,
-          ACP_AUTO_UPDATE: "0", BILI_ADVISORY_CHECK: "0" };
-        this.contextLaunch = { command, args, env: nativeEnv };
-        Object.assign(this.transport, { command: process.execPath, args: [entry, "codex", ...args], env: launcherEnv });
+        const { enabled, entry, version } = readContextPlugin(this.contextProfile);
+        if (enabled && (!billionContextAdmitted || !entry)) this.contextError = true;
+        if (enabled && billionContextAdmitted && entry) {
+          const { command, args, env: nativeEnv } = this.transport;
+          const launcherEnv = { ...nativeEnv, BILI_CLIENT_BIN: command,
+            ACP_AUTO_UPDATE: "0", BILI_ADVISORY_CHECK: "0" };
+          this.contextLaunch = { command, args, env: nativeEnv };
+          this.contextVersion = version;
+          Object.assign(this.transport, { command: process.execPath, args: [entry, "codex", ...args], env: launcherEnv });
+        }
       } catch {
         this.contextError = true;
       }
@@ -119,22 +129,42 @@ export class OplCodexNative extends EventEmitter {
   }
 
   readBillionContext() {
+    const { enabled, version, entry } = readContextPlugin(this.contextProfile);
     return {
-      enabled: existsSync(this.contextPreference),
+      enabled,
+      installed: Boolean(entry),
+      version,
+      availableVersion: this.contextAvailable,
+      updateAvailable: hasContextUpdate(this.contextAvailable, version),
+      activeVersion: this.contextLaunch && this.transport.initialized ? this.contextVersion : null,
       active: this.contextLaunch !== null && this.transport.initialized === true,
       startupFailed: this.contextError
     };
   }
 
-  setBillionContext({ enabled }) {
+  async setBillionContext({ enabled }) {
     if (typeof enabled !== "boolean") {
-      throw Object.assign(new Error("Expected a boolean Billion Context preference"), { code: "invalid_request" });
+      throw new ThreadAdapterError("invalid_request", "Expected a boolean Billion Context preference", {}, 400);
     }
-    if (enabled) {
-      mkdirSync(path.dirname(this.contextPreference), { recursive: true, mode: 0o700 });
-      writeFileSync(this.contextPreference, "", { mode: 0o600 });
-    } else {
-      rmSync(this.contextPreference, { force: true });
+    await setContextPluginEnabled(this.contextProfile, enabled);
+    return this.readBillionContext();
+  }
+
+  async manageBillionContext({ operation }) {
+    if (!["check", "install", "update", "remove"].includes(operation))
+      throw new ThreadAdapterError("invalid_request", "Unknown Billion Context package operation", {}, 400);
+    if (this.contextLaunch && operation !== "check")
+      throw new ThreadAdapterError("dsh_plugin_in_use", "Turn off Billion Context and restart before updating or removing it", {}, 409);
+    const { version } = this.readBillionContext();
+    if ((operation === "update" || operation === "remove") && !version) return this.readBillionContext();
+    if (operation === "install" && version) return this.readBillionContext();
+    if (this.contextPackageOperation)
+      throw new ThreadAdapterError("dsh_plugin_busy", "A Billion Context package operation is running", {}, 409);
+    this.contextPackageOperation = manageContextPlugin(this.contextProfile, operation, version);
+    try {
+      this.contextAvailable = await this.contextPackageOperation;
+    } finally {
+      this.contextPackageOperation = null;
     }
     return this.readBillionContext();
   }

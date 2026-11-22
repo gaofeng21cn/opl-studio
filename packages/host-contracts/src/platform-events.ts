@@ -154,6 +154,7 @@ export type OplStudioSurface = Pick<
 > & Partial<CodexThreadAdapterBridge> & {
   readBillionContext?: () => Promise<BillionContextPreference>;
   setBillionContext?: (request: { enabled: boolean }) => Promise<BillionContextPreference>;
+  manageBillionContext?: (request: { operation: "check" | "install" | "update" | "remove" }) => Promise<BillionContextPreference>;
   linkCompanion?: LinkCompanionManagement;
   eventSourceUrl?: string;
   readClientModuleGraph?: () => Promise<DshClientModuleGraph>;
@@ -166,6 +167,11 @@ export type OplStudioSurface = Pick<
 
 export type BillionContextPreference = {
   enabled: boolean;
+  installed: boolean;
+  version: string | null;
+  availableVersion: string | null;
+  updateAvailable: boolean;
+  activeVersion: string | null;
   active: boolean;
   startupFailed: boolean;
 };
@@ -173,6 +179,7 @@ export type BillionContextPreference = {
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   readBillionContext?: OplStudioSurface["readBillionContext"];
   setBillionContext?: OplStudioSurface["setBillionContext"];
+  manageBillionContext?: OplStudioSurface["manageBillionContext"];
   platformCapabilities: OplPlatformCapabilities;
   readSuperagent(): Promise<SuperagentState>;
   executeSuperagent(request: { operation: "start" | "stop" }): Promise<SuperagentState>;

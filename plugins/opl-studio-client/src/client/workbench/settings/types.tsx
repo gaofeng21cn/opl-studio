@@ -68,7 +68,7 @@ export type SettingsPanelProps = {
   onClose?: () => void;
   onOpenSchedules?: () => void;
   onOpenAppWorkspace?: () => void;
-  onOpenSoftwareCenter?: (section?: "applications" | "updates" | "resources" | "sources") => void;
+  onOpenSoftwareCenter?: (section?: "applications" | "updates" | "resources" | "sources", packageId?: string) => void;
   model: WorkbenchModel;
   managedUpdate: ManagedUpdateProjection | null;
   actionViewModel?: SettingsActionViewModel;

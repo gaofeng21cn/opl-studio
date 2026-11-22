@@ -132,6 +132,9 @@ async function dispatchApi(req, res, hostCore) {
     if (req.method === "GET") return json(res, 200, await hostCore.invoke("readBillionContext"));
     if (req.method === "POST") return json(res, 200, await hostCore.invoke("setBillionContext", await body(req)));
   }
+  if (req.method === "POST" && url.pathname === "/api/host/billion-context") {
+    return json(res, 200, await hostCore.invoke("manageBillionContext", await body(req)));
+  }
   if (req.method === "GET" && url.pathname === "/api/codex/models") {
     json(res, 200, await hostCore.invoke("readCodexModels"));
     return;

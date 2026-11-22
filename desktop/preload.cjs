@@ -120,6 +120,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   readCodexModels: () => invoke("readCodexModels"),
   readBillionContext: () => invoke("readBillionContext"),
   setBillionContext: request => invoke("setBillionContext", request),
+  manageBillionContext: request => invoke("manageBillionContext", request),
   readCodexCapabilities: (threadId) => invoke("readCodexCapabilities", { threadId }),
   readCodexPermissionProfiles: () => invoke("readCodexPermissionProfiles"),
   listPendingServerRequests: () => invoke("listPendingServerRequests"),

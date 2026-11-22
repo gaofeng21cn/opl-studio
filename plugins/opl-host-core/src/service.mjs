@@ -380,6 +380,7 @@ export class OplHostCore extends EventEmitter {
       case "readCodexModels": return this.transport.listModels();
       case "readBillionContext": return this.codex.readBillionContext();
       case "setBillionContext": return this.codex.setBillionContext(payload);
+      case "manageBillionContext": return this.codex.manageBillionContext(payload);
       case "readCodexCapabilities": return this.transport.listCapabilities(payload.threadId);
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
       case "pickFiles": return this.platform.pickFiles(payload);

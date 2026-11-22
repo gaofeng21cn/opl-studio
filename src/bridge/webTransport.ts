@@ -203,6 +203,7 @@ export function installWebTransport(): void {
     readCodexModels: () => requestJson("/api/codex/models"),
     readBillionContext: () => requestJson("/api/codex/billion-context"),
     setBillionContext: request => postJson("/api/codex/billion-context", request),
+    manageBillionContext: request => postJson("/api/host/billion-context", request),
     readCodexCapabilities: (threadId) => requestJson(`/api/codex/capabilities${threadId ? `?threadId=${encodeURIComponent(threadId)}` : ""}`),
     readCodexPermissionProfiles: () => requestJson("/api/codex/permission-profiles"),
     listPendingServerRequests: () => requestJson("/api/codex/pending-requests"),

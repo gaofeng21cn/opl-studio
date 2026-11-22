@@ -420,6 +420,7 @@ export function App({
   const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
   const [applicationManagementTab, setApplicationManagementTab] = useState<ApplicationManagementTab>("applications");
+  const [softwareCenterFocus, setSoftwareCenterFocus] = useState<{ packageId: string; revision: number }>();
   const [startupAttempt, setStartupAttempt] = useState(0);
   const [desktopSetup, setDesktopSetup] = useState<FirstInstallSnapshot | null>(null);
   const t = uiCopy[settings.locale];
@@ -2483,7 +2484,7 @@ export function App({
       onPickKnowledgeDirectory={bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined}
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
       onOpenAppWorkspace={() => { onClose?.(); setMcpTaskTarget(undefined); setMcpAppSelectedLaunch(undefined); setPreferredSoftwareEntry(undefined); setPrimaryView("workspace"); }}
-      onOpenSoftwareCenter={(section = "applications") => { onClose?.(); setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 })); setApplicationManagementTab(section); setPrimaryView("applications"); }}
+      onOpenSoftwareCenter={(section = "applications", packageId) => { onClose?.(); setSoftwareCenterFocus(current => packageId ? { packageId, revision: (current?.revision ?? 0) + 1 } : undefined); setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 })); setApplicationManagementTab(section); setPrimaryView("applications"); }}
       model={{ ...model, features: featureRefsWithCodexStatus(model.features, threadDirectoryStatus, threadDirectoryError, stateStatus, {
         ...(activeTurnId ? { 'B0-03': { state: 'available', summary: '当前 canonical turn 已接受并运行；最终结果尚待回读。' } } : {}),
         ...(sendState === 'error' ? { 'B0-03': { state: 'unavailable', summary: composerSubmissionError || '最近一次发送失败；草稿已保留，请重试。' } } : {}),
@@ -2666,6 +2667,7 @@ export function App({
       manifestInstallAction={projectedManifestInstallAction}
       onOpenSettings={(destination, resourceFocus) => setSettingsNavigation(current => ({ open: true, destination, resourceFocus, revision: (current?.revision ?? 0) + 1 }))}
       initialTab={applicationManagementTab}
+      requestedFocus={softwareCenterFocus}
       onTabChange={setApplicationManagementTab}
       actionFeedback={settingsActionFeedback}
       actionReceipt={settingsActionReceipt}

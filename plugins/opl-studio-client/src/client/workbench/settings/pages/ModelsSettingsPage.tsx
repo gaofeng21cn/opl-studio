@@ -9,7 +9,7 @@ import { SettingRow, SettingsGroup, StatusValue } from "../primitives";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
 
-function BillionContextSetting({ zh, bridge }: { zh: boolean; bridge: SettingsPageContext["billionContext"] }) {
+function BillionContextSetting({ zh, bridge, onManage }: { zh: boolean; bridge: SettingsPageContext["billionContext"]; onManage?: () => void }) {
   const read = bridge?.readBillionContext;
   const write = bridge?.setBillionContext;
   const [preference, setPreference] = useState<BillionContextPreference>();
@@ -48,13 +48,15 @@ function BillionContextSetting({ zh, bridge }: { zh: boolean; bridge: SettingsPa
   }
   return <>
     <SettingRow label="Billion Context" detail={detail}>
-      <Switch label="Billion Context" checked={preference?.enabled ?? false} disabled={!preference || busy} onChange={change} />
+      {preference && !preference.installed && !preference.enabled && onManage
+        ? <button className="settings-inline-command" type="button" onClick={onManage}>{zh ? "在软件中心管理" : "Manage in Software Center"}</button>
+        : <Switch label="Billion Context" checked={preference?.enabled ?? false} disabled={!preference || busy} onChange={change} />}
     </SettingRow>
     {status && <p className="settings-inline-note" role="status">{status}</p>}
   </>;
 }
 
-export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged, setPermissionConfirmation, zh, unavailableFixedModel, settings, displayedModelId, modelOptions, renderSettingControl, modelAccessState, projection, navigate, billionContext }: Pick<SettingsPageContext, "onSettingChange" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "zh" | "unavailableFixedModel" | "settings" | "displayedModelId" | "modelOptions" | "renderSettingControl" | "modelAccessState" | "projection" | "navigate" | "billionContext">) {
+export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged, setPermissionConfirmation, zh, unavailableFixedModel, settings, displayedModelId, modelOptions, renderSettingControl, modelAccessState, projection, navigate, billionContext, onOpenSoftwareCenter }: Pick<SettingsPageContext, "onSettingChange" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "zh" | "unavailableFixedModel" | "settings" | "displayedModelId" | "modelOptions" | "renderSettingControl" | "modelAccessState" | "projection" | "navigate" | "billionContext" | "onOpenSoftwareCenter">) {
 
       return <>
         <p className="settings-inline-note">{zh ? "与输入框中的模型选择同步，作用于之后发送的消息和新任务；不会改变正在执行的消息。" : "Shared with the composer. Applies to subsequent messages and new tasks, without changing a running turn."}</p>
@@ -68,7 +70,7 @@ export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged,
           <SettingRow label={codexModelPolicy.customModelAccess.label[settings.locale]} detail={codexModelPolicy.customModelAccess.description[settings.locale]}>
             <Switch label={codexModelPolicy.customModelAccess.label[settings.locale]} checked={settings.customModelAccessEnabled} onChange={value => onSettingChange("customModelAccessEnabled", value)} />
           </SettingRow>
-          <BillionContextSetting zh={zh} bridge={billionContext} />
+          <BillionContextSetting zh={zh} bridge={billionContext} onManage={onOpenSoftwareCenter ? () => onOpenSoftwareCenter("applications", "billion-context") : undefined} />
         </details>
         {unavailableFixedModel && !settings.customModelAccessEnabled && !codexModelPolicy.modelOptions.some(option => option.id === settings.modelAccess) ? <p className="settings-inline-note" role="status">{zh ? "自定义模型支持已关闭，当前固定选择已保留但无法发送。请选择自动或列表中的模型，或在高级模型选项中重新开启。" : "Custom models are disabled. Your fixed selection is preserved, but cannot send. Choose Auto or a listed model, or re-enable access in Advanced model options."}</p> : null}
         <SettingsGroup title={zh ? "执行权限" : "Execution permissions"}>
