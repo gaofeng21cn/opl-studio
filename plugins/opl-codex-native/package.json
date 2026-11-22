@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-codex-native",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Persistent Codex App Server integration for the OPL DSH application host.",
   "type": "module",
   "main": "./lib/index.mjs",
