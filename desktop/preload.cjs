@@ -118,6 +118,8 @@ contextBridge.exposeInMainWorld("oplStudio", {
   readMcpAppResource: request => invoke("readMcpAppResource", request),
   closeMcpApp: request => invoke("closeMcpApp", request),
   readCodexModels: () => invoke("readCodexModels"),
+  readBillionContext: () => invoke("readBillionContext"),
+  setBillionContext: request => invoke("setBillionContext", request),
   readCodexCapabilities: (threadId) => invoke("readCodexCapabilities", { threadId }),
   readCodexPermissionProfiles: () => invoke("readCodexPermissionProfiles"),
   listPendingServerRequests: () => invoke("listPendingServerRequests"),

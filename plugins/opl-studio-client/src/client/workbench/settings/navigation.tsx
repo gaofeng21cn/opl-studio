@@ -146,6 +146,7 @@ export const searchableSettings: Array<{ destination: SettingsDestinationId | "m
   { destination: "account", labels: ["累计用量", "Total usage"] },
   { destination: "models", labels: ["模型", "Model"], keywords: "推理 reasoning 自动 auto" },
   { destination: "models", labels: ["启用自定义模型", "Enable custom models"], keywords: "自定义 第三方 高级 标准智能体 custom third-party advanced standard agents" },
+  { destination: "models", labels: ["Billion Context", "Billion Context"], keywords: "上下文 压缩 长对话 ACP context compression" },
   { destination: "instructions", labels: ["记忆与纠错", "Memory and corrections"], keywords: "记忆 memory context 上下文" },
   { destination: "workspace", labels: ["当前项目", "Current project"], keywords: "文件夹 folder" },
   { destination: "diagnostics", labels: ["应用日志", "Application logs"] },

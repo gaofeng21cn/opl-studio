@@ -21,6 +21,21 @@ async function post(baseUrl, route, value) {
   return { status: response.status, body: await response.json() };
 }
 
+test("Billion Context preference is off by default and the running Codex remains native until restart", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-billion-context-preference-"));
+  const env = { ...process.env, OPL_DATA_DIR: directory };
+  const transport = new CodexAppServerTransport({ command: process.execPath, args: [fixture], cwd: directory, env });
+  const host = await createWebUiHost({ transport, env, webRoot: directory, opl: { readState: async () => ({}) } });
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
+  const route = "/api/codex/billion-context";
+  const read = async () => (await fetch(host.url + route)).json();
+  assert.deepEqual(await read(), { enabled: false, active: false, startupFailed: false });
+  assert.deepEqual((await post(host.url, route, { enabled: true })).body, { enabled: true, active: false, startupFailed: false });
+  assert.equal(transport.command, process.execPath);
+  assert.deepEqual(await read(), { enabled: true, active: false, startupFailed: false });
+  assert.equal((await post(host.url, route, { enabled: false })).body.enabled, false);
+});
+
 test("HTTP send wait expiry preserves the accepted run and blocks reload until its late result", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-http-wait-expiry-"));
   const appServerLog = path.join(directory, "app-server.jsonl");

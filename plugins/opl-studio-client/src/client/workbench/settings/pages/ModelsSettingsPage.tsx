@@ -1,12 +1,60 @@
 import { Switch } from "@deepseek-ai/dsh-client-ui-primitives";
+import { useEffect, useState } from "react";
 import type { WorkbenchSettings } from "../../settingsModel";
+import type { BillionContextPreference } from "@gaofeng21cn/opl-host-contracts";
 
 import { codexModelPolicy, modelLabel } from "../../modelPolicy";
 
 import { SettingRow, SettingsGroup, StatusValue } from "../primitives";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged, setPermissionConfirmation, zh, unavailableFixedModel, settings, displayedModelId, modelOptions, renderSettingControl, modelAccessState, projection, navigate }: Pick<SettingsPageContext, "onSettingChange" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "zh" | "unavailableFixedModel" | "settings" | "displayedModelId" | "modelOptions" | "renderSettingControl" | "modelAccessState" | "projection" | "navigate">) {
+
+function BillionContextSetting({ zh, bridge }: { zh: boolean; bridge: SettingsPageContext["billionContext"] }) {
+  const read = bridge?.readBillionContext;
+  const write = bridge?.setBillionContext;
+  const [preference, setPreference] = useState<BillionContextPreference>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    read?.().then(value => {
+      if (mounted) setPreference(value);
+    }, () => {
+      if (mounted) setError(true);
+    });
+    return () => { mounted = false; };
+  }, [read]);
+  if (!read || !write) return null;
+  const detail = zh
+    ? "通过本机代理压缩 Codex 长对话，并在本机保存可恢复的上下文。重启后应用。"
+    : "Compress long Codex conversations through a local proxy and store recoverable context on this host. Applies after restart.";
+  const status = error
+    ? (zh ? "无法读取或保存设置" : "Could not read or save the preference")
+    : preference?.enabled && preference.startupFailed
+      ? (zh ? "代理启动失败，已切回原生 Codex" : "Proxy startup failed. Switched to native Codex.")
+      : preference && preference.enabled !== preference.active
+        ? (zh ? "等待重启" : "Restart pending")
+        : null;
+  async function change(enabled: boolean) {
+    setBusy(true);
+    setError(false);
+    try {
+      setPreference(await write!({ enabled }));
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <>
+    <SettingRow label="Billion Context" detail={detail}>
+      <Switch label="Billion Context" checked={preference?.enabled ?? false} disabled={!preference || busy} onChange={change} />
+    </SettingRow>
+    {status && <p className="settings-inline-note" role="status">{status}</p>}
+  </>;
+}
+
+export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged, setPermissionConfirmation, zh, unavailableFixedModel, settings, displayedModelId, modelOptions, renderSettingControl, modelAccessState, projection, navigate, billionContext }: Pick<SettingsPageContext, "onSettingChange" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "zh" | "unavailableFixedModel" | "settings" | "displayedModelId" | "modelOptions" | "renderSettingControl" | "modelAccessState" | "projection" | "navigate" | "billionContext">) {
 
       return <>
         <p className="settings-inline-note">{zh ? "与输入框中的模型选择同步，作用于之后发送的消息和新任务；不会改变正在执行的消息。" : "Shared with the composer. Applies to subsequent messages and new tasks, without changing a running turn."}</p>
@@ -20,6 +68,7 @@ export function ModelsSettingsPage({ onSettingChange, setPermissionAcknowledged,
           <SettingRow label={codexModelPolicy.customModelAccess.label[settings.locale]} detail={codexModelPolicy.customModelAccess.description[settings.locale]}>
             <Switch label={codexModelPolicy.customModelAccess.label[settings.locale]} checked={settings.customModelAccessEnabled} onChange={value => onSettingChange("customModelAccessEnabled", value)} />
           </SettingRow>
+          <BillionContextSetting zh={zh} bridge={billionContext} />
         </details>
         {unavailableFixedModel && !settings.customModelAccessEnabled && !codexModelPolicy.modelOptions.some(option => option.id === settings.modelAccess) ? <p className="settings-inline-note" role="status">{zh ? "自定义模型支持已关闭，当前固定选择已保留但无法发送。请选择自动或列表中的模型，或在高级模型选项中重新开启。" : "Custom models are disabled. Your fixed selection is preserved, but cannot send. Choose Auto or a listed model, or re-enable access in Advanced model options."}</p> : null}
         <SettingsGroup title={zh ? "执行权限" : "Execution permissions"}>

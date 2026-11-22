@@ -5,7 +5,7 @@ import type { ActionReceiptView } from "../actionReceiptView";
 import { FontSizeRow } from "../../../../../../vendor/deepseek-harness/packages/client/ui-theme/src/client/FontSizeRow";
 
 import { createContext, type ReactNode } from "react";
-import type { CarrierDiagnosticsReadback, CodexCapabilityCatalog, NativeAppUpdateResult, OplInitializeReadback } from "../../bridge/oplBridge";
+import type { CarrierDiagnosticsReadback, CodexCapabilityCatalog, NativeAppUpdateResult, OplBridge, OplInitializeReadback } from "../../bridge/oplBridge";
 import type { ManagedUpdateProjection, WorkbenchModel } from "../workbenchModel";
 import { type ResolvedCodexModelOption } from "../modelPolicy";
 import type { WorkbenchSettings } from "../settingsModel";
@@ -102,6 +102,7 @@ export type SettingsPanelProps = {
   };
   onChooseWorkspaceRoot: () => Promise<unknown>;
   onInstallCodex: () => Promise<unknown>;
+  billionContext?: Pick<OplBridge, "readBillionContext" | "setBillionContext">;
   onConfigureCodexApiKey: (apiKey: string) => Promise<boolean>;
   onChangeLogDirectory: () => void;
   onOpenLogDirectory?: () => Promise<unknown>;

@@ -201,6 +201,8 @@ export function installWebTransport(): void {
     readMcpAppResource: request => postJson("/api/mcp-apps/read", request),
     closeMcpApp: request => postJson("/api/mcp-apps/close", request),
     readCodexModels: () => requestJson("/api/codex/models"),
+    readBillionContext: () => requestJson("/api/codex/billion-context"),
+    setBillionContext: request => postJson("/api/codex/billion-context", request),
     readCodexCapabilities: (threadId) => requestJson(`/api/codex/capabilities${threadId ? `?threadId=${encodeURIComponent(threadId)}` : ""}`),
     readCodexPermissionProfiles: () => requestJson("/api/codex/permission-profiles"),
     listPendingServerRequests: () => requestJson("/api/codex/pending-requests"),

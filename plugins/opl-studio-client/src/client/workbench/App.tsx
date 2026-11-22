@@ -2526,6 +2526,7 @@ export function App({
       onChooseWorkspaceRoot={chooseWorkspaceRoot}
       onInstallCodex={installCodex}
       onConfigureCodexApiKey={configureCodexApiKey}
+      billionContext={bridge}
       onChangeLogDirectory={() => void changeLogDirectory()}
       onOpenLogDirectory={bridge.platformCapabilities.nativeWorkspaceFileAccess ? () => bridge.openLogDirectory() : undefined}
       currentWorkspace={selectedProject?.workspace ?? currentProject}

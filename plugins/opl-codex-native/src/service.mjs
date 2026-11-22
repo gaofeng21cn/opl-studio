@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "./app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
@@ -53,6 +55,21 @@ export class OplCodexNative extends EventEmitter {
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
     this.transport.channelBindingStore ??= channelBindingStore;
+    this.contextPreference = path.join(path.dirname(defaultChannelBindingFile(env)), "billion-context-enabled");
+    this.contextLaunch = null;
+    this.contextError = false;
+    if (!transport && existsSync(this.contextPreference)) {
+      try {
+        const entry = fileURLToPath(new URL("./dist/index.js", import.meta.resolve("billion-context/package.json")));
+        const { command, args, env: nativeEnv } = this.transport;
+        const launcherEnv = { ...nativeEnv, BILI_CLIENT_BIN: command,
+          ACP_AUTO_UPDATE: "0", BILI_ADVISORY_CHECK: "0" };
+        this.contextLaunch = { command, args, env: nativeEnv };
+        Object.assign(this.transport, { command: process.execPath, args: [entry, "codex", ...args], env: launcherEnv });
+      } catch {
+        this.contextError = true;
+      }
+    }
     this.threads = new CodexThreadAdapter(this.transport);
     this.channelCallbackAdapter = typeof this.transport.createChannelCallbackAdapter === "function"
       ? this.transport.createChannelCallbackAdapter()
@@ -81,7 +98,16 @@ export class OplCodexNative extends EventEmitter {
 
   async start() {
     try {
-      await this.transport.start();
+      try {
+        await this.transport.start();
+      } catch (error) {
+        if (!this.contextLaunch) throw error;
+        await this.transport.stop();
+        Object.assign(this.transport, this.contextLaunch);
+        this.contextLaunch = null;
+        this.contextError = true;
+        await this.transport.start();
+      }
       this.appServerError = null;
     } catch (error) {
       this.appServerError = {
@@ -90,6 +116,27 @@ export class OplCodexNative extends EventEmitter {
       };
     }
     return this.capabilities();
+  }
+
+  readBillionContext() {
+    return {
+      enabled: existsSync(this.contextPreference),
+      active: this.contextLaunch !== null && this.transport.initialized === true,
+      startupFailed: this.contextError
+    };
+  }
+
+  setBillionContext({ enabled }) {
+    if (typeof enabled !== "boolean") {
+      throw Object.assign(new Error("Expected a boolean Billion Context preference"), { code: "invalid_request" });
+    }
+    if (enabled) {
+      mkdirSync(path.dirname(this.contextPreference), { recursive: true, mode: 0o700 });
+      writeFileSync(this.contextPreference, "", { mode: 0o600 });
+    } else {
+      rmSync(this.contextPreference, { force: true });
+    }
+    return this.readBillionContext();
   }
 
   async reloadConfiguration({ maintenanceHeld = false } = {}) {

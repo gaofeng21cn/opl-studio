@@ -77,6 +77,7 @@
     "@tanstack/react-virtual": "3.14.26",
     "@types/mdast": "4.0.4",
     "anser": "2.3.5",
+    "billion-context": "0.1.216",
     "clsx": "2.1.1",
     "diff": "9.0.0",
     "electron-updater": "6.8.11",

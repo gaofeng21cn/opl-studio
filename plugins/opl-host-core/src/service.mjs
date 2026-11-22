@@ -378,6 +378,8 @@ export class OplHostCore extends EventEmitter {
       case "readMcpAppResource": return this.mcpApps.read(payload);
       case "closeMcpApp": return this.mcpApps.close(payload);
       case "readCodexModels": return this.transport.listModels();
+      case "readBillionContext": return this.codex.readBillionContext();
+      case "setBillionContext": return this.codex.setBillionContext(payload);
       case "readCodexCapabilities": return this.transport.listCapabilities(payload.threadId);
       case "readCodexPermissionProfiles": return this.transport.listPermissionProfiles();
       case "pickFiles": return this.platform.pickFiles(payload);

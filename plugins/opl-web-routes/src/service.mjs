@@ -128,6 +128,10 @@ async function dispatchApi(req, res, hostCore) {
     json(res, 200, await hostCore.invoke(mcpMethods[mcpOperation], await body(req)));
     return;
   }
+  if (url.pathname === "/api/codex/billion-context") {
+    if (req.method === "GET") return json(res, 200, await hostCore.invoke("readBillionContext"));
+    if (req.method === "POST") return json(res, 200, await hostCore.invoke("setBillionContext", await body(req)));
+  }
   if (req.method === "GET" && url.pathname === "/api/codex/models") {
     json(res, 200, await hostCore.invoke("readCodexModels"));
     return;

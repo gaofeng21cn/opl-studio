@@ -1,5 +1,12 @@
 # Third-Party Notices
 
+## Billion Context
+
+The advanced Models setting can launch Codex through the original
+`billion-context` npm package. The version and integrity are pinned in
+`package-lock.json`. Copyright © 2026 ranxianglei, MIT license.
+The package includes its license. <https://github.com/ranxianglei/billion-context>
+
 ## DeepSeek Harness
 
 OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:

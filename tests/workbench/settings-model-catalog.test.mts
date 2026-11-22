@@ -145,6 +145,16 @@ test("custom access is a collapsed Models disclosure after defaults and toggles 
   browser.document.body.append(container);
   const root = createRoot(container as unknown as Element);
   const storage = memoryStorage();
+  const writes: boolean[] = [];
+  let enabled = false;
+  const billionContext = {
+    readBillionContext: async () => ({ enabled, active: false, startupFailed: false }),
+    setBillionContext: async (request: { enabled: boolean }) => {
+      enabled = request.enabled;
+      writes.push(enabled);
+      return { enabled, active: false, startupFailed: false };
+    }
+  };
   const render = (locale: "zh" | "en") => {
     const settings = readSettings(storage);
     flushSync(() => root.render(createElement(ModelsSettingsPage, {
@@ -152,7 +162,7 @@ test("custom access is a collapsed Models disclosure after defaults and toggles 
       displayedModelId: "test-model", modelOptions: [], renderSettingControl: () => null,
       onSettingChange(key, value) { writeSettings({ [key]: value }, storage); render(locale); },
       setPermissionAcknowledged() {}, setPermissionConfirmation() {},
-      modelAccessState: null, projection: undefined, navigate() {}
+      modelAccessState: null, projection: undefined, navigate() {}, billionContext
     })));
   };
   try {
@@ -175,6 +185,15 @@ test("custom access is a collapsed Models disclosure after defaults and toggles 
       expect(disclosure.open).toBe(true);
       expect(disclosure.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
     }
+    await new Promise(resolve => setImmediate(resolve));
+    const context = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Billion Context"]')!;
+    expect(context.disabled).toBe(false);
+    expect(context.getAttribute("aria-checked")).toBe("false");
+    flushSync(() => context.click());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(writes).toEqual([true]);
+    expect(context.getAttribute("aria-checked")).toBe("true");
+    expect(container.textContent).toContain("Restart pending");
     const target = searchableSettings.find(entry => entry.labels.includes("Enable custom models"));
     expect(target?.destination).toBe("models");
     expect(target?.labels).toContain("启用自定义模型");

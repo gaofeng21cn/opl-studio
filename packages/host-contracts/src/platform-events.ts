@@ -152,6 +152,8 @@ export type OplStudioSurface = Pick<
   OplBridge,
   keyof McpAppsBridge | "readSuperagent" | "executeSuperagent" | "readTeamBots" | "executeTeamBot" | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "revealLocalPath" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
+  readBillionContext?: () => Promise<BillionContextPreference>;
+  setBillionContext?: (request: { enabled: boolean }) => Promise<BillionContextPreference>;
   linkCompanion?: LinkCompanionManagement;
   eventSourceUrl?: string;
   readClientModuleGraph?: () => Promise<DshClientModuleGraph>;
@@ -162,8 +164,15 @@ export type OplStudioSurface = Pick<
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;
 };
 
+export type BillionContextPreference = {
+  enabled: boolean;
+  active: boolean;
+  startupFailed: boolean;
+};
 
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
+  readBillionContext?: OplStudioSurface["readBillionContext"];
+  setBillionContext?: OplStudioSurface["setBillionContext"];
   platformCapabilities: OplPlatformCapabilities;
   readSuperagent(): Promise<SuperagentState>;
   executeSuperagent(request: { operation: "start" | "stop" }): Promise<SuperagentState>;
