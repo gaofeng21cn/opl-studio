@@ -16,7 +16,7 @@ on:
       - "scripts/check-plugin-publication.mjs"
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/release-dsh-plugins.yml"
+      - "!src/**/*.test.mjs"
   workflow_dispatch:
     inputs:
       packages:
@@ -98,9 +98,10 @@ jobs:
             const changed = hasBase()
               ? execFileSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean)
               : null;
-            // Test-only changes and edits to this workflow do not change a package's bytes.
+            // Test and publication-only changes do not change a package's bytes.
             const packageInputs = changed?.filter(file =>
               file !== ".github/workflows/release-dsh-plugins.yml" &&
+              file !== "scripts/publish-dsh-plugin-feed.mjs" &&
               !(file.startsWith("src/") && file.endsWith(".test.mjs"))
             );
             const sharedChanged = packageInputs?.some(file => !file.startsWith("plugins/"));
@@ -198,9 +199,9 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish public DSH plugin feed
-        if: steps.version-check.outputs.plugins != '[]' || inputs.force_all == true
         shell: bash
         run: node scripts/publish-dsh-plugin-feed.mjs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SELECTED_PLUGINS: ${{ needs.detect.outputs.plugins }}

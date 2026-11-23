@@ -143,8 +143,10 @@ Published package versions are immutable. Plugin and shared build-input changes
 must advance the affected plugin versions before publication. The publish job
 compares an existing version's registry tarball digest with the freshly packed
 package; it skips only identical bytes and fails on a version collision or an
-unavailable registry check. A skipped version is not evidence that current
-source was published.
+unavailable registry check. The public feed downloads the exact selected
+registry tarballs and preserves existing coordinates. It writes new archives
+before updating the index and preserves the previous index for retries.
+Source-only tests and publication workflow edits do not select plugins.
 
 The active Cordis profile selects Host plugins. The official `clientModules`
 service scans their `dsh.client` declarations and publishes the module graph,
