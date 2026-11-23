@@ -10,7 +10,7 @@ import { StudioAppearanceRow, StudioFontSizeRow } from "../types";
 import { SettingRow, SettingsGroup } from "../primitives";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function PreferencesSettingsPage({ settings, renderSettingControl, onSettingChange, zh, setPermissionAcknowledged, setPermissionConfirmation, navigate }: Pick<SettingsPageContext, "settings" | "renderSettingControl" | "onSettingChange" | "zh" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "navigate">) {
+export function PreferencesSettingsPage({ settings, renderSettingControl, onSettingChange, zh, setPermissionAcknowledged, setPermissionConfirmation, navigate, renderSettingsContributions, renderSettingsGroupSlot }: Pick<SettingsPageContext, "settings" | "renderSettingControl" | "onSettingChange" | "zh" | "setPermissionAcknowledged" | "setPermissionConfirmation" | "navigate" | "renderSettingsContributions" | "renderSettingsGroupSlot">) {
       const themeCopy: Readonly<Record<string, string>> = settings.locale === "zh" ? themeZh : themeEn;
 
       return (
@@ -32,6 +32,8 @@ export function PreferencesSettingsPage({ settings, renderSettingControl, onSett
           </SettingsGroup>
           <ShortcutSettings zh={zh} />
           <SettingsGroup title={zh ? "语音输入" : "Voice input"}><SettingRow label={zh ? "输入框听写" : "Composer dictation"} detail={voiceRecognitionProvider() ? (zh ? "启用后点击输入框麦克风。语音交由浏览器语音服务识别，识别文本只加入草稿，不自动发送。" : "Enable the composer microphone. Audio is processed by the browser speech service; text is added to the draft and never sent automatically.") : (zh ? "此运行环境未提供语音识别。可用系统听写，或在支持语音识别的浏览器中打开网页端。" : "Speech recognition is unavailable in this runtime. Use system dictation or open WebUI in a supporting browser.")}><Switch label={zh ? "输入框听写" : "Composer dictation"} disabled={!voiceRecognitionProvider()} checked={settings.voiceInput} onChange={value => onSettingChange("voiceInput", value)} /></SettingRow></SettingsGroup>
+          {renderSettingsContributions?.("preferences")}
+          {renderSettingsGroupSlot?.("preferences")}
         </>
       );
 

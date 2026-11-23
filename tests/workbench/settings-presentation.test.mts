@@ -1596,3 +1596,112 @@ test("DshPluginManagerOwner unified all-software scope displays Billion Context 
     }
   });
 });
+
+test("OplSoftwareUpdates surfaces quarantined DSH profile boot recovery notice without collapsing", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { OplSoftwareUpdates } = await import("../../plugins/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginUpdates: async () => ({
+        schema: "opl_dsh_plugin_updates.v1",
+        profile: "opl-studio",
+        checkedAt: "2026-11-23T06:00:00Z",
+        plugins: { "@gaofeng21cn/opl-studio-client": { installed: "0.1.5", available: "0.1.5", state: "current" } },
+        profileBootRecovery: {
+          schema: "opl_dsh_profile_recovery.v1",
+          recoveredAt: "2026-11-23T05:59:00Z",
+          quarantinedPackages: { "@gaofeng21cn/opl-studio-client": "0.1.9" },
+          reason: "SyntaxError in overridden plugin"
+        }
+      })
+    };
+    try {
+      render(createElement(OplSoftwareUpdates, { model, locale: "zh", actionBusyKey: null, onAction() {} }));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      const recovery = container.querySelector('[data-testid="dsh-profile-boot-recovery"]');
+      assert.ok(recovery);
+      assert.match(recovery.textContent ?? "", /已自动回退至内置稳定版本/);
+      assert.match(recovery.textContent ?? "", /0\.1\.9/);
+      assert.ok([...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "重新检查"));
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
+  });
+});
+
+test("UpdatesSettingsPage Update All orchestrates DSH plugins, desktop updates, and package updates", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { UpdatesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
+  const appApply: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+    transport: "native_app_updater", key: "app-apply", label: "下载桌面更新", operation: "apply",
+    componentIds: ["opl_app"], confirmationRequired: false, availability: "ready", sourceRef: "desktop:updater"
+  };
+  let pluginUpdatesCalled = 0, restartSignaled = 0;
+  const hostActions: unknown[] = [];
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginUpdates: async () => ({
+        schema: "opl_dsh_plugin_updates.v1",
+        profile: "opl-studio",
+        checkedAt: "2026-11-23T06:00:00Z",
+        plugins: { "@gaofeng21cn/opl-studio-client": { installed: "0.1.5", available: "0.1.6", state: "update_available" } }
+      }),
+      updateDshPlugins: async ({ all }: { all?: boolean }) => {
+        if (all) pluginUpdatesCalled += 1;
+        return { application: "restart-required", installed: { "@gaofeng21cn/opl-studio-client": "0.1.6" }, failures: {} };
+      }
+    };
+    try {
+      render(createElement(UpdatesSettingsPage, {
+        actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [{ componentId: "opl_app", actions: [appApply] }], additionalMaintenanceActions: [] },
+        managedUpdate: null, projection: model.settingsProjection, settings: { ...settingsDefaults, locale: "zh" },
+        nativeAppUpdate: { schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron", operation: "status", supported: true, state: "available", currentVersion: "26.11.20", targetVersion: "26.11.23" },
+        model, actionBusyKey: null, onAction() {}, onHostAction: intent => hostActions.push(intent), catalogOrigin: "all",
+        onDshRestartRequired: () => { restartSignaled += 1; }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      const updateAllBtn = container.querySelector<HTMLButtonElement>('[data-testid="opl-update-all"]')!;
+      assert.ok(updateAllBtn);
+      flushSync(() => updateAllBtn.click());
+      await new Promise(resolve => setTimeout(resolve, 30));
+      assert.equal(pluginUpdatesCalled, 1);
+      assert.equal(restartSignaled, 1);
+      assert.deepEqual(hostActions, [appApply]);
+      assert.match(container.textContent ?? "", /扩展更新已安装/);
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
+  });
+});
+
+test("ShellOverlaySlot shows global lightweight restart pill outside Software Center and hides inside it", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx");
+  let restarted = 0;
+  await withSettingsTestDom(({ container, render }) => {
+    const baseSurface = {
+      locale: "zh", primaryView: "conversation", overlay: null, detailsOpen: false, detailTabs: [],
+      pendingUpdateRestart: true, onRestartForUpdates: () => { restarted += 1; }, openPrimaryView() {}
+    } as never;
+    render(createElement(StudioContext.Provider, { value: baseSurface }, createElement(ShellOverlaySlot)));
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="opl-global-restart-trigger"]')!;
+    assert.ok(trigger);
+    assert.match(trigger.textContent ?? "", /更新已就绪 · 重启生效/);
+    flushSync(() => trigger.click());
+    assert.equal(restarted, 1);
+
+    const hiddenSurface = { ...baseSurface, primaryView: "applications" } as never;
+    render(createElement(StudioContext.Provider, { value: hiddenSurface }, createElement(ShellOverlaySlot)));
+    assert.equal(container.querySelector('[data-testid="opl-global-restart-trigger"]'), null);
+  });
+});

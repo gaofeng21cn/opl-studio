@@ -459,4 +459,8 @@ export const codexWorkbenchStyleNavigation = `  .opl-studio {
     display: none;
   }
 
+  .opl-recent-session-list > * + * {
+    margin-top: 2px;
+  }
+
 `;

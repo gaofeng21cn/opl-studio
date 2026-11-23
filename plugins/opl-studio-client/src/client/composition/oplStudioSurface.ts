@@ -1,15 +1,22 @@
-import type { SuperagentState } from "@gaofeng21cn/opl-host-contracts";
-import type { TeamBotsState, TeamBotAction } from "@gaofeng21cn/opl-host-contracts";
-import type { McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
+import type {
+  McpAppsBridge,
+  McpAppOpen,
+  OplInitializeReadback,
+  OplStudioShellPanelFocus,
+  OplStudioShellSnapshot,
+  SuperagentState,
+  TeamBotAction,
+  TeamBotsState
+} from "@gaofeng21cn/opl-host-contracts";
 import type { ReactNode } from "react";
 import type { SettingsDestinationId } from "../workbench/SettingsPanel";
 import type { AgentPackageSelectionIntent, WorkbenchProjectGroup } from "../workbench/workbenchModel";
 import type { ResolvedCodexModelOption } from "../workbench/modelPolicy";
-import type { OplInitializeReadback } from "@gaofeng21cn/opl-host-contracts";
 import type { OplContributionSlotOwner, OplUiContributionsProjection } from "./contributionProjection";
 import type { OplStudioDetailTab } from "./clientCordis";
 import type { PackageActivity } from '../workbench/packageOperations';
 import type { WorkspaceView } from "@deepseek-ai/dsh-api-workspace-controller/client";
+import type { StudioShellCommandHandlers } from "./studioShellStore";
 
 export type OplSetupOperationResult = {
   status: "completed" | "cancelled" | "error";
@@ -18,7 +25,16 @@ export type OplSetupOperationResult = {
 
 export type OplAgentPermission = ":danger-full-access" | ":workspace" | ":read-only";
 
-export type OplStudioPrimaryView = "conversation" | "runtime" | "schedules" | "workspace" | "applications" | "teams" | "superagent";
+export type OplStudioPrimaryView =
+  | "conversation"
+  | "runtime"
+  | "materials"
+  | "schedules"
+  | "workspace"
+  | "applications"
+  | "teams"
+  | "superagent"
+  | (string & {});
 export type RenderSettingsContribution = (options?: { only?: string }, owner?: { close?: () => void }) => ReactNode;
 
 export type OplStudioSurface = {
@@ -68,9 +84,12 @@ export type OplStudioSurface = {
   applicationManagement: ReactNode;
   packageActivity?: PackageActivity;
   openPackageActivity?(): void;
-  runtimeOverview: ReactNode;
+  pendingUpdateRestart?: boolean;
+  onRestartForUpdates?(): void;
   scheduledTasks: ReactNode;
-  openPrimaryView(view: OplStudioPrimaryView): void;
+  shellSnapshot: OplStudioShellSnapshot;
+  shellHandlers: StudioShellCommandHandlers;
+  openPrimaryView(view: OplStudioPrimaryView, focus?: OplStudioShellPanelFocus): void;
   composerAccessory: ReactNode;
   composerOverlay: ReactNode;
   composerImages: Array<{ id: string; file: File; previewUrl: string }>;

@@ -177,7 +177,7 @@ export function SidebarSlot({ collapsed, width, drawer, renderSlot, renderFactor
         startSession={studio.startSession}
         toggleSidebar={studio.toggleSidebar}
         selectPanel={(id: string) => {
-          if (["applications", "runtime", "schedules", "workspace", "teams", "superagent"].includes(id)) {
+          if (panelIds.includes(id)) {
             studio.openPrimaryView(id as OplStudioSurface["primaryView"]);
           }
         }}
@@ -423,7 +423,6 @@ export function ConversationSlot({ renderSlot }: { renderSlot: any }) {
 }
 
 export function ApplicationMainSlot() { return <>{useStudio().applicationManagement}</>; }
-export function RuntimeMainSlot() { return <>{useStudio().runtimeOverview}</>; }
 export function SchedulesMainSlot() { return <>{useStudio().scheduledTasks}</>; }
 
 export function ConversationHeaderSlot() {

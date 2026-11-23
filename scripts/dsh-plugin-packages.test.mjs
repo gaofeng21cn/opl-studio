@@ -135,7 +135,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       const modules = seedModule.exports.getStaticModules();
       const registrations = new Map();
       browser.__ModuleLoader__ = { load: registration => registrations.set(registration.id, registration) };
-      for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-superagent", "opl-team-bots"]) {
+      for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-runtime-status", "opl-materials-space", "opl-superagent", "opl-team-bots"]) {
         const name = `@gaofeng21cn/${id}`;
         const clientPath = require.resolve(`${name}/client`);
         runInNewContext(await fs.readFile(clientPath, "utf8"), sandbox, { filename: clientPath });
@@ -155,6 +155,15 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         }
       }
     } finally { await browser.happyDOM.close(); }
+    await fs.mkdir(path.join(staging, "packages/host-kit"), { recursive: true });
+    for (const entry of await fs.readdir(path.join(root, "packages/host-kit"), { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".mjs")) {
+        await fs.copyFile(
+          path.join(root, "packages/host-kit", entry.name),
+          path.join(staging, "packages/host-kit", entry.name)
+        );
+      }
+    }
     await fs.cp(path.join(root, "src/host/dsh"), path.join(staging, "src/host/dsh"), { recursive: true });
     const { bootOplStudioHost } = await import(pathToFileURL(path.join(staging, "src/host/dsh/host.mjs")));
     const transport = {
@@ -185,7 +194,9 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@gaofeng21cn/"));
-    assert.equal(own.length, 8);
+    assert.equal(own.length, 10);
+    assert.ok(host.context.oplRuntimeStatus);
+    assert.equal(typeof host.context.oplMaterialsSpace?.listSpaces, "function");
     assert.equal(host.context.get("agents"), undefined);
     await host.context.oplTeamBots.start();
     const collaboration = host.context.oplTeamBots.read();

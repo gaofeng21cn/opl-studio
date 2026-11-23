@@ -218,21 +218,58 @@ export function useConversationPanelInfo<T>(selector: (info: { activePanelId: st
   const studio = useStudio();
   return selector({ activePanelId: studio.primaryView === "conversation" ? null : studio.primaryView });
 }
+const BUILTIN_PANEL_LABELS: Record<string, { zh: string; en: string; order: number }> = {
+  applications: { zh: "软件中心", en: "Software Center", order: 10 },
+  runtime: { zh: "运行状态", en: "Runtime status", order: 20 },
+  materials: { zh: "资料空间", en: "Materials Space", order: 25 },
+  schedules: { zh: "计划任务", en: "Scheduled tasks", order: 30 },
+  teams: { zh: "智能体协作", en: "Agent collaboration", order: 35 },
+  superagent: { zh: "Superagent", en: "Superagent", order: 36 },
+  workspace: { zh: "应用工作台", en: "App workspace", order: 40 }
+};
+
+function resolveSidebarPanelLabel(
+  entry: { options: { id: string; label?: unknown; labelI18n?: { zh?: string; en?: string } } },
+  locale: "zh" | "en"
+): string {
+  const { id, label, labelI18n } = entry.options;
+  if (labelI18n) {
+    const localized = locale === "zh" ? labelI18n.zh : labelI18n.en;
+    if (localized) return localized;
+  }
+  const builtin = BUILTIN_PANEL_LABELS[id];
+  if (builtin) return locale === "zh" ? builtin.zh : builtin.en;
+  if (typeof label === "function") return String((label as (locale: string) => string)(locale) ?? id);
+  if (typeof label === "string" && label.trim()) return label;
+  return id;
+}
+
 export function useStudioPanels<T>(selector: (panels: readonly { id: string; order: number; label: string }[]) => T): T {
   const studio = useStudio();
-  const zh = studio.locale === "zh";
   const slots = useContext(SlotCoreContext);
-  const pluginPanels = new Set(slots?.entries("sidebar.panellist").map(entry => entry.options.id));
-  const panels = [
-    { id: "applications", order: 10, label: zh ? "软件中心" : "Software Center" },
-    { id: "runtime", order: 20, label: zh ? "运行状态" : "Runtime status" },
-    { id: "schedules", order: 30, label: zh ? "计划任务" : "Scheduled tasks" },
-  ];
-  if (pluginPanels.has("teams")) panels.push({ id: "teams", order: 35, label: zh ? "智能体协作" : "Agent collaboration" });
-  if (pluginPanels.has("superagent")) panels.push({ id: "superagent", order: 36, label: "Superagent" });
-  if (pluginPanels.has("workspace")) {
-    panels.push({ id: "workspace", order: 40, label: zh ? "应用工作台" : "App workspace" });
-  }
+  const revision = useSyncExternalStore(
+    (listener) => (slots ? slots.subscribe("sidebar.panellist", listener) : () => {}),
+    () => (slots ? slots.entries("sidebar.panellist").map((entry) => `${entry.options.id}:${entry.options.order ?? 100}`).join("|") : ""),
+    () => ""
+  );
+  const panels = useMemo(() => {
+    void revision;
+    const entries = slots?.entries("sidebar.panellist") ?? [];
+    const byId = new Map<string, { id: string; order: number; label: string }>();
+    for (const entry of entries) {
+      const id = entry.options?.id;
+      if (!id || byId.has(id)) continue;
+      const order = typeof entry.options.order === "number"
+        ? entry.options.order
+        : BUILTIN_PANEL_LABELS[id]?.order ?? 100;
+      byId.set(id, {
+        id,
+        order,
+        label: resolveSidebarPanelLabel(entry as any, studio.locale)
+      });
+    }
+    return Array.from(byId.values()).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  }, [revision, slots, studio.locale]);
   return selector(panels);
 }
 // Match the official layout injector's browser posture observable. This hook

@@ -1,5 +1,18 @@
 import { expect, test } from "bun:test";
-import { navigationArguments, resolveMcpNavigation, readMcpNavigation, rememberMcpNavigation, allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, workspaceArtifactLink, workspaceArtifactPath } from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
+import {
+  allowedMcpLink,
+  extractMcpAuthorizationRequired,
+  modelContextText,
+  navigationArguments,
+  parseMcpResourceSettingsLink,
+  readMcpNavigation,
+  rememberMcpNavigation,
+  resolvedMcpTheme,
+  resolveMcpNavigation,
+  sandboxDocument,
+  workspaceArtifactLink,
+  workspaceArtifactPath
+} from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
 
 test("host-selected theme takes precedence over the operating system preference", () => {
   expect(resolvedMcpTheme("light", true)).toBe("light");
@@ -96,4 +109,35 @@ test("legacy runtime navigation cannot replace the shared product home", () => {
     rememberMcpNavigation("t1", thirdParty, runtime);
     expect(readMcpNavigation("t1", thirdParty)).toEqual(runtime);
   } finally { Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous }); }
+});
+
+test("extractMcpAuthorizationRequired and parseMcpResourceSettingsLink handle authorization round-trips safely", () => {
+  expect(extractMcpAuthorizationRequired({
+    isError: true,
+    structuredContent: {
+      authorization_required: true,
+      code: "library_access_required",
+      package_id: "opl-docs",
+      resource_id: "lib-42",
+      message: "Need library grant"
+    }
+  })).toEqual({
+    code: "library_access_required",
+    packageId: "opl-docs",
+    resourceId: "lib-42",
+    message: "Need library grant"
+  });
+  expect(extractMcpAuthorizationRequired(new Error("mcp_app_thread_busy"))).toBeNull();
+  expect(extractMcpAuthorizationRequired("RPC error: connection_required")).toEqual({
+    code: "connection_required",
+    message: "RPC error: connection_required"
+  });
+
+  expect(parseMcpResourceSettingsLink("opl-settings://resources?section=libraries&packageId=opl-docs&resourceId=lib-42")).toEqual({
+    section: "libraries",
+    packageId: "opl-docs",
+    resourceId: "lib-42"
+  });
+  expect(parseMcpResourceSettingsLink("javascript:alert(1)")).toBeNull();
+  expect(parseMcpResourceSettingsLink("opl-settings://other?packageId=x")).toBeNull();
 });

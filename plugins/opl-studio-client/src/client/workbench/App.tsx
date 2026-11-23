@@ -3,6 +3,7 @@ import { FirstInstallProgress, type FirstInstallSnapshot } from "./FirstInstallP
 import { usePackageOperations } from './usePackageOperations';
 import { packageActivity } from './packageOperations';
 import { softwareCanStart } from "./softwareExperience";
+import { nativeSoftwareProducts } from "./softwareSources";
 import { createComposerAttachmentController, disposeSelectionPreviews } from "./composerAttachments";
 import type { McpAppOpen } from "../bridge/mcpApps";
 import { useWorkbenchShortcuts } from "./shortcuts";
@@ -102,7 +103,6 @@ import {
   type WorkbenchSettings
 } from "./settingsModel";
 import { codexWorkbenchStyles } from "./codexWorkbenchStyles";
-import { RuntimeOverviewPage } from "./RuntimeOverviewPage";
 import { ApplicationManagementPage, type ApplicationManagementTab } from "./ApplicationManagementPage";
 import {
   readRuntimeOverviewCache,
@@ -155,6 +155,10 @@ import {
   trackComposerTurnSelections,
   type TrackedComposerTurn
 } from "./composerSubmissionLifecycle";
+import type {
+  OplSettingsGroupDestination,
+  OplSettingsGroupOwner
+} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import type {
   OplContributionAction,
   OplUiContribution,
@@ -294,6 +298,7 @@ type AppProps = {
   detailTabs: readonly OplStudioDetailTab[];
   renderShell: RenderOplStudioShell;
   renderContributionSlot?: RenderOplContributionSlot;
+  renderSettingsGroupSlot?: (destination: OplSettingsGroupDestination, owner: OplSettingsGroupOwner) => ReactNode;
   onHostStateChange?: (state: unknown) => void;
   onHostStateDispose?: () => void;
 };
@@ -302,6 +307,7 @@ export function App({
   detailTabs,
   renderShell,
   renderContributionSlot,
+  renderSettingsGroupSlot,
   onHostStateChange,
   onHostStateDispose
 }: AppProps) {
@@ -421,6 +427,7 @@ export function App({
   const [preferredSoftwareEntry, setPreferredSoftwareEntry] = useState<{ resourceUri: string; arguments: Record<string, string> }>();
   const [mcpAppSelectedLaunch, setMcpAppSelectedLaunch] = useState<McpAppOpen | undefined>();
   const [primaryView, setPrimaryView] = useState<OplStudioPrimaryView>("conversation");
+  const [panelFocus, setPanelFocus] = useState<import("@gaofeng21cn/opl-host-contracts").OplStudioShellPanelFocus | undefined>();
   const [applicationManagementTab, setApplicationManagementTab] = useState<ApplicationManagementTab>("applications");
   const [softwareCenterFocus, setSoftwareCenterFocus] = useState<{ packageId: string; revision: number }>();
   const [startupAttempt, setStartupAttempt] = useState(0);
@@ -564,13 +571,13 @@ export function App({
     () => selectProjectProgress(projectProgressWorkspace, model.workItemRuntime, settings.locale),
     [model.workItemRuntime, projectProgressWorkspace, settings.locale]
   );
-  const defaultWorkItemId = model.workItemRuntime?.items.find(item => item.workspacePath === projectProgressWorkspace)?.workItemId;
+  const defaultWorkItemId = model.workItemRuntime?.items.find(item => item.workspacePath === projectProgressWorkspace)?.id;
   const [selectedRuntimeWorkItemId, setSelectedRuntimeWorkItemId] = useState<string | undefined>();
   const selectedWorkItemId = selectedRuntimeWorkItemId ?? defaultWorkItemId;
   const selectedRuntimeWorkItem = selectedWorkItemId
-    ? model.workItemRuntime?.items.find((item) => item.workItemId === selectedWorkItemId || item.id === selectedWorkItemId)
+    ? model.workItemRuntime?.items.find((item) => item.id === selectedWorkItemId || item.workItemId === selectedWorkItemId)
     : undefined;
-  const detailWorkItemId = selectedRuntimeWorkItem?.workItemId ?? selectedWorkItemId;
+  const detailWorkItemId = selectedRuntimeWorkItem?.id ?? selectedWorkItemId;
   const runDetail = useMemo(() => buildRunDetailViewModel({
     thread: currentSession,
     workItem: selectedRuntimeWorkItem,
@@ -932,6 +939,25 @@ export function App({
       await loadState(settings.runtimeProfile);
     } catch (error) {
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
+    } finally {
+      setSettingsActionBusyKey(null);
+    }
+  }
+
+  async function restartForPendingUpdates() {
+    setSettingsActionBusyKey("host:restartForPendingUpdates");
+    try {
+      const result = await bridge.restartNativeApp();
+      setNativeAppUpdate(result);
+      setSettingsActionFeedback(nativeAppUpdateFeedback(result, "restart", settings.locale));
+      if (result.accepted === false || result.state === "error") {
+        setApplicationManagementTab("updates");
+        setPrimaryView("applications");
+      }
+    } catch (error) {
+      setSettingsActionFeedback({ tone: "attention", message: String(error) });
+      setApplicationManagementTab("updates");
+      setPrimaryView("applications");
     } finally {
       setSettingsActionBusyKey(null);
     }
@@ -1734,6 +1760,7 @@ export function App({
       setMcpTaskTarget({ itemId: selectedRuntimeWorkItem.id, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace");
     } : undefined,
     openSoftwareCenter: () => setPrimaryView("applications"),
+    pickDirectory: bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined,
     refreshRevision: contributionRefreshRevision,
     readData: readContributionData,
     onAction: handleContributionAction
@@ -2114,6 +2141,19 @@ export function App({
     interruptRequestedForRef.current = null;
     setActiveTurnId(null);
     setComposerPaletteOpen(false);
+  }
+
+  function startConversationInWorkspace(workspacePath: string) {
+    startNewChat();
+    const normalized = workspacePath.trim();
+    if (!normalized) return;
+    const matched = threadProjects.find((project) => !project.projectless && project.workspace === normalized);
+    if (matched) {
+      setPendingWorkspacePath(undefined);
+      updateUiMetadata({ selectedProjectId: matched.id, threadScope: "current" });
+      return;
+    }
+    setPendingWorkspacePath(normalized);
   }
 
   function startNewChatInProject(projectId?: string) {
@@ -2558,8 +2598,27 @@ export function App({
         const entries = settingsEntriesForNativeAppSurface(model.uiContributions.entries, destination, settings.developerDetails);
         if (!entries.length) return null;
         const labels = new Map(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n?.[settings.locale] ?? item.label]));
-        return <SettingsPluginSections entries={entries} labels={labels} collapsible={destination !== 'resources'} renderEntry={entry => renderContribution?.({ only: entry.contributionKey }) ?? null} />;
+        return <SettingsPluginSections entries={entries} labels={labels} collapsible={destination !== 'resources'} focusedPackageId={settingsNavigation?.resourceFocus?.packageId} renderEntry={entry => renderContribution?.({ only: entry.contributionKey }) ?? null} />;
       }}
+      renderSettingsGroupSlot={(destination) => renderSettingsGroupSlot?.(destination, {
+        locale: settings.locale,
+        developerDetails: settings.developerDetails,
+        focusedPackageId: settingsNavigation?.resourceFocus?.packageId,
+        openSoftwareCenter: (section = "applications", packageId) => {
+          onClose?.();
+          setSoftwareCenterFocus(current => packageId ? { packageId, revision: (current?.revision ?? 0) + 1 } : undefined);
+          setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
+          setApplicationManagementTab(section);
+          setPrimaryView("applications");
+        },
+        openSettingsDestination: (targetDestination, focus) => setSettingsNavigation(current => ({
+          open: true,
+          destination: targetDestination as SettingsDestinationId,
+          resourceFocus: focus,
+          revision: (current?.revision ?? 0) + 1
+        })),
+        billionContext: bridge
+      })}
     />
   );
 
@@ -2574,10 +2633,89 @@ export function App({
       onPreferredEntryConsumed: (entry: NonNullable<typeof preferredSoftwareEntry>) => setPreferredSoftwareEntry(current => current === entry ? undefined : current),
       launch: mcpAppSelectedLaunch?.threadId === codexThreadId ? mcpAppSelectedLaunch : undefined,
       onManage: () => setPrimaryView("applications"),
+      onOpenResourceSettings: (focus?: { packageId?: string; resourceId?: string; section?: "libraries" | "remote" }) => setSettingsNavigation(current => ({
+        open: true,
+        destination: "resources",
+        resourceFocus: {
+          section: focus?.section ?? "libraries",
+          packageId: focus?.packageId,
+          resourceId: focus?.resourceId
+        },
+        revision: (current?.revision ?? 0) + 1
+      })),
       onConversation: () => setPrimaryView("conversation"),
       onContext: (threadId: string, text: string) => { if (threadId === codexThreadId) mcpAppContext.current = { threadId, text }; },
       onMessage: (threadId: string, text: string) => { if (threadId === codexThreadId) { updatePrompt(prompt ? `${prompt}\n\n${text}` : text); setPrimaryView("conversation"); } }
     };
+  const shellHandlersLatestRef = useRef({
+    refreshState: () => loadState(settings.runtimeProfile),
+    executeAction: (request: Parameters<typeof bridge.executeAction>[0]) => bridge.executeAction(request),
+    openMaintenance: () => setSettingsNavigation(current => ({ open: true, destination: "services", revision: (current?.revision ?? 0) + 1 })),
+    openPrimaryView: (view: string, focus?: import("@gaofeng21cn/opl-host-contracts").OplStudioShellPanelFocus) => {
+      if (view === "applications") setApplicationManagementTab("applications");
+      setPanelFocus(focus);
+      setPrimaryView(view);
+    },
+    openThread: openCanonicalThreadRef,
+    selectWorkItem: (itemId: string) => {
+      setSelectedRuntimeWorkItemId(itemId);
+      requestDetails("opl-project-progress-panel");
+    },
+    startConversationInWorkspace
+  });
+  shellHandlersLatestRef.current = {
+    refreshState: () => loadState(settings.runtimeProfile),
+    executeAction: (request) => bridge.executeAction(request),
+    openMaintenance: () => setSettingsNavigation(current => ({ open: true, destination: "services", revision: (current?.revision ?? 0) + 1 })),
+    openPrimaryView: (view, focus) => {
+      if (view === "applications") setApplicationManagementTab("applications");
+      setPanelFocus(focus);
+      setPrimaryView(view);
+    },
+    openThread: openCanonicalThreadRef,
+    selectWorkItem: (itemId) => {
+      setSelectedRuntimeWorkItemId(itemId);
+      requestDetails("opl-project-progress-panel");
+    },
+    startConversationInWorkspace
+  };
+  const stableShellHandlers = useMemo(() => ({
+    refreshState: () => shellHandlersLatestRef.current.refreshState(),
+    executeAction: (request: Parameters<typeof bridge.executeAction>[0]) => shellHandlersLatestRef.current.executeAction(request),
+    openMaintenance: () => shellHandlersLatestRef.current.openMaintenance(),
+    openPrimaryView: (view: string, focus?: import("@gaofeng21cn/opl-host-contracts").OplStudioShellPanelFocus) => shellHandlersLatestRef.current.openPrimaryView(view, focus),
+    openThread: (threadId: string) => shellHandlersLatestRef.current.openThread(threadId),
+    selectWorkItem: (itemId: string) => shellHandlersLatestRef.current.selectWorkItem(itemId),
+    startConversationInWorkspace: (workspacePath: string) => shellHandlersLatestRef.current.startConversationInWorkspace(workspacePath)
+  }), []);
+  const stableShellSnapshot = useMemo(() => ({
+    locale: settings.locale,
+    stateStatus,
+    stateError,
+    snapshotSource: runtimeSnapshotSource,
+    snapshotCachedAt: runtimeSnapshotCachedAt,
+    workItemRuntime: model.workItemRuntime,
+    serviceRecovery: model.serviceRecovery,
+    selectedWorkItemId: detailWorkItemId,
+    currentThreadId: codexThreadId,
+    mcpApps: { ...mcpApps, threadId: codexThreadId },
+    panelFocus
+  }), [
+    settings.locale,
+    stateStatus,
+    stateError,
+    runtimeSnapshotSource,
+    runtimeSnapshotCachedAt,
+    model.workItemRuntime,
+    model.serviceRecovery,
+    detailWorkItemId,
+    codexThreadId,
+    panelFocus,
+    bridge,
+    mcpTaskTarget,
+    preferredSoftwareEntry,
+    mcpAppSelectedLaunch
+  ]);
   return renderShell({
     locale: settings.locale,
     projectTitle: pendingWorkspacePath ? directoryLabel(pendingWorkspacePath) : currentProject,
@@ -2650,6 +2788,11 @@ export function App({
     teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
     openPackageActivity: () => { setApplicationManagementTab('activity'); setPrimaryView('applications'); },
+    pendingUpdateRestart: dshPluginRestartRequired
+      || nativeAppUpdate?.state === "downloaded"
+      || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")
+      || nativeSoftwareProducts(model.softwareSources).some(product => product.item.updateStatus === "needs_restart"),
+    onRestartForUpdates: () => void restartForPendingUpdates(),
     applicationManagement: <ApplicationManagementPage
       packageOperations={packageOperations}
       model={model}
@@ -2668,6 +2811,7 @@ export function App({
       actionViewModel={settingsActionViewModel}
       nativeAppUpdate={nativeAppUpdate}
       dshPluginRestartRequired={dshPluginRestartRequired}
+      onDshRestartRequired={() => setDshPluginRestartRequired(true)}
       actionBusyKey={settingsActionBusyKey}
       onAction={(request) => void runSettingsAction(request)}
       onHostAction={(intent) => void runSettingsHostAction(intent)}
@@ -2684,27 +2828,9 @@ export function App({
       <DshScheduledTasksPanel client={workbenchServices} locale={settings.locale} onAction={() => undefined} busy={settingsActionBusyKey !== null} revision={settingsActionReceipt?.receiptId} cwd={selectedProject?.workspace ?? currentProject} onOpened={() => setPrimaryView("conversation")} />
       {settingsActionFeedback ? <p role="status">{settingsActionFeedback.message}</p> : null}
     </>,
-    runtimeOverview: <RuntimeOverviewPage
-      locale={settings.locale}
-      projection={model.workItemRuntime}
-      serviceRecovery={model.serviceRecovery}
-      selectedWorkItemId={detailWorkItemId}
-      stateStatus={stateStatus}
-      snapshotSource={runtimeSnapshotSource}
-      snapshotCachedAt={runtimeSnapshotCachedAt}
-      onRefresh={() => { void loadState(settings.runtimeProfile); }}
-      onOpenMaintenance={() => setSettingsNavigation(current => ({ open: true, destination: "services", revision: (current?.revision ?? 0) + 1 }))}
-      onOpenWorkItem={(item) => {
-        setSelectedRuntimeWorkItemId(item.workItemId);
-        requestDetails("opl-project-progress-panel");
-      }}
-      onOpenThread={openCanonicalThreadRef}
-      mcpApps={{ ...mcpApps, threadId: codexThreadId }}
-    />,
-    openPrimaryView: view => {
-      if (view === "applications") setApplicationManagementTab("applications");
-      setPrimaryView(view);
-    },
+    shellSnapshot: stableShellSnapshot,
+    shellHandlers: stableShellHandlers,
+    openPrimaryView: (view, focus) => stableShellHandlers.openPrimaryView(view, focus),
     composerAccessory: <><ComposerAccessory
       locale={settings.locale}
       recoveredDrafts={drafts.recovered}

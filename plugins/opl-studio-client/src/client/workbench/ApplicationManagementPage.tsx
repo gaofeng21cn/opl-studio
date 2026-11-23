@@ -57,9 +57,10 @@ type ApplicationManagementPageProps = {
   onPickKnowledgeDirectory?: () => Promise<string | undefined>;
   onOpenInstallationLocation?: (path: string) => void;
   dshPluginRestartRequired?: boolean;
+  onDshRestartRequired?: () => void;
 };
 
-export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation, dshPluginRestartRequired = false }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation, dshPluginRestartRequired = false, onDshRestartRequired }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
@@ -125,7 +126,8 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     onAction,
     onHostAction,
     onRefresh: refreshAll,
-    dshRestartRequired: dshPluginRestartRequired
+    dshRestartRequired: dshPluginRestartRequired,
+    onDshRestartRequired
   };
   const desktopHasUpdate = Boolean(nativeAppUpdate?.supported && ["available", "downloading", "downloaded"].includes(nativeAppUpdate.state));
   const pendingUpdatesCount = inventory.updates + (desktopHasUpdate ? 1 : 0) + (dshPluginRestartRequired ? 1 : 0);

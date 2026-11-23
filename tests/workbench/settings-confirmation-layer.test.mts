@@ -23,7 +23,6 @@ const workbenchStyleSources = [
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntimeOverview.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
 ];

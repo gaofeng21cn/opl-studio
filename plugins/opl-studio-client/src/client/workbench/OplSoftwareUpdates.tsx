@@ -41,10 +41,80 @@ export function dshPluginFailureMessage(reason: string | undefined, zh: boolean)
   return zh ? "检查或安装未完成，稍后将重试" : "Check or install did not complete; will retry";
 }
 
-function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevision = 0 }: {
+function resolvePackageLifecycleUpdateRequest(item: ReturnType<typeof softwareCatalogPackages>[number], locale: "zh" | "en", allowRepair = true): SettingsActionRequest | undefined {
+  const state = packageCatalogState(item);
+  if (packageAccessNeedsAttention(item)) return undefined;
+  const kind = state === "update_available" ? "update" : allowRepair ? "repair" : undefined;
+  if (!kind) return undefined;
+  const action = item.actions.find(candidate => candidate.kind === kind && candidate.status === "available" && actionPayloadComplete(candidate.payload, candidate.requiredPayloadFields));
+  if (!action) return undefined;
+  const name = catalogDisplayName(item.label, item.displayNameI18n, locale);
+  return {
+    key: `package:${item.packageId}:${action.actionId}`,
+    actionId: action.actionId,
+    label: `${packageActionLabel(action, locale)} ${name}`,
+    payload: action.payload,
+    confirmationRequired: action.confirmationRequired,
+    dryRunSupported: action.dryRunSupported
+  };
+}
+
+function resolveNativeUpdateRequest(product: ReturnType<typeof softwareCatalogNativeProducts>[number], locale: "zh" | "en"): {
+  request?: SettingsActionRequest;
+  label?: string;
+} {
+  const { item, source, installations } = product;
+  const state = nativeCatalogState(item);
+  const name = item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale);
+  const current = activeSoftwareInstallation(installations, item.activeInstallationId, item.activeInstallationStatus);
+  const ownerAction = state === "update_available" && current ? availableInstallationActions(current).find(action => action.payload.operation === "update") : undefined;
+  const sourceAction = !ownerAction && state === "update_available" && (!installations.length || current?.manager === "homebrew") && nativeCarrierInstalled(item) === true
+    ? item.availableActions.find(action => action.actionId === "source_update" && action.status === "available"
+      && source && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId
+      && Boolean(item.revision) && action.payload.expected_revision === item.revision
+      && actionPayloadComplete(action.payload, action.payloadFields)) : undefined;
+  if (ownerAction && current) {
+    return { request: installationActionRequest(current, ownerAction, locale), label: installationActionLabel(ownerAction, locale) };
+  }
+  if (sourceAction) {
+    const label = softwareSourceActionLabel(sourceAction.actionId, locale, sourceAction.label);
+    return {
+      request: {
+        key: `source:${source?.sourceId}:${item.itemId}:${sourceAction.actionId}`,
+        actionId: sourceAction.actionId,
+        label: `${label} ${name}`,
+        payload: sourceAction.payload,
+        confirmationRequired: sourceAction.confirmationRequired,
+        dryRunSupported: sourceAction.dryRunSupported
+      },
+      label
+    };
+  }
+  return {};
+}
+
+export function packageUpdateRequests(model: WorkbenchModel, locale: "zh" | "en"): SettingsActionRequest[] {
+  const packageRequests = softwareCatalogPackages(model, "all")
+    .filter(item => packageCatalogState(item) === "update_available")
+    .flatMap(item => {
+      const request = resolvePackageLifecycleUpdateRequest(item, locale, false);
+      return request ? [request] : [];
+    });
+  const nativeRequests = softwareCatalogNativeProducts(model, "all")
+    .filter(({ item }) => nativeCatalogState(item) === "update_available")
+    .flatMap(product => {
+      const { request } = resolveNativeUpdateRequest(product, locale);
+      return request ? [request] : [];
+    });
+  return [...packageRequests, ...nativeRequests];
+}
+
+function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevision = 0, onSummaryChange, onRestartRequired }: {
   locale: "zh" | "en";
   externalRestartRequired?: boolean;
   refreshRevision?: number;
+  onSummaryChange?: (updatesCount: number) => void;
+  onRestartRequired?: () => void;
 }) {
   const zh = locale === "zh";
   const [projection, setProjection] = useState<DshPluginUpdateProjection | null>(null);
@@ -56,17 +126,21 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
   const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
   useEffect(() => {
     let active = true;
-    if (!bridge?.readDshPluginUpdates) return;
+    if (typeof bridge?.readDshPluginUpdates !== "function") return;
     void bridge.readDshPluginUpdates().then(
       value => { if (active) { setProjection(value); setError(""); } },
       reason => { if (active) setError(String(reason)); }
     );
     return () => { active = false; };
   }, [bridge, refreshRevision, checkNonce]);
-  if (!bridge?.readDshPluginUpdates) return null;
   const entries = Object.entries(projection?.plugins ?? {});
   const updates = entries.filter(([, item]) => item.state === "update_available");
   const unavailable = entries.filter(([, item]) => item.state === "unavailable");
+  const bootRecovery = projection?.profileBootRecovery ?? null;
+  useEffect(() => {
+    onSummaryChange?.(updates.length);
+  }, [onSummaryChange, updates.length]);
+  if (typeof bridge?.readDshPluginUpdates !== "function") return null;
   const pendingRestart = restartRequired || externalRestartRequired;
   const requestRestart = async () => {
     if (!bridge.restartNativeApp || restarting) return;
@@ -90,6 +164,7 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
       const result = await bridge.updateDshPlugins({ all: true });
       if (result.application === "restart-required" || Object.keys(result.installed ?? {}).length > 0) {
         setRestartRequired(true);
+        onRestartRequired?.();
       }
       const failures = Object.entries(result.failures ?? {});
       if (failures.length) {
@@ -100,7 +175,7 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
   };
-  const allCurrent = Boolean(projection) && updates.length === 0 && unavailable.length === 0 && !pendingRestart && !error;
+  const allCurrent = Boolean(projection) && updates.length === 0 && unavailable.length === 0 && !pendingRestart && !error && !bootRecovery;
   const rows = entries.map(([name, item]) => <div className="opl-package-update-row" key={name}>
     <div><strong>{name.replace(/^@gaofeng21cn\//, "")}</strong><span>{item.installed ?? "—"}{item.available && item.available !== item.installed ? ` → ${item.available}` : ""}</span></div>
     <span>{item.state === "update_available" ? (zh ? "可更新" : "Update available") : item.state === "unavailable" ? dshPluginFailureMessage(item.reason, zh) : (zh ? "已是最新" : "Current")}</span>
@@ -114,6 +189,13 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
   }
   return <section className="opl-package-updates" data-testid="dsh-plugin-updates">
     <h2>{zh ? "应用扩展组件" : "App extension components"}</h2>
+    {bootRecovery ? <div className="opl-app-management-feedback" data-testid="dsh-profile-boot-recovery" data-tone="attention" role="alert">
+      <p>{zh ? "上次启动检测到更新后的扩展组件异常，已自动回退至内置稳定版本以保障正常使用。你可以重新检查更新。" : "An updated extension failed on the previous launch and was automatically reverted to the built-in baseline to keep the app working. Check for updates to retry."}</p>
+      <details className="settings-secondary-details"><summary>{zh ? "回退详情" : "Rollback details"}</summary>
+        <dl>{Object.entries(bootRecovery.quarantinedPackages).map(([pkg, ver]) => <div key={pkg}><dt>{pkg.replace(/^@gaofeng21cn\//, "")}</dt><dd>{ver}</dd></div>)}</dl>
+        {bootRecovery.reason ? <small>{bootRecovery.reason}</small> : null}
+      </details>
+    </div> : null}
     <p>{pendingRestart
       ? (zh ? "新的应用扩展组件已在后台准备就绪，重启应用即可生效。" : "Updated extension components are staged and will take effect after restarting the app.")
       : projection
@@ -129,13 +211,17 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
     <div className="opl-plugin-update-actions">
       {updates.length > 0 && typeof bridge.updateDshPlugins === "function" ? <button type="button" className="settings-action-button primary" disabled={busy || restarting} onClick={() => void runUpdate()}>{busy ? (zh ? "更新中…" : "Updating…") : (zh ? "更新全部扩展组件" : "Update all extensions")}</button> : null}
       {pendingRestart && typeof bridge.restartNativeApp === "function" ? <button type="button" className="settings-action-button primary" disabled={busy || restarting} onClick={() => void requestRestart()}>{restarting ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用使更新生效" : "Restart app to apply updates")}</button> : null}
-      {(unavailable.length > 0 || error) ? <button type="button" className="settings-action-button" disabled={busy || restarting} onClick={() => setCheckNonce(n => n + 1)}>{zh ? "重新检查" : "Check again"}</button> : null}
+      {(unavailable.length > 0 || error || bootRecovery) ? <button type="button" className="settings-action-button" disabled={busy || restarting} onClick={() => setCheckNonce(n => n + 1)}>{zh ? "重新检查" : "Check again"}</button> : null}
     </div>
     {entries.length ? <details className="opl-plugin-updates-list" open={updates.length > 0 || unavailable.length > 0}><summary>{zh ? `查看组件明细 (${entries.length})` : `View component details (${entries.length})`}</summary>{rows}</details> : null}
   </section>;
 }
 
-function ThirdPartyDshPluginsUpdates({ locale, refreshRevision = 0 }: { locale: "zh" | "en"; refreshRevision?: number }) {
+function ThirdPartyDshPluginsUpdates({ locale, refreshRevision = 0, onSummaryChange }: {
+  locale: "zh" | "en";
+  refreshRevision?: number;
+  onSummaryChange?: (updateReady: boolean) => void;
+}) {
   const zh = locale === "zh";
   const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
   const [contextPlugin, setContextPlugin] = useState<BillionContextPreference | null>(null);
@@ -143,13 +229,17 @@ function ThirdPartyDshPluginsUpdates({ locale, refreshRevision = 0 }: { locale: 
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    if (!bridge?.readBillionContext) return;
+    if (typeof bridge?.readBillionContext !== "function") return;
     void bridge.readBillionContext().then(value => {
       if (active && value?.installed) setContextPlugin(value);
       else if (active) setContextPlugin(null);
     }).catch(() => undefined);
     return () => { active = false; };
   }, [bridge, refreshRevision]);
+  const updateReady = Boolean(contextPlugin?.installed && contextPlugin.updateAvailable && !contextPlugin.active && typeof bridge?.manageBillionContext === "function");
+  useEffect(() => {
+    onSummaryChange?.(updateReady);
+  }, [onSummaryChange, updateReady]);
   if (!contextPlugin?.installed || (!contextPlugin.updateAvailable && contextPlugin.active === contextPlugin.enabled)) return null;
   const runAction = async () => {
     if (!bridge || busy) return;
@@ -185,7 +275,7 @@ function ThirdPartyDshPluginsUpdates({ locale, refreshRevision = 0 }: { locale: 
 }
 
 /** Unified software & plugin updates view across all origins without carrier discrimination. */
-export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onManageSources, dshRestartRequired = false, refreshRevision = 0 }: {
+export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onManageSources, dshRestartRequired = false, refreshRevision = 0, onPluginUpdateSummary, onDshRestartRequired }: {
   model: WorkbenchModel;
   locale: "zh" | "en";
   actionBusyKey: string | null;
@@ -193,11 +283,18 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
   onManageSources?: () => void;
   dshRestartRequired?: boolean;
   refreshRevision?: number;
+  onPluginUpdateSummary?: (summary: { dshUpdatesCount: number; billionContextUpdateReady: boolean }) => void;
+  onDshRestartRequired?: () => void;
 }) {
   const zh = locale === "zh";
   const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
   const [restartError, setRestartError] = useState("");
   const [restarting, setRestarting] = useState(false);
+  const [dshUpdatesCount, setDshUpdatesCount] = useState(0);
+  const [billionContextUpdateReady, setBillionContextUpdateReady] = useState(false);
+  useEffect(() => {
+    onPluginUpdateSummary?.({ dshUpdatesCount, billionContextUpdateReady });
+  }, [billionContextUpdateReady, dshUpdatesCount, onPluginUpdateSummary]);
   const packages = softwareCatalogPackages(model, "all");
   const actionable = packages.filter(item => ["update_available", "attention"].includes(packageCatalogState(item)));
   const native = softwareCatalogNativeProducts(model, "all").filter(({ item }) => ["update_available", "attention"].includes(nativeCatalogState(item)));
@@ -223,34 +320,24 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
     {actionable.map(item => {
       const state = packageCatalogState(item), name = catalogDisplayName(item.label, item.displayNameI18n, locale);
       const accessBlocked = packageAccessNeedsAttention(item);
-      const action = accessBlocked ? undefined : item.actions.find(candidate => candidate.kind === (state === "update_available" ? "update" : "repair") && candidate.status === "available" && actionPayloadComplete(candidate.payload, candidate.requiredPayloadFields));
-      return <div className="opl-package-update-row" key={item.packageId}><div><strong>{name}</strong><span>{catalogInstalledVersion(item, locale)}{state === "update_available" && item.availableVersion ? ` → ${item.availableVersion}` : ""}</span></div><span>{packageCatalogStatusLabel(item, locale)}</span>{accessBlocked && onManageSources ? <button type="button" className="settings-action-button" onClick={onManageSources}>{zh ? "检查软件源" : "Check source"}</button> : action ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction({ key: `package:${item.packageId}:${action.actionId}`, actionId: action.actionId, label: `${packageActionLabel(action, locale)} ${name}`, payload: action.payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported })}>{packageActionLabel(action, locale)}</button> : <span className="opl-update-owner-note">{zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details"}</span>}</div>;
+      const request = resolvePackageLifecycleUpdateRequest(item, locale, true);
+      return <div className="opl-package-update-row" key={item.packageId}><div><strong>{name}</strong><span>{catalogInstalledVersion(item, locale)}{state === "update_available" && item.availableVersion ? ` → ${item.availableVersion}` : ""}</span></div><span>{packageCatalogStatusLabel(item, locale)}</span>{accessBlocked && onManageSources ? <button type="button" className="settings-action-button" onClick={onManageSources}>{zh ? "检查软件源" : "Check source"}</button> : request ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction(request)}>{request.label.replace(` ${name}`, "")}</button> : <span className="opl-update-owner-note">{zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details"}</span>}</div>;
     })}
     {native.map(product => {
-      const { item, source, installations, productId } = product;
-      const state = nativeCatalogState(item), name = item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale);
+      const { item, productId, installations } = product;
+      const state = nativeCatalogState(item);
       const targetVersion = item.updateStatus === "needs_restart" ? item.pendingVersion : nativeCatalogAvailableVersion(product, locale);
       const current = activeSoftwareInstallation(installations, item.activeInstallationId, item.activeInstallationStatus);
       const version = installations.length || item.activeInstallationStatus ? current?.displayVersion ?? current?.version : nativeInstalledDisplayVersion(item);
-      const ownerAction = state === "update_available" && current ? availableInstallationActions(current).find(action => action.payload.operation === "update") : undefined;
-      const sourceAction = !ownerAction && state === "update_available" && (!installations.length || current?.manager === "homebrew") && nativeCarrierInstalled(item) === true
-        ? item.availableActions.find(action => action.actionId === "source_update" && action.status === "available"
-          && source && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId
-          && Boolean(item.revision) && action.payload.expected_revision === item.revision
-          && actionPayloadComplete(action.payload, action.payloadFields)) : undefined;
-      const request = ownerAction && current ? installationActionRequest(current, ownerAction, locale) : sourceAction ? {
-        key: `source:${source?.sourceId}:${item.itemId}:${sourceAction.actionId}`, actionId: sourceAction.actionId,
-        label: `${softwareSourceActionLabel(sourceAction.actionId, locale, sourceAction.label)} ${name}`, payload: sourceAction.payload,
-        confirmationRequired: sourceAction.confirmationRequired, dryRunSupported: sourceAction.dryRunSupported,
-      } : undefined;
+      const { request, label } = resolveNativeUpdateRequest(product, locale);
       return <div className="opl-package-update-row" key={productId} data-product-id={productId}>
-        <div><strong>{name}</strong><span>{version ?? "—"}{(state === "update_available" || item.updateStatus === "needs_restart") && targetVersion ? ` → ${targetVersion}` : ""}</span></div>
+        <div><strong>{item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale)}</strong><span>{version ?? "—"}{(state === "update_available" || item.updateStatus === "needs_restart") && targetVersion ? ` → ${targetVersion}` : ""}</span></div>
         <span>{nativeCatalogStatusLabel(item, locale)}</span>
-        {request ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction(request)}>{ownerAction ? installationActionLabel(ownerAction, locale) : softwareSourceActionLabel(sourceAction!.actionId, locale, sourceAction!.label)}</button>
-          : item.updateStatus === "needs_restart" && bridge?.restartNativeApp ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null || restarting} onClick={() => void triggerRestart()}>{restarting ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用生效" : "Restart to apply")}</button>
+        {request ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction(request)}>{label}</button>
+          : item.updateStatus === "needs_restart" && typeof bridge?.restartNativeApp === "function" ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null || restarting} onClick={() => void triggerRestart()}>{restarting ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用生效" : "Restart to apply")}</button>
           : <span className="opl-update-owner-note">{item.updateStatus === "needs_restart" ? (zh ? "更新已暂存，重启应用后生效。" : "The update is staged and will take effect after restarting the app.") : (zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details")}</span>}
       </div>;
     })}
-    <ThirdPartyDshPluginsUpdates locale={locale} refreshRevision={refreshRevision} />
-  </section><DshPluginUpdates locale={locale} externalRestartRequired={dshRestartRequired} refreshRevision={refreshRevision} /></>;
+    <ThirdPartyDshPluginsUpdates locale={locale} refreshRevision={refreshRevision} onSummaryChange={setBillionContextUpdateReady} />
+  </section><DshPluginUpdates locale={locale} externalRestartRequired={dshRestartRequired} refreshRevision={refreshRevision} onSummaryChange={setDshUpdatesCount} onRestartRequired={onDshRestartRequired} /></>;
 }

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { checkRegistryUpdates, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
+import { clearProfileBootRecovery, readProfileBootRecovery } from "@gaofeng21cn/opl-host-kit/profile-boot-recovery";
 import { createSettingsSearchLog } from "./settings-search-log.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "./native-app-updater.mjs";
@@ -152,6 +153,12 @@ export class OplHostCore extends EventEmitter {
 
   attachHostContext(context) {
     this.hostContext = context;
+  }
+
+  get materialsSpace() {
+    const service = this.hostContext?.get("oplMaterialsSpace");
+    if (!service) throw new ThreadAdapterError("materials_space_unavailable", "Materials Space service is unavailable in this host", {}, 503);
+    return service;
   }
 
   async executeAction(payload) {
@@ -316,6 +323,10 @@ export class OplHostCore extends EventEmitter {
       cwd: path.dirname(options.dshInstallAnchor)
     });
     if (result.application === "restart-required") {
+      if (Object.keys(result.failures ?? {}).length === 0) {
+        clearProfileBootRecovery(options.dshProfileDir);
+        this.profileBootRecovery = null;
+      }
       this.emit("event", { method: "host/dsh-plugins-updated", params: { installed: result.installed ?? {} } });
     }
     return result;
@@ -369,7 +380,9 @@ export class OplHostCore extends EventEmitter {
       case "readDshPluginUpdates": {
         const options = this.hostContext?.get("oplStudioHostOptions");
         if (!options?.dshHome || !options?.dshInstallAnchor) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
-        return checkRegistryUpdates({ home: options.dshHome, installAnchor: options.dshInstallAnchor, cwd: path.dirname(options.dshInstallAnchor) });
+        const projection = await checkRegistryUpdates({ home: options.dshHome, installAnchor: options.dshInstallAnchor, cwd: path.dirname(options.dshInstallAnchor) });
+        const profileBootRecovery = this.profileBootRecovery ?? readProfileBootRecovery(options.dshProfileDir);
+        return profileBootRecovery ? { ...projection, profileBootRecovery } : projection;
       }
       case "updateDshPlugins": return this.updateDshPlugins(payload);
       case "readSuperagent": return this.hostContext.get("oplSuperagent").read();
@@ -428,6 +441,17 @@ export class OplHostCore extends EventEmitter {
       case "accessThreadWorkspace": {
         if (!["open", "reveal"].includes(payload?.action)) throw new ThreadAdapterError("invalid_workspace_action", "Desktop file action must be open or reveal", {}, 400);
         const resolved = await this.threadWorkspace.resolveAccess(payload);
+        await this.platform.accessWorkspacePath({ path: resolved.target, action: payload.action });
+        return { accepted: true };
+      }
+      case "listMaterialSpaces": return this.materialsSpace.listSpaces(payload);
+      case "scanProjectDeliverables": return this.materialsSpace.scanDeliverables(payload);
+      case "listProjectWorkspace": return this.materialsSpace.listWorkspace(payload);
+      case "searchProjectWorkspace": return this.materialsSpace.searchWorkspace(payload);
+      case "readProjectWorkspaceBytes": return this.materialsSpace.readBytes(payload);
+      case "accessProjectWorkspace": {
+        if (!["open", "reveal"].includes(payload?.action)) throw new ThreadAdapterError("invalid_workspace_action", "Desktop file action must be open or reveal", {}, 400);
+        const resolved = await this.materialsSpace.resolveAccess(payload);
         await this.platform.accessWorkspacePath({ path: resolved.target, action: payload.action });
         return { accepted: true };
       }

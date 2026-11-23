@@ -1,0 +1,46 @@
+.opl-mcp-app-select-control {
+  min-width: 140px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, var(--opl-border, #ddd));
+  border-radius: var(--dsw-radius-md, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.opl-mcp-app-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, var(--opl-border, #ddd));
+  border-radius: var(--dsw-radius-md, 8px);
+  background: transparent;
+  color: inherit;
+  font-size: var(--dsw-font-xs-13-font-size, 13px);
+  cursor: pointer;
+}
+
+.opl-mcp-auth-banner {
+  width: calc(100% - 40px);
+  max-width: 720px;
+  margin: 12px auto 0;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2, var(--opl-border, #ddd));
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  display: grid;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.opl-mcp-auth-banner p {
+  margin: 0;
+}
+
+.opl-mcp-auth-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

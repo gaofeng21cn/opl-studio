@@ -5,10 +5,12 @@
   "type": "module",
   "exports": {
     "./profile-plugin-updates": "./profile-plugin-updates.mjs",
+    "./profile-boot-recovery": "./profile-boot-recovery.mjs",
     "./app-server-protocol": "./app-server-protocol.mjs",
     "./staged-inputs": "./staged-inputs.mjs",
     "./webui-auth": "./webui-auth.mjs",
     "./official-profile": "./official-profile.mjs",
-    "./channel-bindings": "./channel-bindings.mjs"
+    "./channel-bindings": "./channel-bindings.mjs",
+    "./workspace-fs": "./workspace-fs.mjs"
   }
 }

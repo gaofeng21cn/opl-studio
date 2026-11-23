@@ -120,3 +120,120 @@ export function resolveMcpNavigation(url: string, apps: import("@gaofeng21cn/opl
   const input = fragment ? JSON.parse(decodeURIComponent(fragment)) : {};
   return { app, arguments: navigationArguments(app, input) };
 }
+
+export type McpAuthorizationRequired = {
+  code: string;
+  packageId?: string;
+  resourceId?: string;
+  message?: string;
+};
+
+const MCP_AUTH_ERROR_CODES = new Set([
+  "connection_required",
+  "authorization_required",
+  "resource_unauthorized",
+  "library_access_required"
+]);
+
+function safeShortId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 128 || /[\s\0]/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+export function extractMcpAuthorizationRequired(value: unknown): McpAuthorizationRequired | null {
+  if (!value) return null;
+  if (value instanceof Error) {
+    return extractMcpAuthorizationRequired(value.message);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const extracted = extractMcpAuthorizationRequired(parsed);
+        if (extracted) return extracted;
+      } catch {
+        // Fallback to code scan below when string is not valid JSON.
+      }
+    }
+    const match = /\b(connection_required|authorization_required|resource_unauthorized|library_access_required)\b/i.exec(trimmed);
+    if (!match) return null;
+    return {
+      code: match[1]!.toLowerCase(),
+      message: trimmed.slice(0, 500)
+    };
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const structured = record.structuredContent && typeof record.structuredContent === "object" && !Array.isArray(record.structuredContent)
+    ? record.structuredContent as Record<string, unknown>
+    : null;
+  const rawCode = [
+    structured?.code,
+    structured?.error_code,
+    structured?.reason_code,
+    record.code,
+    record.error_code,
+    record.reason_code
+  ].find(item => typeof item === "string") as string | undefined;
+  const normalizedCode = rawCode?.trim().toLowerCase();
+  const explicitFlag = structured?.authorization_required === true
+    || structured?.connection_required === true
+    || record.authorization_required === true
+    || record.connection_required === true;
+  if (explicitFlag || (normalizedCode && MCP_AUTH_ERROR_CODES.has(normalizedCode))) {
+    const packageId = safeShortId(structured?.package_id ?? structured?.packageId ?? record.package_id ?? record.packageId);
+    const resourceId = safeShortId(structured?.resource_id ?? structured?.resourceId ?? record.resource_id ?? record.resourceId);
+    const msg = [structured?.message, record.message, record.error].find(item => typeof item === "string" && item.trim()) as string | undefined;
+    return {
+      code: normalizedCode && MCP_AUTH_ERROR_CODES.has(normalizedCode) ? normalizedCode : "authorization_required",
+      ...(packageId ? { packageId } : {}),
+      ...(resourceId ? { resourceId } : {}),
+      ...(msg ? { message: msg.trim().slice(0, 500) } : {})
+    };
+  }
+  if (Array.isArray(record.content)) {
+    for (const block of record.content) {
+      if (block && typeof block === "object" && typeof (block as Record<string, unknown>).text === "string") {
+        const hit = extractMcpAuthorizationRequired((block as Record<string, unknown>).text);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
+export function parseMcpResourceSettingsLink(url: string): {
+  section: "libraries" | "remote";
+  packageId?: string;
+  resourceId?: string;
+} | null {
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.protocol !== "opl-settings:"
+      || parsed.hostname !== "resources"
+      || parsed.username
+      || parsed.password
+      || parsed.port
+      || parsed.hash
+      || (parsed.pathname && parsed.pathname !== "/")
+    ) {
+      return null;
+    }
+    const rawSection = parsed.searchParams.get("section");
+    const section = rawSection === "remote" ? "remote" : "libraries";
+    const packageId = safeShortId(parsed.searchParams.get("packageId") ?? parsed.searchParams.get("package_id"));
+    const resourceId = safeShortId(parsed.searchParams.get("resourceId") ?? parsed.searchParams.get("resource_id"));
+    return {
+      section,
+      ...(packageId ? { packageId } : {}),
+      ...(resourceId ? { resourceId } : {})
+    };
+  } catch {
+    return null;
+  }
+}

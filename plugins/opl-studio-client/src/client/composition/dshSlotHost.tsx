@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { IconAlarmClockOutlineRegular, IconAppsAddOutlineRegular, IconGaugeOutlineRegular } from "../../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/icons/index.tsx";
+import { IconAlarmClockOutlineRegular, IconAppsAddOutlineRegular } from "../../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/icons/index.tsx";
 import type { Context } from "@deepseek-ai/cordis";
 import { installIconSprite } from "../integrations/deepseek-harness/iconSprite.mjs";
 import { SlotRegistry } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
@@ -8,6 +8,7 @@ import { createSettingsShellStore } from "../../../../../vendor/deepseek-harness
 import { createComposerFileIntake } from "@opl-vendor/dsh-file-intake";
 import { CodexThreadScope } from "./codexThreadScope";
 import type { OplStudioSurface } from "./oplStudioSurface";
+import type { StudioShellStore } from "./studioShellStore";
 import { createSlotRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx";
 import App from "../workbench/App";
 import { ProjectedContribution } from "./contributionComponents";
@@ -17,6 +18,12 @@ import {
   type OplUiContribution,
   type OplUiContributionsProjection
 } from "./contributionProjection";
+import {
+  oplSettingsGroupSlotName,
+  type OplSettingsGroupDestination,
+  type OplSettingsGroupOwner
+} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
+import { registerBillionContextSettingsSlot } from "./billionContextSettingsSlot";
 import { installWorkspaceClientPlugin } from "./workspaceClientPlugin";
 import { settingsDestinations } from "../workbench/SettingsPanel";
 import {
@@ -35,7 +42,6 @@ import {
   ConversationHeaderSlot,
   ConversationSlot,
   ApplicationMainSlot,
-  RuntimeMainSlot,
   SchedulesMainSlot,
   OplBrandMarkSlot,
   StudioDirectoryFlow,
@@ -64,9 +70,24 @@ import {
 
 type ActiveRegistration = { fingerprint: string; dispose(): void };
 
-function CodexScopedFrame({ surface, renderSlot, scope }: { surface: OplStudioSurface; renderSlot: any; scope: CodexThreadScope }) {
+function CodexScopedFrame({
+  surface,
+  renderSlot,
+  scope,
+  shellStore
+}: {
+  surface: OplStudioSurface;
+  renderSlot: any;
+  scope: CodexThreadScope;
+  shellStore?: StudioShellStore;
+}) {
   useEffect(() => { scope.select(surface.currentThreadId); }, [scope, surface.currentThreadId]);
   useEffect(() => () => scope.select(undefined), [scope]);
+  useEffect(() => {
+    if (!shellStore) return;
+    shellStore.setHandlers(surface.shellHandlers);
+    shellStore.updateSnapshot(surface.shellSnapshot);
+  }, [shellStore, surface.shellHandlers, surface.shellSnapshot]);
   return <StudioFrame surface={surface} renderSlot={renderSlot} />;
 }
 
@@ -100,7 +121,20 @@ function OplStudioRoot({
     slotHost.clearProjection();
   }, [contributions, slotHost]);
 
-  return <ClientContext.Provider value={slotHost.ctx}><SlotCoreContext.Provider value={slotHost.core}><App detailTabs={contributions.detailsTabs} renderShell={(surface) => <CodexScopedFrame surface={surface} renderSlot={renderSlot} scope={slotHost.threadScope} />} renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)} onHostStateChange={updateHostState} onHostStateDispose={clearHostState} /></SlotCoreContext.Provider></ClientContext.Provider>;
+  return (
+    <ClientContext.Provider value={slotHost.ctx}>
+      <SlotCoreContext.Provider value={slotHost.core}>
+        <App
+          detailTabs={contributions.detailsTabs}
+          renderShell={(surface) => <CodexScopedFrame surface={surface} renderSlot={renderSlot} scope={slotHost.threadScope} shellStore={slotHost.shellStore} />}
+          renderContributionSlot={(slot, owner, options) => renderSlot(slot, owner, options)}
+          renderSettingsGroupSlot={(destination: OplSettingsGroupDestination, owner: OplSettingsGroupOwner) => renderSlot(oplSettingsGroupSlotName(destination), owner)}
+          onHostStateChange={updateHostState}
+          onHostStateDispose={clearHostState}
+        />
+      </SlotCoreContext.Provider>
+    </ClientContext.Provider>
+  );
 }
 
 export class OplStudioDshSlotHost {
@@ -108,7 +142,11 @@ export class OplStudioDshSlotHost {
   readonly threadScope: CodexThreadScope;
   private readonly registrations = new Map<string, ActiveRegistration>();
 
-  constructor(readonly ctx: Context, private readonly contributions: OplClientContributionsService) {
+  constructor(
+    readonly ctx: Context,
+    private readonly contributions: OplClientContributionsService,
+    readonly shellStore?: StudioShellStore
+  ) {
     new SlotRegistry(ctx);
     // Use the Cordis service proxy so registrations and stores belong to this
     // client plugin's fiber, including contributions added after initial mount.
@@ -128,12 +166,12 @@ export class OplStudioDshSlotHost {
     const fileIntake = createComposerFileIntake();
     const register = (spec: Record<string, unknown>, component: unknown) => this.core.register(spec as any, component as any);
     const registerFactory = (spec: Record<string, unknown>, component: unknown) => this.core.registerFactory(spec as any, component as any);
-    register({ name: "root", registrant: "opl-studio", inject: () => ({ slotHost: this, contributions: this.contributions }), children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" }, "settings.section": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    register({ name: "root", registrant: "opl-studio", inject: () => ({ slotHost: this, contributions: this.contributions }), children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.group.models": { kind: "list", scope: "root" }, "settings.group.resources": { kind: "list", scope: "root" }, "settings.group.workspace": { kind: "list", scope: "root" }, "settings.group.capabilities": { kind: "list", scope: "root" }, "settings.group.services": { kind: "list", scope: "root" }, "settings.group.preferences": { kind: "list", scope: "root" } } }, OplStudioRoot);
+    registerBillionContextSettingsSlot(this.core);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root", inject: { hooks: { sectionScroller: (_standard: unknown, hookContext: any) => hookContext.useSectionScroller } } }, "sidebar.session.action": { kind: "hoc", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist.actions": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     registerFactory({ name: "sidebar.panel.icon", scope: "root", children: { "sidebar.panellist": { kind: "list", scope: "root" } } }, PanelIcon);
     register({ name: "sidebar.panellist.actions", id: "opl-sidebar-panel-actions", registrant: "opl-studio" }, SidebarPanelActionsSlot);
     register({ name: "sidebar.panellist", id: "applications", order: 10, registrant: "opl-studio" }, ({ size }: { size: number }) => <IconAppsAddOutlineRegular size={size} />);
-    register({ name: "sidebar.panellist", id: "runtime", order: 20, registrant: "opl-studio" }, ({ size }: { size: number }) => <IconGaugeOutlineRegular size={size} />);
     register({ name: "sidebar.panellist", id: "schedules", order: 30, registrant: "opl-studio" }, ({ size }: { size: number }) => <IconAlarmClockOutlineRegular size={size} />);
     register({ name: "shell.leading", registrant: "dsh-ui-sidebar" }, SidebarLeadingSlot);
     register({ name: "sidebar.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
@@ -162,7 +200,6 @@ export class OplStudioDshSlotHost {
       "conversation.hero.options": { kind: "list", scope: "root" },
     } }, ConversationSlot);
     register({ name: "main", key: "applications", registrant: "opl-studio" }, ApplicationMainSlot);
-    register({ name: "main", key: "runtime", registrant: "opl-studio" }, RuntimeMainSlot);
     register({ name: "main", key: "schedules", registrant: "opl-studio" }, SchedulesMainSlot);
     register({ name: "conversation.hero.brand.mark", registrant: "opl-studio" }, OplBrandMarkSlot);
     register({ name: "conversation.hero.workspace", registrant: "dsh-ui-workspace", children: { "conversation.hero.workspace.directoryFlow": { kind: "single", scope: "root" } } }, WorkspacePickerSlot);

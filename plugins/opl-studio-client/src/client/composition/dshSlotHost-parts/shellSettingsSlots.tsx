@@ -1,6 +1,6 @@
 import { applySettingsShellNavigation } from "../../workbench/deepLinkNavigation";
 import { PackageActivityButton } from '../../workbench/PackageInstallationProgress';
-import { Activity, Bot, Cable, ChevronDown, CircleHelp, Files, Folder, Gauge, PanelRight, Puzzle, Settings as SettingsIcon, SlidersHorizontal, UserRound, X } from "lucide-react";
+import { Activity, Bot, Cable, ChevronDown, CircleHelp, Files, Folder, Gauge, PanelRight, Puzzle, RotateCw, Settings as SettingsIcon, SlidersHorizontal, UserRound, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Menu, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { SettingsRoot } from "@opl-vendor/dsh-settings-root";
@@ -10,8 +10,19 @@ import { createEcosystemLocale, mountSettingsSearch } from "../../integrations/d
 import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../../integrations/deepseek-harness/ecosystemSettingsSearch";
 import { settingsDestinations, settingsSubDestinations, searchableSettings, type SettingsDestinationId } from "../../workbench/SettingsPanel";
 import type { SettingsMobileView } from "../../workbench/settings/types";
-import { settingsContributionDestination, type OplUiContribution } from "../contributionProjection";
 import {
+  OPL_SETTINGS_GROUP_DESTINATIONS,
+  oplSettingsGroupSlotName,
+  readOplSettingsGroupMeta,
+  type OplSettingsGroupMeta
+} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
+import {
+  contributionLabel,
+  settingsContributionDestination,
+  type OplUiContribution
+} from "../contributionProjection";
+import {
+  SlotCoreContext,
   SettingsContributionSlotContext,
   SettingsNavigationContext,
   focusableElements,
@@ -50,6 +61,15 @@ export function ShellOverlaySlot() {
     <div className="opl-shell-status-actions" data-inspector-open={detailsOpen || undefined}>
     {studio.packageActivity && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
       <PackageActivityButton activity={studio.packageActivity} locale={studio.locale} onOpen={() => studio.openPackageActivity ? studio.openPackageActivity() : studio.openPrimaryView('applications')} />
+    </div> : null}
+    {studio.pendingUpdateRestart && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
+      <button type="button" className="opl-package-activity-trigger" data-testid="opl-global-restart-trigger" data-tone="active"
+        onClick={() => studio.onRestartForUpdates ? studio.onRestartForUpdates() : studio.openPrimaryView('applications')}
+        aria-label={studio.locale === 'zh' ? '更新已就绪，点击重启应用生效' : 'Updates ready, click to restart app'}
+        title={studio.locale === 'zh' ? '更新已准备好，重启应用即可生效' : 'Updates are staged and ready; restart the app to apply'}>
+        <RotateCw size={15} aria-hidden="true" />
+        <span role="status">{studio.locale === 'zh' ? '更新已就绪 · 重启生效' : 'Updates ready · Restart'}</span>
+      </button>
     </div> : null}
     {studio.primaryView === "conversation" && !detailsOpen ? (
       <div className="opl-context-inspector-trigger-wrap">
@@ -136,7 +156,11 @@ export function ShellOverlaySlot() {
     ) : null}
   </>;
 }
-export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiContribution[] = []): (SettingsSearchTarget & { keywords?: string })[] {
+export function settingsSearchTargets(
+  locale: "zh" | "en",
+  contributions: OplUiContribution[] = [],
+  settingsGroups: readonly OplSettingsGroupMeta[] = []
+): (SettingsSearchTarget & { keywords?: string })[] {
   const pages = settingsDestinations(locale);
   const targetFor = (destination: SettingsDestinationId, label: string, rowLabel?: string, keywords?: string) => {
     const page = pages.find(page => settingsSubDestinations(page.id, locale).some(item => item.id === destination))!;
@@ -152,18 +176,24 @@ export function settingsSearchTargets(locale: "zh" | "en", contributions: OplUiC
   for (const entry of contributions.filter(entry => entry.slot === "settings.section" && entry.view)) {
     const destination = settingsContributionDestination(entry);
     if (!destination) continue;
-    const label = entry.view!.title[locale] ?? entry.view!.title.en ?? entry.contributionId;
+    const label = contributionLabel(entry.view!.title, locale, entry.contributionId);
     targets.push(targetFor(destination, label, label, Object.values(entry.view!.title).join(" ")));
+  }
+  for (const group of settingsGroups) {
+    const label = group.titleI18n[locale] || group.titleI18n.en;
+    targets.push(targetFor(group.destination, label, label, `${group.titleI18n.zh} ${group.titleI18n.en} ${group.searchKeywords ?? ""}`.trim()));
   }
   return targets.filter((item, index, all) => all.findIndex(other => other.label === item.label) === index);
 }
 
 export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: boolean; renderSlot: any } & PropsStore<ReturnType<typeof createSettingsShellStore>>) {
   const studio = useStudio();
+  const slotCore = useContext(SlotCoreContext);
   const settingsOpen = useStore((state) => state.open);
   const ctx = useClientContext();
   const [navigatedDestination, setNavigatedDestination] = useState<SettingsDestinationId | null>(null);
   const [mobileView, setMobileView] = useState<SettingsMobileView>("categories");
+  const [groupSlotRevision, setGroupSlotRevision] = useState(0);
   useEffect(() => { if (!settingsOpen) setMobileView("categories"); }, [settingsOpen]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   useSettingsDialogFocus(rootRef);
@@ -171,22 +201,35 @@ export function SettingsSlot({ wide, renderSlot, useStore, actions }: { wide: bo
   localeRef.current = studio.locale;
   const contributionsRef = useRef(studio.uiContributions.entries);
   contributionsRef.current = studio.uiContributions.entries;
+  const readRegisteredGroupMeta = useCallback((): OplSettingsGroupMeta[] => {
+    if (!slotCore) return [];
+    return OPL_SETTINGS_GROUP_DESTINATIONS.flatMap(destination =>
+      readOplSettingsGroupMeta(slotCore.entries(oplSettingsGroupSlotName(destination)))
+    );
+  }, [slotCore]);
+  useEffect(() => {
+    if (!slotCore) return;
+    const unsubscribes = OPL_SETTINGS_GROUP_DESTINATIONS.map(destination =>
+      slotCore.subscribe(oplSettingsGroupSlotName(destination), () => setGroupSlotRevision(value => value + 1))
+    );
+    return () => { unsubscribes.forEach(dispose => dispose()); };
+  }, [slotCore]);
   const searchLocale = useRef(createEcosystemLocale(() => localeRef.current));
-  useEffect(() => { searchLocale.current.refresh(); }, [studio.locale, studio.uiContributions]);
+  useEffect(() => { searchLocale.current.refresh(); }, [studio.locale, studio.uiContributions, groupSlotRevision]);
   useEffect(() => rootRef.current
-    ? installSettingsSearchInteraction(document.body, () => settingsSearchTargets(localeRef.current, contributionsRef.current), () => localeRef.current, setMobileView)
-    : undefined, []);
+    ? installSettingsSearchInteraction(document.body, () => settingsSearchTargets(localeRef.current, contributionsRef.current, readRegisteredGroupMeta()), () => localeRef.current, setMobileView)
+    : undefined, [readRegisteredGroupMeta]);
   useEffect(() => {
     let active = true;
     let dispose: (() => Promise<void>) | undefined;
     void mountSettingsSearch({
       ctx,
       locale: searchLocale.current,
-      readSections: () => settingsSearchTargets(localeRef.current, contributionsRef.current).map((entry, order) => ({ options: { id: `opl-search-${order} ${entry.keywords ?? ""}`, label: entry.label, order } })),
+      readSections: () => settingsSearchTargets(localeRef.current, contributionsRef.current, readRegisteredGroupMeta()).map((entry, order) => ({ options: { id: `opl-search-${order} ${entry.keywords ?? ""}`, label: entry.label, order } })),
     }).then((cleanup) => { if (active) dispose = cleanup; else void cleanup(); })
       .catch((error) => console.error("Settings search plugin failed to load", error));
     return () => { active = false; void dispose?.(); };
-  }, [ctx]);
+  }, [ctx, readRegisteredGroupMeta]);
 
   const studioRows = settingsDestinations(studio.locale).map((destination, index) => ({
     id: settingsSectionId(destination.id),

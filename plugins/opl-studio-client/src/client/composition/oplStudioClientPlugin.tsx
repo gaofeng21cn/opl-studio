@@ -7,6 +7,7 @@ import {
 } from "./clientCordis";
 import { OplStudioDshSlotHost } from "./dshSlotHost";
 import { McpAppsClientContext } from "./mcpAppsClient";
+import { createStudioShellStore } from "./studioShellStore";
 import "../integrations/deepseek-harness/theme";
 
 export type { UiRendererService as OplStudioUiRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/index.ts";
@@ -17,7 +18,9 @@ export const inject = ["oplMcpAppsClient"];
 
 export function apply(ctx: Context) {
   const contributions = provideOplStudioClientContributions(ctx);
-  const slotHost = new OplStudioDshSlotHost(ctx, contributions);
+  const shellStore = createStudioShellStore();
+  ctx.provide("oplStudioShell", shellStore);
+  const slotHost = new OplStudioDshSlotHost(ctx, contributions, shellStore);
   ctx.effect(() => slotHost.installWorkspaceClient());
   ctx.provide("uiRenderer", {
     mount(container: HTMLElement) {

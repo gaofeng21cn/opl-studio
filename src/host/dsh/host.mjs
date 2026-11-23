@@ -11,6 +11,11 @@ import {
   resolveProfileDir
 } from "@deepseek-ai/dsh-app-boot";
 import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
+import {
+  quarantineProfileOverrides,
+  readProfileBootRecovery,
+  readProfileOplOverrides
+} from "../../../packages/host-kit/profile-boot-recovery.mjs";
 
 const dshRoot = path.dirname(fileURLToPath(import.meta.url));
 const profilePath = path.join(dshRoot, "cordis.yml");
@@ -38,57 +43,74 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   const profileDir = resolveProfileDir(profileName, dshHome);
   const profileBaseUrl = pathToFileURL(path.join(profileDir, "package.json")).href;
   initProfile(profileDir, []);
-  const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
-  const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
-  const patches = [
-    ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
-    // This bundle also ships an agent-loop integration. Studio consumes its
-    // Codex launcher; applying its DSH model/preset patches would change another host.
-    ...dshProfile.layers.filter(layer => layer.packageName !== "billion-context").flatMap(layer => layer.patches),
-    ...dshProfile.patches
-  ];
-  const context = await boot(
-    profileName,
-    profilePath,
-    patches,
-    async (ctx) => {
-      // DSH's packaged Include imports bare names from the profile anchor, but
-      // its tree keeps the shipped config directory as baseUrl. Keep metadata
-      // consumers (including the official client graph) on that same anchor.
-      // Nested Includes retain the resolution base of their own config file.
-      ctx.on("loader/patch-context", async (entry, next) => {
-        await next();
-        if (entry.parent.tree.filename === profilePath) {
-          entry.parent.tree.ctx.baseUrl = profileBaseUrl;
-        }
-      });
-      ctx.provide(OPL_STUDIO_HOST_OPTIONS_SERVICE, Object.freeze({
-        ...options,
-        webHost: resolveWebBindAddress(options.webHost),
-        webPort: options.webPort ?? Number((options.env ?? process.env).OPL_STUDIO_WEB_PORT || 0),
-        workspaceRoot: options.workspaceRoot ?? (options.env ?? process.env).OPL_NATIVE_WORKBENCH_CODEX_CWD
-          ?? (options.env ?? process.env).OPL_STUDIO_CODEX_CWD ?? path.dirname(installAnchor),
-        dshHome,
-        settingsSearchLogOpenAllowed: !web,
-        dshInstallAnchor: installAnchor,
-        dshProfileDir: profileDir,
-        billionContextAdmitted: dshProfile.layers.some(layer => layer.packageName === "billion-context")
-      }));
-      await ctx.plugin(PluginPackages, { resolution });
-    },
-    profileBaseUrl
-  );
-  const core = context.get("oplHostCore");
-  if (!core) {
-    await context.fiber.dispose();
-    throw new Error("opl-studio: DSH profile did not provide oplHostCore");
+
+  async function attemptBoot() {
+    const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
+    const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
+    const patches = [
+      ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
+      // This bundle also ships an agent-loop integration. Studio consumes its
+      // Codex launcher; applying its DSH model/preset patches would change another host.
+      ...dshProfile.layers.filter(layer => layer.packageName !== "billion-context").flatMap(layer => layer.patches),
+      ...dshProfile.patches
+    ];
+    const context = await boot(
+      profileName,
+      profilePath,
+      patches,
+      async (ctx) => {
+        // DSH's packaged Include imports bare names from the profile anchor, but
+        // its tree keeps the shipped config directory as baseUrl. Keep metadata
+        // consumers (including the official client graph) on that same anchor.
+        // Nested Includes retain the resolution base of their own config file.
+        ctx.on("loader/patch-context", async (entry, next) => {
+          await next();
+          if (entry.parent.tree.filename === profilePath) {
+            entry.parent.tree.ctx.baseUrl = profileBaseUrl;
+          }
+        });
+        ctx.provide(OPL_STUDIO_HOST_OPTIONS_SERVICE, Object.freeze({
+          ...options,
+          webHost: resolveWebBindAddress(options.webHost),
+          webPort: options.webPort ?? Number((options.env ?? process.env).OPL_STUDIO_WEB_PORT || 0),
+          workspaceRoot: options.workspaceRoot ?? (options.env ?? process.env).OPL_NATIVE_WORKBENCH_CODEX_CWD
+            ?? (options.env ?? process.env).OPL_STUDIO_CODEX_CWD ?? path.dirname(installAnchor),
+          dshHome,
+          settingsSearchLogOpenAllowed: !web,
+          dshInstallAnchor: installAnchor,
+          dshProfileDir: profileDir,
+          billionContextAdmitted: dshProfile.layers.some(layer => layer.packageName === "billion-context")
+        }));
+        await ctx.plugin(PluginPackages, { resolution });
+      },
+      profileBaseUrl
+    );
+    const core = context.get("oplHostCore");
+    if (!core) {
+      await context.fiber.dispose();
+      throw new Error("opl-studio: DSH profile did not provide oplHostCore");
+    }
+    core.attachHostContext(context);
+    try {
+      await core.start();
+    } catch (error) {
+      await context.fiber.dispose();
+      throw error;
+    }
+    return { context, core };
   }
-  core.attachHostContext(context);
+
   try {
-    await core.start();
-  } catch (error) {
-    await context.fiber.dispose();
-    throw error;
+    const result = await attemptBoot();
+    result.core.profileBootRecovery = readProfileBootRecovery(profileDir);
+    return result;
+  } catch (firstError) {
+    if (Object.keys(readProfileOplOverrides(profileDir)).length === 0) throw firstError;
+    const recovery = quarantineProfileOverrides(profileDir, firstError);
+    if (!recovery) throw firstError;
+    console.warn("[OPL:dsh-boot-recovery]", JSON.stringify(recovery));
+    const result = await attemptBoot();
+    result.core.profileBootRecovery = recovery;
+    return result;
   }
-  return { context, core };
 }

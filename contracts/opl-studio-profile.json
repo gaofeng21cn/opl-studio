@@ -60,6 +60,8 @@
       "opl-host-core",
       "opl-web-routes",
       "opl-mcp-apps",
+      "opl-runtime-status",
+      "opl-materials-space",
       "opl-codex-agents",
       "opl-team-bots",
       "opl-superagent"

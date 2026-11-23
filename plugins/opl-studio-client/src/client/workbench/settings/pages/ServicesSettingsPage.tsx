@@ -5,7 +5,7 @@ import { componentReadinessStatus } from "../packages";
 import { RuntimeActionButton } from "../actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpenSchedules, actionBusyKey, onAction, locale, renderSettingsContributions }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "onOpenSchedules" | "actionBusyKey" | "onAction" | "locale" | "renderSettingsContributions">) {
+export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpenSchedules, actionBusyKey, onAction, locale, renderSettingsContributions, renderSettingsGroupSlot }: Pick<SettingsPageContext, "runtime" | "settings" | "projection" | "zh" | "onOpenSchedules" | "actionBusyKey" | "onAction" | "locale" | "renderSettingsContributions" | "renderSettingsGroupSlot">) {
 
       const pluginServices = renderSettingsContributions?.("services");
       const runtimeActions = runtime?.maintenanceActions ?? [];
@@ -37,6 +37,7 @@ export function ServicesSettingsPage({ runtime, settings, projection, zh, onOpen
             )) : <SettingRow label={settings.locale === "zh" ? "运行环境" : "Runtime environments"}><span className="settings-muted">--</span></SettingRow>}
           </SettingsGroup>
           {pluginServices ? <SettingsGroup title={zh ? "服务与设备" : "Services and devices"}>{pluginServices}</SettingsGroup> : null}
+          {renderSettingsGroupSlot?.("services")}
         </>
       );
 

@@ -122,17 +122,22 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
   if (!projection || asString(projection.schema_version) !== "work-item-projection.v2") return undefined;
   const summary = asRecord(projection?.summary);
   const numberOrZero = (candidate: unknown) => asFiniteNumber(candidate) ?? 0;
-  const agents = asRecordArray(projection?.agent_catalog).flatMap((agent) => {
+  const agentMap = new Map<string, string>();
+  for (const agent of asRecordArray(projection?.agent_catalog)) {
     const id = asString(agent.agent_id);
-    if (!id) return [];
-    return [{ id, label: asString(agent.display_name) ?? id }];
-  });
+    if (!id) continue;
+    agentMap.set(id, asString(agent.display_name) ?? id);
+  }
   const projects = asRecordArray(projection?.project_catalog).flatMap((project) => {
     const id = asString(project.project_id);
     if (!id) return [];
+    const agentId = asString(project.agent_id) ?? "unknown";
+    if (!agentMap.has(agentId) && agentId !== "unknown") {
+      agentMap.set(agentId, asString(project.agent_display_name) ?? agentId);
+    }
     return [{
       id,
-      agentId: asString(project.agent_id) ?? "unknown",
+      agentId,
       label: asString(project.display_name) ?? id,
       ...(asString(project.workspace_path) ? { workspacePath: asString(project.workspace_path) as string } : {})
     }];
@@ -149,6 +154,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
     const currentStageTelemetry = asRecord(telemetry?.current_stage);
     const cumulativeTelemetry = asRecord(telemetry?.cumulative);
     const action = asRecord(item.action);
+    const freshness = asRecord(item.freshness);
     const id = asString(item.item_id);
     const agentId = asString(identity?.agent_id);
     const domainId = asString(identity?.domain_id);
@@ -158,11 +164,31 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
     const workItemScopeId = asString(identity?.work_item_scope_id);
     const identityState = asString(identity?.identity_state);
     const workspacePath = asString(identity?.workspace_path);
+    const workItemRoot = asString(identity?.work_item_root);
     const attemptId = asString(execution?.attempt_id);
     const title = asString(identity?.work_item_display_name);
     if (!id || !agentId || !projectId || !workItemId || !title) return [];
+    if (!agentMap.has(agentId)) {
+      agentMap.set(agentId, asString(identity?.agent_display_name) ?? agentId);
+    }
     const domainDetailViews = parseDomainDetailViewDescriptors(item.domain_detail_views, id);
     const status = asString(lifecycle?.primary_state) ?? asString(lifecycle?.business_state) ?? "unknown";
+    const executionStageId = asString(execution?.current_stage_id) ?? asString(execution?.stage_id);
+    const attentionKind = asString(attention?.kind) ?? "none";
+    const attentionEnvelope = attention
+      ? {
+          kind: attentionKind,
+          ...(asString(attention.reason) ? { reason: asString(attention.reason) as string } : {}),
+          ...(asString(attention.owner) ? { owner: asString(attention.owner) as string } : {}),
+          ...(asString(attention.responsible_component) ? { responsibleComponent: asString(attention.responsible_component) as string } : {}),
+          ...(asString(attention.issue) ? { issue: asString(attention.issue) as string } : {}),
+          ...(asString(attention.impact) ? { impact: asString(attention.impact) as string } : {}),
+          ...(asString(attention.repair_action) ? { repairAction: asString(attention.repair_action) as string } : {}),
+          ...(asString(attention.expected_outcome) ? { expectedOutcome: asString(attention.expected_outcome) as string } : {})
+        }
+      : undefined;
+    const actionMessageArgs = asRecord(action?.message_args);
+    const visibilityGeneration = asFiniteNumber(visibility?.generation);
     return [{
       id,
       agentId,
@@ -171,6 +197,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       projectId,
       projectDisplayName: asString(identity?.project_display_name) ?? projectId,
       ...(workspacePath ? { workspacePath } : {}),
+      ...(workItemRoot ? { workItemRoot } : {}),
       workItemId,
       canonicalThreadIds: [...new Set([...asStringArray(sessionActivity?.active_session_refs), ...asStringArray(sessionActivity?.nonterminal_session_refs), asString(sessionActivity?.latest_session_ref)])]
         .flatMap(ref => typeof ref === "string" && /^codex:\/\/threads\/[0-9A-Za-z-]+$/.test(ref) ? [ref.slice("codex://threads/".length)] : []),
@@ -184,35 +211,51 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       ...(asString(lifecycle?.primary_state_reason) ?? asString(lifecycle?.reason)
         ? { statusReason: (asString(lifecycle?.primary_state_reason) ?? asString(lifecycle?.reason)) as string }
         : {}),
-      ...(asString(lifecycle?.current_stage_id) ?? asString(execution?.current_stage_id)
-        ? { currentStageId: (asString(lifecycle?.current_stage_id) ?? asString(execution?.current_stage_id)) as string }
+      ...(asString(lifecycle?.package_status) ? { packageStatus: asString(lifecycle?.package_status) as string } : {}),
+      ...(asString(lifecycle?.current_stage_id)
+        ? { currentStageId: asString(lifecycle?.current_stage_id) as string }
         : {}),
-      ...(asString(lifecycle?.current_stage_display_name) ?? asString(execution?.current_stage_display_name)
-        ? { currentStageName: (asString(lifecycle?.current_stage_display_name) ?? asString(execution?.current_stage_display_name)) as string }
+      ...(asString(lifecycle?.current_stage_display_name)
+        ? { currentStageName: asString(lifecycle?.current_stage_display_name) as string }
         : {}),
+      ...(executionStageId ? { executionStageId } : {}),
       ...(attemptId ? { attemptId } : {}),
       ...(asString(execution?.next_stage_id) ? { nextStageId: asString(execution?.next_stage_id) as string } : {}),
       ...(asString(execution?.next_stage_display_name) ? { nextStageName: asString(execution?.next_stage_display_name) as string } : {}),
       executionState: asString(execution?.state) ?? "unknown",
       activeSessionCount: numberOrZero(sessionActivity?.active_session_count),
-      attentionKind: asString(attention?.kind) ?? "none",
+      attentionKind,
+      ...(attentionEnvelope ? { attention: attentionEnvelope } : {}),
       ...(asString(action?.title) ? { nextActionTitle: asString(action?.title) as string } : {}),
       ...(asString(action?.summary) ? { nextActionSummary: asString(action?.summary) as string } : {}),
       ...(asString(action?.owner_display_name) ?? asString(action?.owner)
         ? { nextActionOwner: (asString(action?.owner_display_name) ?? asString(action?.owner)) as string }
         : {}),
+      ...(asString(action?.title_key) ? { actionTitleKey: asString(action?.title_key) as string } : {}),
+      ...(asString(action?.summary_key) ? { actionSummaryKey: asString(action?.summary_key) as string } : {}),
+      ...(actionMessageArgs ? { actionMessageArgs } : {}),
+      ...(asString(action?.owner_kind) ? { actionOwnerKind: asString(action?.owner_kind) as string } : {}),
+      ...(asString(action?.action_ref) ? { actionRef: asString(action?.action_ref) as string } : {}),
       ...(asString(execution?.started_at) ? { startedAt: asString(execution?.started_at) as string } : {}),
+      ...(asString(execution?.last_heartbeat_at) ? { lastHeartbeatAt: asString(execution?.last_heartbeat_at) as string } : {}),
       ...(asString(execution?.updated_at) ?? asString(lifecycle?.last_transition_at)
         ? { updatedAt: (asString(execution?.updated_at) ?? asString(lifecycle?.last_transition_at)) as string }
         : {}),
-      elapsedMs: asFiniteNumber(qualityBudget?.elapsed_ms),
+      elapsedMs: asFiniteNumber(qualityBudget?.elapsed_ms) ?? asFiniteNumber(execution?.elapsed_ms),
       stageTokens: asFiniteNumber(currentStageTelemetry?.total_tokens),
+      ...(asString(currentStageTelemetry?.state) ? { stageTokensState: asString(currentStageTelemetry?.state) as string } : {}),
       totalTokens: asFiniteNumber(cumulativeTelemetry?.total_tokens),
+      ...(asString(cumulativeTelemetry?.state) ? { cumulativeTokensState: asString(cumulativeTelemetry?.state) as string } : {}),
       telemetryState: asString(telemetry?.state) ?? "missing",
       ...(asString(telemetry?.missing_reason) ?? asString(cumulativeTelemetry?.missing_reason)
         ? { telemetryMissingReason: (asString(telemetry?.missing_reason) ?? asString(cumulativeTelemetry?.missing_reason)) as string }
         : {}),
+      ...(asString(freshness?.state) ? { freshnessState: asString(freshness?.state) as string } : {}),
       archived: asString(visibility?.state) === "archived",
+      ...(visibilityGeneration !== null ? { visibilityGeneration } : {}),
+      ...(asString(visibility?.control_ref) ? { visibilityControlRef: asString(visibility?.control_ref) as string } : {}),
+      ...(asString(visibility?.source) ? { visibilitySource: asString(visibility?.source) as string } : {}),
+      ...(asString(visibility?.updated_at) ? { visibilityUpdatedAt: asString(visibility?.updated_at) as string } : {}),
       stages: asRecordArray(item.stage_map).flatMap((stage): WorkItemRuntimeStage[] => {
         const stageId = asString(stage.stage_id);
         if (!stageId) return [];
@@ -231,6 +274,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       ...(Array.isArray(item.domain_detail_views) ? { domainDetailViews } : {})
     }];
   });
+  const agents = Array.from(agentMap.entries()).map(([id, label]) => ({ id, label }));
 
   return {
     schemaVersion: "work-item-projection.v2",

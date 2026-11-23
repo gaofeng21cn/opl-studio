@@ -1,4 +1,5 @@
 import { Button, Input, Pill, StateDot, Tooltip, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
+import { PluginErrorBoundary } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { Boxes, Check, Link2, Pencil, Play, QrCode, RefreshCw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -7,6 +8,7 @@ import {
   createOplContributionReadInput,
   readChannelAccessResult,
   readRemoteCompanionAccessResult,
+  readSettingsFormResult,
   type OplContributionSlotOwner,
   type OplChannelAccessAction,
   type OplChannelAccessResult,
@@ -16,6 +18,7 @@ import {
   type OplUiContribution,
   type OplUiContributionBadge
 } from "./contributionProjection";
+import { DeclarativeSettingsForm } from "./DeclarativeSettingsForm";
 import { readWorkspaceCollection, workspaceReadInput, WORKSPACE_VIEW_TYPES } from "./workspaceViewModel";
 import { WorkspaceCollectionView } from "./workspaceClientPlugin";
 
@@ -361,6 +364,44 @@ function ServiceStatusResult({ value, locale, developerDetails }: {
   </div>;
 }
 
+function SettingsFormContributionView({ entry, owner }: {
+  entry: OplUiContribution;
+  owner: OplContributionSlotOwner;
+}) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [result, setResult] = useState<unknown>(null);
+  const [error, setError] = useState("");
+  const [readRevision, setReadRevision] = useState(0);
+  const view = entry.view;
+
+  useEffect(() => {
+    if (!view) return;
+    let active = true;
+    if (result === null) setState("loading");
+    setError("");
+    void owner.readData(entry).then((value) => {
+      if (!active) return;
+      setResult(value);
+      setState("ready");
+    }).catch((reason) => {
+      if (!active) return;
+      setError(String(reason));
+      if (result === null) setState("error");
+    });
+    return () => { active = false; };
+  }, [entry.packageId, owner.readData, owner.refreshRevision, readRevision, view?.dataRef]);
+
+  if (!view) return null;
+  if (state === "loading") {
+    return <p className="opl-contribution-fallback" role="status"><StateDot state="ongoing" size={10} />{owner.locale === "zh" ? "正在读取配置项" : "Loading configuration"}</p>;
+  }
+  const parsed = state === "error" ? null : readSettingsFormResult(result);
+  if (state === "error" || !parsed) {
+    return <p className="opl-contribution-fallback" role="status" title={error}><StateDot state="warning" size={10} />{view.emptyState ? contributionLabel(view.emptyState, owner.locale, "") : (owner.locale === "zh" ? "该配置表单当前不可用" : "This settings form is unavailable")}</p>;
+  }
+  return <DeclarativeSettingsForm entry={entry} result={parsed} owner={owner} onSaved={() => setReadRevision(revision => revision + 1)} />;
+}
+
 function ContributionView({ entry, owner }: {
   entry: OplUiContribution;
   owner: OplContributionSlotOwner;
@@ -370,6 +411,7 @@ function ContributionView({ entry, owner }: {
     : <p role="status">{owner.locale === "zh" ? "请选择一个任务后打开工作台" : "Select a task to open the workbench"}</p>;
   if (entry.view?.viewType === "channel_access") return <ChannelAccessView entry={entry} owner={owner} />;
   if (entry.view?.viewType === "remote_companion_access") return <RemoteCompanionAccessView entry={entry} owner={owner} />;
+  if (entry.view?.viewType === "settings_form") return <SettingsFormContributionView entry={entry} owner={owner} />;
   const identity = owner.runtimeDetailIdentity;
   return <StructuredContributionView key={`${entry.contributionKey}:${entry.view?.dataRef}:${identity?.agentId ?? ""}:${identity?.domainId ?? ""}:${identity?.workItemId ?? ""}:${identity?.workItemScopeId ?? ""}`} entry={entry} owner={owner} />;
 }
@@ -973,6 +1015,9 @@ export function ProjectedContribution({ entry, owner }: {
 }) {
   const supported = entry.contributionKind === "command_group"
     || (entry.contributionKind === "view" && entry.view !== undefined);
+  const title = entry.view
+    ? contributionLabel(entry.view.title, owner.locale, entry.contributionId)
+    : entry.contributionId;
   return (
     <section
       className="opl-contribution"
@@ -980,20 +1025,28 @@ export function ProjectedContribution({ entry, owner }: {
       data-testid={`opl-ui-contribution-${entry.contributionKey}`}
     >
       <ContributionHeader entry={entry} owner={owner} />
-      {supported ? (
-        <>
-          <ContributionView entry={entry} owner={owner} />
-          <ContributionBadges entry={entry} owner={owner} />
-          {entry.view?.viewType === "channel_access" || WORKSPACE_VIEW_TYPES.has(entry.view?.viewType ?? "") ? null : <ContributionActions entry={entry} owner={owner} />}
-        </>
-      ) : (
-        <p className="opl-contribution-fallback" role="status">
-          <StateDot state="warning" size={10} />
-          {owner.locale === "zh"
-            ? `暂不支持 ${entry.contributionKind}，其他模块仍可使用。`
-            : `${entry.contributionKind} is not supported; other modules remain available.`}
-        </p>
-      )}
+      <PluginErrorBoundary
+        pluginId={entry.packageId}
+        pluginLabel={title}
+        locale={owner.locale}
+        onOpenSoftwareCenter={owner.openSoftwareCenter}
+        resetKey={entry.contributionKey}
+      >
+        {supported ? (
+          <>
+            <ContributionView entry={entry} owner={owner} />
+            <ContributionBadges entry={entry} owner={owner} />
+            {["channel_access", "settings_form"].includes(entry.view?.viewType ?? "") || WORKSPACE_VIEW_TYPES.has(entry.view?.viewType ?? "") ? null : <ContributionActions entry={entry} owner={owner} />}
+          </>
+        ) : (
+          <p className="opl-contribution-fallback" role="status">
+            <StateDot state="warning" size={10} />
+            {owner.locale === "zh"
+              ? `暂不支持 ${entry.contributionKind}，其他模块仍可使用。`
+              : `${entry.contributionKind} is not supported; other modules remain available.`}
+          </p>
+        )}
+      </PluginErrorBoundary>
     </section>
   );
 }

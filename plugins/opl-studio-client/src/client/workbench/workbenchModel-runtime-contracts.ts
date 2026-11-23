@@ -1,97 +1,18 @@
+import type {
+  DomainDetailViewAvailability,
+  DomainDetailViewDescriptor,
+  WorkItemRuntimeItem,
+  WorkItemRuntimeProjection,
+  WorkItemRuntimeStage
+} from "@gaofeng21cn/opl-host-contracts";
 import type { AgentPackageLocalizedText } from "./workbenchModel-package-contracts";
 
-export type WorkItemRuntimeStage = {
-  stageId: string;
-  displayName: string;
-  displayNameI18n: AgentPackageLocalizedText;
-  state: string;
-  owner?: string;
-  ownerDisplayName?: string;
-  elapsedSeconds: number | null;
-  totalTokens: number | null;
-};
-
-export type DomainDetailViewAvailability =
-  | "unread"
-  | "available"
-  | "missing"
-  | "stale"
-  | "invalid"
-  | "read_error";
-
-export type DomainDetailViewDescriptor = {
-  itemId: string;
-  viewId: string;
-  viewKind: string;
-  title?: string;
-  schemaRef?: string;
-  schemaVersion?: string;
-  revision?: number;
-  digest?: string;
-  availability: DomainDetailViewAvailability;
-  valid: boolean;
-  invalidReason?: string;
-};
-
-export type WorkItemRuntimeItem = {
-  id: string;
-  agentId: string;
-  agentDisplayName: string;
-  domainId?: string;
-  projectId: string;
-  projectDisplayName: string;
-  workspacePath?: string;
-  workItemId: string;
-  domainWorkItemId?: string;
-  canonicalThreadIds?: string[];
-  workItemScopeId?: string;
-  identityState?: string;
-  title: string;
-  kind?: string;
-  status: string;
-  statusLabel: string;
-  statusReason?: string;
-  currentStageId?: string;
-  currentStageName?: string;
-  attemptId?: string;
-  nextStageId?: string;
-  nextStageName?: string;
-  executionState: string;
-  activeSessionCount: number;
-  attentionKind: string;
-  nextActionTitle?: string;
-  nextActionSummary?: string;
-  nextActionOwner?: string;
-  startedAt?: string;
-  updatedAt?: string;
-  elapsedMs: number | null;
-  stageTokens: number | null;
-  totalTokens: number | null;
-  telemetryState: string;
-  telemetryMissingReason?: string;
-  archived: boolean;
-  stages: WorkItemRuntimeStage[];
-  domainDetailViews?: DomainDetailViewDescriptor[];
-};
-
-export type WorkItemRuntimeProjection = {
-  schemaVersion: "work-item-projection.v2";
-  generatedAt?: string;
-  summary: {
-    agentCount: number;
-    projectCount: number;
-    workItemCount: number;
-    archivedWorkItemCount: number;
-    runningCount: number;
-    activeSessionCount: number;
-    userAttentionCount: number;
-    systemAttentionCount: number;
-    telemetryObservedCount: number;
-    telemetryMissingCount: number;
-  };
-  agents: Array<{ id: string; label: string }>;
-  projects: Array<{ id: string; agentId: string; label: string; workspacePath?: string }>;
-  items: WorkItemRuntimeItem[];
+export type {
+  DomainDetailViewAvailability,
+  DomainDetailViewDescriptor,
+  WorkItemRuntimeItem,
+  WorkItemRuntimeProjection,
+  WorkItemRuntimeStage
 };
 
 export type RuntimeMaintenanceActionRef = {

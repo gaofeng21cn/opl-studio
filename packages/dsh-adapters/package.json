@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./visual-source": "./deepseekHarnessSourceManifest.json",
-    "./workspace-preview": "./workspace-preview.ts"
+    "./workspace-preview": "./workspace-preview.ts",
+    "./ui-kit": "./ui-kit.ts"
   }
 }

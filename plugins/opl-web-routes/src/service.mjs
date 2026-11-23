@@ -198,8 +198,11 @@ async function dispatchApi(req, res, hostCore) {
     return;
   }
 
-  if (req.method === "POST" && url.pathname === "/api/threads/workspace/download") {
-    const file = await hostCore.threadWorkspace.download(await body(req));
+  if (req.method === "POST" && (url.pathname === "/api/threads/workspace/download" || url.pathname === "/api/materials/workspace/download")) {
+    const isMaterials = url.pathname.startsWith("/api/materials/");
+    const file = isMaterials
+      ? await hostCore.materialsSpace.download(await body(req))
+      : await hostCore.threadWorkspace.download(await body(req));
     try {
       res.writeHead(200, {
         "content-type": "application/octet-stream",
@@ -228,7 +231,12 @@ async function dispatchApi(req, res, hostCore) {
     ["/api/threads/workspace/read", (value) => hostCore.invoke("readThreadWorkspaceFile", value)],
     ["/api/threads/workspace/search", (value) => hostCore.invoke("searchThreadWorkspace", value)],
     ["/api/threads/archive", (value) => hostCore.invoke("setArchived", { ...value, archived: true })],
-    ["/api/threads/unarchive", (value) => hostCore.invoke("setArchived", { ...value, archived: false })]
+    ["/api/threads/unarchive", (value) => hostCore.invoke("setArchived", { ...value, archived: false })],
+    ["/api/materials/spaces", (value) => hostCore.invoke("listMaterialSpaces", value)],
+    ["/api/materials/deliverables", (value) => hostCore.invoke("scanProjectDeliverables", value)],
+    ["/api/materials/workspace/list", (value) => hostCore.invoke("listProjectWorkspace", value)],
+    ["/api/materials/workspace/search", (value) => hostCore.invoke("searchProjectWorkspace", value)],
+    ["/api/materials/workspace/bytes", (value) => hostCore.invoke("readProjectWorkspaceBytes", value)]
   ]);
   const route = req.method === "POST" ? postRoutes.get(url.pathname) : undefined;
   if (route) {

@@ -73,6 +73,9 @@ test("Electron owns the App carrier log directory exposed in diagnostics", () =>
   assert.match(preload, /listThreadWorkspace: \(request\) => invoke\("listThreadWorkspace", request\)/);
   assert.match(preload, /readThreadWorkspaceFile: \(request\) => invoke\("readThreadWorkspaceFile", request\)/);
   assert.match(preload, /searchThreadWorkspace: \(request\) => invoke\("searchThreadWorkspace", request\)/);
+  for (const method of ["listMaterialSpaces", "scanProjectDeliverables", "listProjectWorkspace", "searchProjectWorkspace", "readProjectWorkspaceBytes", "accessProjectWorkspace"]) {
+    assert.match(preload, new RegExp(`${method}:\\s*\\(request(?:\\s*=\\s*\\{\\})?\\)\\s*=>\\s*invoke\\("${method}", request\\)`));
+  }
   assert.match(logDirectoryOwner, /desktop_client_system_info: \{ logDir \}/);
   assert.match(logDirectoryOwner, /electronApp\.setAppLogsPath\(nextLogDir\)/);
   assert.match(settingsPanel, /const appLogDirectory = carrierDiagnostics\.application\?\.systemInfo\.logDir/);

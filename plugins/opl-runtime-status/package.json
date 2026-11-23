@@ -1,0 +1,38 @@
+{
+  "name": "@gaofeng21cn/opl-runtime-status",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "OPL App first-party runtime status monitor for registered standard agents, active projects, stage progress, and task workbenches.",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.2-rc.3"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@gaofeng21cn/opl-studio-client"
+      ]
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/opl-runtime-status"
+  }
+}

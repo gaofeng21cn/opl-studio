@@ -10,7 +10,6 @@ import { codexWorkbenchStyleSettingsActions } from "./codexWorkbenchStyleSetting
 import { codexWorkbenchStyleRuntime } from "./codexWorkbenchStyleRuntime";
 import { codexWorkbenchStyleThreads } from "./codexWorkbenchStyleThreads";
 import { codexWorkbenchStyleDsh } from "./codexWorkbenchStyleDsh";
-import { codexWorkbenchStyleRuntimeOverview } from "./codexWorkbenchStyleRuntimeOverview";
 import { codexWorkbenchStyleResponsive } from "./codexWorkbenchStyleResponsive";
 import { codexWorkbenchStyleSettingsIntegration } from "./codexWorkbenchStyleSettingsIntegration";
 import { codexWorkbenchStyleApplicationManagement } from "./codexWorkbenchStyleApplicationManagement";
@@ -28,7 +27,6 @@ export const codexWorkbenchStyles =
   codexWorkbenchStyleRuntime +
   codexWorkbenchStyleThreads +
   codexWorkbenchStyleDsh +
-  codexWorkbenchStyleRuntimeOverview +
   codexWorkbenchStyleResponsive +
   codexWorkbenchStyleSettingsIntegration +
   codexWorkbenchStyleApplicationManagement;

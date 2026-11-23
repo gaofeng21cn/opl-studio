@@ -9,7 +9,7 @@ import { SettingRow, SettingsGroup, StatusValue } from "../primitives";
 import { RuntimeActionButton } from "../actions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function ResourcesSettingsPage({ model, resourceFocus, onPickKnowledgeDirectory, onRefresh, projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, onAction, onApproveConnectionAccess, onOpenSoftwareCenter, navigate, renderSettingsContributions }: Pick<SettingsPageContext, "model" | "resourceFocus" | "onPickKnowledgeDirectory" | "onRefresh" | "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "onAction" | "onApproveConnectionAccess" | "onOpenSoftwareCenter" | "navigate" | "renderSettingsContributions">) {
+export function ResourcesSettingsPage({ model, resourceFocus, onPickKnowledgeDirectory, onRefresh, projection, actionBusyKey, dockerDiagnostic, settings, zh, capabilityCatalog, capabilityStatus, onAction, onApproveConnectionAccess, onOpenSoftwareCenter, navigate, renderSettingsContributions, renderSettingsGroupSlot }: Pick<SettingsPageContext, "model" | "resourceFocus" | "onPickKnowledgeDirectory" | "onRefresh" | "projection" | "actionBusyKey" | "dockerDiagnostic" | "settings" | "zh" | "capabilityCatalog" | "capabilityStatus" | "onAction" | "onApproveConnectionAccess" | "onOpenSoftwareCenter" | "navigate" | "renderSettingsContributions" | "renderSettingsGroupSlot">) {
 
       const [section, setSection] = useState<"libraries" | "remote">(resourceFocus?.section ?? "libraries");
       const remoteConnections = renderSettingsContributions?.("resources");
@@ -37,6 +37,7 @@ export function ResourcesSettingsPage({ model, resourceFocus, onPickKnowledgeDir
               <button className="settings-action-button" type="button" disabled={!onOpenSoftwareCenter} onClick={() => onOpenSoftwareCenter?.("applications")}>{zh ? "管理远程扩展" : "Manage remote extensions"}</button>
             </SettingRow>}
           </SettingsGroup>
+          {renderSettingsGroupSlot?.("resources")}
           <LinkCompanionSection locale={settings.locale} onOpenAccount={() => navigate("account")} />
           <SettingsGroup title={settings.locale === "zh" ? "网页访问" : "Web access"}>
             <SettingRow label={zh ? "部署网页端" : "Deploy WebUI"} detail={zh ? "网页端独立部署。指南包含安装、访问认证、数据目录和启动步骤。" : "WebUI is a separate deployment. The guide covers installation, authentication, data directories and startup."}><a className="settings-support-link" target="_blank" rel="noreferrer" href="https://github.com/gaofeng21cn/opl-studio/blob/main/docs/oci-distribution.md">{zh ? "配置指南" : "Setup guide"}</a></SettingRow>

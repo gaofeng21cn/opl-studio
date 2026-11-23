@@ -36,6 +36,13 @@ import type {
   ThreadWorkspaceSearch
 } from "./codex-workspace";
 import type {
+  MaterialSpaceCatalog,
+  ProjectDeliverablesScan,
+  ProjectWorkspaceAccessRequest,
+  ProjectWorkspaceListing,
+  ProjectWorkspaceSearch
+} from "./materials-space";
+import type {
   CodexThreadAdapterBridge,
   SetArchivedRequest,
   ThreadForkRequest,
@@ -128,11 +135,18 @@ export type DshClientModuleGraph = {
   entries: Array<{ id: string; url: string; rev: string; inject?: string[]; external?: string[] }>;
   batches: Array<{ phase: "bootstrap" | "application"; url: string; rev: string; entries: string[] }>;
 };
+export type DshProfileBootRecovery = {
+  schema: "opl_dsh_profile_recovery.v1";
+  recoveredAt: string;
+  quarantinedPackages: Record<string, string>;
+  reason: string;
+};
 export type DshPluginUpdateProjection = {
   schema: "opl_dsh_plugin_updates.v1";
   profile: string;
   checkedAt: string;
   plugins: Record<string, { installed: string | null; available: string | null; state: "current" | "update_available" | "unavailable"; reason?: string }>;
+  profileBootRecovery?: DshProfileBootRecovery | null;
 };
 export type DshPluginUpdateResult = Record<string, unknown> & { operation?: string; application?: string; installed?: Record<string, string>; failures?: Record<string, string> };
 
@@ -162,6 +176,12 @@ export type OplStudioSurface = Pick<
   readClientModuleBoot?: () => Promise<import("@deepseek-ai/dsh-host-webserver").IndexInjection[]>;
   readDshPluginUpdates?: () => Promise<DshPluginUpdateProjection>;
   updateDshPlugins?: (request: { all?: boolean; packages?: string[] }) => Promise<DshPluginUpdateResult>;
+  listMaterialSpaces?: (request?: { refresh?: boolean }) => Promise<MaterialSpaceCatalog>;
+  scanProjectDeliverables?: (request: { projectId: string; workItemId?: string; query?: string; category?: string }) => Promise<ProjectDeliverablesScan>;
+  listProjectWorkspace?: (request: { projectId: string; relativePath?: string }) => Promise<ProjectWorkspaceListing>;
+  searchProjectWorkspace?: (request: { projectId: string; query: string }) => Promise<ProjectWorkspaceSearch>;
+  readProjectWorkspaceBytes?: (request: { projectId: string; relativePath: string; offset?: number; length?: number; ifMatch?: string }) => Promise<ThreadWorkspaceBytes>;
+  accessProjectWorkspace?: (request: ProjectWorkspaceAccessRequest) => Promise<{ accepted: boolean }>;
   retryDesktopHost?: () => Promise<{ status: string }>;
   connectEvents?: (onEvent: (event: OplBridgeEvent) => void) => () => void;
 };

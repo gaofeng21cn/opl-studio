@@ -52,6 +52,7 @@ export type McpAppProps = {
   preferredEntry?: { resourceUri: string; arguments: Record<string, string> };
   onPreferredEntryConsumed?: (entry: NonNullable<McpAppProps["preferredEntry"]>) => void;
   onManage?: () => void;
+  onOpenResourceSettings?: (focus?: { packageId?: string; resourceId?: string; section?: "libraries" | "remote" }) => void;
   onConversation?: () => void;
   onContext(threadId: string, context: string): void;
   onMessage(threadId: string, text: string): void;

@@ -20,7 +20,21 @@ const bridge = [
 const passthrough = read("plugins/opl-framework-bridge/src/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
 const model = read("plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-const runtimePage = read("plugins/opl-studio-client/src/client/workbench/RuntimeOverviewPage.tsx");
+const runtimePage = [
+  "plugins/opl-runtime-status/src/client/plugin.tsx",
+  "plugins/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
+  "plugins/opl-runtime-status/src/client/StageProgressStepper.tsx",
+  "plugins/opl-runtime-status/src/client/ArchiveConfirmDialog.tsx",
+  "plugins/opl-runtime-status/src/client/WorkItemDetailDrawer.tsx",
+  "plugins/opl-runtime-status/src/client/runtimeStatusHelpers.ts"
+].map(read).join("\n");
+const materialsSpaceSource = [
+  "plugins/opl-materials-space/src/index.mjs",
+  "plugins/opl-materials-space/src/materials-service.mjs",
+  "plugins/opl-materials-space/src/client/plugin.tsx",
+  "plugins/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
+  "plugins/opl-materials-space/src/client/materialsSpaceHelpers.ts"
+].map(read).join("\n");
 const applicationManagementPage = read("plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/SharedResourcesPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection.tsx");
 const runtimeCache = read("plugins/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts");
 const settingsPanel = read("plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx") + read("plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx") + fs.readdirSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
@@ -37,7 +51,6 @@ const styleSources = [
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntimeOverview.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleApplicationManagement.ts"
@@ -142,26 +155,26 @@ test("primary settings actions keep readable contrast on hover", () => {
 });
 
 test("Studio exposes an App-projected first-level runtime overview", () => {
-  assert.match(slotHost, /name: "main", key: "runtime", registrant: "opl-studio"/);
-  assert.match(slotHost, /export function RuntimeMainSlot\(\) \{ return <\>\{useStudio\(\)\.runtimeOverview\}<\/>; \}/);
+  assert.match(runtimePage, /name: "main",\s*key: "runtime",\s*registrant: "opl-runtime-status"/);
   assert.doesNotMatch(slotHost, /SidebarPrimaryNavigationSlot|opl-primary-navigation/);
-  assert.match(slotHost, /id: "runtime", order: 20, label: zh \? "运行状态" : "Runtime status"/);
+  assert.match(runtimePage, /name: "sidebar\.panellist",\s*id: "runtime",\s*order: 20,/);
   assert.match(slotHost, /usePanels=\{useStudioPanels\}/);
-  assert.match(app, /<RuntimeOverviewPage/);
+  assert.match(slotHost, /slots\?\.entries\("sidebar\.panellist"\)/);
+  assert.match(read("plugins/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx"), /ctx\.provide\("oplStudioShell", shellStore\)/);
   assert.match(bridge, /workbench\?: Record<string, unknown>/);
   assert.match(model, /work_item_projection_v2/);
   assert.match(runtimePage, /data-testid="opl-runtime-overview-page"/);
   assert.match(runtimePage, /formatTokens/);
   assert.match(runtimePage, /value === null/);
-  assert.match(runtimePage, /aria-expanded=\{stagesOpen\}/);
+  assert.match(runtimePage, /aria-expanded=\{open\}/);
   assert.match(runtimePage, /showArchived/);
   assert.match(runtimePage, /runtime-service-notice/);
   assert.match(runtimePage, /onClick=\{onOpenMaintenance\}/);
   assert.doesNotMatch(runtimePage, /onRunServiceRecovery|pendingRecoveryAction/);
   assert.doesNotMatch(runtimePage, /causalRoot\.reasonCode|causalRoot\.rawStatus|mutationGuard\.status/);
-  assert.match(app, /onOpenMaintenance=\{\(\) => setSettingsNavigation\(current => \(\{ open: true, destination: "services"/);
-  assert.match(app, /await bridge\.executeAction/);
-  assert.match(app, /await loadState\(settings\.runtimeProfile\)/);
+  assert.match(app, /openMaintenance:\s*\(\)\s*=>\s*setSettingsNavigation\(current => \(\{ open: true, destination: "services"/);
+  assert.match(app, /executeAction:\s*\(request\)\s*=>\s*bridge\.executeAction\(request\)/);
+  assert.match(app, /refreshState:\s*\(\)\s*=>\s*loadState\(settings\.runtimeProfile\)/);
   assert.match(app, /writeRuntimeOverviewCache/);
   assert.match(app, /runtimeSnapshotSource/);
   assert.match(runtimePage, /runtime-snapshot-note/);
@@ -169,6 +182,22 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
   assert.match(runtimeCache, /cached_snapshot_requires_fresh_state/);
   assert.match(runtimeCache, /maintenanceActions: \[\]/);
   assert.match(runtimePage, /causalRoot\.detail\[locale\]/);
+});
+
+test("Studio exposes a first-party Tier 2 Materials Space plugin with Desktop and WebUI parity", () => {
+  assert.match(materialsSpaceSource, /name: "sidebar\.panellist",\s*id: "materials",\s*order: 25,/);
+  assert.match(materialsSpaceSource, /name: "main",\s*key: "materials",\s*registrant: "opl-materials-space"/);
+  assert.match(materialsSpaceSource, /ctx\.provide\("oplMaterialsSpace", service\)/);
+  assert.match(dshProfile, /id: opl-runtime-status/);
+  assert.match(dshProfile, /id: opl-materials-space/);
+  for (const method of ["listMaterialSpaces", "scanProjectDeliverables", "listProjectWorkspace", "searchProjectWorkspace", "readProjectWorkspaceBytes", "accessProjectWorkspace"]) {
+    assert.match(desktopPreload, new RegExp(`${method}:`));
+    assert.match(hostCore, new RegExp(`case "${method}"`));
+  }
+  for (const route of ["/api/materials/spaces", "/api/materials/deliverables", "/api/materials/workspace/list", "/api/materials/workspace/search", "/api/materials/workspace/bytes", "/api/materials/workspace/download"]) {
+    assert.ok(httpRoutes.includes(route), `missing HTTP Materials route ${route}`);
+    assert.ok(webTransport.includes(route), `missing WebUI Materials route ${route}`);
+  }
 });
 
 test("Studio exposes one App-owned application management surface", () => {
@@ -195,7 +224,8 @@ test("Studio exposes one App-owned application management surface", () => {
 
 test("new task and runtime entries use the pinned DSH sidebar controls", () => {
   assert.match(slotHost, /<SidebarRoot/);
-  assert.match(slotHost, /name: "sidebar.panellist", id: "runtime"/);
+  assert.match(runtimePage, /name: "sidebar\.panellist",\s*id: "runtime"/);
+  assert.match(slotHost, /usePanels=\{useStudioPanels\}/);
   assert.match(slotHost, /name: "sidebar.panel.icon"/);
   assert.match(slotHost, /name: "sidebar.panellist.actions"/);
   assert.match(read("vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.module.css"), /\.newSession \{/);
@@ -625,7 +655,7 @@ test("channel_access stays declarative and forwards only owner-projected scoped 
   assert.match(contributionComponents, /viewType === "channel_access"/);
   assert.match(contributionComponents, /readChannelAccessResult/);
   assert.match(contributionComponents, /owner\.onAction\(entry, command, action\.input\)/);
-  assert.match(contributionComponents, /entry\.view\?\.viewType === "channel_access" \|\| WORKSPACE_VIEW_TYPES\.has\(entry\.view\?\.viewType \?\? ""\) \? null : <ContributionActions/);
+  assert.match(contributionComponents, /\["channel_access", "settings_form"\]\.includes\(entry\.view\?\.viewType \?\? ""\) \|\| WORKSPACE_VIEW_TYPES\.has\(entry\.view\?\.viewType \?\? ""\) \? null : <ContributionActions/);
   assert.match(contributionComponents, /data-testid="opl-channel-access-pairings"/);
   assert.match(contributionComponents, /data-testid="opl-channel-access-users"/);
   assert.match(contributionComponents, /\["qr_ready", "authorizing"\]\.includes/);

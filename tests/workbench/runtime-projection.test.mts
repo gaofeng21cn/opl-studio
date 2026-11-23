@@ -839,13 +839,14 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
 // The overview must preserve the distinction between task data and service health.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RuntimeOverviewPage } from "../../plugins/opl-studio-client/src/client/workbench/RuntimeOverviewPage";
+import { RuntimeStatusPanel } from "../../plugins/opl-runtime-status/src/client/RuntimeStatusPanel";
+import { StageProgressStepper } from "../../plugins/opl-runtime-status/src/client/StageProgressStepper";
 import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
 function renderOverview(overrides: Record<string, unknown> = {}) {
   const model = runtimeOverviewFixture();
-  return renderToStaticMarkup(createElement(RuntimeOverviewPage, {
+  return renderToStaticMarkup(createElement(RuntimeStatusPanel, {
     locale: "zh", projection: model.workItemRuntime, serviceRecovery: model.serviceRecovery,
     stateStatus: "ready", snapshotSource: "live", onRefresh() {}, onOpenMaintenance() {}, onOpenWorkItem() {}, ...overrides
   }));
@@ -880,4 +881,109 @@ test("initial loading and a failed read without a snapshot have distinct recover
   assert.match(failed, /重试/);
   assert.match(failed, /打开维护/);
   assert.doesNotMatch(failed, /当前范围没有工作|后台服务配置已变化/);
+});
+
+test("work item projection preserves control generation, root, package status, heartbeat, action keys, and does not fall back to diagnostic stage", () => {
+  const compacted = compactFastState({
+    app_state: {
+      operator: {
+        workbench: {
+          work_item_projection_v2: {
+            schema_version: "work-item-projection.v2",
+            summary: { work_item_count: 1, project_count: 1, agent_count: 1 },
+            agent_catalog: [{ agent_id: "mas", display_name: "MAS" }],
+            project_catalog: [
+              { project_id: "mas:dm", agent_id: "mas", display_name: "DM", workspace_path: "/tmp/dm", binding_status: "active" },
+              { project_id: "med-autocast:video", agent_id: "med-autocast", agent_display_name: "Med Auto Cast", display_name: "科普视频", workspace_path: "/tmp/cast", binding_status: "active" }
+            ],
+            items: [{
+              item_id: "mas:dm::study-1",
+              identity: {
+                agent_id: "mas",
+                agent_display_name: "MAS",
+                project_id: "mas:dm",
+                project_display_name: "DM",
+                workspace_binding_id: "bind-1",
+                workspace_path: "/tmp/dm",
+                work_item_id: "study-1",
+                work_item_root: "studies/study-1",
+                work_item_display_name: "Study 1"
+              },
+              lifecycle: {
+                primary_state: "delivered_auto_paused",
+                primary_state_label: "已交付自动暂停",
+                current_stage_id: null,
+                package_status: "milestone_delivered"
+              },
+              visibility: {
+                state: "visible",
+                source: "operator_override",
+                control_ref: "work_item_visibility_set",
+                generation: 4
+              },
+              execution: {
+                state: "idle",
+                stage_id: "legacy_exec_stage",
+                stage_status: "completed",
+                current_stage_id: "diagnostic_stage",
+                last_heartbeat_at: "2026-11-23T12:00:00Z",
+                elapsed_ms: 42000
+              },
+              action: {
+                title_key: "lifecycle.deliveredPaused.title",
+                summary_key: "lifecycle.deliveredPaused.summary",
+                message_args: { milestone: "manuscript" },
+                owner_kind: "user"
+              },
+              stage_map: [
+                { stage_id: "plan", display_name: "Plan", display_names: { zh: "研究设计", en: "Study design" }, state: "completed" },
+                { stage_id: "manuscript", display_name: "Manuscript", display_names: { zh: "成稿撰写", en: "Manuscript" }, state: "delivered" },
+                { stage_id: "future_tail", display_name: "Tail", display_names: { zh: "后续收尾", en: "Follow-up" }, state: "pending" }
+              ]
+            }]
+          }
+        }
+      }
+    }
+  });
+
+  const model = deriveWorkbenchModelFromState(compacted);
+  const item = model.workItemRuntime?.items[0];
+  assert.ok(item);
+  assert.equal(item.workItemRoot, "studies/study-1");
+  assert.equal(item.packageStatus, "milestone_delivered");
+  assert.equal(item.visibilitySource, "operator_override");
+  assert.equal(item.visibilityControlRef, "work_item_visibility_set");
+  assert.equal(item.visibilityGeneration, 4);
+  assert.equal(item.lastHeartbeatAt, "2026-11-23T12:00:00Z");
+  assert.equal(item.elapsedMs, 42000);
+  assert.equal(item.actionTitleKey, "lifecycle.deliveredPaused.title");
+  assert.equal(item.actionSummaryKey, "lifecycle.deliveredPaused.summary");
+  assert.deepEqual(item.actionMessageArgs, { milestone: "manuscript" });
+  assert.equal(item.currentStageId, undefined, "must not fall back from lifecycle.current_stage_id=null to diagnostic execution stage");
+  assert.equal(item.executionStageId, "diagnostic_stage");
+  assert.ok(model.workItemRuntime?.agents.some((agent) => agent.id === "med-autocast"), "project_catalog agents missing from agent_catalog must be merged");
+
+  const deliveredHtml = renderToStaticMarkup(createElement(StageProgressStepper, {
+    item,
+    locale: "zh",
+    open: true,
+    onToggle() {},
+    onClose() {}
+  }));
+  assert.match(deliveredHtml, /已交付 \(2\/2\)/);
+  assert.match(deliveredHtml, /已完成/);
+  assert.doesNotMatch(deliveredHtml, /后续收尾/);
+  assert.doesNotMatch(deliveredHtml, />completed<|>delivered<|>running</);
+
+  const enHtml = renderToStaticMarkup(createElement(RuntimeStatusPanel, {
+    locale: "en",
+    projection: model.workItemRuntime,
+    stateStatus: "ready",
+    snapshotSource: "live",
+    onRefresh() {},
+    onOpenMaintenance() {}
+  }));
+  assert.match(enHtml, /Delivered and auto-paused/);
+  assert.doesNotMatch(enHtml, /已交付自动暂停/);
 });

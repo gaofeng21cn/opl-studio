@@ -1,29 +1,13 @@
-import { type ReactNode } from "react";
+import {
+  SettingRow,
+  SettingsGroup
+} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 
 import type { WorkbenchSettings } from "../settingsModel";
 
 import { statusTone, formatStatus } from "./presentation";
 
-export function SettingRow({ label, detail, children }: { label: string; detail?: string; children: ReactNode }) {
-  return (
-    <div className="settings-row" data-slot="settings.general.item">
-      <div className="settings-row-label">
-        <span>{label}</span>
-        {detail ? <small>{detail}</small> : null}
-      </div>
-      <div className="settings-row-value">{children}</div>
-    </div>
-  );
-}
-
-export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="settings-group" data-testid="opl-settings-section">
-      <h2>{title}</h2>
-      <div className="settings-rows">{children}</div>
-    </section>
-  );
-}
+export { SettingRow, SettingsGroup };
 
 export function StatusValue({ status, locale }: { status?: string; locale: WorkbenchSettings["locale"] }) {
   return (

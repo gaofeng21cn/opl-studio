@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme";
 import { codexWorkbenchStyles } from "../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
-import { RuntimeOverviewPage } from "../../plugins/opl-studio-client/src/client/workbench/RuntimeOverviewPage";
+import { RuntimeStatusPanel } from "../../plugins/opl-runtime-status/src/client/RuntimeStatusPanel";
+import runtimeStatusStyles from "../../plugins/opl-runtime-status/src/client/runtime-status.css?raw";
 import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
@@ -14,7 +15,7 @@ function Fixture() {
   Object.assign(window, { runtimeEvidence: evidence, setRuntimeScenario: setScenario, setRuntimeLocale: setLocale });
   const model = runtimeOverviewFixture(locale);
   const absent = ["loading", "failed"].includes(scenario);
-  return <><style>{codexWorkbenchStyles}{`body { margin: 0; } #root { min-height: 100vh; }`}</style><RuntimeOverviewPage
+  return <><style>{codexWorkbenchStyles}{runtimeStatusStyles}{`body { margin: 0; } #root { min-height: 100vh; }`}</style><RuntimeStatusPanel
     key={`${locale}:${scenario}`} locale={locale}
     projection={absent ? undefined : scenario === "empty" ? { ...model.workItemRuntime!, items: [] } : model.workItemRuntime}
     serviceRecovery={scenario === "unknown" ? deriveServiceRecoveryModel({}) : scenario === "healthy" ? undefined : model.serviceRecovery}

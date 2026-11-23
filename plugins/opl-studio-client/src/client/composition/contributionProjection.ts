@@ -48,6 +48,7 @@ export type OplUiContributionBadge = {
 export type OplUiContributionView = {
   viewId: string;
   viewType: string;
+  settingsDestination?: OplSettingsContributionDestination;
   title: OplUiLocalizedText;
   dataRef: string;
   emptyState?: OplUiLocalizedText;
@@ -77,12 +78,162 @@ export type OplUiContributionsProjection = {
  * Settings contributions are placed by their declared view semantics. The
  * client does not inspect package IDs or recreate package-specific policy.
  */
-export type OplSettingsContributionDestination = "resources" | "services" | "capabilities";
+export const OPL_SETTINGS_CONTRIBUTION_DESTINATIONS = [
+  "models",
+  "resources",
+  "workspace",
+  "capabilities",
+  "services",
+  "preferences"
+] as const;
+
+export type OplSettingsContributionDestination = (typeof OPL_SETTINGS_CONTRIBUTION_DESTINATIONS)[number];
 
 export type OplSettingsContributionGroup = {
   packageId: string;
   entries: OplUiContribution[];
 };
+
+export const OPL_SETTINGS_FORM_SCHEMA_VERSION = "opl-app-settings-form.v1";
+
+export type OplSettingsFormFieldType =
+  | "boolean"
+  | "enum"
+  | "string"
+  | "number"
+  | "directory"
+  | "secret_ref";
+
+export type OplSettingsFormEffectTiming =
+  | "immediate"
+  | "next_task"
+  | "restart_required";
+
+export type OplSettingsFormFieldOption = {
+  value: string;
+  label: OplUiLocalizedText;
+};
+
+export type OplSettingsFormField = {
+  fieldId: string;
+  fieldType: OplSettingsFormFieldType;
+  label: OplUiLocalizedText;
+  description?: OplUiLocalizedText;
+  placeholder?: OplUiLocalizedText;
+  effectTiming: OplSettingsFormEffectTiming;
+  required?: boolean;
+  readonly?: boolean;
+  multiline?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  maxLength?: number;
+  options?: OplSettingsFormFieldOption[];
+  secretConfigured?: boolean;
+};
+
+export type OplSettingsFormScalar = boolean | string | number | null;
+
+export type OplSettingsFormResult = {
+  schemaVersion: typeof OPL_SETTINGS_FORM_SCHEMA_VERSION;
+  status?: "ready" | "restart_pending" | "attention" | "unavailable";
+  statusMessage?: OplUiLocalizedText;
+  submitCommandId?: string;
+  fields: OplSettingsFormField[];
+  values: Record<string, OplSettingsFormScalar>;
+};
+
+const SETTINGS_FORM_FIELD_TYPES = new Set<OplSettingsFormFieldType>([
+  "boolean",
+  "enum",
+  "string",
+  "number",
+  "directory",
+  "secret_ref"
+]);
+
+const SETTINGS_FORM_EFFECT_TIMINGS = new Set<OplSettingsFormEffectTiming>([
+  "immediate",
+  "next_task",
+  "restart_required"
+]);
+
+export function readSettingsFormResult(value: unknown): OplSettingsFormResult | null {
+  const record = asRecord(value);
+  if (!record || record.schema_version !== OPL_SETTINGS_FORM_SCHEMA_VERSION || !Array.isArray(record.fields)) {
+    return null;
+  }
+  const fields: OplSettingsFormField[] = [];
+  for (const item of record.fields.slice(0, 64)) {
+    const field = asRecord(item);
+    const fieldId = asString(field?.field_id);
+    const fieldType = asString(field?.field_type);
+    const effectTiming = asString(field?.effect_timing);
+    if (
+      !fieldId
+      || !fieldType
+      || !SETTINGS_FORM_FIELD_TYPES.has(fieldType as OplSettingsFormFieldType)
+      || !effectTiming
+      || !SETTINGS_FORM_EFFECT_TIMINGS.has(effectTiming as OplSettingsFormEffectTiming)
+    ) {
+      continue;
+    }
+    const label = localizedText(field?.label_i18n);
+    if (!Object.keys(label).length) continue;
+    const description = localizedText(field?.description_i18n);
+    const placeholder = localizedText(field?.placeholder_i18n);
+    const options = Array.isArray(field?.options)
+      ? field.options.slice(0, 64).flatMap((opt): OplSettingsFormFieldOption[] => {
+          const option = asRecord(opt);
+          const optionValue = asString(option?.value);
+          const optionLabel = localizedText(option?.label_i18n);
+          return optionValue && Object.keys(optionLabel).length
+            ? [{ value: optionValue, label: optionLabel }]
+            : [];
+        })
+      : undefined;
+    fields.push({
+      fieldId,
+      fieldType: fieldType as OplSettingsFormFieldType,
+      label,
+      ...(Object.keys(description).length ? { description } : {}),
+      ...(Object.keys(placeholder).length ? { placeholder } : {}),
+      effectTiming: effectTiming as OplSettingsFormEffectTiming,
+      ...(field?.required === true ? { required: true } : {}),
+      ...(field?.readonly === true ? { readonly: true } : {}),
+      ...(field?.multiline === true ? { multiline: true } : {}),
+      ...(typeof field?.min === "number" && Number.isFinite(field.min) ? { min: field.min } : {}),
+      ...(typeof field?.max === "number" && Number.isFinite(field.max) ? { max: field.max } : {}),
+      ...(typeof field?.step === "number" && Number.isFinite(field.step) && field.step > 0 ? { step: field.step } : {}),
+      ...(typeof field?.max_length === "number" && Number.isInteger(field.max_length) && field.max_length > 0 ? { maxLength: field.max_length } : {}),
+      ...(options?.length ? { options } : {}),
+      ...(typeof field?.secret_configured === "boolean" ? { secretConfigured: field.secret_configured } : {})
+    });
+  }
+  const secretIds = new Set(fields.filter(field => field.fieldType === "secret_ref").map(field => field.fieldId));
+  const rawValues = asRecord(record.values) ?? {};
+  const values: Record<string, OplSettingsFormScalar> = {};
+  for (const [key, item] of Object.entries(rawValues).slice(0, 64)) {
+    if (secretIds.has(key)) continue;
+    if (item === null || typeof item === "boolean" || typeof item === "string" || (typeof item === "number" && Number.isFinite(item))) {
+      values[key] = item;
+    }
+  }
+  const statusRaw = asString(record.status);
+  const status = statusRaw && ["ready", "restart_pending", "attention", "unavailable"].includes(statusRaw)
+    ? statusRaw as OplSettingsFormResult["status"]
+    : undefined;
+  const statusMessage = localizedText(record.status_message_i18n);
+  const submitCommandId = asString(record.submit_command_id) ?? undefined;
+  return {
+    schemaVersion: OPL_SETTINGS_FORM_SCHEMA_VERSION,
+    ...(status ? { status } : {}),
+    ...(Object.keys(statusMessage).length ? { statusMessage } : {}),
+    ...(submitCommandId ? { submitCommandId } : {}),
+    fields,
+    values
+  };
+}
 
 export function settingsContributionDestination(
   entry: Pick<OplUiContribution, "view">
@@ -93,6 +244,8 @@ export function settingsContributionDestination(
       return "resources";
     case "service_status":
       return "services";
+    case "settings_form":
+      return entry.view.settingsDestination ?? null;
     case "activity_log":
       // An activity log is a technical read model, not an App-admitted Settings
       // destination. Keep it available to other typed renderers without
@@ -170,6 +323,7 @@ export type OplContributionSlotOwner = {
   actionAvailable: boolean;
   developerDetails?: boolean;
   openSoftwareCenter?(): void;
+  pickDirectory?: () => Promise<string | undefined>;
   runtimeDetailIdentity?: OplRuntimeDetailIdentity;
   openRuntimeWorkbench?(): void;
   readData(entry: OplUiContribution, input?: OplContributionInput): Promise<unknown>;
@@ -289,10 +443,15 @@ function parseView(value: unknown): OplUiContributionView | undefined {
   const viewType = asString(view?.view_type);
   const dataRef = asString(view?.data_ref);
   if (!viewId || !viewType || !dataRef) return undefined;
+  const rawDest = asString(view?.settings_destination);
+  const settingsDestination = rawDest && OPL_SETTINGS_CONTRIBUTION_DESTINATIONS.includes(rawDest as OplSettingsContributionDestination)
+    ? rawDest as OplSettingsContributionDestination
+    : undefined;
   const emptyState = localizedText(view?.empty_state_i18n);
   return {
     viewId,
     viewType,
+    ...(settingsDestination ? { settingsDestination } : {}),
     title: localizedText(view?.title_i18n),
     dataRef,
     ...(Object.keys(emptyState).length ? { emptyState } : {})

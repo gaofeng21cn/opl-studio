@@ -128,7 +128,8 @@ export type SettingsPanelProps = {
   pendingConfirmation: SettingsActionConfirmation | null;
   onConfirmAction: () => void;
   onCancelAction: () => void;
-  renderSettingsContributions?: (destination: "resources" | "services" | "capabilities") => ReactNode;
+  renderSettingsContributions?: (destination: import("../../composition/contributionProjection").OplSettingsContributionDestination) => ReactNode;
+  renderSettingsGroupSlot?: (destination: import("@gaofeng21cn/opl-dsh-adapters/ui-kit").OplSettingsGroupDestination) => ReactNode;
 };
 
 export type SettingsActionFeedback = {

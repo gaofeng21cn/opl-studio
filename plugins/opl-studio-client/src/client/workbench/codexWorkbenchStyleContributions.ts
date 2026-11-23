@@ -208,4 +208,97 @@ export const codexWorkbenchStyleContributions = `  .opl-contribution-slot {
     margin: 0;
   }
 
+  .opl-settings-form {
+    display: grid;
+    gap: 10px;
+  }
+
+  .opl-settings-form-timing {
+    color: var(--opl-muted);
+    font-size: var(--dsw-font-xxs-12-font-size);
+  }
+
+  .opl-form-error {
+    margin: 4px 0 0;
+    color: var(--dsw-alias-state-error-primary, #c62828);
+    font-size: var(--dsw-font-xs-13-font-size);
+    font-weight: 500;
+  }
+
+  .opl-settings-form [aria-invalid="true"] {
+    border-color: var(--dsw-alias-state-error-primary, #c62828);
+  }
+
+  .opl-settings-form-radio-group {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .opl-settings-form-radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--dsw-alias-border-l2, var(--opl-border));
+    border-radius: var(--dsw-radius-sm, 6px);
+    cursor: pointer;
+    font-size: var(--dsw-font-xs-13-font-size);
+  }
+
+  .opl-settings-form-radio-option[data-checked="true"] {
+    border-color: var(--dsw-alias-label-primary, currentColor);
+    background: var(--dsw-alias-interactive-bg-active, transparent);
+    font-weight: 500;
+  }
+
+  .opl-settings-form-directory,
+  .opl-settings-form-secret {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .opl-settings-form-textarea {
+    width: min(320px, 100%);
+    min-height: 72px;
+    padding: 8px 10px;
+    border: 1px solid var(--dsw-alias-border-l2, var(--opl-border));
+    border-radius: var(--dsw-radius-sm, 6px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  .opl-settings-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+  }
+
+  .opl-settings-form-status {
+    margin: 0;
+    color: var(--opl-muted);
+    font-size: var(--dsw-font-xs-13-font-size);
+  }
+
+  .opl-ui-empty-state {
+    display: grid;
+    gap: 6px;
+    padding: 12px 0;
+  }
+
+  .opl-ui-empty-state p {
+    margin: 0;
+    color: var(--opl-muted);
+  }
+
 `;

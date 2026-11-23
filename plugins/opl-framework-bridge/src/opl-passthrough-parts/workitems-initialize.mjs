@@ -22,18 +22,18 @@ function compactWorkItem(value) {
     ...selectedFields(value, ["item_id"]),
     identity: selectedFields(value.identity, [
       "agent_id", "agent_display_name", "domain_id", "project_id", "project_display_name",
-      "workspace_path", "work_item_id", "domain_work_item_id", "work_item_scope_id", "identity_state",
+      "workspace_binding_id", "workspace_path", "work_item_id", "domain_work_item_id", "work_item_root", "work_item_scope_id", "identity_state",
       "work_item_display_name", "work_item_kind", "source_kind"
     ]),
     lifecycle: selectedFields(value.lifecycle, [
       "business_state", "primary_state", "primary_state_reason", "primary_state_label", "reason",
-      "last_transition_at", "current_stage_id", "current_stage_display_name", "current_stage_status"
+      "last_transition_at", "current_stage_id", "current_stage_display_name", "current_stage_status", "package_status"
     ]),
-    visibility: selectedFields(value.visibility, ["state", "updated_at"]),
+    visibility: selectedFields(value.visibility, ["state", "source", "updated_at", "control_ref", "generation"]),
     execution: execution ? {
       ...selectedFields(execution, [
-        "state", "current_stage_id", "current_stage_display_name", "next_stage_id",
-        "next_stage_display_name", "attempt_id", "started_at", "updated_at", "running_proof_status"
+        "state", "stage_id", "stage_status", "current_stage_id", "current_stage_display_name", "next_stage_id",
+        "next_stage_display_name", "attempt_id", "started_at", "last_heartbeat_at", "updated_at", "elapsed_ms", "running_proof_status"
       ]),
       review_chain: selectedFields(execution.review_chain, [
         "stage_run_count", "total_attempt_count", "total_repair_rounds", "total_tokens_observed",
@@ -61,7 +61,7 @@ function compactWorkItem(value) {
       ])
     } : undefined,
     action: selectedFields(value.action, [
-      "kind", "title", "summary", "owner", "owner_kind", "owner_display_name", "action_ref"
+      "kind", "title", "title_key", "summary", "summary_key", "message_args", "owner", "owner_kind", "owner_display_name", "action_ref"
     ]),
     domain_detail_views: Array.isArray(value.domain_detail_views) ? value.domain_detail_views.slice(0, 64).map(view => selectedFields(view, [
       "item_id", "view_id", "view_kind", "title", "schema_ref", "schema_version", "revision", "digest", "availability"

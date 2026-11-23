@@ -424,4 +424,43 @@ export const codexWorkbenchStyleRuntime = `  @keyframes opl-spin {
     font-size: var(--opl-text-xs);
   }
 
+  .runtime-domain-view-entries {
+    grid-column: 1 / -1;
+    padding-top: 12px;
+    border-top: 1px solid var(--opl-border);
+  }
+
+  .runtime-domain-view-entries > h4 {
+    margin: 0;
+    font-size: var(--opl-text-sm);
+    font-weight: var(--opl-weight-semibold);
+  }
+
+  .runtime-domain-view-entry-list {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .runtime-domain-view-entry-list > button {
+    min-width: 0;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid var(--opl-border);
+    border-radius: var(--dsw-radius-sm);
+    background: var(--opl-canvas);
+    color: var(--opl-text);
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .runtime-domain-view-entry-list > button:hover {
+    border-color: var(--opl-border-heavy);
+    background: var(--opl-hover);
+  }
+
 `;

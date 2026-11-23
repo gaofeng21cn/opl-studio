@@ -1,12 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport, type McpUiStyles } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { McpAppDescriptor, McpAppSession, McpAppProps, McpAppsBridge, McpAppOpen } from "@gaofeng21cn/opl-host-contracts";
-import { Button } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
-import { Input } from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Input";
-import buttonCss from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button.module.css";
-import inputCss from "../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Input.module.css";
+import { Button, Input, PluginErrorBoundary } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { EcosystemFilePreview } from "@gaofeng21cn/opl-dsh-adapters/workspace-preview";
-import { allowedMcpLink, modelContextText, resolvedMcpTheme, sandboxDocument, workspaceArtifactLink, workspaceArtifactPath, type WorkspaceArtifact, readMcpNavigation, rememberMcpNavigation, resolveMcpNavigation } from "./mcpAppHost";
+import {
+  allowedMcpLink,
+  extractMcpAuthorizationRequired,
+  modelContextText,
+  parseMcpResourceSettingsLink,
+  readMcpNavigation,
+  rememberMcpNavigation,
+  resolvedMcpTheme,
+  resolveMcpNavigation,
+  sandboxDocument,
+  workspaceArtifactLink,
+  workspaceArtifactPath,
+  type McpAuthorizationRequired,
+  type WorkspaceArtifact
+} from "./mcpAppHost";
+import "./mcp-apps.css";
 
 function descriptorId(app: McpAppDescriptor): string {
   return app.miniAppId || `mcp:${app.server}:${app.resourceUri}`;
@@ -33,7 +45,13 @@ function readinessLabel(app: McpAppDescriptor, zh: boolean): string {
   return zh ? "可打开" : "Ready to open";
 }
 
-export function McpAppFrame({ session, bridge: host, locale, onContext, onMessage, onNavigate, onNavigation, fillHeight = false }: McpAppProps & { session: McpAppSession; fillHeight?: boolean; onNavigate?: (url: string) => void; onNavigation?: (value: unknown) => void }) {
+export function McpAppFrame({ session, bridge: host, locale, onContext, onMessage, onNavigate, onNavigation, onAuthorizationRequired, fillHeight = false }: McpAppProps & {
+  session: McpAppSession;
+  fillHeight?: boolean;
+  onNavigate?: (url: string) => void;
+  onNavigation?: (value: unknown) => void;
+  onAuthorizationRequired?: (auth: McpAuthorizationRequired) => void;
+}) {
   const frame = useRef<HTMLIFrameElement>(null);
   const activeBridge = useRef<AppBridge | null>(null);
   const [error, setError] = useState("");
@@ -42,10 +60,14 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
   const [expanded, setExpanded] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [artifact, setArtifact] = useState<WorkspaceArtifact | null>(null);
-  const handlers = useRef({ onContext, onMessage, locale, onNavigate, onNavigation });
-  handlers.current = { onContext, onMessage, locale, onNavigate, onNavigation };
+  const handlers = useRef({ onContext, onMessage, locale, onNavigate, onNavigation, onAuthorizationRequired });
+  handlers.current = { onContext, onMessage, locale, onNavigate, onNavigation, onAuthorizationRequired };
   useEffect(() => { activeBridge.current?.setHostContext({ displayMode: expanded ? "fullscreen" : "inline" }); }, [expanded]);
   useEffect(() => { activeBridge.current?.setHostContext({ locale: locale === "zh" ? "zh-CN" : "en" }); }, [locale]);
+  useEffect(() => {
+    const auth = extractMcpAuthorizationRequired(session.result);
+    if (auth) handlers.current.onAuthorizationRequired?.(auth);
+  }, [session.id, session.result]);
   useEffect(() => {
     const iframe = frame.current!;
     let disposed = false;
@@ -55,8 +77,10 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const theme = () => resolvedMcpTheme(getComputedStyle(document.documentElement).colorScheme, dark.matches);
     const styles = () => {
+      const rootStyle = getComputedStyle(document.documentElement);
       const body = getComputedStyle(document.body);
-      const token = (name: string) => body.getPropertyValue(name).trim() || undefined;
+      const token = (name: string) => body.getPropertyValue(name).trim() || rootStyle.getPropertyValue(name).trim() || undefined;
+      const contentFontSize = token("--opl-content-font-size") || token("--dsh-content-font-size") || token("--dsw-font-s-14-font-size");
       // The SDK permits subsets; its generated Record type requires a cast for omitted keys.
       return { variables: {
         "--font-sans": body.fontFamily,
@@ -68,6 +92,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
         "--color-text-secondary": token("--dsw-alias-label-secondary"),
         "--color-text-inverse": token("--dsw-alias-label-primary-foreground"),
         "--color-text-info": token("--dsw-alias-state-business-primary"),
+        "--color-accent-primary": token("--dsw-alias-state-business-primary"),
         "--color-text-danger": token("--dsw-alias-state-error-primary"),
         "--color-text-warning": token("--dsw-alias-state-warn-label"),
         "--color-text-success": token("--dsw-alias-state-success-primary"),
@@ -76,9 +101,10 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
         "--border-radius-sm": token("--dsw-radius-sm"),
         "--border-radius-md": token("--dsw-radius-md"),
         "--border-radius-lg": token("--dsw-radius-lg"),
-        "--font-text-md-size": token("--dsw-font-s-14-font-size"),
+        "--font-text-md-size": contentFontSize,
+        "--opl-content-font-size": contentFontSize,
         "--font-text-md-line-height": token("--dsw-font-s-14-line-height")
-      } as McpUiStyles };
+      } as unknown as McpUiStyles };
     };
     const appBridge = new AppBridge(null, { name: "OPL App", version: "1.0.0" }, {
       serverTools: {}, serverResources: {}, openLinks: {}, updateModelContext: { text: {} }, message: { text: {} }
@@ -86,7 +112,16 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     activeBridge.current = appBridge;
     appBridge.oncalltool = async params => {
       requireActive();
-      return host.callMcpAppTool({ ...binding, name: params.name, arguments: params.arguments });
+      try {
+        const result = await host.callMcpAppTool({ ...binding, name: params.name, arguments: params.arguments });
+        const auth = extractMcpAuthorizationRequired(result);
+        if (auth) handlers.current.onAuthorizationRequired?.(auth);
+        return result;
+      } catch (reason) {
+        const auth = extractMcpAuthorizationRequired(reason);
+        if (auth) handlers.current.onAuthorizationRequired?.(auth);
+        throw reason;
+      }
     };
     appBridge.onreadresource = params => { requireActive(); return host.readMcpAppResource({ ...binding, uri: params.uri }); };
     appBridge.onlistresources = async () => ({ resources: session.resources });
@@ -101,6 +136,15 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     };
     appBridge.onopenlink = async ({ url }) => {
       requireActive();
+      const settingsTarget = parseMcpResourceSettingsLink(url);
+      if (settingsTarget) {
+        handlers.current.onAuthorizationRequired?.({
+          code: "authorization_required",
+          ...(settingsTarget.packageId ? { packageId: settingsTarget.packageId } : {}),
+          ...(settingsTarget.resourceId ? { resourceId: settingsTarget.resourceId } : {})
+        });
+        return {};
+      }
       if (url.startsWith("ui://") && handlers.current.onNavigate) {
         try { handlers.current.onNavigate(url); return {}; }
         catch (reason) { setError(String(reason)); return { isError: true }; }
@@ -131,7 +175,7 @@ export function McpAppFrame({ session, bridge: host, locale, onContext, onMessag
     const updateAppearance = () => appBridge.setHostContext({ theme: theme(), styles: styles() });
     dark.addEventListener("change", updateAppearance);
     const appearanceObserver = new MutationObserver(updateAppearance);
-    const appearanceAttributes = { attributes: true, attributeFilter: ["style", "class", "data-ds-theme-source", "data-ds-dark-theme"] };
+    const appearanceAttributes = { attributes: true, attributeFilter: ["style", "class", "data-theme", "data-font-size", "data-ds-theme-source", "data-ds-dark-theme"] };
     appearanceObserver.observe(document.documentElement, appearanceAttributes);
     appearanceObserver.observe(document.body, appearanceAttributes);
     const resize = new ResizeObserver(() => appBridge.setHostContext({ containerDimensions: { width: iframe.clientWidth, maxHeight: fillHeight ? iframe.clientHeight : 1400 } }));
@@ -177,6 +221,7 @@ export function McpAppWorkspace(props: McpAppProps) {
     return { ...initialInputs(app), ...Object.fromEntries(Object.entries(recent).map(([key, value]) => [key, typeof value === "string" ? value : JSON.stringify(value)])) };
   }
   const [error, setError] = useState("");
+  const [authRequired, setAuthRequired] = useState<McpAuthorizationRequired | null>(null);
   const generation = useRef(0);
   const active = useRef<{ view: McpAppSession; owner: McpAppsBridge } | null>(null);
   const pending = useRef<Promise<void>>(Promise.resolve());
@@ -195,7 +240,7 @@ export function McpAppWorkspace(props: McpAppProps) {
   }
   function transition(request?: McpAppOpen) {
     const ticket = ++generation.current;
-    setBusy(true); setError(""); setSession(null);
+    setBusy(true); setError(""); setAuthRequired(null); setSession(null);
     pending.current = pending.current.catch(() => {}).then(async () => {
       await release();
       if (!request || ticket !== generation.current) return;
@@ -204,11 +249,16 @@ export function McpAppWorkspace(props: McpAppProps) {
       if (ticket !== generation.current) { await release(); return; }
       setSelected(view.miniAppId);
       setSession(view);
-    }).catch(reason => { if (ticket === generation.current) setError(String(reason)); })
-      .finally(() => { if (ticket === generation.current) setBusy(false); });
+    }).catch(reason => {
+      if (ticket === generation.current) {
+        setError(String(reason));
+        const auth = extractMcpAuthorizationRequired(reason);
+        if (auth) setAuthRequired(auth);
+      }
+    }).finally(() => { if (ticket === generation.current) setBusy(false); });
   }
   useEffect(() => {
-    setApps([]); setSelected(""); setInputs({}); setReturnTo(null); setSession(null); setBusy(false); setError("");
+    setApps([]); setSelected(""); setInputs({}); setReturnTo(null); setSession(null); setBusy(false); setError(""); setAuthRequired(null);
     return () => {
       generation.current++;
       pending.current = pending.current.catch(() => {}).then(release).catch(() => {});
@@ -290,7 +340,7 @@ export function McpAppWorkspace(props: McpAppProps) {
     <header className="opl-mcp-app-header">
       {returnTo ? <Button variant="outline" type="button" disabled={busy} onClick={() => { const target = returnTo; setReturnTo(null); transition(target); }}>{zh ? "返回上一界面" : "Back to previous app"}</Button> : null}
       <label className="opl-mcp-app-switcher"><span>{zh ? "应用" : "App"}</span>
-        <span className={`${inputCss.wrap} opl-mcp-app-select`}><select className={inputCss.input} aria-label={zh ? "当前应用" : "Current app"} disabled={!apps.length} value={current ? descriptorId(current) : ""} onChange={event => { const app = apps.find(entry => descriptorId(entry) === event.target.value); if (app) select(app); }}>
+        <span className="opl-mcp-app-select"><select className="opl-mcp-app-select-control" aria-label={zh ? "当前应用" : "Current app"} disabled={!apps.length} value={current ? descriptorId(current) : ""} onChange={event => { const app = apps.find(entry => descriptorId(entry) === event.target.value); if (app) select(app); }}>
           {!apps.length ? <option value="">{zh ? "选择应用" : "Choose an app"}</option> : apps.map(app => <option key={descriptorId(app)} value={descriptorId(app)}>{app.title}</option>)}
         </select></span>
       </label>
@@ -299,7 +349,7 @@ export function McpAppWorkspace(props: McpAppProps) {
         {currentSession ? <Button variant="outline" type="button" onClick={() => { setInputs(inputsFor(current)); transition(); }}>{zh ? "关闭界面" : "Close UI"}</Button> : <Button variant="primary" className="opl-mcp-app-start" type="button" disabled={!current.readOnly || requiredInputMissing || !threadId || busy} onClick={open}>{busy ? (zh ? "处理中…" : "Opening…") : error ? (zh ? "重新打开" : "Retry opening") : (zh ? "打开界面" : "Open UI")}</Button>}
       </> : null}
       <details className="opl-mcp-app-menu">
-        <summary className={`${buttonCss.button} ${buttonCss.md} ${buttonCss.outline}`}>{zh ? "更多" : "More"}</summary>
+        <summary className="opl-mcp-app-menu-trigger">{zh ? "更多" : "More"}</summary>
         <div onClick={event => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
           {threadId ? <Button variant="outline" type="button" disabled={loading} onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "刷新目录" : "Refresh directory"}</Button> : null}
           {props.onManage ? <Button variant="outline" type="button" onClick={props.onManage}>{zh ? "软件中心" : "Software Center"}</Button> : null}
@@ -312,6 +362,44 @@ export function McpAppWorkspace(props: McpAppProps) {
     {threadId && loading ? <p className="opl-mcp-app-notice" role="status">{zh ? "正在加载可用应用…" : "Loading available apps…"}</p> : null}
     {catalogError ? <div className="opl-mcp-app-error"><p role="alert">{catalogError.includes("mcp_app_thread_busy") ? (zh ? "此对话的连接正在由另一窗口使用。请选择其他对话，或在另一窗口释放连接后重试。" : "This conversation's connection is in use by another window. Choose another conversation or retry after that window releases it.") : (zh ? "应用连接未就绪，请重新连接目录；也可到软件中心检查连接。" : "App connections are not ready. Retry the directory or check Software Center.")}</p><details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{catalogError}</p></details><Button variant="outline" type="button" onClick={() => setCatalogAttempt(value => value + 1)}>{zh ? "重试目录" : "Retry directory"}</Button>{props.onConversation ? <Button variant="outline" type="button" onClick={props.onConversation}>{zh ? "选择对话" : "Choose a conversation"}</Button> : null}</div> : null}
     {threadId && !loading && !apps.length && !catalogError ? <div className="opl-mcp-app-empty"><strong>{zh ? "当前会话没有可用的 MiniApp" : "No MiniApps are available in this conversation"}</strong><p>{zh ? "前往软件中心检查安装与连接，再返回会话刷新目录。" : "Check installation and connections in Software Center, then refresh this directory."}</p>{props.onManage ? <Button variant="outline" type="button" onClick={props.onManage}>{zh ? "打开软件中心" : "Open Software Center"}</Button> : null}</div> : null}
+    {authRequired ? (
+      <section className="opl-mcp-auth-banner" data-testid="opl-mcp-auth-required" role="alert">
+        <p>{zh ? "该应用需要资料库或连接授权才能继续。" : "This app requires library or connection authorization to continue."}</p>
+        {authRequired.message ? <p className="opl-mcp-app-notice">{authRequired.message}</p> : null}
+        <div className="opl-mcp-auth-actions">
+          {props.onOpenResourceSettings ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={() => props.onOpenResourceSettings?.({
+                section: "libraries",
+                ...(authRequired.packageId ? { packageId: authRequired.packageId } : {}),
+                ...(authRequired.resourceId ? { resourceId: authRequired.resourceId } : {})
+              })}
+            >
+              {zh ? "前往资料与连接授权" : "Authorize in Libraries & Connections"}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy || !current || !current.readOnly || !threadId}
+            onClick={() => {
+              setAuthRequired(null);
+              if (current && current.readOnly && threadId && !missingRequiredInput(current, inputs)) {
+                open();
+              } else {
+                setCatalogAttempt(value => value + 1);
+              }
+            }}
+          >
+            {zh ? "重试" : "Retry"}
+          </Button>
+        </div>
+      </section>
+    ) : null}
     {threadId && current ? <div className="opl-mcp-app-surface" aria-busy={busy}>
         {!currentSession ? <div className="opl-mcp-app-launch">
           <h3>{current.title}</h3>
@@ -322,7 +410,25 @@ export function McpAppWorkspace(props: McpAppProps) {
         {!currentSession && current.readOnly && Object.keys(current.inputSchema.properties ?? {}).length ? <details className="opl-mcp-app-options" open={requiredInputMissing}><summary>{zh ? "打开选项" : "Open options"}</summary>{Object.entries(current.inputSchema.properties ?? {}).map(([name, field]) => <label key={name}><span>{field.title || name}{current.inputSchema.required?.includes(name) ? (zh ? "（必填）" : " (required)") : ""}</span><Input required={current.inputSchema.required?.includes(name)} disabled={busy} value={inputs[name] ?? ""} placeholder={field.description} onChange={event => setInputs(values => ({ ...values, [name]: event.target.value }))}/></label>)}</details> : null}
         {!currentSession && !current.readOnly ? <p className="opl-mcp-app-notice">{zh ? "从会话中的已完成工具结果打开这个应用。" : "Open this app from a completed tool result in the conversation."}</p> : null}
         {!currentSession && requiredInputMissing ? <p className="opl-mcp-app-notice" role="status">{zh ? "请先填写必填项。" : "Complete the required fields first."}</p> : null}
-        {currentSession ? <McpAppFrame key={currentSession.id} {...props} session={currentSession} fillHeight onNavigate={navigate} onNavigation={value => { if (current && threadId) rememberMcpNavigation(threadId, current, value); }}/> : null}
+        {currentSession ? (
+          <PluginErrorBoundary
+            pluginId={currentSession.server}
+            pluginLabel={currentSession.title}
+            locale={locale}
+            onOpenSoftwareCenter={props.onManage}
+            resetKey={currentSession.id}
+          >
+            <McpAppFrame
+              key={currentSession.id}
+              {...props}
+              session={currentSession}
+              fillHeight
+              onNavigate={navigate}
+              onNavigation={value => { if (current && threadId) rememberMcpNavigation(threadId, current, value); }}
+              onAuthorizationRequired={auth => setAuthRequired(auth)}
+            />
+          </PluginErrorBoundary>
+        ) : null}
     </div> : null}
   </section>;
 }

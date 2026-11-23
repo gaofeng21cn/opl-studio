@@ -155,6 +155,31 @@ function connectServerEvents(
   return () => source.close();
 }
 
+async function downloadWorkspaceEndpoint(endpoint: string, request: { relativePath?: string; action: string }) {
+  if (request.action !== "download") {
+    throw new WebTransportError("desktop_capability_unavailable", "Download files to open them on this device");
+  }
+  const response = await fetch(deploymentUrl(endpoint), await authenticatedInit({
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request)
+  }));
+  requireAuthentication(response);
+  if (!response.ok) {
+    const value = await response.json();
+    throw new WebTransportError(value.error?.code ?? "workspace_download_failed", value.error?.message ?? "Unable to download workspace file");
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = request.relativePath?.split("/").at(-1) ?? "download";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return { accepted: true };
+}
+
 export function installWebTransport(): void {
   const eventSourceUrl = deploymentUrl("/api/opl-events");
   const subscribeEvents = (onEvent: (event: OplBridgeEvent) => void) => connectServerEvents(eventSourceUrl, onEvent);
@@ -229,27 +254,14 @@ export function installWebTransport(): void {
     readThreadWorkspaceGit: (request) => postJson("/api/threads/workspace/git", request),
     readThreadWorkspaceBytes: (request) => postJson("/api/threads/workspace/bytes", request),
     readThreadWorkspaceFile: (request) => postJson("/api/threads/workspace/read", request),
-    accessThreadWorkspace: async (request) => {
-      if (request.action !== "download") throw new WebTransportError("desktop_capability_unavailable", "Download files to open them on this device");
-      const response = await fetch(deploymentUrl("/api/threads/workspace/download"), await authenticatedInit({
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request)
-      }));
-      requireAuthentication(response);
-      if (!response.ok) {
-        const value = await response.json();
-        throw new WebTransportError(value.error?.code ?? "workspace_download_failed", value.error?.message ?? "Unable to download workspace file");
-      }
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = request.relativePath?.split("/").at(-1) ?? "download";
-      document.body.append(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return { accepted: true };
-    },
+    accessThreadWorkspace: (request) => downloadWorkspaceEndpoint("/api/threads/workspace/download", request),
     searchThreadWorkspace: (request) => postJson("/api/threads/workspace/search", request),
+    listMaterialSpaces: (request = {}) => postJson("/api/materials/spaces", request),
+    scanProjectDeliverables: (request) => postJson("/api/materials/deliverables", request),
+    listProjectWorkspace: (request) => postJson("/api/materials/workspace/list", request),
+    searchProjectWorkspace: (request) => postJson("/api/materials/workspace/search", request),
+    readProjectWorkspaceBytes: (request) => postJson("/api/materials/workspace/bytes", request),
+    accessProjectWorkspace: (request) => downloadWorkspaceEndpoint("/api/materials/workspace/download", request),
     openLogDirectory: () => Promise.reject(new Error("Log folder access requires the desktop app")),
     setLogDirectory: () => Promise.resolve({
       schema: "opl_app_log_directory_update.v1",
