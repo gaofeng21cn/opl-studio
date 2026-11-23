@@ -71,7 +71,12 @@ const settings = read("plugins/opl-studio-client/src/client/workbench/settingsMo
 const gatewayCache = read("plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts");
 const gatewayLoginHost = read("plugins/opl-framework-bridge/src/gateway-account-login.mjs");
 const contributionComponents = read("plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
-const contributionProjection = read("plugins/opl-studio-client/src/client/composition/contributionProjection.ts");
+const contributionProjection = [
+  "contributionProjection.ts",
+  "channelAccessProjection.ts",
+  "remoteCompanionAccessProjection.ts",
+  "contributionWireValues.ts"
+].map(file => read(`plugins/opl-studio-client/src/client/composition/${file}`)).join("\n");
 const primitiveIndex = read("vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
 const scopedSlots = read("vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx");
 const runtimeShim = read("plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
