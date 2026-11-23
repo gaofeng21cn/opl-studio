@@ -101,8 +101,9 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   }
   function status() {
     const reasonCode = errorCode ?? connection?.lastError();
+    const enabled = !closed && (metadata?.enabled ?? Boolean(readAccount));
     return { status: closed || metadata?.enabled === false ? "disabled" : ACCOUNT_ERRORS.has(reasonCode) ? "account_required" : reasonCode ? "error" : !metadata?.enabled && !readAccount ? "disabled" : connection?.isOnline() && !suspended ? "ready" : connection?.isReconnecting() ? "reconnecting" : "connecting",
-      ...(reasonCode ? { reasonCode } : {}) };
+      enabled, ...(reasonCode ? { reasonCode } : {}) };
   }
   function scopedFetch(input, init = {}) {
     const url = new URL(typeof input === "string" ? input : input.url);
@@ -293,7 +294,8 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     readTransportEvidence: () => evidence.read({ authenticated: connections?.isOnline() === true, relayConnected: connections?.connectedPeers().some(peer => peer.mode === "Relay") === true }) };
   try {
     metadata = JSON.parse(await readFile(metadataFile, "utf8"));
-    if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || typeof metadata.enabled !== "boolean" || ((metadata.enabled || metadata.accountScope !== undefined) && !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? ""))) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
+    const hasEnrollment = [metadata.accountScope, metadata.deviceId, metadata.identityKey].some(value => value !== undefined);
+    if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || typeof metadata.enabled !== "boolean" || ((hasEnrollment || (metadata.enabled && !readAccount)) && !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? ""))) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
     if (!metadata.accountScope) return carrier;
     identity = await identities.loadExisting();
     if (!identity || identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);

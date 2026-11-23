@@ -143,7 +143,7 @@ export type LinkPairing = { schema: "opl_link_studio_wire.v2"; endpoint?: string
 export type LinkCompanionManagement = {
   readDevices(): Promise<LinkDeviceReadback>;
   enableInternet(): Promise<LinkInternetStatus>;
-  disableInternet(): Promise<LinkInternetStatus>;
+  disableInternet?(): Promise<LinkInternetStatus>;
   reconnectInternet(): Promise<LinkInternetStatus>;
   createPairing(request?: { endpoint?: string }): Promise<LinkPairing>;
   revokeDevice(request: { id: string }): Promise<{ id: string; revoked: boolean }>;

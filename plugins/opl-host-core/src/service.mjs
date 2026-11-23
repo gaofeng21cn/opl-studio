@@ -156,6 +156,18 @@ export class OplHostCore extends EventEmitter {
 
   async executeAction(payload) {
     if (this.closePromise) throw new Error("Application is closing");
+    if (payload?.actionId === "link_disable_internet") {
+      // Older desktop preloads only expose the generic action channel.
+      if (payload.mode !== "execute" || payload.dryRun !== false || payload.payload?.confirmed !== true) {
+        throw new ThreadAdapterError("invalid_request", "Turning off phone access requires explicit execution", {}, 400);
+      }
+      await this.invoke("disableLinkInternet");
+      return {
+        actionId: payload.actionId, dryRun: false, confirmationRequired: false, canExecute: true,
+        receiptKind: "execute", requestedMode: "execute", authorityBoundary: "app_bridge_no_domain_authority",
+        status: "executed", command: "", commandArgs: [], exitCode: 0, stdout: "", stderr: "", timedOut: false
+      };
+    }
     const updateActions = ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "agent_package_uninstall", "agent_package_preferences_set", "install_from_manifest_url", "official_profile_restore"];
     if (payload?.dryRun === false && updateActions.includes(payload?.actionId) && this.transport.runWhenIdle) {
       const operation = this.transport.runWhenIdle(async () => {

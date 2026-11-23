@@ -94,6 +94,24 @@ test("allows explicit opt-out and clears the backup QR code", async () => {
   expect(document.body.textContent).toContain("手机访问已就绪");
 });
 
+test("turns off phone access through the action channel on an older desktop preload", async () => {
+  let internet: LinkInternetStatus = { status: "ready", enabled: true };
+  const requests: unknown[] = [];
+  (browser as any).oplStudio = {
+    linkCompanion: { readDevices: async () => ({ schema: "opl_link_studio_wire.v2", devices: [], internet }) },
+    executeAction: async (request: unknown) => {
+      requests.push(request);
+      internet = { status: "disabled", enabled: false };
+      return { status: "executed" };
+    }
+  };
+  await act(async () => root.render(<LinkCompanionSection locale="zh" />));
+  await act(async () => button("关闭手机访问").click());
+  expect(requests).toEqual([{ actionId: "link_disable_internet", mode: "execute", dryRun: false, payload: { confirmed: true } }]);
+  expect(document.body.textContent).toContain("手机访问已关闭");
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
 test("keeps explicit opt-out after an earlier recovery and status read complete", async () => {
   const active: LinkDeviceReadback = {
     schema: "opl_link_studio_wire.v2", devices: [],

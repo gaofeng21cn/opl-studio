@@ -129,6 +129,29 @@ test("carrier refuses mismatched enrollment identity before persisting or openin
   await assert.rejects(readFile(path.join(root, ".opl-studio/link-remote/server-credentials.json")), error => error.code === "ENOENT");
 });
 
+test("phone access preference survives restart before an account is connected", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-preference-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let accountReads = 0;
+  const options = {
+    env: { OPL_DATA_DIR: root }, handle: () => {},
+    readAccount: async () => { accountReads++; return null; }
+  };
+  let carrier = await createLinkInternet(options);
+  t.after(() => carrier.close());
+  assert.deepEqual(await carrier.disable(), { status: "disabled", enabled: false });
+  await carrier.close();
+
+  carrier = await createLinkInternet(options);
+  assert.deepEqual(await carrier.synchronizeAccount(), { status: "disabled", enabled: false });
+  assert.equal(accountReads, 0);
+  assert.deepEqual(await carrier.enable(), { status: "account_required", enabled: true, reasonCode: "link_account_required" });
+  await carrier.close();
+
+  carrier = await createLinkInternet(options);
+  assert.deepEqual(await carrier.synchronizeAccount(), { status: "account_required", enabled: true, reasonCode: "link_account_required" });
+});
+
 test("restarted carrier refreshes the host name and preserves existing identity pins", { timeout: 10_000 }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-restart-test-"));
   const sockets = []; const created = new EventEmitter(); const peers = new Map();
@@ -242,7 +265,7 @@ test("the actual Framework CLI maps an isolated signed-out account to the existi
   const carrier = await createLinkInternet({ env: { ...process.env, NODE_ENV: "test", OPL_DATA_DIR: root, OPL_STATE_DIR: path.join(root, "framework-state"), OPL_APP_OPL_BIN: path.join(frameworkRoot, "bin/opl"), OPL_GATEWAY_CONTROL_BASE_URL: "http://127.0.0.1:1/api/v1" }, handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
   t.after(async () => { await carrier.close(); await rm(root, { recursive: true, force: true }); });
   await assert.rejects(carrier.enable(), error => error.code === "link_account_required");
-  assert.deepEqual(carrier.status(), { status: "account_required", reasonCode: "link_account_required" });
+  assert.deepEqual(carrier.status(), { status: "account_required", enabled: false, reasonCode: "link_account_required" });
 });
 
 test("RTC evidence requires an actual succeeded pair and data bytes and exposes only closed classifications", async () => {

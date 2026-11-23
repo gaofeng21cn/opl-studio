@@ -10,7 +10,8 @@ function needsRecovery(internet: LinkDeviceReadback["internet"]) {
 
 export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" | "en"; onOpenAccount?: () => void }) {
   const zh = locale === "zh";
-  const bridge = typeof window === "undefined" ? undefined : window.oplStudio?.linkCompanion;
+  const studio = typeof window === "undefined" ? undefined : window.oplStudio;
+  const bridge = studio?.linkCompanion;
   const [state, setState] = useState<LinkDeviceReadback | null>(null);
   const [pairing, setPairing] = useState<LinkPairing | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,7 +138,14 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
     <SettingRow label={zh ? "在 iPhone 或 iPad 上继续" : "Continue on iPhone or iPad"} detail={zh ? "登录同一个 OPL 账号，即可在 OPL Link 中连接这台电脑。电脑需保持联网并运行 OPL App。" : "Sign in to the same OPL account to connect to this computer in OPL Link. Keep this computer online with OPL App running."}>
       {remoteEnabled ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => {
         setPairing(null);
-        updateStatus(await bridge.disableInternet());
+        if (bridge.disableInternet) {
+          updateStatus(await bridge.disableInternet());
+          return;
+        }
+        const receipt = await studio?.executeAction?.({ actionId: "link_disable_internet", mode: "execute", dryRun: false, payload: { confirmed: true } });
+        const next = await bridge.readDevices();
+        updateState(next);
+        if (receipt?.status !== "executed" || next.internet?.status !== "disabled") throw new Error("Phone access could not be turned off");
       })}>{zh ? "关闭手机访问" : "Turn off phone access"}</button> :
         <button className="settings-action-button" type="button" disabled={busy || !connection} onClick={() => void run(async () => {
           updateStatus(await bridge.enableInternet());

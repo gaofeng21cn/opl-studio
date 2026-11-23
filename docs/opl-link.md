@@ -28,15 +28,18 @@ public service deployment are separate acceptance surfaces.
 ## Connect within OPL App
 
 1. Open **Settings → Resources → OPL Link**, or **Software Center → Shared Resources → OPL Link**.
-2. Choose **Enable phone access**. If prompted, open the existing **OPL Account** page and sign in there.
-3. When the status reads **Phone access is ready**, choose **Create pairing code**.
-4. Scan it in OPL Link and verify the computer fingerprint shown on both devices.
+2. Sign in from **OPL Account**. Phone access starts automatically unless you turned it off on this computer.
+3. In OPL Link on your iPhone or iPad, sign in to the same OPL Gateway account. Link connects automatically when one computer is online. If several are online, choose the one you want.
+4. To pause remote access on this computer, choose **Turn off phone access**. Existing remote sessions close and the setting persists across restarts. Choose **Enable phone access** to resume.
 
-The default connection uses `https://link.medopl.com`. Users do not enter a
-server address, configure a tunnel, install another network app, or type an
-account password on their phone. Keep the computer online and OPL App running.
+The default connection uses `https://link.medopl.com`. Keep the computer online
+and OPL App running.
 There is no guarantee of background delivery while iOS suspends Link or the
 computer sleeps.
+
+To connect with a QR code, wait for **Phone access is ready**, then choose
+**Create pairing code**. Scan it in OPL Link and verify the computer fingerprint
+shown on both devices.
 
 The desktop code is single use and expires after two minutes. Its business
 claim code travels only inside the encrypted channel pinned to the desktop

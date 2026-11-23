@@ -34,6 +34,19 @@ test("Host Core requires the providers owned by its Cordis profile", () => {
   assert.throws(() => new OplHostCore(), /requires the Codex, Framework and MCP Apps services/);
 });
 
+test("the older desktop action channel can only disable Link with an explicit execute request", async () => {
+  const core = createStandaloneHostCore();
+  let disables = 0;
+  core.linkInternet = { disable: async () => { disables++; return { status: "disabled", enabled: false }; } };
+  const action = { actionId: "link_disable_internet", mode: "execute", dryRun: false, payload: { confirmed: true } };
+  for (const invalid of [{ mode: "preview" }, { dryRun: true }, { payload: {} }, { mode: "rollback" }]) {
+    await assert.rejects(core.invoke("executeAction", { ...action, ...invalid }), { code: "invalid_request" });
+  }
+  assert.equal(disables, 0);
+  assert.equal((await core.invoke("executeAction", action)).status, "executed");
+  assert.equal(disables, 1);
+});
+
 test("Host shutdown waits for a manual update and its Codex refresh", async () => {
   const core = createStandaloneHostCore();
   const events = [];
