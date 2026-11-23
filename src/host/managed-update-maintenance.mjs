@@ -17,6 +17,7 @@ export function eligibleBackgroundComponents(plan) {
 
 export function createManagedUpdateMaintenance({
   opl, codex, stateFile, onStateChange = () => {}, checkAppUpdate = async () => {},
+  syncDshPlugins = null,
   now = Date.now, schedule = setTimeout, unschedule = clearTimeout
 }) {
   let state = {
@@ -25,6 +26,9 @@ export function createManagedUpdateMaintenance({
     lastCompletedAt: null,
     nextAttemptAt: null,
     reloadPending: false,
+    dshPluginRestartRequired: false,
+    dshPluginUpdateStatus: "idle",
+    updatedDshPlugins: {},
     failureRetryCount: 0,
     retryExhausted: false
   };
@@ -88,6 +92,26 @@ export function createManagedUpdateMaintenance({
     }
     const failedRetryCount = appUpdateFailed ? Math.min(MAX_FAILURE_RETRIES, state.failureRetryCount + 1) : 0;
     const retryExhausted = failedRetryCount >= MAX_FAILURE_RETRIES;
+    if (typeof syncDshPlugins === "function") {
+      try {
+        const dshResult = await syncDshPlugins();
+        const installedPlugins = dshResult?.installed ?? {};
+        const dshFailures = dshResult?.failures ?? {};
+        if (dshResult?.application === "restart-required" || Object.keys(installedPlugins).length > 0) {
+          emit({
+            dshPluginRestartRequired: true,
+            dshPluginUpdateStatus: "restart_required",
+            updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
+          });
+        } else if (Object.keys(dshFailures).length > 0) {
+          emit({ dshPluginUpdateStatus: "failed" });
+        } else {
+          emit({ dshPluginUpdateStatus: "current" });
+        }
+      } catch {
+        emit({ dshPluginUpdateStatus: "failed" });
+      }
+    }
     emit({
       status: "completed",
       lastCompletedAt: now(),
@@ -128,6 +152,12 @@ export function createManagedUpdateMaintenance({
             state.lastCompletedAt = saved.lastCompletedAt;
           }
           state.reloadPending = saved.reloadPending === true;
+          // A cold restart has already activated any previously installed DSH profile overrides.
+          state.dshPluginRestartRequired = false;
+          state.updatedDshPlugins = {};
+          if (typeof saved.dshPluginUpdateStatus === "string" && saved.dshPluginUpdateStatus !== "restart_required") {
+            state.dshPluginUpdateStatus = saved.dshPluginUpdateStatus;
+          }
           if (Number.isInteger(saved.failureRetryCount) && saved.failureRetryCount >= 0) {
             state.failureRetryCount = saved.failureRetryCount;
           }

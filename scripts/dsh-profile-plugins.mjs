@@ -10,7 +10,7 @@ import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { buildDshPlugins } from "./build-dsh-plugins.mjs";
 import { discoverPublishablePackages, inspectProfile, isPublishableManifest, normalizePluginNames, retireLegacyOverrides, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
-export { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, resolveRegistryVersions, retireLegacyOverrides, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
+export { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, resolveBundledPnpm, resolveRegistryVersions, retireLegacyOverrides, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const profile = "opl-studio";

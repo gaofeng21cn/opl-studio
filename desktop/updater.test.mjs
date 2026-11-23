@@ -196,3 +196,15 @@ test("signed local builds retain identity and never start a public update", asyn
   assert.equal(result.currentVersion, "26.9.2691");
   assert.equal(result.state, "unsupported");
 });
+
+test("desktop updater catches download errors into structured updater state instead of throwing", async () => {
+  const autoUpdater = new FakeAutoUpdater();
+  autoUpdater.downloadUpdate = async () => { throw new Error("network reset"); };
+  const updater = createDesktopUpdater({ autoUpdater, isPackaged: true, currentVersion: "1.0.0", automatic: false });
+  await updater.perform("check");
+  const result = await updater.perform("apply");
+  assert.equal(result.accepted, false);
+  assert.equal(result.state, "error");
+  assert.equal(result.errorCode, "desktop_updater_error");
+  assert.equal(result.message, "network reset");
+});

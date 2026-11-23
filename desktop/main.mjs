@@ -29,6 +29,7 @@ import {
   performDesktopUpdaterQualification,
   createDesktopUpdater
 } from "./updater.mjs";
+import { performDesktopRestart } from "./relaunch.mjs";
 
 const { autoUpdater } = updaterPackage;
 protocol.registerSchemesAsPrivileged([{ scheme: "opl-client", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
@@ -488,6 +489,7 @@ async function createDesktopHost(appLogDirectory) {
       codex: core.codex,
       stateFile: path.join(app.getPath("userData"), "managed-update-maintenance.json"),
       checkAppUpdate: () => updater.perform("check"),
+      syncDshPlugins: () => core.invoke("updateDshPlugins", { all: true }),
       onStateChange: (state) => core.emit("event", {
         method: "host/managed-update", params: { ...state, activationStatus }
       })
@@ -624,9 +626,23 @@ app.whenReady().then(async () => {
     }
     if (request?.method === 'readDesktopSetupStatus') return desktopSetupSnapshot;
     if (request?.method === "readPendingDeepLinks") return deepLinks.takePending();
+    if (request?.method === "restartNativeApp") {
+      return performDesktopRestart({
+        desktopUpdater,
+        hostCore,
+        prepareShutdown: async () => {
+          quittingApplication = true;
+          await hostCore?.close();
+          ipcMain.removeHandler("opl:invoke");
+          installingUpdate = true;
+        },
+        relaunchApp: () => app.relaunch(),
+        quitApp: () => app.quit()
+      });
+    }
     const updateOperation = {
       readNativeAppUpdateStatus: "status", checkNativeAppUpdate: "check",
-      applyNativeAppUpdate: "apply", restartNativeApp: "restart"
+      applyNativeAppUpdate: "apply"
     }[request?.method];
     if (updateOperation && desktopUpdater) return desktopUpdater.perform(updateOperation);
     const retry = request?.method === "retryDesktopHost";
@@ -658,7 +674,41 @@ app.whenReady().then(async () => {
       resourcesPath: process.resourcesPath,
       isPackaged: app.isPackaged,
       invokeHost: (method, payload) => activeHost.core.invoke(method, payload),
-      checkForUpdates: () => activeHost.desktopUpdater.perform("check"),
+      checkForUpdates: async () => {
+        const [desktopResult, pluginResult, stateResult] = await Promise.allSettled([
+          activeHost.desktopUpdater.perform("check"),
+          activeHost.core.invoke("readDshPluginUpdates"),
+          activeHost.core.invoke("readState", { profile: "fast" })
+        ]);
+        const desktop = desktopResult.status === "fulfilled"
+          ? desktopResult.value
+          : { schema: "opl_native_app_updater.v1", supported: false, state: "error", message: String(desktopResult.reason) };
+        const plugins = pluginResult.status === "fulfilled" ? pluginResult.value?.plugins ?? {} : {};
+        const pluginUpdatesCount = Object.values(plugins).filter((item) => item?.state === "update_available").length;
+        const agentPackages = stateResult.status === "fulfilled"
+          ? stateResult.value?.app_state?.app_state?.agent_packages ?? stateResult.value?.app_state?.agent_packages ?? {}
+          : {};
+        const entries = Array.isArray(agentPackages?.directory?.entries) ? agentPackages.directory.entries : [];
+        const nativeItems = Array.isArray(agentPackages?.sources?.entries)
+          ? agentPackages.sources.entries.flatMap((source) => Array.isArray(source?.native_items) ? source.native_items : [])
+          : [];
+        const softwareUpdatesCount = entries.filter((entry) => entry?.installed === true && (entry?.update_status === "update_available" || entry?.update_state === "update_available")).length
+          + nativeItems.filter((item) => item?.installed === true && item?.update_status === "available").length;
+        const softwareRestartRequired = entries.some((entry) => entry?.installed === true && (entry?.update_status === "needs_restart" || entry?.update_state === "needs_restart"))
+          || nativeItems.some((item) => item?.installed === true && item?.update_status === "needs_restart");
+        const maintenanceSnapshot = activeHost.core.updateMaintenance?.snapshot?.();
+        const restartRequired = Boolean(desktop.restartRequired || maintenanceSnapshot?.dshPluginRestartRequired || softwareRestartRequired);
+        if (pluginUpdatesCount > 0 && activeHost.core.updateMaintenance) {
+          void activeHost.core.updateMaintenance.runNow().catch(() => undefined);
+        }
+        return {
+          ...desktop,
+          pluginCheckOk: pluginResult.status === "fulfilled",
+          pluginUpdatesCount,
+          softwareUpdatesCount,
+          restartRequired
+        };
+      },
       getWindow: () => mainWindow,
       sendRendererEvent: sendDesktopRendererEvent,
       restart: restartApplication,

@@ -284,3 +284,55 @@ test("only an idle-lease deferral uses the short automatic retry", async () => {
   assert.equal(timer.delay, 5 * 60_000);
   await maintenance.close();
 });
+
+test("background maintenance syncs DSH plugins, marks restart pending, and clears the flag on cold start", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-maintenance-dsh-sync-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "state.json");
+  const transport = new CodexAppServerTransport();
+  let syncCalls = 0;
+  const maintenance = createManagedUpdateMaintenance({
+    stateFile,
+    opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+    codex: { transport },
+    syncDshPlugins: async () => {
+      syncCalls += 1;
+      return { application: "restart-required", installed: { "@gaofeng21cn/opl-studio-client": "0.1.99" }, failures: {} };
+    },
+    now: () => 50_000
+  });
+  const snapshot = await maintenance.runNow();
+  assert.equal(syncCalls, 1);
+  assert.equal(snapshot.status, "completed");
+  assert.equal(snapshot.dshPluginRestartRequired, true);
+  assert.equal(snapshot.dshPluginUpdateStatus, "restart_required");
+  assert.deepEqual(snapshot.updatedDshPlugins, { "@gaofeng21cn/opl-studio-client": "0.1.99" });
+  await maintenance.close();
+
+  const relaunched = createManagedUpdateMaintenance({
+    stateFile,
+    opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+    codex: { transport },
+    schedule: (cb, delay) => ({ cb, delay }),
+    unschedule: () => {},
+    now: () => 60_000
+  });
+  await relaunched.start();
+  assert.equal(relaunched.snapshot().dshPluginRestartRequired, false);
+  await relaunched.close();
+});
+
+test("DSH plugin sync failures remain isolated without failing Framework package maintenance", async () => {
+  const transport = new CodexAppServerTransport();
+  const maintenance = createManagedUpdateMaintenance({
+    opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+    codex: { transport },
+    syncDshPlugins: async () => { throw new Error("feed_unavailable"); },
+    now: () => 50_000
+  });
+  const snapshot = await maintenance.runNow();
+  assert.equal(snapshot.status, "completed");
+  assert.equal(snapshot.dshPluginUpdateStatus, "failed");
+  assert.equal(snapshot.dshPluginRestartRequired, false);
+  await maintenance.close();
+});

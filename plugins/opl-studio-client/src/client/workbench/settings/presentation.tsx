@@ -103,8 +103,8 @@ export function statusTone(status: string | undefined): "ready" | "attention" | 
   const normalized = status.toLowerCase();
   // Currentness is a separate axis from callability. Handle compound states
   // before the broad "current"/"available" matches below.
-  if (["currentness_not_checked", "unknown", "not_checked", "staged", "pending"].includes(normalized)) return "neutral";
-  if (["update_available", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(normalized)) return "attention";
+  if (["currentness_not_checked", "unknown", "not_checked", "staged", "pending", "idle", "downloading", "installing", "restart_scheduled"].includes(normalized)) return "neutral";
+  if (["update_available", "downloaded", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(normalized)) return "attention";
   const healthRatio = normalized.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (healthRatio) {
     const available = Number(healthRatio[1]);
@@ -161,6 +161,11 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     update_available: ["有可用更新", "Update available"],
     currentness_not_checked: ["尚未检查更新", "Update not checked"],
     updating: ["更新中", "Updating"],
+    downloading: ["正在下载更新", "Downloading update"],
+    downloaded: ["已下载，待重启安装", "Downloaded; restart to install"],
+    installing: ["正在安装更新", "Installing update"],
+    restart_scheduled: ["正在重启", "Restarting"],
+    idle: ["就绪", "Ready"],
     applying: ["正在更新", "Applying update"],
     queued: ["等待处理", "Queued"],
     staged: ["已准备更新", "Update staged"],

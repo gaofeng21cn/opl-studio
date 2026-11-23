@@ -115,6 +115,7 @@ import {
   resolveCodexSelection
 } from "./modelPolicy";
 import {
+  nativeAppUpdateFeedback,
   SettingsPanel,
   type SettingsDestinationId
 } from "./SettingsPanel";
@@ -333,6 +334,7 @@ export function App({
   const [nativeAppUpdate, setNativeAppUpdate] = useState<NativeAppUpdateResult | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
+  const [dshPluginRestartRequired, setDshPluginRestartRequired] = useState(false);
   const [projectedManagedUpdateActions, setProjectedManagedUpdateActions] = useState<ProjectedManagedUpdateAction[]>([]);
   const [projectedSetupActions, setProjectedSetupActions] = useState<ProjectedSetupAction[]>([]);
   const [projectedManifestInstallAction, setProjectedManifestInstallAction] = useState<ProjectedManifestInstallAction>();
@@ -832,6 +834,9 @@ export function App({
         setProjectedManifestInstallAction(readProjectedManifestInstallAction(state));
         setCarrierDiagnostics(state.carrierDiagnostics);
         setMaintenanceStatus(state.managedUpdateMaintenance?.status ?? null);
+        if (typeof state.managedUpdateMaintenance?.dshPluginRestartRequired === "boolean") {
+          setDshPluginRestartRequired(state.managedUpdateMaintenance.dshPluginRestartRequired);
+        }
         const nextGatewayActions = readGatewayActionsFromState(state);
         projectedGatewayActionsRef.current = nextGatewayActions;
         setProjectedGatewayActions(nextGatewayActions);
@@ -923,12 +928,7 @@ export function App({
             ? await bridge.restartNativeApp()
             : await bridge.readNativeAppUpdateStatus();
       setNativeAppUpdate(result);
-      setSettingsActionFeedback({
-        tone: result.supported || result.accepted ? "success" : "attention",
-        message: result.supported || result.accepted
-          ? (settings.locale === "zh" ? "操作已由 Native App 接受。" : "The Native App accepted the operation.")
-          : (result.reasonCode ?? (settings.locale === "zh" ? "当前载体不支持此操作。" : "This carrier does not support the operation."))
-      });
+      setSettingsActionFeedback(nativeAppUpdateFeedback(result, intent.operation, settings.locale));
       await loadState(settings.runtimeProfile);
     } catch (error) {
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
@@ -1497,9 +1497,16 @@ export function App({
     if (method === "desktop/native-app-update" && params.schema === "opl_native_app_updater.v1") {
       setNativeAppUpdate(params as NativeAppUpdateResult);
     }
+    if (method === "host/dsh-plugins-updated") {
+      const installed = params.installed && typeof params.installed === "object" ? Object.keys(params.installed as Record<string, unknown>) : [];
+      if (installed.length > 0) setDshPluginRestartRequired(true);
+    }
     if (method === "host/managed-update" && typeof params.status === "string") {
       setMaintenanceError(typeof params.errorCode === "string" ? params.errorCode : null);
       setMaintenanceStatus(params.status);
+      if (typeof params.dshPluginRestartRequired === "boolean") {
+        setDshPluginRestartRequired(params.dshPluginRestartRequired);
+      }
       if (params.status === "completed") void loadState(settings.runtimeProfile);
     }
     if (method === "codex/server-request") {
@@ -2660,6 +2667,7 @@ export function App({
       managedUpdate={managedUpdate}
       actionViewModel={settingsActionViewModel}
       nativeAppUpdate={nativeAppUpdate}
+      dshPluginRestartRequired={dshPluginRestartRequired}
       actionBusyKey={settingsActionBusyKey}
       onAction={(request) => void runSettingsAction(request)}
       onHostAction={(intent) => void runSettingsHostAction(intent)}

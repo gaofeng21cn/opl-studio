@@ -153,3 +153,60 @@ test("tray controller reads recent threads and routes menu actions through exist
   controller.destroy();
   assert.equal(controller.tray.destroyed, true);
 });
+
+test("tray checkForUpdates reports combined plugin updates, catches errors cleanly, and navigates to Software Center updates", async () => {
+  class FakeTray extends EventEmitter {
+    setToolTip() {}
+    setContextMenu(value) { this.menu = value; }
+    destroy() {}
+  }
+  const dialogs = [];
+  const events = [];
+  let responseChoice = 0;
+  let updateResult = {
+    schema: "opl_native_app_updater.v1",
+    supported: true,
+    state: "available",
+    targetVersion: "26.11.24",
+    pluginUpdatesCount: 2,
+    restartRequired: false
+  };
+  const controller = await createDesktopTray({
+    electron: {
+      Tray: FakeTray,
+      Menu: { buildFromTemplate: (template) => ({ template }) },
+      nativeImage: { createFromPath: () => ({ isEmpty: () => false, setTemplateImage() {} }) },
+      dialog: {
+        showMessageBox: async (_window, options) => {
+          dialogs.push(options ?? _window);
+          return { response: responseChoice };
+        }
+      },
+      app: { getVersion: () => "26.11.23", dock: { show() {}, hide() {} } }
+    },
+    repositoryRoot: "/workspace",
+    resourcesPath: "/resources",
+    isPackaged: true,
+    invokeHost: async (method) => method === "listThreads" ? { data: [] } : { app_state: {} },
+    checkForUpdates: async () => updateResult,
+    getWindow: () => ({ isDestroyed: () => false, isMinimized: () => false, show() {}, focus() {} }),
+    sendRendererEvent: (method, params) => events.push({ method, params }),
+    restart: () => undefined,
+    quit: () => undefined,
+    platform: "darwin",
+    enabled: true
+  });
+  const checkItem = controller.tray.menu.template.find((item) => item.label === "检查更新");
+  const aboutItem = controller.tray.menu.template.find((item) => item.label === "关于 One Person Lab");
+  await aboutItem.click();
+  assert.equal(dialogs.at(-1).detail, "版本 26.11.23");
+  await checkItem.click();
+  assert.match(dialogs.at(-1).message, /26\.11\.24.*软件中心 > 更新/);
+  assert.deepEqual(events.at(-1), { method: "desktop/deep-link", params: { action: "navigate", params: { route: "/apps?section=updates" } } });
+
+  updateResult = Promise.reject(new Error("offline"));
+  responseChoice = 1;
+  await checkItem.click();
+  assert.match(dialogs.at(-1).message, /检查更新失败：offline/);
+  controller.destroy();
+});

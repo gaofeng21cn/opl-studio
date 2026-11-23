@@ -91,23 +91,40 @@ export function buildDesktopTrayMenu({
   return menu;
 }
 
-function updateMessage(result, locale) {
+export function updateMessage(result, locale) {
   const zh = locale === "zh";
+  const pluginUpdates = Number(result?.pluginUpdatesCount ?? 0);
+  const softwareUpdates = Number(result?.softwareUpdatesCount ?? 0);
+  const hasComponentUpdates = pluginUpdates > 0 || softwareUpdates > 0;
+  if (result?.restartRequired) {
+    return zh
+      ? "更新或扩展组件已在后台准备就绪，重启 One Person Lab 即可生效。"
+      : "Updates or extension components are ready. Restart One Person Lab to apply them.";
+  }
+  const desktopVersion = result?.targetVersion ?? result?.availableVersion ?? result?.latestVersion;
+  if (result?.supported && (result.state === "available" || result.state === "downloaded")) {
+    return zh
+      ? `发现新版本${desktopVersion ? ` ${desktopVersion}` : ""}${hasComponentUpdates ? `（另有 ${pluginUpdates + softwareUpdates} 项软件与扩展更新）` : ""}，可在“软件中心 > 更新”中安装。`
+      : `An update${desktopVersion ? ` (${desktopVersion})` : ""} is available in Software Center > Updates.`;
+  }
+  if (hasComponentUpdates) {
+    return zh
+      ? `发现 ${pluginUpdates + softwareUpdates} 项插件或软件更新，可在“软件中心 > 更新”中一键更新。`
+      : `${pluginUpdates + softwareUpdates} plugin or software update(s) are available in Software Center > Updates.`;
+  }
+  if (/error|failed/.test(String(result?.state))) {
+    const detail = result?.message ?? result?.errorMessage ?? result?.errorCode ?? result?.reasonCode ?? result?.state;
+    return zh ? `检查更新失败：${detail}` : `Update check failed: ${detail}`;
+  }
+  if (result?.pluginCheckOk && result.state === "unsupported") {
+    return zh ? "当前扩展组件与已安装软件均为最新版本。" : "Extensions and installed software are up to date.";
+  }
   if (!result?.supported) {
     return zh
-      ? `当前安装包没有可用更新源${result?.reasonCode ? `（${result.reasonCode}）` : ""}。`
-      : `This installation has no available update source${result?.reasonCode ? ` (${result.reasonCode})` : ""}.`;
+      ? "当前安装方式不支持应用包在线更新；扩展插件与软件仍会在“软件中心 > 更新”自动检查与更新。"
+      : "App shell online updates are not enabled for this installation; plugins and software still update in Software Center > Updates.";
   }
-  if (result.state === "available") {
-    const version = result.availableVersion ?? result.latestVersion;
-    return zh
-      ? `发现新版本${version ? ` ${version}` : ""}，可在“设置 > 更新”中安装。`
-      : `An update${version ? ` (${version})` : ""} is available in Settings > Updates.`;
-  }
-  if (/error|failed/.test(String(result.state))) {
-    return zh ? `检查更新失败：${result.errorMessage ?? result.reasonCode ?? result.state}` : `Update check failed: ${result.errorMessage ?? result.reasonCode ?? result.state}`;
-  }
-  return zh ? "当前已是最新版本。" : "One Person Lab is up to date.";
+  return zh ? "当前应用、扩展组件与已安装软件均为最新版本。" : "One Person Lab, extensions, and installed software are up to date.";
 }
 
 export async function createDesktopTray({
@@ -174,19 +191,42 @@ export async function createDesktopTray({
       sendRendererEvent("desktop/open-thread", { threadId: id });
     },
     checkForUpdates: async () => {
-      const result = await checkForUpdates();
-      sendRendererEvent("desktop/native-update-result", { result });
-      await showDialog({
-        type: result?.supported && result?.state === "available" ? "info" : result?.state === "error" ? "error" : "none",
+      let result;
+      try {
+        result = await checkForUpdates();
+      } catch (error) {
+        result = { supported: false, state: "error", message: error instanceof Error ? error.message : String(error) };
+      }
+      if (result?.schema === "opl_native_app_updater.v1") {
+        sendRendererEvent("desktop/native-app-update", result);
+      }
+      const hasUpdates = Boolean(
+        result?.restartRequired
+        || (result?.supported && (result?.state === "available" || result?.state === "downloaded"))
+        || Number(result?.pluginUpdatesCount ?? 0) > 0
+        || Number(result?.softwareUpdatesCount ?? 0) > 0
+      );
+      const isError = /error|failed/.test(String(result?.state));
+      const choice = await showDialog({
+        type: hasUpdates ? "info" : isError ? "error" : "none",
         title: locale === "zh" ? "One Person Lab 更新" : "One Person Lab update",
-        message: updateMessage(result, locale)
+        message: updateMessage(result, locale),
+        ...(hasUpdates ? {
+          buttons: locale === "zh" ? ["打开软件中心更新", "稍后"] : ["Open Software Center", "Later"],
+          defaultId: 0,
+          cancelId: 1
+        } : {})
       });
+      if (hasUpdates && choice?.response === 0) {
+        showWindow();
+        sendRendererEvent("desktop/deep-link", { action: "navigate", params: { route: "/apps?section=updates" } });
+      }
     },
     showAbout: () => showDialog({
       type: "info",
       title: locale === "zh" ? "关于 One Person Lab" : "About One Person Lab",
       message: "One Person Lab",
-      detail: `${locale === "zh" ? "候选桌面版本" : "Desktop candidate"} ${app.getVersion()}`
+      detail: `${locale === "zh" ? "版本" : "Version"} ${app.getVersion()}`
     }),
     restart,
     quit

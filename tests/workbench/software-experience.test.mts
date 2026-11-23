@@ -46,6 +46,17 @@ test("unknown source checks and unused resources do not become user failures", (
   expect(softwareAttentionItems(state, "en")).toEqual([]);
 });
 
+test("external software attention issues surface with the same priority as OPL software", () => {
+  const state = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([{
+    package_id: "external-pkg", display_name: "External Pkg", catalog_scope: "software", catalog_origin: "external",
+    installed: true, app_enabled: true, presence: { callable: false }, readiness: { callable: false, reason: "hosted_agent_source_unavailable" }
+  }]) } } } });
+  const issues = softwareAttentionItems(state, "en");
+  expect(issues.map(item => item.packageId)).toEqual(["external-pkg"]);
+  expect(issues[0]?.title).toBe("External Pkg");
+  expect(issues[0]?.productIds).toEqual(["external-pkg"]);
+});
+
 test("use entry survives the bridge and local use does not require download authorization", () => {
   const item = model().packageLifecycle.find(item => item.packageId === "example-1")!;
   expect(item.miniAppEntry).toEqual({ resourceUri: "ui://example/app", arguments: { package_id: "example-1" } });

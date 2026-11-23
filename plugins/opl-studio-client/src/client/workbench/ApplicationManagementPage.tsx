@@ -56,9 +56,10 @@ type ApplicationManagementPageProps = {
   onUseSoftware?: (packageId: string) => void;
   onPickKnowledgeDirectory?: () => Promise<string | undefined>;
   onOpenInstallationLocation?: (path: string) => void;
+  dshPluginRestartRequired?: boolean;
 };
 
-export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation, dshPluginRestartRequired = false }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
@@ -112,6 +113,7 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     || resources.some(resource => resource.status === "unknown");
   const observedAt = model.stateGeneratedAt && Number.isFinite(Date.parse(model.stateGeneratedAt))
     ? new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(Date.parse(model.stateGeneratedAt)) : null;
+  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
   const updatesProps: UpdatesPageProps = {
     actionViewModel,
     managedUpdate,
@@ -121,17 +123,20 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     model,
     actionBusyKey: effectiveBusyKey,
     onAction,
-    onHostAction
+    onHostAction,
+    onRefresh: refreshAll,
+    dshRestartRequired: dshPluginRestartRequired
   };
-  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
-  const updatesLabel = inventory.updates > 0 ? (zh ? `更新 (${inventory.updates})` : `Updates (${inventory.updates})`) : (zh ? "更新" : "Updates");
+  const desktopHasUpdate = Boolean(nativeAppUpdate?.supported && ["available", "downloading", "downloaded"].includes(nativeAppUpdate.state));
+  const pendingUpdatesCount = inventory.updates + (desktopHasUpdate ? 1 : 0) + (dshPluginRestartRequired ? 1 : 0);
+  const updatesLabel = pendingUpdatesCount > 0 ? (zh ? `更新 (${pendingUpdatesCount})` : `Updates (${pendingUpdatesCount})`) : (zh ? "更新" : "Updates");
   const activityLabel = activity.running > 0 ? (zh ? `安装记录 (${activity.running})` : `Activity (${activity.running})`) : (zh ? "安装记录" : "Installation activity");
   const pageTabs = [
-    { id: "updates", label: updatesLabel, content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => navigate("sources")} /> },
-    { id: "activity", label: activityLabel, content: packageOperations && (packageOperations.operations.length || packageOperations.readError)
+    { id: "updates", label: updatesLabel, content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="all" onManageSources={() => navigate("sources")} /> },
+    { id: "activity", label: activityLabel, content: packageOperations && (packageOperations.operations.length || packageOperations.readError || packageOperations.cancelError)
       ? <PackageOperations operations={packageOperations.operations} locale={settings.locale}
           labels={Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n[settings.locale] ?? item.label]))}
-          readError={packageOperations.readError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)}
+          readError={packageOperations.readError} cancelError={packageOperations.cancelError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)}
           onRetry={runAction} onRefresh={refreshAll} onUse={onUseSoftware}
           readyPackageIds={stateStatus === "ready" ? model.packageLifecycle.filter(softwareCanStart).map(item => item.packageId) : []}
           onOpenLocation={onOpenInstallationLocation} />
@@ -139,6 +144,10 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     ...(tab === "sources" ? [{ id: "sources", label: zh ? "软件源" : "Software sources", content: <SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} /> }] : [])
   ];
   const headerStatus = <div className="opl-app-management-status">
+    {dshPluginRestartRequired && tab !== "updates" ? <div className="opl-software-continuation" data-testid="opl-dsh-restart-banner">
+      <span role="status">{zh ? "新的应用扩展更新已准备就绪，重启应用即可生效。" : "Updated app extensions are ready. Restart the app to apply them."}</span>
+      <Button size="sm" variant="primary" onClick={() => navigate("updates")}>{zh ? "查看更新" : "View updates"}</Button>
+    </div> : null}
     {tab === "applications" ? <>
       <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown}
         inventory={inventory} catalogAvailable={catalogAvailable} complete={nativeInventory.complete}

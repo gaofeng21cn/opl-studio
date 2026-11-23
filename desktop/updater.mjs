@@ -150,7 +150,12 @@ export function createDesktopUpdater({
           return { ...this.snapshot(operation), accepted: false, reasonCode: "update_not_available" };
         }
         update({ state: "downloading", operation });
-        await autoUpdater.downloadUpdate();
+        try {
+          await autoUpdater.downloadUpdate();
+        } catch (error) {
+          update({ state: "error", errorCode: "desktop_updater_error", message: error?.message ?? String(error) });
+          return { ...this.snapshot(operation), accepted: false };
+        }
         return { ...this.snapshot(operation), accepted: state.state === "downloaded" };
       }
       if (operation === "restart" || operation === "installOnQuit") {

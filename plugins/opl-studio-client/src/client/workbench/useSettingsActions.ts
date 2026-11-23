@@ -48,7 +48,7 @@ export function useSettingsActions({
       };
     }
     if (receipt.status === "no_op" || receipt.status === "unsupported") {
-      return { tone: "neutral", message: receipt.status === "no_op" ? (settings.locale === "zh" ? "Owner 回读：无需变更。" : "Owner reports no changes needed.") : (settings.locale === "zh" ? "Owner 尚不支持此操作；请刷新或在所属服务处理。" : "This action is unsupported by the owner; refresh or use the owner service.") };
+      return { tone: "neutral", message: receipt.status === "no_op" ? (settings.locale === "zh" ? "当前已是目标状态，无需变更。" : "Already up to date; no changes needed.") : (settings.locale === "zh" ? "当前软件暂不支持此操作，请刷新后重试。" : "This action is currently unsupported by this software. Refresh and try again.") };
     }
     if (receipt.status === "executed") {
       if (receipt.payload?.package_id === 'opl-workbench-services' && receipt.payload?.ref === 'workbench#task_run') return { tone: 'success', message: settings.locale === 'zh' ? '运行请求已提交；请在执行历史中查看进度与结果。' : 'Run request submitted. Check history for progress and results.' };

@@ -31,7 +31,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write   # for npm provenance attestation
 
@@ -191,3 +191,11 @@ jobs:
         env:
           UNPUBLISHED_PLUGINS: ${{ steps.version-check.outputs.plugins }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish public DSH plugin feed
+        if: steps.version-check.outputs.plugins != '[]' || inputs.force_all == true
+        shell: bash
+        run: node scripts/publish-dsh-plugin-feed.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

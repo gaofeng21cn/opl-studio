@@ -42,18 +42,18 @@ export function PackageActivityButton({ activity, locale, onOpen }: { activity: 
   const zh = locale === 'zh';
   const label = activity.readError ? (zh ? '进度待确认' : 'Progress unavailable')
     : activity.running ? (zh ? `${activity.running} 项进行中` : `${activity.running} in progress`)
-    : (zh ? `${activity.attention} 项需要处理` : `${activity.attention} need attention`);
+    : (zh ? `${activity.attention} 项未完成` : `${activity.attention} incomplete`);
   const needsAttention = activity.readError || activity.attention > 0;
   return <button type="button" className="opl-package-activity-trigger" data-testid="opl-package-activity-trigger" data-tone={needsAttention ? 'attention' : 'active'}
     onClick={onOpen} aria-label={`${zh ? '软件中心' : 'Software Center'} · ${label}`} title={zh ? '打开软件中心查看进度与结果' : 'Open Software Center to view progress and results'}>
     {needsAttention ? <CircleAlert size={16} aria-hidden="true" /> : <Download size={16} aria-hidden="true" />}
     <span role="status">{label}</span>
-    {activity.running > 0 && activity.attention > 0 && !activity.readError ? <span>{zh ? `· ${activity.attention} 项需要处理` : `· ${activity.attention} need attention`}</span> : null}
+    {activity.running > 0 && activity.attention > 0 && !activity.readError ? <span>{zh ? `· ${activity.attention} 项未完成` : `· ${activity.attention} incomplete`}</span> : null}
   </button>;
 }
 
-export function PackageOperations({ operations, locale, labels, readError, cancelling, onCancel, onRetry, onRefresh, onUse, readyPackageIds = [], onOpenLocation }: {
-  operations: PackageOperation[]; locale: 'zh' | 'en'; labels: Record<string, string>; readError: boolean;
+export function PackageOperations({ operations, locale, labels, readError, cancelError = false, cancelling, onCancel, onRetry, onRefresh, onUse, readyPackageIds = [], onOpenLocation }: {
+  operations: PackageOperation[]; locale: 'zh' | 'en'; labels: Record<string, string>; readError: boolean; cancelError?: boolean;
   cancelling: string | null; onCancel: (id: string) => void; onRetry: (request: SettingsActionRequest) => void; onRefresh: () => void;
   onUse?: (packageId: string) => void; readyPackageIds?: readonly string[]; onOpenLocation?: (path: string) => void;
 }) {
@@ -62,7 +62,7 @@ export function PackageOperations({ operations, locale, labels, readError, cance
   const active = latest.some(item => item.status === 'running');
   const current = latest.filter(item => ['running', 'failed', 'interrupted'].includes(item.status));
   const history = latest.filter(item => !current.includes(item));
-  if (!operations.length && !readError) return null;
+  if (!operations.length && !readError && !cancelError) return null;
 
   const renderOperation = (operation: PackageOperation) => {
     const running = operation.status === 'running';
@@ -109,6 +109,7 @@ export function PackageOperations({ operations, locale, labels, readError, cance
 
   return <section className="opl-package-operations" aria-label={zh ? '安装与更新任务' : 'Installation and update tasks'}>
     {readError ? <div className="opl-package-operation-read-error" role="alert"><p>{zh ? '暂时无法读取进度，任务可能仍在继续。重新读取后再决定下一步。' : 'Progress is unavailable; the task may still be running. Refresh before taking further action.'}</p><Button size="sm" variant="outline" onClick={onRefresh}>{zh ? '重新读取' : 'Refresh'}</Button></div> : null}
+    {cancelError ? <div className="opl-package-operation-read-error" role="alert"><p>{zh ? '取消请求未成功，任务可能仍在继续；请刷新后查看最新状态。' : 'Cancel request did not succeed; the task may still be running. Refresh to check the latest status.'}</p><Button size="sm" variant="outline" onClick={onRefresh}>{zh ? '重新读取' : 'Refresh'}</Button></div> : null}
     {current.map(renderOperation)}
     {history.length ? <details className="opl-package-operation-history"><summary>{zh ? `最近任务 · ${history.length}` : `Recent tasks · ${history.length}`}</summary>{history.map(renderOperation)}</details> : null}
   </section>;

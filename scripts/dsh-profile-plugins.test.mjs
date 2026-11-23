@@ -9,7 +9,8 @@ import { createHash } from "node:crypto";
 import { inc } from "semver";
 import { initProfile, loadOptionalPatches } from "@deepseek-ai/dsh-app-boot";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
-import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
+import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveBundledPnpm, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
+import { mergePublicFeedIndex } from "./publish-dsh-plugin-feed.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pnpmAvailable = spawnSync("pnpm", ["--version"], { encoding: "utf8" }).status === 0;
@@ -175,4 +176,92 @@ test("registry updates use the profile scope route without overriding npm's defa
   assert.equal(managerContext.installAnchor, installAnchor);
   assert.equal(managerContext.cwd, process.cwd());
   assert.ok(managerContext.dir.startsWith(home));
+});
+
+test("public DSH plugin feed works without GitHub tokens, rejects tampered tarballs, and uses bundled pnpm", async (t) => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-public-feed-update-"));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const home = path.join(temp, "dsh-home");
+  const carrierDir = path.join(temp, "carrier");
+  const bundledPnpmBin = path.join(carrierDir, "node_modules", "pnpm", "bin", "pnpm.mjs");
+  await fs.mkdir(path.dirname(bundledPnpmBin), { recursive: true });
+  await fs.writeFile(bundledPnpmBin, "// fixture bundled pnpm\n");
+  const superagentManifest = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"), "utf8"));
+  const bootManifest = JSON.parse(await fs.readFile(path.join(root, "node_modules/@deepseek-ai/dsh-app-boot/package.json"), "utf8"));
+  await fs.mkdir(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent"), { recursive: true });
+  await fs.writeFile(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent", "package.json"), JSON.stringify(superagentManifest));
+  await fs.mkdir(path.join(carrierDir, "node_modules", "@deepseek-ai", "dsh-app-boot"), { recursive: true });
+  await fs.writeFile(path.join(carrierDir, "node_modules", "@deepseek-ai", "dsh-app-boot", "package.json"), JSON.stringify(bootManifest));
+  const installAnchor = path.join(carrierDir, "package.json");
+  await fs.writeFile(installAnchor, JSON.stringify({
+    name: "opl-studio-carrier-fixture",
+    version: "1.0.0",
+    dependencies: { "@gaofeng21cn/opl-superagent": superagentManifest.version }
+  }));
+
+  const name = "@gaofeng21cn/opl-superagent";
+  const bundled = resolveBundledPnpm(installAnchor);
+  assert.equal(bundled.command, process.execPath);
+  assert.equal(bundled.args?.[0], bundledPnpmBin);
+
+  const nextVersion = inc(superagentManifest.version, "patch");
+  const validBytes = Buffer.from("valid-plugin-tarball");
+  const integrity = "sha512-" + createHash("sha512").update(validBytes).digest("base64");
+  const feedUrl = "http://127.0.0.1:49999/dsh-plugin-index.json";
+  const tarballUrl = `http://127.0.0.1:49999/opl-superagent-${nextVersion}.tgz`;
+  const mergedFeed = mergePublicFeedIndex(null, [{
+    dirName: "opl-superagent",
+    name,
+    version: nextVersion,
+    engines: { dsh: "0.2.2-rc.3" },
+    peerDependencies: {},
+    assetName: `opl-superagent-${nextVersion}.tgz`,
+    integrity
+  }]);
+  assert.equal(mergedFeed.schema, "opl_dsh_plugin_public_feed.v1");
+  mergedFeed.plugins[name][0].tarballUrl = tarballUrl;
+
+  let tampered = false;
+  const fetchImpl = async (url) => {
+    if (String(url) === feedUrl) return new Response(JSON.stringify(mergedFeed), { status: 200 });
+    if (String(url) === tarballUrl) return new Response(tampered ? Buffer.from("tampered") : validBytes, { status: 200 });
+    return new Response("not found", { status: 404 });
+  };
+
+  const checked = await checkRegistryUpdates({ installAnchor, home, names: [name], feedUrl, fetchImpl });
+  assert.equal(checked.source, "public_feed");
+  assert.equal(checked.plugins[name].state, "update_available");
+  assert.equal(checked.plugins[name].available, nextVersion);
+
+  tampered = true;
+  const tamperedResult = await updateRegistryPlugins({
+    installAnchor,
+    home,
+    names: [name],
+    feedUrl,
+    fetchImpl,
+    run: async () => assert.fail("tampered tarball must not invoke pnpm")
+  });
+  assert.equal(tamperedResult.application, "update-check-failed");
+  assert.equal(tamperedResult.failures[name], "integrity_mismatch");
+
+  tampered = false;
+  let capturedArgs;
+  let capturedOptions;
+  await assert.rejects(updateRegistryPlugins({
+    installAnchor,
+    home,
+    names: [name],
+    feedUrl,
+    fetchImpl,
+    run: async (_ctx, args, options) => {
+      capturedArgs = args;
+      capturedOptions = options;
+      return { exitCode: 1, timedOut: false, logPath: "fixture" };
+    }
+  }), /Native DSH package operation failed/);
+  assert.equal(capturedArgs[0], "add");
+  assert.ok(capturedArgs[1].endsWith(".tgz"));
+  assert.equal(capturedOptions.command, bundled.command);
+  assert.deepEqual(capturedOptions.args, bundled.args);
 });

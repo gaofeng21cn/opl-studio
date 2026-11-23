@@ -113,7 +113,14 @@ export type OplStateReadback = {
   app_state: OplAppState;
   readback: OplCommandReadback;
   carrierDiagnostics: CarrierDiagnosticsReadback;
-  managedUpdateMaintenance?: { schema: "opl_studio_update_maintenance.v1"; status: string; lastCompletedAt: number | null };
+  managedUpdateMaintenance?: {
+    schema: "opl_studio_update_maintenance.v1";
+    status: string;
+    lastCompletedAt: number | null;
+    dshPluginRestartRequired?: boolean;
+    dshPluginUpdateStatus?: string | null;
+    updatedDshPlugins?: Record<string, string>;
+  };
   raw_state?: Record<string, unknown>;
 };
 

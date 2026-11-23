@@ -6,7 +6,7 @@ import { SettingsIntentButton } from "../actions";
 import { formatUpdateChannel } from "../maintenance";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
-export function AboutSettingsPage({ actionViewModel, nativeAppUpdate, managedUpdate, projection, settings, zh, carrierDiagnostics, actionBusyKey, onAction, onHostAction, maintenanceStatus, maintenanceError, stateStatus }: Pick<SettingsPageContext, "actionViewModel" | "nativeAppUpdate" | "managedUpdate" | "projection" | "settings" | "zh" | "carrierDiagnostics" | "actionBusyKey" | "onAction" | "onHostAction" | "maintenanceStatus" | "maintenanceError" | "stateStatus">) {
+export function AboutSettingsPage({ actionViewModel, nativeAppUpdate, managedUpdate, projection, settings, zh, carrierDiagnostics, actionBusyKey, onAction, onHostAction, onOpenSoftwareCenter, maintenanceStatus, maintenanceError, stateStatus }: Pick<SettingsPageContext, "actionViewModel" | "nativeAppUpdate" | "managedUpdate" | "projection" | "settings" | "zh" | "carrierDiagnostics" | "actionBusyKey" | "onAction" | "onHostAction" | "onOpenSoftwareCenter" | "maintenanceStatus" | "maintenanceError" | "stateStatus">) {
 const appUpdate = actionViewModel.managedUpdates.find((item) => item.componentId === "opl_app");
 const appUpdateComponent = appUpdate?.component;
 const hostUpdateActions = appUpdate?.actions.filter(
@@ -32,6 +32,7 @@ return (
               <span className="runtime-setting-control">
                 <StatusValue status={unpackagedPreview ? "development_preview" : nativeAppUpdate?.buildKind === "local-development" ? "local_development" : nativeAppUpdate?.state === "not_available" ? "current" : nativeAppUpdate?.state ?? appUpdateComponent?.state} locale={settings.locale} />
                 {updateAction && nativeAppUpdate?.supported !== false ? <SettingsIntentButton intent={updateAction} locale={settings.locale} busyKey={actionBusyKey} onAction={onAction} onHostAction={onHostAction} /> : null}
+                {onOpenSoftwareCenter ? <button type="button" className="settings-action-button" onClick={() => onOpenSoftwareCenter("updates")}>{settings.locale === "zh" ? "软件中心 > 更新" : "Software Center > Updates"}</button> : null}
               </span>
             </SettingRow>
           </div>
@@ -47,8 +48,7 @@ return (
             {maintenanceError ? <span data-testid="opl-maintenance-error">
               {maintenanceError === "framework_update_downgrade_blocked"
                 ? (settings.locale === "zh" ? "当前已安装的运行环境比更新源更新，已保留当前版本。无需降级，普通会话不受影响。" : "Your installed runtime is newer than the update source. The current version was kept; no downgrade is needed and conversations remain available.")
-                : (settings.locale === "zh" ? "请在运行与维护中检查更新源或重试。" : "Check the update source or retry in Runtime & Maintenance.")}
-              <code>{maintenanceError}</code>
+                : (settings.locale === "zh" ? "请在“软件中心 > 更新”中检查更新源或重试。" : "Check the update source or retry in Software Center > Updates.")}
             </span> : null}
           </SettingRow> : null}
         </SettingsGroup>
@@ -57,13 +57,11 @@ return (
           {carrierDiagnostics.frameworkBootstrapStatus && carrierDiagnostics.frameworkBootstrapStatus !== "available" ? (
             <SettingRow label={settings.locale === "zh" ? "运行环境恢复" : "Runtime recovery"}>
               <span>{settings.locale === "zh" ? "本机工作环境未能完成准备，部分专业功能暂不可用。已有可用模型配置时仍可对话；请先检查网络，再点击下方“检查更新”获取修复。" : "Local setup could not finish, so some specialist features are unavailable. Chat remains available with an existing model connection. Check your network, then use Check for updates below to get a repair."}</span>
-              <code>{carrierDiagnostics.frameworkBootstrapStatus}</code>
             </SettingRow>
           ) : null}
           {carrierDiagnostics.frameworkActivationStatus?.startsWith("framework_") ? (
             <SettingRow label={settings.locale === "zh" ? "运行环境更新" : "Runtime update"}>
-              <span>{settings.locale === "zh" ? "新运行环境暂不兼容，已保留可用的当前版本。你可以继续工作，稍后在“运行与维护”中重新检查更新。" : "The new runtime is not compatible, so the working version was kept. Continue working and check again later in Runtime and maintenance."}</span>
-              <code>{carrierDiagnostics.frameworkActivationStatus}</code>
+              <span>{settings.locale === "zh" ? "新运行环境暂不兼容，已保留可用的当前版本。你可以继续工作，稍后在“软件中心 > 更新”中重新检查更新。" : "The new runtime is not compatible, so the working version was kept. Continue working and check again later in Software Center > Updates."}</span>
             </SettingRow>
           ) : null}
           <a className="settings-support-link" target="_blank" rel="noreferrer" href="https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/install/README.zh-CN.md">{settings.locale === "zh" ? "安装与使用指南" : "Installation and getting started"}</a>
@@ -72,6 +70,9 @@ return (
         <details className="settings-secondary-details"><summary>{zh ? "技术详情" : "Technical details"}</summary>
           <SettingRow label={zh ? "运行方式" : "Carrier"}><code>{carrierDiagnostics.carrier}</code></SettingRow>
           <SettingRow label={zh ? "平台 / 架构" : "Platform / architecture"}><code>{carrierDiagnostics.application?.systemInfo.platform ?? "--"} / {carrierDiagnostics.application?.systemInfo.arch ?? "--"}</code></SettingRow>
+          {maintenanceError ? <SettingRow label={zh ? "维护诊断代码" : "Maintenance code"}><code>{maintenanceError}</code></SettingRow> : null}
+          {carrierDiagnostics.frameworkBootstrapStatus && carrierDiagnostics.frameworkBootstrapStatus !== "available" ? <SettingRow label={zh ? "启动引导状态" : "Bootstrap status"}><code>{carrierDiagnostics.frameworkBootstrapStatus}</code></SettingRow> : null}
+          {carrierDiagnostics.frameworkActivationStatus?.startsWith("framework_") ? <SettingRow label={zh ? "运行环境激活代码" : "Activation code"}><code>{carrierDiagnostics.frameworkActivationStatus}</code></SettingRow> : null}
           {nativeAppUpdate?.localBuildId ? <SettingRow label={zh ? "构建标识" : "Build ID"}><code>{nativeAppUpdate.localBuildId}</code></SettingRow> : null}
         </details>
       </div>

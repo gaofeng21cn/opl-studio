@@ -20,7 +20,7 @@ export type SoftwareAttentionItem = {
 /** Merge only explicit owner relationships; a common label is not evidence of a common cause. */
 export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en"): SoftwareAttentionItem[] {
   const zh = locale === "zh";
-  const packages = softwareCatalogPackages(model, "opl");
+  const packages = softwareCatalogPackages(model, "all");
   const name = (id: string) => { const item = packages.find(item => item.packageId === id); return item?.displayNameI18n[locale] ?? item?.label ?? id; };
   const issues: SoftwareAttentionItem[] = [];
   const covered = new Set<string>();
@@ -61,7 +61,7 @@ export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en
     issues.push({ id: `package:${item.packageId}`, title: name(item.packageId), detail,
       products: [], productIds: [item.packageId], destination: "applications", packageId: item.packageId });
   }
-  for (const { productId, item } of softwareCatalogNativeProducts(model, "opl")) {
+  for (const { productId, item } of softwareCatalogNativeProducts(model, "all")) {
     if (nativeCatalogState(item) !== "attention") continue;
     issues.push({ id: `native:${productId}`, title: item.productDisplayName ?? item.displayName,
       detail: item.updateStatus === "needs_restart" ? (zh ? "更新已准备好，需要重新启动应用。" : "An update is ready. Restart the application to finish.") : (zh ? "需要确认当前使用的安装。" : "Confirm which installation should be used."),

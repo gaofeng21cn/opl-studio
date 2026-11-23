@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadOptionalPatches, loadProfile, readProfileManifest, resolveProfileDir, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
 import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
@@ -13,6 +14,7 @@ const profile = "opl-studio";
 const REGISTRY_URL = "https://npm.pkg.github.com";
 const REGISTRY_HOST = "//npm.pkg.github.com/";
 const LEGACY_SCOPE = "@one-person-lab/";
+export const PUBLIC_FEED_URL = "https://github.com/gaofeng21cn/opl-studio/releases/download/dsh-plugins-latest/dsh-plugin-index.json";
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -24,6 +26,79 @@ export function isPublishableManifest(manifest) {
     && manifest.publishConfig?.registry === REGISTRY_URL
     && typeof manifest.version === "string"
     && typeof manifest.engines?.dsh === "string";
+}
+
+/** Resolve bundled pnpm inside the packaged carrier so users do not need global pnpm. */
+export function resolveBundledPnpm(installAnchor) {
+  if (!installAnchor) return {};
+  try {
+    let cursor = path.dirname(path.resolve(installAnchor));
+    while (true) {
+      const candidate = path.join(cursor, "node_modules", "pnpm", "bin", "pnpm.mjs");
+      if (fs.existsSync(candidate)) return { command: process.execPath, args: [candidate] };
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    const require = createRequire(installAnchor);
+    const pnpmBin = path.join(path.dirname(require.resolve("pnpm")), "bin", "pnpm.mjs");
+    if (fs.existsSync(pnpmBin)) {
+      return { command: process.execPath, args: [pnpmBin] };
+    }
+  } catch {
+    // Fall back to system pnpm in developer environments without a local pnpm package.
+  }
+  return {};
+}
+
+function isAllowedTarballUrl(rawUrl, allowLoopbackHttp = false) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.username || parsed.password) return false;
+    if (parsed.protocol === "http:") {
+      return allowLoopbackHttp && ["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname);
+    }
+    if (parsed.protocol !== "https:") return false;
+    return parsed.hostname === "github.com" || parsed.hostname.endsWith(".githubusercontent.com");
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackHttpFeed(feedUrl) {
+  try {
+    const parsed = new URL(feedUrl);
+    return parsed.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function parseIntegrity(integrity) {
+  if (typeof integrity !== "string") return null;
+  const match = integrity.trim().match(/^(sha512|sha256)-([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  return { algorithm: match[1], digestBase64: match[2] };
+}
+
+function matchesIntegrity(buffer, parsedIntegrity) {
+  const actual = createHash(parsedIntegrity.algorithm).update(buffer).digest("base64");
+  const actualBytes = Buffer.from(actual, "base64");
+  const expectedBytes = Buffer.from(parsedIntegrity.digestBase64, "base64");
+  return actualBytes.length === expectedBytes.length && actualBytes.equals(expectedBytes);
+}
+
+export function hasProfileRegistryToken(dir, env = process.env) {
+  if (env.GITHUB_TOKEN || env.NODE_AUTH_TOKEN) return true;
+  try {
+    const existing = fs.readFileSync(path.join(dir, ".npmrc"), "utf8");
+    return existing.split("\n").some((line) => {
+      if (!line.startsWith(`${REGISTRY_HOST}:_authToken=`)) return false;
+      return line.slice(`${REGISTRY_HOST}:_authToken=`.length).trim().length > 0;
+    });
+  } catch {
+    return false;
+  }
 }
 
 /** Discover publishable DSH packages from the package metadata that owns them. */
@@ -90,6 +165,7 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
   const manifest = readJson(path.join(dir, "package.json"));
   const available = createRequire(path.join(dir, "package.json"));
   const carrier = createRequire(installAnchor);
+  const pnpmExec = resolveBundledPnpm(installAnchor);
   const retired = names.filter(name => name.startsWith("@gaofeng21cn/opl-")).map(name => {
     const old = LEGACY_SCOPE + name.slice("@gaofeng21cn/".length);
     if (!Object.hasOwn(manifest.dependencies ?? {}, old)) return null;
@@ -99,6 +175,7 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
   }).filter(Boolean);
   if (retired.length) {
     const result = await run({ profile, dir, installAnchor, home, cwd }, ["remove", ...retired], {
+      ...pnpmExec,
       execution: "service", outputBytes: 16384, lockWaitMs: 120000, lookupTimeoutMs: 30000,
       idleTimeoutMs: 60000, activateNewBundles: false, onOutput: text => process.stderr.write(text)
     });
@@ -111,7 +188,8 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
     const replacement = "@gaofeng21cn/" + name.slice(LEGACY_SCOPE.length);
     return names.includes(replacement) ? replacement : name;
   }))];
-  if (JSON.stringify(bundles) !== JSON.stringify(migratedBundles)) writeProfileBundles(dir, selected, migratedBundles);
+  const bundlesChanged = JSON.stringify(bundles) !== JSON.stringify(migratedBundles);
+  if (bundlesChanged) writeProfileBundles(dir, selected, migratedBundles);
   const patchFile = path.join(dir, "cordis.patch.yml");
   const patches = loadOptionalPatches(profile, patchFile);
   let changed = false;
@@ -133,21 +211,127 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
       fs.renameSync(temporary, patchFile);
     } finally { fs.rmSync(temporary, { force: true }); }
   }
-  return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed
-    || JSON.stringify(bundles) !== JSON.stringify(migratedBundles) };
+  return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed || bundlesChanged };
 }
 
-/** Resolve published versions against the selected carrier using DSH's own metadata admission. */
-export async function resolveRegistryVersions(names, dir, installAnchor, view = viewProfilePackage) {
+function readPackageMetadataResolvers(dir, installAnchor) {
   const carrierRequire = createRequire(installAnchor);
   const profileRequire = createRequire(path.join(dir, "package.json"));
   const readManifest = name => {
     try { return readJson(profileRequire.resolve(`${name}/package.json`)); }
     catch { return readJson(carrierRequire.resolve(`${name}/package.json`)); }
   };
-  const runtimeVersion = readManifest("@deepseek-ai/dsh-app-boot").version;
+  return { readManifest, runtimeVersion: readManifest("@deepseek-ai/dsh-app-boot").version };
+}
+
+/** Resolve published versions from the anonymous public release feed with DSH metadata admission. */
+export async function resolvePublicFeedVersions(names, dir, installAnchor, { feedUrl = process.env.OPL_DSH_PLUGIN_FEED_URL || PUBLIC_FEED_URL, fetchImpl = fetch, timeoutMs = 15000 } = {}) {
+  const { readManifest, runtimeVersion } = readPackageMetadataResolvers(dir, installAnchor);
+  const allowLoopbackHttp = isLoopbackHttpFeed(feedUrl);
+  let response;
+  try {
+    response = await fetchImpl(feedUrl, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (error) {
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError" || error?.code === "ETIMEDOUT";
+    throw Object.assign(new Error("Public DSH plugin feed request failed"), { code: timedOut ? "timeout" : "network" });
+  }
+  if (!response?.ok) {
+    throw Object.assign(new Error(`Public DSH plugin feed returned HTTP ${response?.status}`), {
+      code: response?.status === 404 ? "feed_unavailable" : "network"
+    });
+  }
+  let feed;
+  try {
+    feed = await response.json();
+  } catch {
+    throw Object.assign(new Error("Public DSH plugin feed returned invalid JSON"), { code: "invalid_feed_response" });
+  }
+  if (feed?.schema !== "opl_dsh_plugin_public_feed.v1" || typeof feed.plugins !== "object" || feed.plugins === null || Array.isArray(feed.plugins)) {
+    throw Object.assign(new Error("Public DSH plugin feed schema is invalid"), { code: "invalid_feed_response" });
+  }
+  const resolved = {};
+  for (const name of names) {
+    const baseline = readManifest(name).version;
+    const entries = Array.isArray(feed.plugins[name]) ? feed.plugins[name] : [];
+    const compatibleCandidates = entries
+      .filter(entry => entry && typeof entry.version === "string"
+        && semver.valid(entry.version)
+        && !semver.prerelease(entry.version)
+        && semver.satisfies(entry.version, "^" + baseline))
+      .sort((left, right) => semver.rcompare(left.version, right.version));
+    let selected = null;
+    for (const entry of compatibleCandidates) {
+      if (typeof entry.tarballUrl !== "string" || !isAllowedTarballUrl(entry.tarballUrl, allowLoopbackHttp)) continue;
+      if (!parseIntegrity(entry.integrity)) continue;
+      const manifest = {
+        name,
+        version: entry.version,
+        engines: entry.engines,
+        peerDependencies: entry.peerDependencies
+      };
+      if (!evaluatePluginCompatibility(manifest, {}, runtimeVersion)) {
+        selected = entry;
+        break;
+      }
+    }
+    resolved[name] = selected
+      ? { available: true, version: selected.version, tarballUrl: selected.tarballUrl, integrity: selected.integrity, source: "public_feed" }
+      : { available: false, reason: "no_compatible_version" };
+  }
+  return resolved;
+}
+
+/** Download and integrity-verify a public DSH plugin tarball before handing it to DSH pnpm. */
+export async function downloadVerifiedPluginTarball({ name, version, tarballUrl, integrity, cacheDir, fetchImpl = fetch, allowLoopbackHttp = false, timeoutMs = 60000 }) {
+  if (!isAllowedTarballUrl(tarballUrl, allowLoopbackHttp)) {
+    throw Object.assign(new Error(`Untrusted tarball URL for ${name}`), { code: "invalid_tarball_url" });
+  }
+  const parsedIntegrity = parseIntegrity(integrity);
+  if (!parsedIntegrity) {
+    throw Object.assign(new Error(`Invalid tarball integrity digest for ${name}`), { code: "integrity_mismatch" });
+  }
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const digestHexPrefix = createHash("sha256").update(integrity).digest("hex").slice(0, 12);
+  const safeName = name.replace(/^@/, "").replaceAll("/", "-");
+  const destination = path.join(cacheDir, `${safeName}-${version}-${digestHexPrefix}.tgz`);
+  if (fs.existsSync(destination)) {
+    const existing = fs.readFileSync(destination);
+    if (matchesIntegrity(existing, parsedIntegrity)) return destination;
+    fs.rmSync(destination, { force: true });
+  }
+  let response;
+  try {
+    response = await fetchImpl(tarballUrl, { signal: AbortSignal.timeout(timeoutMs) });
+  } catch (error) {
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError" || error?.code === "ETIMEDOUT";
+    throw Object.assign(new Error(`Tarball download failed for ${name}`), { code: timedOut ? "timeout" : "network" });
+  }
+  if (!response?.ok) {
+    throw Object.assign(new Error(`Tarball download failed for ${name} (HTTP ${response?.status})`), { code: "network" });
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!matchesIntegrity(bytes, parsedIntegrity)) {
+    throw Object.assign(new Error(`Tarball integrity mismatch for ${name}@${version}`), { code: "integrity_mismatch" });
+  }
+  const temporary = `${destination}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(temporary, bytes, { mode: 0o600 });
+    fs.renameSync(temporary, destination);
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
+  return destination;
+}
+
+/** Resolve published versions against the selected carrier using DSH's own metadata admission. */
+export async function resolveRegistryVersions(names, dir, installAnchor, view = viewProfilePackage) {
+  const { readManifest, runtimeVersion } = readPackageMetadataResolvers(dir, installAnchor);
+  const pnpmExec = resolveBundledPnpm(installAnchor);
   const query = async (spec, fields) => {
-    const result = await view(dir, spec, { registry: REGISTRY_URL, fields, timeoutMs: 15000 });
+    const result = await view(dir, spec, { ...pnpmExec, registry: REGISTRY_URL, fields, timeoutMs: 15000 });
     if (result.exitCode !== 0 || result.timedOut) {
       const reason = classifyInstallFailure({ log: result.stderr + result.stdout, cause: result.cause, timedOut: result.timedOut });
       throw Object.assign(new Error("Registry lookup failed"), { code: reason });
@@ -162,7 +346,7 @@ export async function resolveRegistryVersions(names, dir, installAnchor, view = 
       const answer = await query(name, ["versions"]);
       const listed = Array.isArray(answer) ? answer : typeof answer === "string" ? [answer] : answer?.versions;
       if (!Array.isArray(listed)) throw Object.assign(new Error("Registry returned no versions"), { code: "invalid_registry_response" });
-      const versions = listed.filter(version => semver.valid(version) && semver.satisfies(version, "^" + baseline)).sort(semver.rcompare);
+      const versions = listed.filter(version => semver.valid(version) && !semver.prerelease(version) && semver.satisfies(version, "^" + baseline)).sort(semver.rcompare);
       let selected;
       for (const version of versions) {
         const manifest = await query(name + "@" + version, ["name", "version", "engines", "peerDependencies"]);
@@ -185,14 +369,33 @@ export function normalizePluginNames(names, available) {
   });
 }
 
-export async function checkRegistryUpdates({ installAnchor, home, names, cwd = process.cwd(), view = viewProfilePackage } = {}) {
+async function resolveUpdatePlan({ installAnchor, home, names, view, token, feedUrl, fetchImpl }) {
   const dir = resolveProfileDir(profile, home);
   initProfile(dir, []);
   const snapshot = await inspectProfile({ installAnchor, home });
   const available = discoverPublishablePackages({ installAnchor, profilePackages: snapshot.overrides });
   const selected = normalizePluginNames(names ?? available, available);
   const current = Object.fromEntries(snapshot.overrides.map(item => [item.name, item.version]));
-  const resolved = await resolveRegistryVersions(selected, dir, installAnchor, view);
+  const useRegistryOnly = Boolean(view || token);
+  let resolved;
+  let source = "github_packages";
+  if (useRegistryOnly) {
+    resolved = await resolveRegistryVersions(selected, dir, installAnchor, view);
+  } else {
+    try {
+      resolved = await resolvePublicFeedVersions(selected, dir, installAnchor, { feedUrl, fetchImpl });
+      source = "public_feed";
+    } catch (error) {
+      if (hasProfileRegistryToken(dir)) {
+        resolved = await resolveRegistryVersions(selected, dir, installAnchor);
+        source = "github_packages";
+      } else {
+        const reason = error.code ?? "feed_unavailable";
+        resolved = Object.fromEntries(selected.map(name => [name, { available: false, reason }]));
+        source = "public_feed";
+      }
+    }
+  }
   const carrierRequire = createRequire(installAnchor);
   const baselineVersion = name => {
     try { return JSON.parse(fs.readFileSync(carrierRequire.resolve(`${name}/package.json`), "utf8")).version; }
@@ -209,26 +412,67 @@ export async function checkRegistryUpdates({ installAnchor, home, names, cwd = p
       reason: resolved[name]?.reason
     }];
   }));
-  return { schema: "opl_dsh_plugin_updates.v1", profile, plugins, checkedAt: new Date().toISOString(), cwd };
+  return { dir, source, resolved, plugins };
+}
+
+export async function checkRegistryUpdates({ installAnchor, home, names, cwd = process.cwd(), view, token, feedUrl, fetchImpl } = {}) {
+  const plan = await resolveUpdatePlan({ installAnchor, home, names, view, token, feedUrl, fetchImpl });
+  return { schema: "opl_dsh_plugin_updates.v1", profile, source: plan.source, plugins: plan.plugins, checkedAt: new Date().toISOString(), cwd };
 }
 
 export async function updateRegistryPlugins({ installAnchor, home, names, all = false, token, cwd = process.cwd(),
-  view = viewProfilePackage, run = runPluginCommand } = {}) {
+  view, run = runPluginCommand, feedUrl, fetchImpl } = {}) {
   if (!all && !names?.length) throw new Error("Specify all or at least one plugin");
   const dir = resolveProfileDir(profile, home);
   initProfile(dir, []);
-  ensureProfileNpmrc(dir, token);
-  const projection = await checkRegistryUpdates({ installAnchor, home, names: all ? undefined : names, cwd, view });
-  const toInstall = Object.entries(projection.plugins).filter(([, value]) => value.state === "update_available");
-  const failures = Object.fromEntries(Object.entries(projection.plugins).filter(([, value]) => value.state === "unavailable").map(([name, value]) => [name, value.reason]));
+  if (token) ensureProfileNpmrc(dir, token);
+  const plan = await resolveUpdatePlan({ installAnchor, home, names: all ? undefined : names, view, token, feedUrl, fetchImpl });
+  const toInstall = Object.entries(plan.plugins).filter(([, value]) => value.state === "update_available");
+  const failures = Object.fromEntries(Object.entries(plan.plugins).filter(([, value]) => value.state === "unavailable").map(([name, value]) => [name, value.reason]));
   if (!toInstall.length) {
     const migration = await retireLegacyOverrides({ installAnchor, home,
-      names: Object.entries(projection.plugins).filter(([, value]) => value.state === "current").map(([name]) => name), cwd, run });
+      names: Object.entries(plan.plugins).filter(([, value]) => value.state === "current").map(([name]) => name), cwd, run });
     return { operation: "update-registry", application: migration.profileChanged ? "restart-required"
       : Object.keys(failures).length ? "update-check-failed" : "current", installed: {}, failures, ...migration, profile, home };
   }
-  const addArgs = ["add", "--save-exact", ...toInstall.map(([name, value]) => `${name}@${value.available}`)];
+  const pnpmExec = resolveBundledPnpm(installAnchor);
+  const usePublicFeed = plan.source === "public_feed" && !view && !token;
+  let addArgs;
+  const acceptedTargets = [];
+  if (usePublicFeed) {
+    const resolvedFeedUrl = feedUrl || process.env.OPL_DSH_PLUGIN_FEED_URL || PUBLIC_FEED_URL;
+    const allowLoopbackHttp = isLoopbackHttpFeed(resolvedFeedUrl);
+    const cacheDir = path.join(home, "cache", "dsh-plugins");
+    const tarballPaths = [];
+    for (const [name, value] of toInstall) {
+      const target = plan.resolved[name];
+      try {
+        const filePath = await downloadVerifiedPluginTarball({
+          name,
+          version: value.available,
+          tarballUrl: target.tarballUrl,
+          integrity: target.integrity,
+          cacheDir,
+          fetchImpl,
+          allowLoopbackHttp
+        });
+        tarballPaths.push(filePath);
+        acceptedTargets.push([name, value]);
+      } catch (error) {
+        failures[name] = error.code ?? "tarball_download_failed";
+      }
+    }
+    if (!acceptedTargets.length) {
+      return { operation: "update-registry", application: "update-check-failed", installed: {}, failures, profile, home };
+    }
+    addArgs = ["add", ...tarballPaths];
+  } else {
+    ensureProfileNpmrc(dir, token);
+    acceptedTargets.push(...toInstall);
+    addArgs = ["add", "--save-exact", ...acceptedTargets.map(([name, value]) => `${name}@${value.available}`)];
+  }
   const result = await run({ profile, dir, installAnchor, home, cwd }, addArgs, {
+    ...pnpmExec,
     execution: "service", outputBytes: 16384, lockWaitMs: 120000, lookupTimeoutMs: 30000,
     idleTimeoutMs: 60000, activateNewBundles: false, onOutput: text => process.stderr.write(text),
     env: token ? { NODE_AUTH_TOKEN: token } : {}
@@ -236,7 +480,7 @@ export async function updateRegistryPlugins({ installAnchor, home, names, all = 
   if (result.exitCode !== 0 || result.timedOut) throw new Error(`Native DSH package operation failed; inspect ${result.logPath}`);
   const saved = new Map((await inspectProfile({ installAnchor, home })).overrides.map(item => [item.name, item.version]));
   const installed = {};
-  for (const [name, value] of toInstall) {
+  for (const [name, value] of acceptedTargets) {
     if (saved.get(name) === value.available) installed[name] = value.available;
     else failures[name] = "installed_version_mismatch";
   }
@@ -256,4 +500,3 @@ export async function inspectProfile({ installAnchor, home }) {
   return { profile, home, installAnchor, skippedBundles: loaded.skippedBundles,
     overrides: local };
 }
-

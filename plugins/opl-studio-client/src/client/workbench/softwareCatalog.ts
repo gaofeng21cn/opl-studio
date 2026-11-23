@@ -3,21 +3,28 @@ import type { NativeSoftwareItemRef, SoftwareActivationStatus, SoftwareInstallat
 import { nativeAvailableDisplayVersion, nativeSoftwareProducts } from "./softwareSources";
 import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
 
-export type SoftwareCatalogScope = "opl" | "external" | "components";
+export type SoftwareCatalogScope = "all" | "opl" | "external" | "components";
 export type SoftwareCatalogState = "not_installed" | "installed" | "update_available" | "attention" | "unknown";
 
 /** Maintenance origin is supplied by Framework; technical package roles never select the source. */
-export function packageCatalogScope(item: AgentPackageLifecycleRef): SoftwareCatalogScope {
+export function packageCatalogScope(item: AgentPackageLifecycleRef): Exclude<SoftwareCatalogScope, "all"> {
   if (item.catalogScope === "host_component" || (item.catalogScope !== "software" && item.managementScope === "local_component")) return "components";
   return item.catalogOrigin === "opl" ? "opl" : "external";
 }
 
 export function softwareCatalogPackages(model: Pick<WorkbenchModel, "packageLifecycle">, scope: SoftwareCatalogScope) {
-  return model.packageLifecycle.filter(item => item.managementScope !== "deployment_target" && !["missing_bridge", "agent_packages_directory"].includes(item.packageId) && packageCatalogScope(item) === scope);
+  return model.packageLifecycle.filter(item => {
+    if (item.managementScope === "deployment_target" || ["missing_bridge", "agent_packages_directory"].includes(item.packageId)) return false;
+    const itemScope = packageCatalogScope(item);
+    return scope === "all" ? itemScope !== "components" : itemScope === scope;
+  });
 }
 
 export function softwareCatalogNativeProducts(model: Pick<WorkbenchModel, "softwareSources">, scope: SoftwareCatalogScope) {
-  return nativeSoftwareProducts(model.softwareSources).filter(({ item }) => scope !== "components" && (item.catalogOrigin === "opl" ? "opl" : "external") === scope);
+  return nativeSoftwareProducts(model.softwareSources).filter(({ item }) => {
+    if (scope === "components") return false;
+    return scope === "all" || (item.catalogOrigin === "opl" ? "opl" : "external") === scope;
+  });
 }
 
 export function packageCatalogState(item: AgentPackageLifecycleRef): SoftwareCatalogState {
@@ -104,8 +111,8 @@ export function softwareActivationLabel(status: SoftwareActivationStatus | undef
 }
 
 export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLifecycle" | "softwareSources">) {
-  const packages = softwareCatalogPackages(model, "opl");
-  const native = softwareCatalogNativeProducts(model, "opl");
+  const packages = softwareCatalogPackages(model, "all");
+  const native = softwareCatalogNativeProducts(model, "all");
   const states = [...packages.map(packageCatalogState), ...native.map(({ item }) => nativeCatalogState(item))];
   return {
     total: states.length,
@@ -113,6 +120,7 @@ export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLif
     notInstalled: states.filter(state => state === "not_installed").length,
     updates: states.filter(state => state === "update_available").length,
     attention: states.filter(state => state === "attention").length,
+    opl: softwareCatalogPackages(model, "opl").length + softwareCatalogNativeProducts(model, "opl").length,
     external: softwareCatalogPackages(model, "external").length + softwareCatalogNativeProducts(model, "external").length,
     components: softwareCatalogPackages(model, "components").length
   };

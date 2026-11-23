@@ -5,6 +5,7 @@ import { packageOperationResult, readPackageOperation, type PackageOperation } f
 export function usePackageOperations(bridge: OplBridge, onCompleted: () => void, visible = true) {
   const [operations, setOperations] = useState<PackageOperation[]>([]);
   const [readError, setReadError] = useState(false);
+  const [cancelError, setCancelError] = useState(false);
   const [supported, setSupported] = useState(false);
   const [revision, setRevision] = useState(0);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -45,12 +46,13 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
   };
   const cancel = async (id: string) => {
     setCancelling(id);
+    setCancelError(false);
     try {
       const receipt = await bridge.executeAction({ actionId: 'package_operation_cancel', payload: { operation_id: id, confirmed: true }, dryRun: false });
       if (receipt.status !== 'executed') throw new Error('package_operation_cancel_failed');
       refresh();
-    } catch { setReadError(true); }
+    } catch { setCancelError(true); }
     finally { setCancelling(null); }
   };
-  return { operations, readError, supported, cancelling, accept, cancel, refresh };
+  return { operations, readError, cancelError, supported, cancelling, accept, cancel, refresh };
 }
