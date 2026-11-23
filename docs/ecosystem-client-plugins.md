@@ -8,7 +8,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
-| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.2`，MIT，与固定 cohort 同步 | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备和状态内容，不装载其模型或凭据 controller |
+| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.3`，MIT，与固定 cohort 同步 | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备和状态内容，不装载其模型或凭据 controller |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | Host 扫描当前启用包的 `dsh.client` 声明生成 graph，官方 `AppWebEntry` 装载与挂载；React 等平台模块由官方 boot 单实例提供 |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
 | DSH `ui-sidebar-documentpreview` | 固定 DSH cohort 的 MIT 官方源码 | 当前预览 UI 源码编入产品 Client Plugin，文件面板仍使用窄工作区适配器；完整 `apply()` 等待官方 Remote、Resource、Sidebar 与 Session 运行时 |
@@ -162,8 +162,8 @@ URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存�
 模块视图和关闭行为说明放在“更多”菜单，不常驻目录侧栏或重复工作台标题。
 工作台的 iframe 尺寸由可用画布决定；任务详情的行内嵌入继续响应 App 的尺寸请求。
 
-固定 DSH `0.2.1-rc.2`（`687f282e8625c6b8d11ff58211a90524be2e4317`）
-及核对的官方 `dsh-v0.2.2-rc.2` 提供 MCP client/tools/resources，尚无标准
+固定 DSH `0.2.2-rc.3`（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）
+提供 MCP client/tools/resources，尚无标准
 MCP App UI 宿主。因此使用官方 `@modelcontextprotocol/ext-apps` `2.0.4`
 的 `AppBridge` 和 `PostMessageTransport`，放入现有 DSH 工作台 slot；后续
 DSH 升级需重新评估这个缺口。`opl-codex-native` 继续持有 MCP 连接、凭据、
@@ -211,7 +211,7 @@ Mini App 时释放预览，文件不跨对话共享或落入持久状态。独�
 Host 的个人 Profile 由启动时的 `OPL_PROFILE_WORKSPACE` 固定，当前没有动态 Profile 切换投影；
 不能把 fast/full 状态读取模式当作个人身份。真人麦克风与打包载体的识别服务仍须在目标环境单独验收。
 
-DSH 插件位于 `plugins/<plugin-id>/`。Host Core 通过 Cordis 消费其他插件服务，共享协议与原生 profile 更新分别归 `packages/host-contracts` 和 `packages/host-kit`。桌面、WebUI、Docker 通过同一个 Host profile 按 npm 包名装载。客户端组合和设置壳归 `opl-studio-client`，设置页在 `src/client/workbench/settings/pages/`。
+DSH 插件位于 `plugins/<plugin-id>/`。Host Core 通过 Cordis 消费其他插件服务，共享协议与原生 profile 更新分别归 `packages/host-contracts` 和 `packages/host-kit`。桌面、WebUI、Docker 通过同一个 Host profile 按 npm 包名装载。客户端组合和设置壳归 `opl-studio-client`，设置页在 `plugins/opl-studio-client/src/client/workbench/settings/pages/`。
 
 计划任务使用主导航入口，设置中的后台任务页仅提供运行条件和跳转，两个入口共用同一 Framework 服务及操作确认组件。模型与执行页包含权限、Codex Auto Review 和逐次发送的时间上下文。偏好页包含自定义快捷键和语音输入；语音由运行环境的识别服务提供，未提供时明确说明系统听写替代入口。能力目录提供用途入口、类型筛选与动态 Package 管理，配置表单仍由其唯一功能页持有。
 

@@ -274,7 +274,7 @@ build cache.
 
 `scripts/desktop/prepare-wsl-host-payload.mjs` is the only producer. It stages
 the tracked sources, installs the frozen lock with `npm ci --omit=dev
---ignore-scripts`, runs `src/host/packed-host-smoke.mjs` on Linux x64, copies the
+--ignore-scripts`, runs `src/host/packaged-host-smoke.mjs` on Linux x64, copies the
 tree with materialized symlinks (NTFS extraction must not depend on symlink
 privileges), and writes `manifest.json` — schema
 `opl_studio_windows_guest_host.v1` — while the payload bytes are still on disk.
