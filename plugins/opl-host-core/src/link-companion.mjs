@@ -25,7 +25,7 @@ function string(value, name, max = 8192) {
   if (typeof value !== "string" || !value.trim() || value.length > max || value.includes("\0")) throw fail("invalid_link_request", `${name} is invalid`);
   return value.trim();
 }
-function projectDevice(value) { const { tokenHash: _, ...device } = value; return device; }
+function projectDevice(value) { const { tokenHash: _, remotePeerKey: _peerKey, ...device } = value; return device; }
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   return record(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
@@ -67,6 +67,7 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
   const operations = new Map(stored.operations.map(item => [item.key, { hash: item.hash, unknown: true }]));
   const pairs = new Map(); const clients = new Map(); const stagedTurns = new Map();
   const securePeers = new WeakMap();
+  const accountClaims = new Map();
   const uploads = createLinkUploads({ root: path.join(root, "link-upload-chunks"), hostCore, now });
   const host = { id: stored.hostId, name: env.OPL_LINK_HOST_NAME || os.hostname() };
   let writes = Promise.resolve(); let closed = false;
@@ -116,7 +117,11 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     const hash = token ? digest(token) : "";
     const device = [...devices.values()].find(item => item.tokenHash === hash && availableDevice(item.id));
     if (!device) throw fail("link_device_unauthorized", "Reconnect this iPhone from the desktop App", 401);
-    if (device.remotePeerId && securePeers.get(req)?.peerDeviceId !== device.remotePeerId) throw fail("link_device_unauthorized", "Reconnect this iPhone from the desktop App", 401);
+    const peer = securePeers.get(req);
+    if (device.remotePeerId && (peer?.peerDeviceId !== device.remotePeerId || internet?.isRemoteAccessEnabled?.() === false
+      || (device.remotePeerKey && peer.peerIdentityKey !== device.remotePeerKey))) {
+      throw fail("link_device_unauthorized", "Reconnect this iPhone from the desktop App", 401);
+    }
     device.lastSeenAt = new Date(now()).toISOString();
     return device;
   }
@@ -147,12 +152,43 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     if (pair.remote && !context?.peerDeviceId) throw fail("link_secure_pairing_required", "Scan the desktop code in OPL Link", 403);
     const name = string(deviceName, "deviceName", 80);
     pairs.delete(key);
-    for (const [id] of devices) if (!availableDevice(id)) { devices.delete(id); for (const [key] of operations) if (key.startsWith(`${id}:`)) operations.delete(key); }
-    if (devices.size >= 32) throw fail("link_device_limit", "Remove an unused device on the desktop first", 409);
+    return issueDevice(name, context);
+  }
+  async function accountClaim(payload, context) {
+    if (!context || !internet?.verifyAccountGrant) throw fail("link_secure_channel_required", "Authenticated desktop channel required", 403);
+    if (Object.keys(payload).some(key => key !== "deviceName")) throw fail("invalid_link_request", "Only the phone name can be supplied", 400);
+    const name = string(payload.deviceName, "deviceName", 80);
+    const { peerDeviceId, peerIdentityKey } = context;
+    const current = accountClaims.get(peerDeviceId);
+    if (current && current.peerIdentityKey === peerIdentityKey) return current.result;
+    const result = (async () => {
+      await internet.verifyAccountGrant(context);
+      if (closed || internet.isRemoteAccessEnabled?.() === false) throw fail("link_device_unauthorized", "Phone access is unavailable", 403);
+      const prior = [...devices.values()].find(item => item.remotePeerId === peerDeviceId && item.remotePeerKey === peerIdentityKey);
+      if (prior?.revokedAt) throw fail("link_device_unauthorized", "This device was disconnected", 403);
+      return issueDevice(name, context, { prior, accountBound: true });
+    })();
+    accountClaims.set(peerDeviceId, { peerIdentityKey, result });
+    try { return await result; }
+    finally { if (accountClaims.get(peerDeviceId)?.result === result) accountClaims.delete(peerDeviceId); }
+  }
+  async function issueDevice(name, context, { prior, accountBound = false } = {}) {
+    for (const [id, device] of devices) {
+      if (availableDevice(id) || (device.remotePeerKey && device.revokedAt)) continue;
+      devices.delete(id);
+      for (const [key] of operations) if (key.startsWith(`${id}:`)) operations.delete(key);
+    }
+    if (devices.has(prior?.id) === false && [...devices.values()].filter(item => availableDevice(item.id)).length >= 32) throw fail("link_device_limit", "Remove an unused device on the desktop first", 409);
     const token = crypto.randomBytes(32).toString("base64url");
-    const device = { id: crypto.randomUUID(), name, createdAt: new Date(now()).toISOString(), lastSeenAt: new Date(now()).toISOString(), expiresAt: new Date(now() + DEVICE_TTL).toISOString(), tokenHash: digest(token), ...(context?.peerDeviceId ? { remotePeerId: context.peerDeviceId } : {}) };
+    const device = {
+      id: prior?.id ?? crypto.randomUUID(), name, createdAt: prior?.createdAt ?? new Date(now()).toISOString(),
+      lastSeenAt: new Date(now()).toISOString(), expiresAt: new Date(now() + DEVICE_TTL).toISOString(),
+      tokenHash: digest(token), ...(context?.peerDeviceId ? { remotePeerId: context.peerDeviceId } : {}),
+      ...(accountBound ? { remotePeerKey: context.peerIdentityKey } : {})
+    };
     devices.set(device.id, device);
-    try { await persist(); } catch (error) { devices.delete(device.id); throw error; }
+    try { await persist(); }
+    catch (error) { if (prior) devices.set(prior.id, prior); else devices.delete(device.id); throw error; }
     return { schema: LINK_SCHEMA, token, expiresAt: device.expiresAt, device: projectDevice(device), host };
   }
   function readDevices() { return { schema: LINK_SCHEMA, host, endpoint: !internet && env.OPL_LINK_PUBLIC_URL ? endpointUrl(env.OPL_LINK_PUBLIC_URL, allowLoopback) : null, internet: internet?.status() ?? { status: "disabled" }, devices: [...devices.values()].filter(item => availableDevice(item.id)).map(projectDevice) }; }
@@ -164,7 +200,17 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     for (const [res, value] of clients) if (value.deviceId === deviceId) { clearInterval(value.timer); res.end(); clients.delete(res); }
     await uploads.revoke(deviceId); await persist();
     if (revokeRelay && device?.remotePeerId) await internet?.revoke(device.remotePeerId);
-    devices.delete(deviceId); await persist(); return { id: deviceId, revoked: true };
+    if (!device?.remotePeerKey) { devices.delete(deviceId); await persist(); }
+    return { id: deviceId, revoked: true };
+  }
+  async function clearRemoteDevices({ accountOnly = false } = {}) {
+    const devicesToClear = [...devices.values()].filter(device => device.remotePeerId && !device.revokedAt && (!accountOnly || device.remotePeerKey));
+    for (const device of devicesToClear) {
+      for (const [res, stream] of clients) if (stream.deviceId === device.id) { clearInterval(stream.timer); res.end(); clients.delete(res); }
+      await uploads.revoke(device.id);
+      devices.delete(device.id);
+    }
+    await persist();
   }
   async function prepareAttachments(attachments, device, payload) {
     if (attachments === undefined || (Array.isArray(attachments) && attachments.length === 0)) return { inputs: [], paths: [], groupId: null };
@@ -313,6 +359,11 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
       if (suffix === "/devices" && req.method === "GET") { requireDesktop(req); return sendJson(res, 200, readDevices()); }
       if (suffix.startsWith("/devices/") && req.method === "DELETE") { requireDesktop(req, true); return sendJson(res, 200, await revokeDevice({ id: decodeURIComponent(suffix.slice(9)) })); }
       if (suffix === "/claim" && req.method === "POST") { assertSecure(req); assertOrigin(req); return sendJson(res, 200, await claim(await readJson(req), securePeers.get(req))); }
+      if (suffix === "/account/claim" && req.method === "POST") {
+        const context = securePeers.get(req);
+        if (!context) throw fail("link_secure_channel_required", "Authenticated desktop channel required", 403);
+        return sendJson(res, 200, await accountClaim(await readJson(req), context));
+      }
       const device = requireDevice(req);
       if (suffix === "/bootstrap" && req.method === "GET") return sendJson(res, 200, { schema: LINK_SCHEMA, host, cwd: hostCore.transport?.cwd, device: projectDevice(device), capabilities: LINK_METHODS.filter(method => !method.includes("Workspace") || Boolean(hostCore.threadWorkspace)) });
       if (suffix === "/invoke" && req.method === "POST") return sendJson(res, 200, { result: await invoke(device, await readJson(req, MAX_BODY)) });
@@ -359,7 +410,7 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     }
   }
   function register(webServer) {
-    const dispose = ["/pair", "/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect", "/uploads"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, handler: handle }));
+    const dispose = ["/pair", "/claim", "/account/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect", "/uploads"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, handler: handle }));
     dispose.push(webServer.register({ kind: "prefix", path: "/api/link/devices/", handler: handle }));
     dispose.push(webServer.register({ kind: "prefix", path: "/api/link/uploads/", handler: handle }));
     return () => { for (const close of dispose.reverse()) close(); };
@@ -370,5 +421,5 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     try { return await handle(req, res); } finally { securePeers.delete(req); }
   }
   async function close() { closed = true; pairs.clear(); hostCore.off("event", onEvent); for (const [res] of clients) { closeStream(res); res.end(); } await uploads.close(); await writes; }
-  return { createPairing, readDevices, revokeDevice, handle, handleAuthenticatedPeer, register, close };
+  return { createPairing, readDevices, revokeDevice, clearRemoteDevices, handle, handleAuthenticatedPeer, register, close };
 }

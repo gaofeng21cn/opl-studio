@@ -42,6 +42,29 @@ async function http(loop, route, { method = "GET", body, token, headers = [] } =
 }
 async function pair(service, loop) { const pairing = await service.createPairing(); const response = await http(loop, "/api/link/claim", { method: "POST", body: { code: pairing.code, deviceName: "Test iPhone" } }); assert.equal(response.status, 200); return { pairing, ...response.json }; }
 
+test("account claim requires a current relay grant for the authenticated phone key", async t => {
+  const { service, peer, internet } = await fixture(t);
+  let enabled = true;
+  let trusted;
+  internet.isRemoteAccessEnabled = () => enabled;
+  internet.verifyAccountGrant = async context => {
+    trusted ??= context.peerIdentityKey;
+    if (context.peerIdentityKey !== trusted) throw Object.assign(new Error("phone key rejected"), { status: 403 });
+  };
+  const id = crypto.randomUUID();
+  const phone = peer(id);
+  const claim = loop => http(loop, "/api/link/account/claim", { method: "POST", body: { deviceName: "Test iPhone" } });
+  const first = await claim(phone);
+  assert.equal(first.status, 200);
+  assert.equal((await http(phone, "/api/link/bootstrap", { token: first.json.token })).status, 200);
+  assert.notEqual((await claim(peer(id))).status, 200);
+  enabled = false;
+  assert.equal((await http(phone, "/api/link/bootstrap", { token: first.json.token })).status, 401);
+  enabled = true;
+  await service.revokeDevice({ id: first.json.device.id });
+  assert.equal((await claim(phone)).status, 403);
+});
+
 test("authenticated virtual HTTP confines targets, management, peer credentials and stream handles", async t => {
   const { service, peer, core } = await fixture(t); const loop = peer(); const second = peer();
   const claim = await pair(service, loop);

@@ -137,12 +137,13 @@ export type DshPluginUpdateProjection = {
 export type DshPluginUpdateResult = Record<string, unknown> & { operation?: string; application?: string; installed?: Record<string, string>; failures?: Record<string, string> };
 
 export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
-export type LinkInternetStatus = { status: "disabled" | "account_required" | "connecting" | "reconnecting" | "ready" | "error"; reasonCode?: string };
+export type LinkInternetStatus = { status: "disabled" | "account_required" | "connecting" | "reconnecting" | "ready" | "error"; enabled?: boolean; reasonCode?: string };
 export type LinkDeviceReadback = { schema: "opl_link_studio_wire.v2"; host?: { id: string; name: string }; endpoint?: string | null; internet?: LinkInternetStatus; devices: LinkPairedDevice[]; unavailable?: boolean };
 export type LinkPairing = { schema: "opl_link_studio_wire.v2"; endpoint?: string; serverUrl?: string; accountScope?: string; hostDeviceId?: string; hostIdentityKey?: string; hostFingerprint?: string; code: string; expiresAt: string; pairingURL: string };
 export type LinkCompanionManagement = {
   readDevices(): Promise<LinkDeviceReadback>;
   enableInternet(): Promise<LinkInternetStatus>;
+  disableInternet(): Promise<LinkInternetStatus>;
   reconnectInternet(): Promise<LinkInternetStatus>;
   createPairing(request?: { endpoint?: string }): Promise<LinkPairing>;
   revokeDevice(request: { id: string }): Promise<{ id: string; revoked: boolean }>;

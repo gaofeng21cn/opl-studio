@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   linkCompanion: {
     readDevices: () => invoke("readLinkDevices"),
     enableInternet: () => invoke("enableLinkInternet"),
+    disableInternet: () => invoke("disableLinkInternet"),
     reconnectInternet: () => invoke("reconnectLinkInternet"),
     createPairing: request => invoke("createLinkPairing", request),
     revokeDevice: request => invoke("revokeLinkDevice", request)

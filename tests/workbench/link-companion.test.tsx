@@ -3,6 +3,7 @@ let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { LinkCompanionSection } from "../../plugins/opl-studio-client/src/client/workbench/settings/LinkCompanionSection";
+import type { LinkDeviceReadback, LinkInternetStatus } from "../../packages/host-contracts/src/platform-events";
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
@@ -46,6 +47,7 @@ test("automatically recovers an interrupted Link connection without requiring Re
   const bridge = {
     readDevices: async () => readback,
     enableInternet: async () => ({ status: "ready" as const }),
+    disableInternet: async () => ({ status: "disabled" as const, enabled: false }),
     reconnectInternet: async () => { reconnects += 1; return { status: "ready" as const }; },
     createPairing: async () => { throw new Error("not used"); },
     revokeDevice: async () => ({ id: "", revoked: true })
@@ -56,4 +58,73 @@ test("automatically recovers an interrupted Link connection without requiring Re
   expect(reconnects).toBe(1);
   expect(document.body.textContent).toContain("手机访问已就绪");
   expect(document.body.textContent).not.toContain("连接需要处理");
+});
+
+function button(label: string) {
+  const element = [...document.querySelectorAll("button")].find(candidate => candidate.textContent === label);
+  if (!element) throw new Error(`Missing button: ${label}`);
+  return element;
+}
+
+test("allows explicit opt-out and clears the backup QR code", async () => {
+  let internet: LinkInternetStatus = { status: "ready", enabled: true };
+  const bridge = {
+    readDevices: async () => ({ schema: "opl_link_studio_wire.v2", devices: [], internet }),
+    enableInternet: async () => internet = { status: "ready", enabled: true },
+    disableInternet: async () => internet = { status: "disabled", enabled: false },
+    reconnectInternet: async () => internet,
+    createPairing: async () => ({
+      schema: "opl_link_studio_wire.v2",
+      code: "test-pairing",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      pairingURL: "opllink://pair?code=test-pairing"
+    })
+  };
+  (browser as any).oplStudio = { linkCompanion: bridge };
+  await act(async () => root.render(<LinkCompanionSection locale="zh" />));
+  expect(document.body.textContent).toContain("登录同一个 OPL 账号");
+  await act(async () => button("生成连接码").click());
+  expect(document.querySelector(".opl-link-pairing")).not.toBeNull();
+  await act(async () => button("关闭手机访问").click());
+  expect(internet.enabled).toBe(false);
+  expect(document.body.textContent).toContain("手机访问已关闭");
+  expect(document.querySelector(".opl-link-pairing")).toBeNull();
+  await act(async () => button("开启手机访问").click());
+  expect(internet.enabled).toBe(true);
+  expect(document.body.textContent).toContain("手机访问已就绪");
+});
+
+test("keeps explicit opt-out after an earlier recovery and status read complete", async () => {
+  const active: LinkDeviceReadback = {
+    schema: "opl_link_studio_wire.v2", devices: [],
+    internet: { status: "error", enabled: true }
+  };
+  const disabled: LinkInternetStatus = { status: "disabled", enabled: false };
+  const staleRead = Promise.withResolvers<LinkDeviceReadback>();
+  const recovery = Promise.withResolvers<LinkInternetStatus>();
+  const reconnectStarted = Promise.withResolvers<void>();
+  let reads = 0;
+  let reconnects = 0;
+  const bridge = {
+    readDevices: async () => ++reads === 1 ? active : staleRead.promise,
+    disableInternet: async () => disabled,
+    reconnectInternet: () => {
+      reconnects++;
+      reconnectStarted.resolve();
+      return recovery.promise;
+    }
+  };
+  (browser as any).oplStudio = { linkCompanion: bridge };
+  await act(async () => root.render(<LinkCompanionSection locale="zh" />));
+  await act(async () => reconnectStarted.promise);
+  await act(async () => { browser.document.dispatchEvent(new browser.Event("visibilitychange")); });
+  expect(reads).toBe(2);
+  await act(async () => button("关闭手机访问").click());
+  await act(async () => {
+    staleRead.resolve(active);
+    recovery.resolve({ status: "ready", enabled: true });
+  });
+  expect(reconnects).toBe(1);
+  expect(document.body.textContent).toContain("手机访问已关闭");
+  expect(button("开启手机访问").disabled).toBe(false);
 });

@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-host-core",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Shared OPL application services for desktop and WebUI.",
   "type": "module",
   "main": "./lib/index.mjs",

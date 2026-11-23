@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "./native-app-updater.mjs";
 import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 import { createLinkCompanion } from "./link-companion.mjs";
-import { createLinkInternet } from "./link-internet.mjs";
+import { createLinkInternet, readLinkGatewayAccount } from "./link-internet.mjs";
 import { createThreadWorkspaceService } from "./thread-workspace-service.mjs";
 import { Peer } from "@deepseek-ai/dsh-client-connection";
 
@@ -125,6 +125,9 @@ export class OplHostCore extends EventEmitter {
       : async () => ({ status: 503, body: JSON.stringify({ ok: false, reason: "dsh-home-unavailable" }) });
     this.linkOptions = { env, webAuth: options.webAuth, stagedInputs: options.stagedInputs };
     this.linkInternetFactory = options.linkInternetFactory ?? createLinkInternet;
+    this.readLinkAccount = options.readLinkAccount ?? (options.linkInternetFactory || env.NODE_TEST_CONTEXT
+      ? undefined
+      : () => readLinkGatewayAccount(env));
     this.closePromise = null;
     this.manualUpdateOperations = new Set();
     this.codex.on("event", (event) => this.emit("event", event));
@@ -135,9 +138,14 @@ export class OplHostCore extends EventEmitter {
     await this.framework.start();
     const webServer = this.hostContext?.get("webServer");
     if (webServer) {
-      this.linkInternet = await this.linkInternetFactory({ env: this.linkOptions.env, handle: (...args) => this.linkCompanion.handleAuthenticatedPeer(...args) });
+      this.linkInternet = await this.linkInternetFactory({
+        env: this.linkOptions.env, handle: (...args) => this.linkCompanion.handleAuthenticatedPeer(...args),
+        readAccount: this.readLinkAccount,
+        onAccountChanged: options => this.linkCompanion.clearRemoteDevices(options)
+      });
       this.linkCompanion = await createLinkCompanion({ hostCore: this, ...this.linkOptions, internet: this.linkInternet });
       this.disposeLinkRoutes = this.linkCompanion.register(webServer);
+      this.linkInternet.startAccountLifecycle?.();
     }
     return this.capabilities();
   }
@@ -177,6 +185,9 @@ export class OplHostCore extends EventEmitter {
       && receipt?.exitCode === 0
     ) {
       await this.#reloadCodexConfiguration({ deferredReasonCode: "gateway_model_access_refresh_deferred" });
+    }
+    if (payload?.dryRun === false && payload.actionId === "gateway_account_disconnect") {
+      this.linkInternet?.synchronizeAccount?.({ reset: true }).catch(() => {});
     }
     if (payload?.dryRun === false && receipt?.status === "executed") this.emit("event", { method: "host/app-state-changed", params: { actionId: payload.actionId } });
     return receipt;
@@ -321,6 +332,10 @@ export class OplHostCore extends EventEmitter {
         if (!this.linkInternet) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
         return this.linkInternet.enable();
       }
+      case "disableLinkInternet": {
+        if (!this.linkInternet) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
+        return this.linkInternet.disable();
+      }
       case "reconnectLinkInternet": {
         if (!this.linkInternet) throw new ThreadAdapterError("link_host_unavailable", "OPL Link is unavailable in this host", {}, 503);
         return this.linkInternet.reconnect();
@@ -413,7 +428,11 @@ export class OplHostCore extends EventEmitter {
       case "respondToServerRequest": return this.transport.respondToServerRequest(payload?.id, payload?.response ?? {});
       case "steerTurn": return this.transport.steerMessage(payload);
       case "interruptTurn": return this.transport.interruptMessage(payload);
-      case "loginGatewayAccount": return this.gatewayAccountLogin(payload);
+      case "loginGatewayAccount": {
+        const result = await this.gatewayAccountLogin(payload);
+        if (result?.ok || result?.stateRefreshRequired) this.linkInternet?.synchronizeAccount?.().catch(() => {});
+        return result;
+      }
       case "configureCodexApiKey": return this.configureCodexApiKey(payload);
       case "approveConnectionAccess": return this.connectionAccessApproval(payload);
       case "readNativeAppUpdateStatus": return this.nativeUpdater.perform("status", payload);

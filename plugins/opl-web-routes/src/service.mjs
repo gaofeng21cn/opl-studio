@@ -75,6 +75,7 @@ async function dispatchApi(req, res, hostCore) {
   }
   if (req.method === "GET" && url.pathname === "/api/link-management/devices") { json(res, 200, await hostCore.invoke("readLinkDevices")); return; }
   if (req.method === "POST" && url.pathname === "/api/link-management/enable") { json(res, 200, await hostCore.invoke("enableLinkInternet")); return; }
+  if (req.method === "POST" && url.pathname === "/api/link-management/disable") { json(res, 200, await hostCore.invoke("disableLinkInternet")); return; }
   if (req.method === "POST" && url.pathname === "/api/link-management/reconnect") { json(res, 200, await hostCore.invoke("reconnectLinkInternet")); return; }
   if (req.method === "POST" && url.pathname === "/api/link-management/pair") { json(res, 200, await hostCore.invoke("createLinkPairing", await body(req, 16 * 1024))); return; }
   if (req.method === "POST" && url.pathname === "/api/link-management/revoke") { json(res, 200, await hostCore.invoke("revokeLinkDevice", await body(req, 16 * 1024))); return; }

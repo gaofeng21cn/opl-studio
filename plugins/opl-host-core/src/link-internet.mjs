@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import WebSocket from "ws";
 import { ConnectionController, HostServerApi, HostServerConnection, IdentityStore, RpcRouter, ServerCredentialStore, resolveConfig } from "../../../vendor/dsh-remote/host.mjs";
@@ -14,6 +15,20 @@ export const LINK_SERVICE_ORIGIN = "https://link.medopl.com";
 export const LINK_REMOTE_REVISION = "f214c5abb39434d0e8358956bfca8d4529981fee";
 const fail = (code, message, status = 400) => new ThreadAdapterError(code, message, {}, status);
 const noop = () => {};
+const runFile = promisify(execFile);
+const ACCOUNT_RECHECK_MS = 30_000;
+
+export async function readLinkGatewayAccount(env) {
+  const { stdout } = await runFile(env.OPL_APP_OPL_BIN ?? "opl", ["connect", "gateway", "status", "--json"], {
+    env, timeout: 5_000, maxBuffer: 64 * 1024
+  });
+  const { gateway_account: account } = JSON.parse(stdout);
+  if (account?.surface_kind !== "opl_gateway_account_read_model.v1") throw new Error("Unable to read the OPL Gateway account");
+  if (account.connection_mode !== "account" || ["not_connected", "reauth_required", "disconnect_pending"].includes(account.status)) return null;
+  if (!account.account?.email || account.account.status !== "active") return null;
+  // The cache tells us when to re-check. The Relay authorizes the stable Gateway ID.
+  return crypto.createHash("sha256").update(account.account.email.trim().toLowerCase()).digest("hex");
+}
 const logger = { debug: noop, info: noop, warn: noop, error: noop };
 const ACCOUNT_ERRORS = new Set(["link_account_required", "AUTH_REQUIRED", "AUTH_INVALID", "TOKEN_EXPIRED", "DEVICE_REVOKED", "MEMBERSHIP_REQUIRED"]);
 
@@ -58,14 +73,27 @@ export async function authorizeLinkHost({ device, env }) {
 }
 
 /** The official Remote carrier feeds only the existing Link owner, with one Noise identity. */
-export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
+export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, readAccount, onAccountChanged = async () => {}, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
   const directory = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "link-remote");
   const deviceName = env.OPL_LINK_HOST_NAME || os.hostname();
   const metadataFile = path.join(directory, "link-host.json");
   const identities = new IdentityStore({ directory, role: "host" });
   const store = new ServerCredentialStore(directory);
   const evidence = createLinkTransportEvidence();
-  let identity; let metadata; let api; let connections; let connection; let operation; let errorCode; let identityError; let closed = false;
+  let identity;
+  let metadata;
+  let api;
+  let connections;
+  let connection;
+  let accountFingerprint;
+  let discoverable = false;
+  let suspended = Boolean(readAccount);
+  let timer;
+  let operation = Promise.resolve();
+  let refresh;
+  let errorCode;
+  let identityError;
+  let closed = false;
   async function saveMetadata(value) {
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const temporary = `${metadataFile}.${crypto.randomUUID()}.tmp`;
@@ -73,7 +101,7 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   }
   function status() {
     const reasonCode = errorCode ?? connection?.lastError();
-    return { status: closed ? "disabled" : ACCOUNT_ERRORS.has(reasonCode) ? "account_required" : reasonCode ? "error" : !metadata?.enabled ? "disabled" : connection?.isOnline() ? "ready" : connection?.isReconnecting() ? "reconnecting" : "connecting",
+    return { status: closed || metadata?.enabled === false ? "disabled" : ACCOUNT_ERRORS.has(reasonCode) ? "account_required" : reasonCode ? "error" : !metadata?.enabled && !readAccount ? "disabled" : connection?.isOnline() && !suspended ? "ready" : connection?.isReconnecting() ? "reconnecting" : "connecting",
       ...(reasonCode ? { reasonCode } : {}) };
   }
   function scopedFetch(input, init = {}) {
@@ -106,36 +134,140 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   function validateCredentials(value) {
     const keys = ["schema", "serverUrl", "accountScope", "deviceId", "identityKey", "role", "accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt"];
     if (!value || Object.keys(value).some(key => !keys.includes(key)) || value.schema !== "opl_link_remote_credentials.v1" || value.serverUrl !== serviceOrigin || value.deviceId !== identity.deviceId || value.identityKey !== identity.publicKey || value.role !== "host" || !/^[A-Za-z0-9_-]{43}$/.test(value.accountScope ?? "") || typeof value.accessToken !== "string" || value.accessToken.length < 16 || typeof value.refreshToken !== "string" || value.refreshToken.length < 16 || !Number.isSafeInteger(value.accessTokenExpiresAt) || value.accessTokenExpiresAt <= Date.now() || !Number.isSafeInteger(value.refreshTokenExpiresAt) || value.refreshTokenExpiresAt <= value.accessTokenExpiresAt) throw fail("link_credentials_invalid", "Phone access credentials did not match this App", 503);
-    if (metadata?.accountScope && metadata.accountScope !== value.accountScope) throw fail("link_account_changed", "Disconnect the existing phone access before changing its account", 409);
   }
-  async function enable() {
-    if (closed) throw fail("link_host_closed", "The App is closing", 503);
-    if (identityError) throw identityError;
-    if (operation) return operation;
-    operation = (async () => {
-      errorCode = undefined;
-      identity ??= await identities.loadOrCreate(deviceName);
-      if (!metadata?.enabled || ACCOUNT_ERRORS.has(connection?.lastError()) || !await store.load(serviceOrigin, identity.deviceId)) {
-        const credentials = await authorize({ device: { deviceId: identity.deviceId, name: identity.name, role: "host", platform: process.platform, identityKey: identity.publicKey, clientVersion: "0.6.5" }, env });
-        validateCredentials(credentials);
-        await store.save({ serverUrl: serviceOrigin, deviceId: identity.deviceId, authorizationMethod: "account", accessToken: credentials.accessToken, accessTokenExpiresAt: credentials.accessTokenExpiresAt, refreshToken: credentials.refreshToken, refreshTokenExpiresAt: credentials.refreshTokenExpiresAt });
-        await saveMetadata({ schema: "opl_link_remote_host.v1", enabled: true, serverUrl: serviceOrigin, accountScope: credentials.accountScope, deviceId: identity.deviceId, identityKey: identity.publicKey });
-        await connection?.stop(); await connections?.close(); api?.close(); connection = undefined;
-      }
-      await startCarrier(); return status();
-    })().catch(error => { errorCode = error.code ?? "link_connection_failed"; throw error; }).finally(() => { operation = undefined; });
-    return operation;
+  function enqueue(action) {
+    const next = operation.catch(noop).then(() => {
+      if (closed) throw fail("link_host_closed", "The App is closing", 503);
+      return action();
+    });
+    operation = next;
+    return next;
   }
-  async function request(route, { method = "GET", body } = {}) {
+  async function request(route, { method = "GET", body, allowUnsupported = false } = {}) {
     if (!api || !identity) throw fail("link_not_enabled", "Enable phone access in OPL App", 409);
     const credentials = await api.authenticate(identity);
     const response = await scopedFetch(`${serviceOrigin}${route}`, { method, headers: { authorization: `Bearer ${credentials.accessToken}`, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) throw fail("link_service_unavailable", "Phone access could not complete this request. Try again.", response.status === 401 ? 401 : 503);
+    if (!response.ok) {
+      await response.body?.cancel().catch(noop);
+      if (response.status === 404 && allowUnsupported) return null;
+      if ([401, 403, 404].includes(response.status)) throw fail("link_device_unauthorized", "This phone is not authorized for this computer", response.status === 401 ? 401 : 403);
+      throw fail("link_service_unavailable", "Phone access could not complete this request. Try again.", 503);
+    }
     return response.json();
   }
+  async function setDiscovery(enabled) {
+    const result = await request("/api/v1/link/account/host", { method: "PUT", body: { enabled }, allowUnsupported: true });
+    discoverable = enabled && result !== null;
+  }
+  async function stopCarrier({ unpublish = false } = {}) {
+    // Fence new requests before awaiting network or transport shutdown.
+    suspended = true;
+    discoverable = false;
+    const publication = unpublish && api ? setDiscovery(false).catch(noop) : undefined;
+    await connection?.stop();
+    await connections?.close();
+    await publication;
+    api?.close();
+    api = undefined;
+    connections = undefined;
+    connection = undefined;
+  }
+  async function withdrawSavedHost() {
+    if (!api && metadata?.accountScope && identity && await store.load(serviceOrigin, identity.deviceId)) {
+      api = new HostServerApi(serviceOrigin, store, scopedFetch, "host", httpAllowlist);
+      api.bindIdentity(identity);
+    }
+    await stopCarrier({ unpublish: true });
+  }
+  async function activate(force = false) {
+    if (identityError) throw identityError;
+    identity ??= await identities.loadOrCreate(deviceName);
+    if (force || !metadata?.enabled || ACCOUNT_ERRORS.has(connection?.lastError()) || !await store.load(serviceOrigin, identity.deviceId)) {
+      const credentials = await authorize({ device: { deviceId: identity.deviceId, name: identity.name, role: "host", platform: process.platform, identityKey: identity.publicKey, clientVersion: "0.6.5" }, env });
+      validateCredentials(credentials);
+      if (closed) return;
+      if (metadata?.accountScope && metadata.accountScope !== credentials.accountScope) {
+        await stopCarrier({ unpublish: true });
+        await onAccountChanged();
+      } else if (connection) {
+        await stopCarrier();
+      }
+      await store.save({ serverUrl: serviceOrigin, deviceId: identity.deviceId, authorizationMethod: "account", accessToken: credentials.accessToken, accessTokenExpiresAt: credentials.accessTokenExpiresAt, refreshToken: credentials.refreshToken, refreshTokenExpiresAt: credentials.refreshTokenExpiresAt });
+      await saveMetadata({ schema: "opl_link_remote_host.v1", enabled: true, serverUrl: serviceOrigin, accountScope: credentials.accountScope, deviceId: identity.deviceId, identityKey: identity.publicKey });
+    }
+    await startCarrier();
+    suspended = false;
+    if (readAccount && !discoverable) await setDiscovery(true);
+  }
+  async function syncAccount({ reset = false, explicit = false } = {}) {
+    if (metadata?.enabled === false && !explicit) return status();
+    if (explicit && metadata?.enabled === false) await saveMetadata({ ...metadata, enabled: true });
+    errorCode = undefined;
+    try {
+      const nextAccount = await readAccount();
+      if (closed) return status();
+      if (!nextAccount) {
+        await withdrawSavedHost();
+        accountFingerprint = undefined;
+        errorCode = "link_account_required";
+        return status();
+      }
+      const changed = nextAccount !== accountFingerprint;
+      if (changed || reset) await withdrawSavedHost();
+      await activate(changed || reset);
+      accountFingerprint = nextAccount;
+    } catch (error) {
+      errorCode = error.code ?? "link_connection_failed";
+      if (ACCOUNT_ERRORS.has(errorCode)) await stopCarrier({ unpublish: true });
+      if (explicit) throw error;
+    }
+    return status();
+  }
+  function synchronizeAccount({ reset = false } = {}) {
+    if (!readAccount || closed) return Promise.resolve(status());
+    if (reset) suspended = true;
+    if (refresh && !reset) return refresh;
+    const current = enqueue(() => syncAccount({ reset })).finally(() => { if (refresh === current) refresh = undefined; });
+    refresh = current;
+    return current;
+  }
+  function startAccountLifecycle() {
+    if (!readAccount || timer) return;
+    void synchronizeAccount().catch(noop);
+    timer = setInterval(() => { void synchronizeAccount().catch(noop); }, ACCOUNT_RECHECK_MS);
+    timer.unref?.();
+  }
+  function enable() {
+    return enqueue(async () => {
+      if (readAccount) return syncAccount({ explicit: true });
+      try { errorCode = undefined; await activate(); return status(); }
+      catch (error) { errorCode = error.code ?? "link_connection_failed"; throw error; }
+    });
+  }
+  function disable() {
+    suspended = true;
+    return enqueue(async () => {
+      await saveMetadata(metadata ? { ...metadata, enabled: false } : { schema: "opl_link_remote_host.v1", enabled: false, serverUrl: serviceOrigin });
+      await stopCarrier({ unpublish: true });
+      errorCode = undefined;
+      return status();
+    });
+  }
+  function isRemoteAccessEnabled() {
+    return !closed && !suspended && metadata?.enabled === true;
+  }
+  async function verifyAccountGrant({ peerDeviceId, peerIdentityKey }) {
+    if (!discoverable || !isRemoteAccessEnabled()) throw fail("link_device_unauthorized", "Phone access is unavailable", 403);
+    const current = connection;
+    const result = await request(`/api/v1/link/account/grants/${encodeURIComponent(peerDeviceId)}`);
+    if (!discoverable || !isRemoteAccessEnabled() || current !== connection || result?.authorized !== true || result.identityKey !== peerIdentityKey) {
+      throw fail("link_device_unauthorized", "This phone is not authorized for this computer", 403);
+    }
+  }
   async function createInvitation() {
+    if (metadata?.enabled === false) throw fail("link_not_enabled", "Enable phone access in OPL App", 409);
     if (!metadata?.enabled) await enable();
-    if (!connection?.isOnline()) throw fail("link_host_connecting", "The App is connecting. Try again in a moment.", 409);
+    if (!isRemoteAccessEnabled() || !connection?.isOnline()) throw fail("link_host_connecting", "The App is connecting. Try again in a moment.", 409);
     const invitation = await request("/api/v1/link/invitations", { method: "POST", body: { ttlSeconds: 120 } });
     if (typeof invitation.enrollmentToken !== "string" || !Number.isSafeInteger(invitation.expiresAt) || invitation.expiresAt <= Date.now()) throw fail("link_invitation_invalid", "Could not generate a connection code", 502);
     return { serverUrl: serviceOrigin, accountScope: metadata.accountScope, hostDeviceId: identity.deviceId, hostIdentityKey: identity.publicKey, enrollmentToken: invitation.enrollmentToken, expiresAt: invitation.expiresAt };
@@ -144,17 +276,31 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     await connections?.revoke(deviceId);
     await request(`/api/v1/link/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
   }
-  async function reconnect() { await enable(); connection?.reconnect(); return status(); }
-  async function close() { closed = true; await operation?.catch(noop); await connection?.stop(); await connections?.close(); api?.close(); }
+  async function reconnect() {
+    if (metadata?.enabled === false) return status();
+    if (readAccount) await synchronizeAccount();
+    else await enable();
+    if (isRemoteAccessEnabled()) connection?.reconnect();
+    return status();
+  }
+  async function close() {
+    closed = true;
+    clearInterval(timer);
+    await operation.catch(noop);
+    await stopCarrier();
+  }
+  const carrier = { status, enable, disable, reconnect, createInvitation, revoke, close, startAccountLifecycle, synchronizeAccount, isRemoteAccessEnabled, verifyAccountGrant,
+    readTransportEvidence: () => evidence.read({ authenticated: connections?.isOnline() === true, relayConnected: connections?.connectedPeers().some(peer => peer.mode === "Relay") === true }) };
   try {
     metadata = JSON.parse(await readFile(metadataFile, "utf8"));
-    if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? "")) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
+    if (metadata.schema !== "opl_link_remote_host.v1" || metadata.serverUrl !== serviceOrigin || typeof metadata.enabled !== "boolean" || ((metadata.enabled || metadata.accountScope !== undefined) && !/^[A-Za-z0-9_-]{43}$/.test(metadata.accountScope ?? ""))) throw fail("link_host_identity_invalid", "Existing phone access needs repair", 503);
+    if (!metadata.accountScope) return carrier;
     identity = await identities.loadExisting();
     if (!identity || identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
     // The official store updates the display name in place and restores peer pins.
     identity = await identities.loadOrCreate(deviceName);
     if (identity.deviceId !== metadata.deviceId || identity.publicKey !== metadata.identityKey) throw fail("link_host_identity_invalid", "Existing phone access identity changed", 503);
-    if (metadata.enabled) await startCarrier();
+    if (metadata.enabled && !readAccount) await startCarrier();
   } catch (error) { if (error.code !== "ENOENT") { errorCode = error.code ?? "link_host_identity_invalid"; if (errorCode !== "link_account_required") identityError = error; } }
-  return { status, enable, reconnect, createInvitation, revoke, close, readTransportEvidence: () => evidence.read({ authenticated: connections?.isOnline() === true, relayConnected: connections?.connectedPeers().some(peer => peer.mode === "Relay") === true }) };
+  return carrier;
 }

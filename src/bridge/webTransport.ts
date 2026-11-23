@@ -162,6 +162,7 @@ export function installWebTransport(): void {
     linkCompanion: {
       readDevices: () => requestJson("/api/link-management/devices"),
       enableInternet: () => postJson("/api/link-management/enable", {}),
+      disableInternet: () => postJson("/api/link-management/disable", {}),
       reconnectInternet: () => postJson("/api/link-management/reconnect", {}),
       createPairing: request => postJson("/api/link-management/pair", request ?? {}),
       revokeDevice: request => postJson("/api/link-management/revoke", request)
