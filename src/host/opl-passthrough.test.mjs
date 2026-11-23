@@ -895,7 +895,7 @@ test("fast state keeps a bounded work-item runtime projection without private ex
                 work_item_scope_id: "work-item:study-one",
                 identity_state: "resolved",
                 work_item_display_name: "Study one",
-                work_item_root: "/private/study"
+                work_item_root: "/workspace/research/study-one"
               },
               lifecycle: {
                 primary_state: "paused",
@@ -903,7 +903,12 @@ test("fast state keeps a bounded work-item runtime projection without private ex
                 current_stage_id: null,
                 lifecycle_ref: "private://lifecycle"
               },
-              visibility: { state: "visible", control_ref: "private://control" },
+              visibility: {
+                state: "visible",
+                control_ref: "work-item-visibility:study-one",
+                generation: 7,
+                private_visibility_receipt: "omit"
+              },
               execution: {
                 state: "idle",
                 attempt_id: "attempt:analysis:1",
@@ -945,13 +950,16 @@ test("fast state keeps a bounded work-item runtime projection without private ex
   assert.equal(projection.items[0].identity.work_item_scope_id, "work-item:study-one");
   assert.equal(projection.items[0].identity.identity_state, "resolved");
   assert.equal(projection.items[0].identity.workspace_path, "/workspace/research");
+  assert.equal(projection.items[0].identity.work_item_root, "/workspace/research/study-one");
+  assert.equal(projection.items[0].visibility.control_ref, "work-item-visibility:study-one");
+  assert.equal(projection.items[0].visibility.generation, 7);
   assert.equal(projection.items[0].execution.attempt_id, "attempt:analysis:1");
   assert.equal(projection.items[0].telemetry.cumulative.total_tokens, null);
   assert.equal(projection.items[0].stage_map[0].display_names["zh-CN"], "分析");
   const serialized = JSON.stringify(projection);
   for (const marker of [
-    "private_counter", "private_launch_payload", "work_item_root", "lifecycle_ref",
-    "control_ref", "workflow_id", "receipt_ref", "source_refs", "internal_receipt", "diagnostics"
+    "private_counter", "private_launch_payload", "lifecycle_ref", "private_visibility_receipt",
+    "workflow_id", "receipt_ref", "source_refs", "internal_receipt", "diagnostics"
   ]) {
     assert.equal(serialized.includes(marker), false, `must omit ${marker}`);
   }
