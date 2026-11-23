@@ -54,6 +54,13 @@
 - Follow the topic owners and lifecycle in `docs/README.md`. Fold completed
   implementation facts into their reference, remove obsolete checklists and
   prompts, and preserve only history with a durable decision or provenance role.
+- Maintain module cohesion during normal development and PRs rather than via
+  line-count budgets or scheduled split patrols: avoid both multi-responsibility
+  monoliths and over-fragmented `*-parts` micro-files, nested `*-parts/*-parts`,
+  or heavy callback-forwarding wrappers. Prefer eliminating duplication and
+  simplifying call paths over mechanical splitting; preserve behavior, public
+  exports, and protected or unknown capabilities (no static caller is only an
+  investigation signal).
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph
