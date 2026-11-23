@@ -85,6 +85,7 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   let api;
   let connections;
   let connection;
+  let retriedReplacement = false;
   let accountFingerprint;
   let discoverable = false;
   let suspended = Boolean(readAccount);
@@ -130,6 +131,7 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
       return evidence.observeSocket(webSocketFactory ? webSocketFactory(url, options) : new WebSocket(url, options));
     };
     connection = new HostServerConnection(config, identity, identities, api, connections, logger, makeSocket, async () => { const factory = await rtcFactoryProvider(); return factory ? evidence.wrapFactory(factory) : undefined; }, () => []);
+    retriedReplacement = false;
     connection.start();
   }
   function validateCredentials(value) {
@@ -217,6 +219,12 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
       if (changed || reset) await withdrawSavedHost();
       await activate(changed || reset);
       accountFingerprint = nextAccount;
+      // Let an interrupted startup recover once without competing indefinitely
+      // with another process that holds the same Host identity.
+      if (!explicit && !retriedReplacement && connection?.lastError() === "CONNECTION_REPLACED") {
+        retriedReplacement = true;
+        connection.resume();
+      }
     } catch (error) {
       errorCode = error.code ?? "link_connection_failed";
       if (ACCOUNT_ERRORS.has(errorCode)) await stopCarrier({ unpublish: true });
@@ -279,9 +287,12 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   }
   async function reconnect() {
     if (metadata?.enabled === false) return status();
+    const wasReplaced = connection?.lastError() === "CONNECTION_REPLACED";
     if (readAccount) await synchronizeAccount();
     else await enable();
-    if (isRemoteAccessEnabled()) connection?.reconnect();
+    if (isRemoteAccessEnabled() && !(wasReplaced && connection?.lastError() !== "CONNECTION_REPLACED")) {
+      connection?.reconnect();
+    }
     return status();
   }
   async function close() {

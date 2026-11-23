@@ -5,7 +5,7 @@ import type { LinkDeviceReadback, LinkPairing } from "../../bridge/oplBridge-typ
 import { SettingRow, SettingsGroup } from "./primitives";
 
 function needsRecovery(internet: LinkDeviceReadback["internet"]) {
-  return internet?.enabled !== false && (internet?.status === "error" || internet?.status === "reconnecting");
+  return internet?.enabled !== false && internet?.reasonCode !== "CONNECTION_REPLACED" && (internet?.status === "error" || internet?.status === "reconnecting");
 }
 
 export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" | "en"; onOpenAccount?: () => void }) {
@@ -24,6 +24,7 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
   const updateGeneration = useRef(0);
   const latestConnection = useRef<LinkDeviceReadback["internet"]>(undefined);
   const connection = state?.internet?.status;
+  const connectionReplaced = state?.internet?.reasonCode === "CONNECTION_REPLACED";
   const remoteEnabled = state?.internet?.enabled ?? (connection !== undefined && connection !== "disabled" && connection !== "account_required");
 
   function updateState(next: LinkDeviceReadback) {
@@ -111,7 +112,7 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
     }
     scheduleRecovery(connection === "error" && recoveryAttempt.current === 0 ? 0 : recoveryDelay());
     return clearRecoveryTimer;
-  }, [bridge, connection, remoteEnabled]);
+  }, [bridge, connection, connectionReplaced, remoteEnabled]);
   useEffect(() => () => { updateGeneration.current++; clearRecoveryTimer(); }, []);
   useEffect(() => { if (!pairing) return; const timer = window.setInterval(() => setClock(Date.now()), 1000); return () => window.clearInterval(timer); }, [pairing]);
   const expiresIn = pairing ? Math.max(0, Math.ceil((Date.parse(pairing.expiresAt) - clock) / 1000)) : 0;
@@ -131,7 +132,9 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
       scheduleRecovery(recoveryDelay());
     }
   }
-  const statusText = connection
+  const statusText = connectionReplaced
+    ? (zh ? "电脑连接已被替换" : "This computer’s connection was replaced")
+    : connection
     ? ({ disabled: zh ? "手机访问已关闭" : "Phone access is off", account_required: zh ? "请先登录 OPL 账号" : "Sign in to your OPL account", connecting: zh ? "正在连接" : "Connecting", reconnecting: zh ? "正在自动恢复" : "Automatically recovering", ready: zh ? "手机访问已就绪" : "Phone access is ready", error: zh ? "正在自动恢复" : "Automatically recovering" })[connection]
     : (zh ? "正在读取连接状态" : "Reading connection status");
   return <SettingsGroup title="OPL Link">
@@ -154,7 +157,7 @@ export function LinkCompanionSection({ locale, onOpenAccount }: { locale: "zh" |
     <SettingRow label={zh ? "连接状态" : "Connection status"}>
       <span role="status" aria-live="polite">{statusText}</span>
       {connection === "account_required" && onOpenAccount ? <button className="settings-inline-command" type="button" onClick={onOpenAccount}>{zh ? "打开 OPL 账号" : "Open OPL account"}</button> : null}
-      {needsRecovery(state?.internet) ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { recoveryAttempt.current = 0; updateStatus(await bridge.reconnectInternet()); })}><RefreshCw size={13} aria-hidden="true" />{zh ? "立即重连" : "Reconnect now"}</button> : null}
+      {(connectionReplaced || needsRecovery(state?.internet)) ? <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { recoveryAttempt.current = 0; updateStatus(await bridge.reconnectInternet()); })}><RefreshCw size={13} aria-hidden="true" />{zh ? "立即重连" : "Reconnect now"}</button> : null}
     </SettingRow>
     {remoteEnabled && connection === "ready" ? <SettingRow label={zh ? "备用连接方式" : "Fallback connection"}>
       <button className="settings-action-button" type="button" disabled={busy} onClick={() => void run(async () => { const value = await bridge.createPairing(); setClock(Date.now()); setPairing(value); })}>{zh ? "生成连接码" : "Create pairing code"}</button>

@@ -66,6 +66,22 @@ function button(label: string) {
   return element;
 }
 
+test("shows replacement and allows manual reconnect without competing for the Host identity", async () => {
+  const internet: LinkInternetStatus = { status: "error", enabled: true, reasonCode: "CONNECTION_REPLACED" };
+  let reconnects = 0;
+  (browser as any).oplStudio = { linkCompanion: {
+    readDevices: async () => ({ schema: "opl_link_studio_wire.v2", devices: [], internet }),
+    reconnectInternet: async () => { reconnects++; return { status: "ready", enabled: true }; }
+  } };
+  await act(async () => root.render(<LinkCompanionSection locale="zh" />));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+  expect(document.body.textContent).toContain("电脑连接已被替换");
+  expect(reconnects).toBe(0);
+  await act(async () => button("立即重连").click());
+  expect(reconnects).toBe(1);
+  expect(document.body.textContent).toContain("手机访问已就绪");
+});
+
 test("allows explicit opt-out and clears the backup QR code", async () => {
   let internet: LinkInternetStatus = { status: "ready", enabled: true };
   const bridge = {

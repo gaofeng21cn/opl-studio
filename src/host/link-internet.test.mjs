@@ -152,7 +152,7 @@ test("phone access preference survives restart before an account is connected", 
   assert.deepEqual(await carrier.synchronizeAccount(), { status: "account_required", enabled: true, reasonCode: "link_account_required" });
 });
 
-test("restarted carrier refreshes the host name and preserves existing identity pins", { timeout: 10_000 }, async t => {
+test("restarted carrier keeps its identity and recovers a replaced connection once", { timeout: 10_000 }, async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-restart-test-"));
   const sockets = []; const created = new EventEmitter(); const peers = new Map();
   class ControlSocket extends EventEmitter {
@@ -219,6 +219,30 @@ test("restarted carrier refreshes the host name and preserves existing identity 
   assert.deepEqual(identityAfter, { ...identityBefore, name: "Changed environment name" });
   assert.equal(await readFile(path.join(directory, "device.key"), "utf8"), keyBefore);
   assert.equal(authorizations, 1);
+
+  await carrier.close();
+  carrier = await createLinkInternet({
+    ...options,
+    readAccount: async () => "owner",
+    fetchImplementation: async () => Response.json({ enabled: true })
+  });
+  await carrier.synchronizeAccount();
+  const recoveredHost = await socketAt(2);
+  async function replace(socket) {
+    socket.close(4003, "CONNECTION_REPLACED");
+    for (let attempt = 0; attempt < 100 && carrier.status().reasonCode !== "CONNECTION_REPLACED"; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    assert.equal(carrier.status().reasonCode, "CONNECTION_REPLACED");
+  }
+  await replace(recoveredHost);
+  await carrier.synchronizeAccount();
+  const replacement = await socketAt(3);
+  await replace(replacement);
+  assert.equal((await carrier.synchronizeAccount()).reasonCode, "CONNECTION_REPLACED");
+  assert.equal(sockets.length, 4);
+  await carrier.reconnect();
+  await socketAt(4);
 });
 
 test("phone disconnect acknowledges durable local revocation before its separate Relay self-revoke", async t => {
