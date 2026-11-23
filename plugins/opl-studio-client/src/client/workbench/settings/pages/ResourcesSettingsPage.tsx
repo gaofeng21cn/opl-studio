@@ -33,7 +33,7 @@ export function ResourcesSettingsPage({ model, resourceFocus, onPickKnowledgeDir
           {section === "libraries" ? <SharedResourcesPage model={model} settings={settings} actionBusyKey={actionBusyKey} onAction={onAction} onRefresh={onRefresh} onApproveConnectionAccess={onApproveConnectionAccess} onPickKnowledgeDirectory={onPickKnowledgeDirectory} selectedPackageId={resourceFocus?.packageId} focusedResourceId={resourceFocus?.resourceId} onManageSources={onOpenSoftwareCenter ? () => onOpenSoftwareCenter("sources") : undefined} /> : <>
           <SettingsGroup title={zh ? "消息与远程连接" : "Messages & remote connections"}>
             <p className="settings-inline-note">{zh ? "通过微信等消息通道远程使用 OPL。已启用的远程扩展在这里统一连接和管理。" : "Use OPL remotely through Weixin and other messaging channels. Connect and manage enabled remote extensions here."}</p>
-            {remoteConnections ?? <SettingRow label={zh ? "微信及其他远程扩展" : "Weixin and other remote extensions"} detail={zh ? "当前没有可配置的消息通道。请到“软件中心 → 运行组件”检查远程能力包的安装与启用状态，完成后刷新。" : "No configurable message channel is available. Check installation and enablement in Software Center → Runtime components, then refresh."}>
+            {remoteConnections ?? <SettingRow label={zh ? "微信及其他远程扩展" : "Weixin and other remote extensions"} detail={zh ? "在软件中心搜索并安装所需的远程插件，然后回到这里连接账号。" : "Find and install a remote plugin in Software Center, then return here to connect an account."}>
               <button className="settings-action-button" type="button" disabled={!onOpenSoftwareCenter} onClick={() => onOpenSoftwareCenter?.("applications")}>{zh ? "管理远程扩展" : "Manage remote extensions"}</button>
             </SettingRow>}
           </SettingsGroup>

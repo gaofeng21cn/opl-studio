@@ -109,10 +109,9 @@ function applicationMarkup(model: WorkbenchModel, stateStatus: "loading" | "read
 test("application management does not invent zero entries or health before a catalog read", () => {
   for (const status of ["loading", "error"] as const) {
     const markup = applicationMarkup(initialWorkbenchModel, status);
-    expect(markup).toContain(status === "loading" ? "Reading software status" : "Some status is not confirmed");
+    expect(markup).toContain(status === "loading" ? "Refreshing catalog" : "Refresh failed");
     expect(markup).not.toContain("No action needed");
     expect(markup).not.toContain("<strong>0</strong>");
-    expect(markup).toContain(status === "loading" ? "Reading apps and shared resources" : "Could not read the current state");
     if (status === "error") expect(markup).toContain(">Retry</button>");
   }
 });
@@ -129,7 +128,7 @@ test("unused resource staleness is not a user action and read failures stay visi
   expect(markup).toContain("Some status is not confirmed");
   expect(markup).not.toMatch(new RegExp("<strong>2</strong> shared resources need attention"));
   const failedRead = applicationMarkup({ ...model, stateGeneratedAt: "2026-11-10T02:00:00Z" }, "error");
-  expect(failedRead).toContain("Last read:");
+  expect(failedRead).toContain("Last read ");
   expect(failedRead).not.toContain("No known issues");
 });
 

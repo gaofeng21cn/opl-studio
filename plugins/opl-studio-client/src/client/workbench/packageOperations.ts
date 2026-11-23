@@ -35,7 +35,7 @@ export function packageActivity(operations: PackageOperation[], readError: boole
 
 export function packageActionVerb(actionId: string, locale: 'zh' | 'en'): string {
   const verbs: Record<string, [string, string]> = {
-    agent_package_install: ['安装', 'Install'], agent_package_update: ['更新', 'Update'], agent_package_repair: ['修复', 'Repair'],
+    agent_package_install: ['安装', 'Install'], agent_package_update: ['更新', 'Update'], agent_package_repair: ['恢复安装', 'Restore installation'],
   };
   return (verbs[actionId] ?? verbs.agent_package_install!)[locale === 'zh' ? 0 : 1];
 }

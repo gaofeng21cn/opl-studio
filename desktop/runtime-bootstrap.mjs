@@ -185,6 +185,31 @@ async function removeQuarantine(root, platform) {
   }
 }
 
+function parseStableSemver(value) {
+  const match = typeof value === "string" ? value.trim().match(/^(\d+)\.(\d+)\.(\d+)$/) : null;
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function isStrictlyNewerVersion(candidate, baseline) {
+  const left = parseStableSemver(candidate);
+  const right = parseStableSemver(baseline);
+  if (!left || !right) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (left[i] !== right[i]) return left[i] > right[i];
+  }
+  return false;
+}
+
+function shouldPreservePendingFramework(target, payloadRoot) {
+  const pendingRoot = path.join(target, "opl.pending");
+  const pendingMeta = readJsonRecord(path.join(target, "opl.pending.json"));
+  const pendingPkg = readJsonRecord(path.join(pendingRoot, "package.json"));
+  const incomingPkg = readJsonRecord(path.join(payloadRoot, "opl", "package.json"));
+  return pendingMeta?.surface_kind === "opl_framework_pending_generation.v1"
+    && pendingPkg?.name === "opl-framework"
+    && isStrictlyNewerVersion(pendingPkg.version, incomingPkg?.version);
+}
+
 async function installPayload({ payload, target, platform }) {
   if (isUsableRuntime(target) && markerMatches(target, payload.manifestSha256, payload.markerName)) return;
   await fs.promises.mkdir(path.dirname(target), { recursive: true });
@@ -201,17 +226,21 @@ async function installPayload({ payload, target, platform }) {
       mode: fs.constants.COPYFILE_FICLONE,
       preserveTimestamps: true
     });
+    await makeOwnerWritable(temporary);
     // Native Package installations live in their owner-managed carriers, outside
     // this bootstrap seed. Never merge old seed modules/skills into new bytes.
-    // Keep only Framework's already staged activation transaction for restart.
-    for (const name of ["opl.pending", "opl.pending.json"]) {
-      const current = path.join(target, name);
-      if (!fs.existsSync(current)) continue;
-      await fs.promises.cp(current, path.join(temporary, name), {
-        recursive: true, dereference: false, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE, preserveTimestamps: true
-      });
+    // Keep a staged Framework activation transaction only when it is strictly
+    // newer than the incoming Full payload, and copy it after makeOwnerWritable
+    // so its file modes and integrity digest stay unchanged.
+    if (shouldPreservePendingFramework(target, payload.payloadRoot)) {
+      for (const name of ["opl.pending", "opl.pending.json"]) {
+        const current = path.join(target, name);
+        if (!fs.existsSync(current)) continue;
+        await fs.promises.cp(current, path.join(temporary, name), {
+          recursive: true, dereference: false, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE, preserveTimestamps: true
+        });
+      }
     }
-    await makeOwnerWritable(temporary);
     await removeQuarantine(temporary, platform);
     await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
       version: payload.version,
@@ -220,7 +249,7 @@ async function installPayload({ payload, target, platform }) {
     }, null, 2)}\n`, "utf8");
     if (fs.existsSync(target)) await fs.promises.rename(target, previous);
     await fs.promises.rename(temporary, target);
-    await fs.promises.rm(previous, { recursive: true, force: true });
+    await fs.promises.rm(previous, { recursive: true, force: true }).catch(() => {});
   } catch (error) {
     if (!fs.existsSync(target) && fs.existsSync(previous)) await fs.promises.rename(previous, target);
     await fs.promises.rm(temporary, { recursive: true, force: true });

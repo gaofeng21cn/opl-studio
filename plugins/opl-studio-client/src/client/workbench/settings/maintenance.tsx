@@ -45,14 +45,36 @@ export function isDefaultSilentManagedComponent(component: ManagedUpdateComponen
 export function managedDependencyLabel(dependencyId: string, locale: WorkbenchSettings["locale"]): string {
   const labels: Record<string, [string, string]> = {
     "codex-cli": ["Codex CLI", "Codex CLI"],
-    "temporal-runtime": ["Temporal 运行时", "Temporal runtime"],
-    "temporal-system-cli": ["Temporal CLI", "Temporal CLI"],
+    "temporal-runtime": ["Temporal 工作流组件（OPL 内置）", "Temporal workflow SDK (OPL built-in)"],
+    "temporal-system-cli": ["Temporal CLI（本机工具）", "Temporal CLI (local tool)"],
     "officecli": ["OfficeCLI", "OfficeCLI"],
     "mineru-open-api": ["MinerU", "MinerU"],
     "gh-stack": ["gh-stack", "gh-stack"],
     "ffmpeg": ["FFmpeg", "FFmpeg"]
   };
   return labels[dependencyId]?.[locale === "zh" ? 0 : 1] ?? dependencyId;
+}
+
+export function managedDependencySummary(dependency: ManagedRuntimeDependencyRef, locale: WorkbenchSettings["locale"]): string {
+  const zh = locale === "zh";
+  if (dependency.dependencyId === "temporal-runtime") {
+    return zh ? "OPL 内置的任务调度运行时组件，随 OPL 基座一起更新，无需单独安装。" : "OPL built-in workflow runtime SDK, updated with OPL Base without separate installation.";
+  }
+  if (dependency.dependencyId === "temporal-system-cli") {
+    return zh ? "本机系统中已检测到的 Temporal 命令行工具，继续由原安装器维护。" : "Temporal CLI detected on this device; maintained by its original installer.";
+  }
+  if (dependency.dependencyId === "codex-cli") {
+    return zh ? `核心 AI 执行引擎 · ${managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}` : `Core AI execution engine · ${managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}`;
+  }
+  if (dependency.updatePolicy === "updated_with_opl_base_framework_generation") {
+    return zh ? "随 OPL 基座更新" : "Updated with OPL Base";
+  }
+  return managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale);
+}
+
+export function managedDependencyMissingPackages(value: ManagedRuntimeDependencyRef["version"] | undefined): string[] {
+  if (!value || typeof value === "string") return [];
+  return Object.entries(value).filter(([, item]) => !item).map(([key]) => key);
 }
 
 export function managedDependencyPolicyLabel(updateMode: string | undefined, updatePolicy: string | undefined, locale: WorkbenchSettings["locale"]): string {
@@ -82,11 +104,11 @@ export function managedPackageUpdateLabel(packageState: Pick<ManagedPackageState
   return managedDependencyPolicyLabel(packageState.updateMode, undefined, locale);
 }
 
-export function managedDependencyVersion(value: ManagedRuntimeDependencyRef["version"] | undefined): string {
+export function managedDependencyVersion(value: ManagedRuntimeDependencyRef["version"] | undefined, locale?: WorkbenchSettings["locale"]): string {
   if (!value) return "--";
   if (typeof value === "string") return value;
-  const entries = Object.entries(value).filter(([, item]) => item);
-  return entries.length ? entries.map(([key, item]) => `${key} ${item}`).join(", ") : "--";
+  const entries = Object.entries(value).filter(([, item]) => item || locale);
+  return entries.length ? entries.map(([key, item]) => `${key} ${item ?? (locale === "zh" ? "缺失" : "missing")}`).join(", ") : "--";
 }
 
 /** A compact version for catalog rows; details retain the complete owner readback. */

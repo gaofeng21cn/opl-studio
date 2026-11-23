@@ -16,29 +16,29 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
       const packageComponent = component("opl_packages")?.component;
       const packageStates = packageComponent?.packageStates ?? [];
       const packageAttentionCount = packageStates.filter((item) => ["update_available", "staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(item.state.toLowerCase())).length;
-      const hostMaintenance = <>
-        <ManagedUpdateGroup
-          component={component("opl_app")?.component}
-          nativeUpdate={nativeAppUpdate}
-          fallbackLabel={catalogOrigin ? (settings.locale === "zh" ? "当前桌面宿主" : "Current desktop host") : "One Person Lab"}
-          actions={component("opl_app")?.actions ?? []}
-          locale={settings.locale}
-          busyKey={actionBusyKey}
-          onAction={onAction}
-          onHostAction={onHostAction}
-          unavailableActionLabel={settings.locale === "zh" ? "暂不可用" : "Unavailable"}
-        />
-        <ManagedUpdateGroup
-          component={component("opl_base")?.component}
-          fallbackLabel={settings.locale === "zh" ? "基础服务" : "Base services"}
-          actions={component("opl_base")?.actions ?? []}
-          locale={settings.locale}
-          busyKey={actionBusyKey}
-          onAction={onAction}
-          onHostAction={onHostAction}
-          unavailableActionLabel={settings.locale === "zh" ? "暂不可用" : "Unavailable"}
-        />
-      </>;
+      const desktopUpdateActionable = Boolean(nativeAppUpdate?.supported && ["available", "downloading", "downloaded"].includes(nativeAppUpdate.state));
+      const appGroup = <ManagedUpdateGroup
+        component={component("opl_app")?.component}
+        nativeUpdate={nativeAppUpdate}
+        fallbackLabel={catalogOrigin ? (desktopUpdateActionable ? "One Person Lab" : (settings.locale === "zh" ? "当前桌面宿主" : "Current desktop host")) : "One Person Lab"}
+        actions={component("opl_app")?.actions ?? []}
+        locale={settings.locale}
+        busyKey={actionBusyKey}
+        onAction={onAction}
+        onHostAction={onHostAction}
+        unavailableActionLabel={settings.locale === "zh" ? "暂不可用" : "Unavailable"}
+      />;
+      const baseGroup = <ManagedUpdateGroup
+        component={component("opl_base")?.component}
+        fallbackLabel={settings.locale === "zh" ? "基础服务" : "Base services"}
+        actions={component("opl_base")?.actions ?? []}
+        locale={settings.locale}
+        busyKey={actionBusyKey}
+        onAction={onAction}
+        onHostAction={onHostAction}
+        unavailableActionLabel={settings.locale === "zh" ? "暂不可用" : "Unavailable"}
+      />;
+      const hostMaintenance = <>{appGroup}{baseGroup}</>;
       return (
         <>
           <div className="settings-page-summary">
@@ -49,7 +49,7 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
               ? packageAttentionCount ? `${packageAttentionCount} 个能力包需要更新或处理` : `已读取 ${packageStates.length} 个已安装能力包`
               : packageAttentionCount ? `${packageAttentionCount} package(s) need an update or action` : `${packageStates.length} installed package(s) read`}</span> : null}
           </div>
-          {!catalogOrigin ? hostMaintenance : null}
+          {!catalogOrigin ? hostMaintenance : desktopUpdateActionable ? appGroup : null}
           {catalogOrigin === "opl" ? <OplSoftwareUpdates model={model} locale={settings.locale} actionBusyKey={actionBusyKey} onAction={onAction} onManageSources={onManageSources} /> : <ManagedUpdateGroup
             component={component("opl_packages")?.component}
             fallbackLabel={settings.locale === "zh" ? "智能体与能力" : "Agents and capabilities"}
@@ -62,7 +62,7 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
           />}
           {catalogOrigin ? <details className="settings-advanced-actions" data-testid="opl-runtime-maintenance-details">
             <summary>{settings.locale === "zh" ? "桌面宿主与运行组件维护" : "Desktop host and runtime maintenance"}<ChevronDown aria-hidden="true" size={14} /></summary>
-            {hostMaintenance}
+            {desktopUpdateActionable ? baseGroup : hostMaintenance}
           </details> : null}
           {!catalogOrigin && actionViewModel.additionalMaintenanceActions.some((intent) => (
             intent.availability === "ready" && (intent.transport === "app_action" || Boolean(onHostAction))

@@ -2,8 +2,7 @@ import { PackageOperations } from './PackageInstallationProgress';
 import type { usePackageOperations } from './usePackageOperations';
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { softwareAttentionItems, softwareCanStart } from "./softwareExperience";
-import { RefreshCw } from "lucide-react";
-import { packageActivity, latestPackageOperations } from "./packageOperations";
+import { packageActivity } from "./packageOperations";
 import { SoftwareCenterOverview } from "./SoftwareCenterOverview";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -20,7 +19,7 @@ import { SoftwareSourcesPage } from "./SoftwareSourcesPage";
 import { nativeSoftwareInventory, pendingSoftwareSourceAccessCheck, softwareSourceActionLabel } from "./softwareSources";
 import { softwareCatalogInventory } from "./softwareCatalog";
 
-export type ApplicationManagementTab = "applications" | "updates" | "resources" | "sources";
+export type ApplicationManagementTab = "applications" | "updates" | "activity" | "resources" | "sources";
 
 type UpdatesPageProps = Parameters<typeof UpdatesSettingsPage>[0];
 
@@ -77,6 +76,7 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
       confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported });
   }, [actionBusyKey, model.softwareSources, onAction, settings.locale, stateStatus]);
   const [pendingPackageId, setPendingPackageId] = useState<string>();
+  const [statusFilter, setStatusFilter] = useState("all");
   const [focus, setFocus] = useState<{ packageId: string; revision: number }>();
   const pendingPackage = model.packageLifecycle.find(item => item.packageId === pendingPackageId);
   const pendingPackageReady = stateStatus === "ready" && pendingPackage && softwareCanStart(pendingPackage)
@@ -105,8 +105,6 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
   const effectiveBusyKey = actionBusyKey ?? (stateStatus !== "ready" ? "application-management:state" : null);
   const nativeInventory = nativeSoftwareInventory(model.softwareSources);
   const activity = packageActivity(packageOperations?.operations ?? [], packageOperations?.readError ?? false);
-  const affected = new Set([...issues.flatMap(issue => issue.productIds), ...latestPackageOperations(packageOperations?.operations ?? [])
-    .filter(operation => ['failed', 'interrupted'].includes(operation.status)).map(operation => operation.package_id)]).size;
   const resources = (model.applicationManagement?.sharedResources ?? []).filter(resource => ["knowledge_source", "connection"].includes(resource.resourceKind) && resource.consumerPackageIds.some(id => model.packageLifecycle.some(item => item.packageId === id && item.installed === true)));
   const stateUnknown = inventory.total > inventory.installed + inventory.notInstalled || !catalogAvailable || !model.softwareSources || !nativeInventory.complete
     || resources.some(resource => resource.status === "unknown");
@@ -123,24 +121,52 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     onAction,
     onHostAction
   };
+  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
+  const updatesLabel = inventory.updates > 0 ? (zh ? `更新 (${inventory.updates})` : `Updates (${inventory.updates})`) : (zh ? "更新" : "Updates");
+  const activityLabel = activity.running > 0 ? (zh ? `安装记录 (${activity.running})` : `Activity (${activity.running})`) : (zh ? "安装记录" : "Installation activity");
   const pageTabs = [
-    { id: "updates", label: zh ? "更新" : "Updates", content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => { setTab("sources"); onTabChange?.("sources"); }} /> },
+    { id: "updates", label: updatesLabel, content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="opl" onManageSources={() => navigate("sources")} /> },
+    { id: "activity", label: activityLabel, content: packageOperations && (packageOperations.operations.length || packageOperations.readError)
+      ? <PackageOperations operations={packageOperations.operations} locale={settings.locale}
+          labels={Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n[settings.locale] ?? item.label]))}
+          readError={packageOperations.readError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)}
+          onRetry={runAction} onRefresh={refreshAll} onUse={onUseSoftware}
+          readyPackageIds={stateStatus === "ready" ? model.packageLifecycle.filter(softwareCanStart).map(item => item.packageId) : []}
+          onOpenLocation={onOpenInstallationLocation} />
+      : <p className="opl-app-management-feedback">{zh ? "暂无安装、更新或恢复记录。" : "No installation, update or recovery activity yet."}</p> },
     ...(tab === "sources" ? [{ id: "sources", label: zh ? "软件源" : "Software sources", content: <SoftwareSourcesPage projection={model.softwareSources} locale={settings.locale} actionBusyKey={effectiveBusyKey} onAction={onAction} onRefresh={onRefresh} /> }] : [])
   ];
-  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
   const headerStatus = <div className="opl-app-management-status">
-    <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown} inventory={inventory}
-      catalogAvailable={catalogAvailable} complete={nativeInventory.complete} activity={activity} issues={issues.length} affected={affected}
-      observedAt={observedAt} onUpdates={() => navigate('updates')} onRefresh={refreshAll} />
-    {pendingPackage ? <div className="opl-software-continuation" role="status"><div><strong>{pendingPackage.displayNameI18n[settings.locale] ?? pendingPackage.label}</strong><p>{pendingPackageReady ? (zh ? "已可使用，可以继续原来的任务。" : "Ready to use. Continue your task.") : (zh ? "完成安装或必要授权后，可在这里继续。" : "Continue here after installation or required access is ready.")}</p></div><div className="runtime-setting-control">{pendingPackageReady && onUseSoftware ? <Button size="sm" variant="primary" disabled={effectiveBusyKey !== null} onClick={() => onUseSoftware(pendingPackage.packageId)}>{zh ? "继续使用" : "Continue"}</Button> : <Button size="sm" variant="outline" onClick={() => { navigate("applications"); setFocus({ packageId: pendingPackage.packageId, revision: Date.now() }); }}>{zh ? "返回软件" : "Back to software"}</Button>}<Button size="sm" variant="outline" onClick={() => setPendingPackageId(undefined)}>{zh ? "收起" : "Dismiss"}</Button></div></div> : null}
-    {issues.length ? <details className="opl-software-attention" open><summary>{zh ? "需要处理" : "Needs attention"} · {issues.length}</summary>{issues.map(issue => <div className="opl-software-attention-row" key={issue.id}><div><strong>{issue.title}</strong><p>{issue.detail}</p>{issue.products.length ? <small>{zh ? `影响 ${issue.productIds.length} 个软件：` : `Affects ${issue.productIds.length} software items: `}{issue.products.join(zh ? "、" : ", ")}</small> : null}</div><Button size="sm" variant="outline" disabled={effectiveBusyKey !== null} onClick={() => { navigate(issue.destination, { packageId: issue.productIds[0], resourceId: issue.id }); if (issue.packageId) setFocus({ packageId: issue.packageId, revision: Date.now() }); }}>{issue.destination === "sources" ? (zh ? "管理连接" : "Manage connection") : issue.destination === "resources" ? (zh ? "去资料与连接设置" : "Open resource settings") : (zh ? "查看并处理" : "Review")}</Button></div>)}</details> : null}
-    {stateStatus !== "ready" ? <div className="opl-app-management-state" data-testid="opl-app-management-state" data-tone={stateStatus === "error" ? "attention" : "neutral"} role={stateStatus === "error" ? "alert" : "status"}>
-      <p>{stateStatus === "loading" ? (zh ? "正在读取应用与共享资源状态…" : "Reading apps and shared resources…") : (zh ? "状态读取失败，当前信息暂未确认。" : "Could not read the current state. Displayed information is not confirmed.")}{observedAt ? ` ${zh ? "保留上次读取：" : "Last read: "}${observedAt}` : ""}</p>
-      {stateStatus === "error" ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={onRefresh}><RefreshCw size={14} aria-hidden="true" />{zh ? "重新读取" : "Retry"}</button> : null}
-      {stateStatus === "error" && stateError ? <details><summary>{zh ? "错误详情" : "Error details"}</summary><p>{stateError}</p></details> : null}
-    </div> : null}
-    {packageOperations ? <PackageOperations operations={packageOperations.operations} locale={settings.locale} labels={Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n[settings.locale] ?? item.label]))} readError={packageOperations.readError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)} onRetry={runAction} onRefresh={refreshAll} onUse={onUseSoftware} readyPackageIds={stateStatus === "ready" ? model.packageLifecycle.filter(softwareCanStart).map(item => item.packageId) : []} onOpenLocation={onOpenInstallationLocation} /> : null}
+    {tab === "applications" ? <>
+      <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown}
+        inventory={inventory} catalogAvailable={catalogAvailable} complete={nativeInventory.complete}
+        activity={activity} observedAt={observedAt} statusFilter={statusFilter} onSelectStatus={setStatusFilter}
+        onUpdates={() => navigate("updates")} onActivity={() => navigate("activity")} onRefresh={refreshAll} />
+      {stateStatus === "error" && stateError ? <details className="opl-app-management-receipt" data-testid="opl-app-management-state">
+        <summary>{zh ? "读取错误详情" : "Read error details"}</summary><p>{stateError}</p>
+      </details> : null}
+      {issues.length ? <details className="opl-software-attention">
+        <summary>{zh ? `软件与来源问题 · ${issues.length}` : `Software and source issues · ${issues.length}`}</summary>
+        {issues.map(issue => <div className="opl-software-attention-row" key={issue.id}>
+          <div><strong>{issue.title}</strong><p>{issue.detail}</p>
+            {issue.products.length ? <small>{issue.products.join(zh ? "、" : ", ")}</small> : null}</div>
+          <Button size="sm" variant="outline" onClick={() => {
+            navigate(issue.destination, { packageId: issue.productIds[0], resourceId: issue.id });
+            if (issue.packageId) setFocus({ packageId: issue.packageId, revision: Date.now() });
+          }}>{issue.destination === "sources" ? (zh ? "管理软件源" : "Manage sources")
+            : issue.destination === "resources" ? (zh ? "打开资料与连接" : "Open resource settings")
+              : (zh ? "在目录中查看" : "Find in catalog")}</Button>
+        </div>)}
+      </details> : null}
+      {pendingPackageReady && onUseSoftware ? <div className="opl-software-continuation">
+        <span role="status">{pendingPackage.displayNameI18n[settings.locale] ?? pendingPackage.label} {zh ? "已可使用" : "is ready"}</span>
+        <div className="runtime-setting-control">
+          <Button size="sm" variant="primary" disabled={actionBusyKey !== null} onClick={() => onUseSoftware(pendingPackage.packageId)}>{zh ? "继续使用" : "Continue"}</Button>
+          <Button size="sm" variant="outline" onClick={() => setPendingPackageId(undefined)}>{zh ? "收起" : "Dismiss"}</Button>
+        </div>
+      </div> : null}
+    </> : null}
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}</div>;
-  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "找到需要的软件，开始使用，并管理安装与更新。" : "Find software, start using it, and manage installation and updates."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;
+  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "按需安装、组合与更新软件和插件。" : "Install, compose, and update software and plugins."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;
 }

@@ -15,7 +15,7 @@ function createPayload(root, overrides = {}) {
   fs.mkdirSync(path.join(runtime, "opl"), { recursive: true });
   fs.writeFileSync(path.join(runtime, "bin", "opl"), "#!/bin/sh\nexit 0\n");
   fs.chmodSync(path.join(runtime, "bin", "opl"), 0o755);
-  fs.writeFileSync(path.join(runtime, "opl", "package.json"), JSON.stringify({ name: "opl-framework" }));
+  fs.writeFileSync(path.join(runtime, "opl", "package.json"), JSON.stringify({ name: "opl-framework", version: overrides.frameworkVersion ?? "0.3.16" }));
   fs.mkdirSync(path.join(runtime, "node", "bin"), { recursive: true });
   fs.mkdirSync(path.join(runtime, "node", "lib", "node_modules", "npm", "bin"), { recursive: true });
   fs.writeFileSync(path.join(runtime, "node", "lib", "node_modules", "npm", "bin", "npm-cli.js"), "// npm fixture\n");
@@ -142,8 +142,13 @@ test("Full upgrade replaces old seed modules exactly while preserving the native
   fs.writeFileSync(path.join(initial.runtimeHome, "modules", "custom-package", "deleted-in-v2"), "old file");
   fs.mkdirSync(path.join(homeDir, ".codex", "plugins"), { recursive: true });
   fs.writeFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "owner-selected v3");
-  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending.json"), "verified pending generation");
-  const nextResources = createPayload(path.join(root, "new"), { version: "0.2.0" });
+  fs.mkdirSync(path.join(initial.runtimeHome, "opl.pending"), { recursive: true });
+  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending", "package.json"), JSON.stringify({ name: "opl-framework", version: "0.3.22" }));
+  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending", "readonly.txt"), "keep mode");
+  fs.chmodSync(path.join(initial.runtimeHome, "opl.pending", "readonly.txt"), 0o444);
+  const pendingMeta = JSON.stringify({ surface_kind: "opl_framework_pending_generation.v1", target_root: path.join(initial.runtimeHome, "opl"), pending_root: path.join(initial.runtimeHome, "opl.pending") });
+  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending.json"), pendingMeta);
+  const nextResources = createPayload(path.join(root, "new"), { version: "0.2.0", frameworkVersion: "0.3.20" });
   const nextModule = path.join(nextResources, "opl-studio-full-runtime", "runtime", "current", "modules", "custom-package");
   fs.mkdirSync(nextModule, { recursive: true });
   fs.writeFileSync(path.join(nextModule, "runtime"), "seed v2");
@@ -154,10 +159,41 @@ test("Full upgrade replaces old seed modules exactly while preserving the native
   assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "utf8"), "seed v2");
   assert.equal(fs.existsSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "deleted-in-v2")), false);
   assert.equal(fs.readFileSync(path.join(homeDir, ".codex", "plugins", "user-choice"), "utf8"), "owner-selected v3");
-  assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "opl.pending.json"), "utf8"), "verified pending generation");
+  assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "opl.pending.json"), "utf8"), pendingMeta);
+  assert.equal(fs.statSync(path.join(upgraded.runtimeHome, "opl.pending", "readonly.txt")).mode & 0o777, 0o444);
   fs.writeFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "later owner update");
   await ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: path.join(root, "new", "Resources"), homeDir, env: { PATH: "/usr/bin" }, platform: "linux" });
   assert.equal(fs.readFileSync(path.join(upgraded.runtimeHome, "modules", "custom-package", "runtime"), "utf8"), "later owner update");
+});
+
+test("Full upgrade discards stale or older opl.pending generations instead of carrying them into the newer runtime", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-full-stale-pending-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const initial = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath: createPayload(path.join(root, "old"), { version: "0.1.0", frameworkVersion: "0.3.16" }),
+    homeDir,
+    env: { PATH: "/usr/bin" },
+    platform: "linux"
+  });
+  fs.mkdirSync(path.join(initial.runtimeHome, "opl.pending"), { recursive: true });
+  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending", "package.json"), JSON.stringify({ name: "opl-framework", version: "0.3.18" }));
+  fs.writeFileSync(path.join(initial.runtimeHome, "opl.pending.json"), JSON.stringify({
+    surface_kind: "opl_framework_pending_generation.v1",
+    target_root: path.join(initial.runtimeHome, "opl"),
+    pending_root: path.join(initial.runtimeHome, "opl.pending")
+  }));
+  const upgraded = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath: createPayload(path.join(root, "new"), { version: "0.2.0", frameworkVersion: "0.3.20" }),
+    homeDir,
+    env: { PATH: "/usr/bin" },
+    platform: "linux"
+  });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(upgraded.runtimeHome, "opl", "package.json"), "utf8")).version, "0.3.20");
+  assert.equal(fs.existsSync(path.join(upgraded.runtimeHome, "opl.pending")), false);
+  assert.equal(fs.existsSync(path.join(upgraded.runtimeHome, "opl.pending.json")), false);
 });
 
 test("packaged Full runtime rejects a carrier manifest that can embed a second Codex payload", async (t) => {

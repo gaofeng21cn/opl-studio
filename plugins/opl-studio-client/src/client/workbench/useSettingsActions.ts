@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { OplActionReceipt, OplBridge } from "../bridge/oplBridge";
 import { actionReceiptView, type ActionReceiptView } from "./actionReceiptView";
 import { dockerDiagnosticFromReceipt } from "./appProjection";
-import { packageActionVerb, preparePackageOperationRequest } from "./packageOperations";
+import { preparePackageOperationRequest } from "./packageOperations";
 import type { SettingsActionFeedback, SettingsDockerDiagnostic } from "./settings/types";
 import type { SettingsActionRequest } from "./settingsActions";
 import type { SettingsActionConfirmation } from "./settings/presentation";
@@ -76,8 +76,7 @@ export function useSettingsActions({
     if (request.actionId !== 'package_operation_start' || !packageOperations.accept(receipt)) return false;
     setSettingsActionConfirmation(null);
     setSettingsActionReceipt(null);
-    const verb = packageActionVerb(String(request.payload.action_id), settings.locale);
-    setSettingsActionFeedback({ tone: 'neutral', message: settings.locale === 'zh' ? `${verb}已在后台开始，可在软件中心查看进度。` : `${verb} started in the background. View progress in Software Center.` });
+    setSettingsActionFeedback(null);
     settleWorkbenchAction(request.key, { status: 'running' });
     return true;
   }

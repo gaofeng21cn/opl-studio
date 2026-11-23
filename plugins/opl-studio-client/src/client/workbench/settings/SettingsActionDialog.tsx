@@ -9,8 +9,9 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
  const confirmationDialogRef = useRef<HTMLElement>(null);
  const confirmationCancelRef = useRef<HTMLButtonElement>(null);
  const open = Boolean(pendingConfirmation);
+ const actionId = pendingConfirmation?.request.payload.action_id ?? pendingConfirmation?.request.actionId;
  const downloadAction = pendingConfirmation?.preview?.downloadPlan?.length
-   ? packageActionVerb(String(pendingConfirmation.request.payload.action_id ?? pendingConfirmation.request.actionId), settings.locale) : null;
+   ? packageActionVerb(String(actionId), settings.locale) : null;
  useEffect(() => { if (!open) return; const previous = document.activeElement; confirmationCancelRef.current?.focus(); return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); }; }, [open]);
  return (pendingConfirmation ? createPortal(
         <div className="settings-action-dialog-backdrop" role="presentation">
@@ -45,7 +46,7 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
                     ? "确认后，本机新会话将默认通过 OPL Gateway 访问模型。账户本身不会被修改。"
                     : "New conversations on this device will use OPL Gateway for model access by default. The account itself will not be changed.")
                 : (settings.locale === "zh" ? `${pendingConfirmation.previewStatus === "preview_ready" ? "检查已完成。" : ""}确认后将执行此操作并刷新最新状态。` : `${pendingConfirmation.previewStatus === "preview_ready" ? "The check is complete. " : ""}Confirm to run this action and refresh the latest status.`)}</p> : null}
-              {pendingConfirmation.preview?.downloadPlan ? <PackageDownloadPreview plans={pendingConfirmation.preview.downloadPlan} locale={settings.locale} products={products} /> : null}
+              {pendingConfirmation.preview?.downloadPlan ? <PackageDownloadPreview plans={pendingConfirmation.preview.downloadPlan} locale={settings.locale} products={products} restoring={actionId === "agent_package_repair"} /> : null}
               {pendingConfirmation.preview && !pendingConfirmation.preview.downloadPlan && <div data-testid="opl-action-preview-detail"><p>{pendingConfirmation.preview.owner}</p><p>{pendingConfirmation.preview.summary}</p><p>{pendingConfirmation.preview.affectedCategories.join(" · ")}</p><p>{pendingConfirmation.preview.nextStep}</p>{pendingConfirmation.preview.selectedBytes !== undefined || pendingConfirmation.preview.expectedRemainingBytes !== undefined ? <p>{settings.locale === "zh" ? `将释放 ${formatBytes(pendingConfirmation.preview.selectedBytes, settings.locale)}，预计保留 ${formatBytes(pendingConfirmation.preview.expectedRemainingBytes, settings.locale)}` : `Will release ${formatBytes(pendingConfirmation.preview.selectedBytes, settings.locale)}; expected remaining ${formatBytes(pendingConfirmation.preview.expectedRemainingBytes, settings.locale)}`}</p> : null}{pendingConfirmation.preview.recoverability ? <p>{settings.locale === "zh" ? `恢复能力：${pendingConfirmation.preview.recoverability === "not_restorable" ? "不可恢复" : pendingConfirmation.preview.recoverability}` : `Recovery: ${pendingConfirmation.preview.recoverability}`}</p> : null}{pendingConfirmation.preview.protectedFromChange?.length ? <p>{settings.locale === "zh" ? `不会改变：${pendingConfirmation.preview.protectedFromChange.join("、")}` : `Will not change: ${pendingConfirmation.preview.protectedFromChange.join(", ")}`}</p> : null}{pendingConfirmation.preview.affectedFiles?.length ? <ul style={{ maxHeight: 180, overflow: "auto" }}>{pendingConfirmation.preview.affectedFiles.map(file => <li key={file.name}>{file.name} · {formatBytes(file.bytes, settings.locale)}</li>)}</ul> : null}</div>}
               {pendingConfirmation.previewStatus !== "confirmation_required" ? <small>{settings.locale === "zh" ? "预检查" : "Preview"}: {formatStatus(pendingConfirmation.previewStatus, settings.locale)}</small> : null}
             </div>

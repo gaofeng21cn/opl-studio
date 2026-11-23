@@ -519,8 +519,8 @@ export function channelUnavailableMessage(reason: string | undefined, zh: boolea
   ]);
   if (setupReasons.has(reason ?? "")) {
     return zh
-      ? '微信能力尚未安装或启用。请打开“软件中心 → 运行组件”，启用微信后刷新此页。'
-      : 'The Weixin capability is not installed or enabled. Open Software Center → Runtime components, enable it, then refresh this page.';
+      ? '在软件中心搜索“微信远程”，检查是否已安装并启用。'
+      : 'Search for Weixin in Software Center and check that it is installed and enabled.';
   }
   if (["projection_unavailable", "invalid_projection", "state_unavailable"].includes(reason ?? "")) {
     return zh
@@ -528,8 +528,8 @@ export function channelUnavailableMessage(reason: string | undefined, zh: boolea
       : 'Weixin status is temporarily unavailable. Refresh this page; if it persists, check Logs and diagnostics.';
   }
   return zh
-    ? '微信当前不可用。请在“软件中心 → 运行组件”检查微信能力，完成后刷新此页。'
-    : 'Weixin is currently unavailable. Check the Weixin capability in Software Center → Runtime components, then refresh this page.';
+    ? '请在软件中心检查微信远程插件的状态，然后刷新此页。'
+    : 'Check the Weixin plugin in Software Center, then refresh this page.';
 }
 
 function ChannelAccessView({ entry, owner }: {

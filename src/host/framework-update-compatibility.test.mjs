@@ -29,7 +29,8 @@ test('automatic apply rejects stale channels, unknown versions and mismatched ta
     [{ channel_version: '0.3.5-alpha.1' }, 'framework_update_downgrade_blocked'],
     [{ channel_version: null }, 'framework_update_version_unverified'],
     [{ source_archive_configured: true }, 'framework_update_version_unverified'],
-    [{ target_root: '/another-root' }, 'framework_update_target_unverified']
+    [{ target_root: '/another-root' }, 'framework_update_target_unverified'],
+    [{ channel_artifact: `ghcr.io/gaofeng21cn/one-person-lab-framework@sha256:${'b'.repeat(64)}` }, 'framework_update_artifact_unverified']
   ]) {
     const original = { ...f.source };
     Object.assign(f.source, change);
@@ -38,6 +39,13 @@ test('automatic apply rejects stale channels, unknown versions and mismatched ta
     Object.assign(f.source, original);
   }
   await assert.rejects(frameworkUpdateEnvironment({}, { operation: 'activate' }), { code: 'framework_update_target_unbound' });
+});
+
+test('eligible apply accepts digest-pinned channel_artifact refs emitted by Framework', async (t) => {
+  const f = await fixture(t);
+  f.source.channel_artifact = `ghcr.io/gaofeng21cn/one-person-lab-framework@${f.source.channel_artifact_digest}`;
+  const updated = await frameworkUpdateEnvironment(f.env, { operation: 'apply', plan: f.plan });
+  assert.equal(updated.OPL_FRAMEWORK_ARTIFACT_REF, `ghcr.io/gaofeng21cn/one-person-lab-framework@${f.source.channel_artifact_digest}`);
 });
 
 test('eligible apply binds the owner command to the inspected immutable artifact without changing the current root', async (t) => {

@@ -32,9 +32,9 @@ export function localizedPackageDescription(
 
 export function packageActionLabel(action: PackageLifecycleActionRef, locale: WorkbenchSettings["locale"]): string {
   const labels: Record<PackageLifecycleActionRef["kind"], [string, string]> = {
-    install: ["安装到当前宿主", "Install in this host"],
+    install: ["安装", "Install"],
     update: ["更新", "Update"],
-    repair: ["修复", "Repair"],
+    repair: ["恢复安装", "Restore installation"],
     uninstall: ["卸载", "Uninstall"],
     preferences: ["偏好", "Preferences"],
     other: ["管理", "Manage"]
@@ -119,10 +119,10 @@ export function agentAvailabilityDetail(item: AgentPackageLifecycleRef, locale: 
   if (status === "not_installed") return zh ? "此软件尚未安装到当前宿主。安装完成后可通过软件提供的入口使用。" : "This software is not installed in the current host. Install it here to use its provided entry points.";
   if (status === "disabled") return zh ? "此软件已停用。" : "This software is disabled.";
   const missing = (item.dependencies ?? []).filter(dep => dep.required !== false && (dep.present === false || dep.callable === false)).map(dep => dep.packageId);
-  if (missing.length) return zh ? `必需能力不可用：${missing.join("、")}。点击“修复”补齐后重新检查。` : `Required capabilities unavailable: ${missing.join(", ")}. Choose Repair and check again.`;
-  if (item.readiness.reason === "hosted_agent_source_unavailable") return zh ? "插件已登记，但执行所需文件缺失。点击“修复”恢复完整安装。" : "The plugin is registered, but its execution files are missing. Choose Repair to restore the full installation.";
+  if (missing.length) return zh ? `必需能力不可用：${missing.join("、")}。选择“恢复安装”补齐后重新检查。` : `Required capabilities unavailable: ${missing.join(", ")}. Choose Restore installation and check again.`;
+  if (item.readiness.reason === "hosted_agent_source_unavailable") return zh ? "插件已登记，但运行所需文件缺失。可选择“恢复安装”重新准备文件，不影响个人数据。" : "The plugin is registered, but its runtime files are missing. Choose Restore installation to prepare files without affecting personal data.";
   if (item.readiness.statusReadError) return zh ? "无法读取软件状态。请重新检查；若仍失败，到诊断页查看原因。" : "Software status could not be read. Refresh, then open Diagnostics if it still fails.";
-  if (status === "unavailable") return zh ? "软件的调用或启动检查未通过。点击“修复”，并在检查详情中查看具体原因。" : "Calling or launch checks failed. Choose Repair and review Check details for the cause.";
+  if (status === "unavailable") return zh ? "软件的调用或启动检查未通过。可选择“恢复安装”，并在详情中查看具体原因。" : "Calling or launch checks failed. Choose Restore installation and review details for the cause.";
   return zh ? "状态来自本机安装与运行检查。" : "Based on local installation and runtime checks.";
 }
 

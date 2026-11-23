@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PackageOperations, PackageDownloadPreview, PackageActivityButton } from '../../plugins/opl-studio-client/src/client/workbench/PackageInstallationProgress';
 import { packageActivity, packageRemainingTime, packageOperationRequest, preparePackageOperationRequest, readPackageOperation } from '../../plugins/opl-studio-client/src/client/workbench/packageOperations';
 import { SoftwareCenterOverview } from '../../plugins/opl-studio-client/src/client/workbench/SoftwareCenterOverview';
+import { runtimeDependencyStatus } from "../../plugins/opl-studio-client/src/client/workbench/softwareCatalog";
 import { actionReceiptView } from '../../plugins/opl-studio-client/src/client/workbench/actionReceiptView';
 
 const operation = { operation_id: 'fixture', package_id: 'mac-media-assets', action_id: 'agent_package_install', status: 'running', stage: 'downloading', can_cancel: true, downloaded_bytes: 250, total_bytes: 1000, bytes_per_second: 50, eta_seconds: 15 };
@@ -77,6 +78,8 @@ test('a newer successful attempt clears an old failure and active tasks are neve
   const html = renderToStaticMarkup(createElement(PackageOperations, { operations: [...rows, operation], locale: 'en', labels: { 'mac-media-assets': 'MAC Media Assets' }, readError: false, cancelling: null, onCancel() {}, onRetry() {}, onRefresh() {} }));
   expect(html).toContain('value="250"');
   expect(html.indexOf('MAC Media Assets')).toBeLessThan(html.indexOf('Recent tasks'));
+  expect(render({ status: 'completed', stage: 'completed', action_id: 'agent_package_repair' })).toContain('<details class="opl-package-operation-history">');
+  expect(render({ status: 'completed', stage: 'completed', action_id: 'agent_package_repair' })).toContain('恢复安装完成');
 });
 
 test('global activity and overview distinguish unknown results, background work and ordinary updates', () => {
@@ -84,10 +87,10 @@ test('global activity and overview distinguish unknown results, background work 
   expect(renderToStaticMarkup(createElement(PackageActivityButton, { activity, locale: 'zh', onOpen() {} }))).toContain('1 项进行中');
   expect(renderToStaticMarkup(createElement(PackageActivityButton, { activity: { ...activity, readError: true }, locale: 'zh', onOpen() {} }))).toContain('进度待确认');
   expect(renderToStaticMarkup(createElement(PackageActivityButton, { activity: { running: 0, attention: 0, readError: false }, locale: 'zh', onOpen() {} }))).toBe('');
-  const props = { locale: 'zh' as const, stateStatus: 'ready' as const, stateUnknown: false, inventory: { total: 5, installed: 3, notInstalled: 2, updates: 1 }, catalogAvailable: true, complete: true, activity: { running: 0, attention: 0, readError: false }, issues: 0, affected: 0, observedAt: null, onUpdates() {}, onRefresh() {} };
+  const props = { locale: 'zh' as const, stateStatus: 'ready' as const, stateUnknown: false, inventory: { total: 5, installed: 3, notInstalled: 2, updates: 1 }, catalogAvailable: true, complete: true, activity: { running: 0, attention: 0, readError: false }, observedAt: null, onUpdates() {}, onActivity() {}, onRefresh() {} };
   expect(renderToStaticMarkup(createElement(SoftwareCenterOverview, props))).toContain('1 个软件可更新');
   const unknown = renderToStaticMarkup(createElement(SoftwareCenterOverview, { ...props, stateStatus: 'error' }));
-  expect(unknown).toContain('部分状态待确认');
+  expect(unknown).toContain('刷新失败');
   expect(unknown).not.toContain('当前没有待办');
   expect(packageRemainingTime(3660, 'zh')).toBe('约剩 1.1 小时');
 });
@@ -120,4 +123,12 @@ test('first installation separates offline payloads, network services and measur
   expect(localFailure).toContain('此步骤无需联网');
   expect(localFailure).toContain('磁盘空间');
   expect(localFailure).not.toContain('检查网络');
+});
+
+test('a partially present SDK and a detected system CLI report distinct states', () => {
+  const sdk = { dependencyId: 'temporal-runtime', dependencyKind: 'runtime_substrate', installed: true, version: { worker: '1.25.0', client: null }, latestVersion: '1.25.0',
+    currentness: 'missing', status: 'attention_needed', updatePolicy: 'updated_with_opl_base_framework_generation', updateMode: 'silent_managed', activationPolicy: 'app_launch_reconcile_generation_switch' };
+  expect(runtimeDependencyStatus(sdk, 'zh')).toEqual({ state: 'attention', label: '组件安装不完整' });
+  expect(runtimeDependencyStatus({ ...sdk, currentness: 'current', status: 'ready' }, 'zh')).toEqual({ state: 'installed' });
+  expect(runtimeDependencyStatus({ ...sdk, dependencyKind: 'external_cli', status: 'unknown', currentness: 'unknown', version: null }, 'zh')).toEqual({ state: 'installed', label: '已检测到，版本未读' });
 });

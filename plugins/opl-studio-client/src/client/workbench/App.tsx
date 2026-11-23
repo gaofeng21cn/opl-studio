@@ -2640,7 +2640,7 @@ export function App({
     superagent: { read: bridge.readSuperagent, execute: bridge.executeSuperagent },
     teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
-    openPackageActivity: () => { setApplicationManagementTab('applications'); setPrimaryView('applications'); },
+    openPackageActivity: () => { setApplicationManagementTab('activity'); setPrimaryView('applications'); },
     applicationManagement: <ApplicationManagementPage
       packageOperations={packageOperations}
       model={model}
@@ -2690,7 +2690,10 @@ export function App({
       onOpenThread={openCanonicalThreadRef}
       mcpApps={{ ...mcpApps, threadId: codexThreadId }}
     />,
-    openPrimaryView: setPrimaryView,
+    openPrimaryView: view => {
+      if (view === "applications") setApplicationManagementTab("applications");
+      setPrimaryView(view);
+    },
     composerAccessory: <><ComposerAccessory
       locale={settings.locale}
       recoveredDrafts={drafts.recovered}

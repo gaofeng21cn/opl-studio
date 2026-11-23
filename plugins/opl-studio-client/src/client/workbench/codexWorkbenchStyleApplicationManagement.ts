@@ -21,32 +21,15 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     gap: 8px;
   }
 
-  .opl-app-management-overview {
-    width: min(100%, 960px);
-    margin-inline: auto;
-  }
-
-  .opl-software-primary-status { display: flex; align-items: flex-start; gap: 10px; padding-block: 12px 16px; color: var(--dsw-alias-label-primary); }
-  .opl-software-primary-status > svg { margin-top: 2px; flex: 0 0 auto; }
-  .opl-software-primary-status > div { min-width: 0; flex: 1; }
-  .opl-software-primary-status strong { font-size: var(--dsw-font-s-14-font-size); font-weight: 500; }
-  .opl-software-primary-status p { margin: 5px 0 0; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); max-width: 72ch; }
-  .opl-software-primary-status[data-state="attention"] > svg { color: var(--opl-warning); }
   .opl-app-management-summary > button { padding: 0; border: 0; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .opl-app-management-summary > button.opl-summary-filter { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: var(--dsw-radius-sm); text-decoration: none; color: var(--opl-muted); }
+  .opl-app-management-summary > button.opl-summary-filter:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+  .opl-app-management-summary > button.opl-summary-filter[aria-pressed="true"] { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+  .opl-app-management-summary > button.opl-summary-filter[aria-pressed="true"]::after { content: ""; position: absolute; inset: auto 4px 0; border-block-end: 2px solid var(--dsw-alias-label-primary); }
   .opl-app-management-summary > button:focus-visible { outline: 2px solid var(--dsw-alias-label-primary); outline-offset: 4px; }
-  .opl-app-management-summary .opl-software-observed { margin-left: auto; }
-  @media (max-width: 680px) {
-    .opl-software-primary-status { flex-wrap: wrap; }
-    .opl-software-primary-status > div { flex-basis: calc(100% - 32px); }
-    .opl-software-primary-status > button { margin-left: 28px; }
-    .opl-app-management-summary .opl-software-observed { margin-left: 0; grid-column: 1 / -1; }
-  }
-
-  .opl-app-management-overview .opl-app-management-summary {
-    width: 100%;
-  }
-
-  .opl-app-management-status .opl-app-management-summary { margin: 0; box-sizing: border-box; }
+  .opl-app-management-summary .opl-software-observed { margin-inline-start: auto; gap: 12px; flex-wrap: wrap; }
+  .opl-software-observed > [role="status"]:empty { position: absolute; }
+  .opl-app-management-status .opl-app-management-summary { margin: 0; padding-block: 8px; border-block-start: 0; box-sizing: border-box; }
 
   .opl-app-management-summary > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 
@@ -586,11 +569,7 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     color: var(--opl-muted);
   }
 
-  .opl-app-management-state { width: min(100%, 960px); margin: 12px auto 0; padding: 12px 0; color: var(--opl-muted); font-size: var(--opl-text-sm); line-height: var(--opl-leading-relaxed); }
-  .opl-app-management-state[data-tone="attention"] { color: var(--opl-warning); }
-  .opl-app-management-state p { margin: 0 0 8px; overflow-wrap: anywhere; }
-  .opl-app-management-state details { margin-top: 8px; }
-  .opl-app-management-state summary, .opl-resource-details summary { cursor: pointer; }
+  .opl-resource-details summary { cursor: pointer; }
   .opl-resource-intro { margin: 0 0 24px; max-width: 72ch; color: var(--opl-muted); font-size: var(--opl-text-sm); line-height: var(--opl-leading-relaxed); }
   .opl-resource-section { margin: 30px 0; }
   .opl-resource-section-heading h2 { margin: 0; font-size: var(--opl-text-lg); font-weight: var(--opl-weight-semibold); }
@@ -656,7 +635,8 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
       justify-content: flex-start;
     }
 
-    .opl-app-management-status .opl-app-management-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+    .opl-app-management-status .opl-app-management-summary { gap: 6px 12px; }
+    .opl-app-management-summary .opl-software-observed { margin-inline-start: 0; }
     .opl-app-management-status .opl-app-management-summary > span { min-width: 0; }
     .opl-dsh-owner-filters { align-items: stretch; }
     .opl-dsh-owner-filters > input { flex-basis: 100%; min-width: 0; }
@@ -694,12 +674,17 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
     .opl-app-management-tabs button svg { display: none; }
   }
 
-  .opl-catalog-controls { display: grid; gap: 16px; }
-  .opl-catalog-scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
-  .opl-catalog-scope-options { display: flex; gap: 2px; padding: 4px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-interactive-bg-hover); }
-  .opl-catalog-scope-options button { background: transparent; border-color: transparent; color: var(--dsw-alias-label-secondary); }
+  .opl-catalog-controls { display: grid; gap: 12px; }
+  .opl-catalog-scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+  .opl-catalog-scope-options { display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; gap: 2px; padding: 4px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-interactive-bg-hover); }
+  .opl-catalog-scope-options button { position: relative; flex: none; background: transparent; border-color: transparent; color: var(--dsw-alias-label-secondary); }
   .opl-catalog-scope-options button[aria-pressed="true"] { background: var(--dsw-alias-bg-layer-1); border-color: var(--dsw-alias-border-l3); color: var(--dsw-alias-label-primary); }
+  .opl-catalog-scope-options button[aria-pressed="true"]::after { content: ""; position: absolute; inset: auto 8px 0; border-block-end: 2px solid var(--dsw-alias-label-primary); }
   .opl-catalog-scope p { margin: 0; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); }
+  .opl-catalog-more { position: relative; }
+  .opl-catalog-more > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md); font-size: var(--dsw-font-xs-13-font-size); color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
+  .opl-catalog-more > summary::-webkit-details-marker { display: none; }
+  .opl-catalog-more-menu { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 20; min-width: max-content; padding: 6px; border: 1px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); display: grid; gap: 4px; }
   .opl-catalog-external-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xs-13-font-size); }
   .opl-catalog-external-status > span { flex: 1; }
   .opl-catalog-row-facts { flex-basis: 100%; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); line-height: var(--dsw-font-xxs-12-line-height); font-variant-numeric: tabular-nums; }
@@ -712,9 +697,13 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   .opl-software-source-group-heading { margin-bottom: 16px; }
   .opl-software-source-group-heading h2 { margin: 0; font-size: var(--dsw-font-s-14-font-size); font-weight: 600; color: var(--dsw-alias-label-primary); }
   .opl-software-source-group-heading p { max-width: 72ch; margin: 7px 0 0; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
-  .opl-package-updates { margin-top: 28px; }
+  .opl-package-updates { margin-top: 24px; }
   .opl-package-updates h2 { margin: 0 0 8px; font-size: var(--dsw-font-s-14-font-size); font-weight: 600; }
-  .opl-package-updates > p { margin: 0 0 16px; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
+  .opl-package-updates > p { margin: 0 0 14px; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); color: var(--dsw-alias-label-secondary); }
+  .opl-plugin-update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .opl-plugin-updates-details { margin-top: 20px; }
+  .opl-plugin-updates-list { margin-top: 8px; }
+  .opl-plugin-updates-list > summary { cursor: pointer; font-size: var(--dsw-font-xs-13-font-size); color: var(--dsw-alias-label-secondary); }
   .opl-package-update-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 14px 0; border-top: 1px solid var(--dsw-alias-border-l3); font-size: var(--dsw-font-xs-13-font-size); }
   .opl-package-update-row > div { display: grid; gap: 5px; flex: 1; min-width: 180px; }
   .opl-package-update-row > div > span { color: var(--dsw-alias-label-secondary); font-size: var(--dsw-font-xxs-12-font-size); font-variant-numeric: tabular-nums; }
@@ -727,7 +716,7 @@ export const codexWorkbenchStyleApplicationManagement = `  .opl-app-management {
   }
 
 
-  .opl-software-attention { margin: 16px 0; font-size: var(--opl-text-sm); color: var(--opl-text); }
+  .opl-software-attention { margin: 0; font-size: var(--opl-text-sm); color: var(--opl-text); }
   .opl-software-attention > summary { cursor: pointer; width: fit-content; font-weight: var(--opl-weight-medium); }
   .opl-software-attention-row, .opl-software-continuation { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--opl-border); }
   .opl-software-attention-row > div:first-child, .opl-software-continuation > div:first-child { min-width: 0; }

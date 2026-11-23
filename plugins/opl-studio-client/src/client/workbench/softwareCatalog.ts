@@ -1,4 +1,4 @@
-import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
+import type { AgentPackageLifecycleRef, ManagedRuntimeDependencyRef, WorkbenchModel } from "./workbenchModel";
 import type { NativeSoftwareItemRef, SoftwareActivationStatus, SoftwareInstallationRef } from "./workbenchModel-package-contracts";
 import { nativeAvailableDisplayVersion, nativeSoftwareProducts } from "./softwareSources";
 import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
@@ -8,7 +8,7 @@ export type SoftwareCatalogState = "not_installed" | "installed" | "update_avail
 
 /** Maintenance origin is supplied by Framework; technical package roles never select the source. */
 export function packageCatalogScope(item: AgentPackageLifecycleRef): SoftwareCatalogScope {
-  if (item.managementScope === "local_component" || item.catalogScope === "host_component") return "components";
+  if (item.catalogScope === "host_component" || (item.catalogScope !== "software" && item.managementScope === "local_component")) return "components";
   return item.catalogOrigin === "opl" ? "opl" : "external";
 }
 
@@ -38,7 +38,35 @@ export function nativeCatalogState(item: NativeSoftwareItemRef): SoftwareCatalog
 }
 
 export function catalogStateLabel(state: SoftwareCatalogState, locale: "zh" | "en") {
-  return ({ not_installed: ["未安装", "Not installed"], installed: ["已安装", "Installed"], update_available: ["可更新", "Update available"], attention: ["需要处理", "Needs attention"], unknown: ["状态待确认", "Status not confirmed"] })[state][locale === "zh" ? 0 : 1];
+  return ({ not_installed: ["未安装", "Not installed"], installed: ["已安装", "Installed"], update_available: ["可更新", "Update available"], attention: ["需检查", "Needs check"], unknown: ["状态待确认", "Status not confirmed"] })[state][locale === "zh" ? 0 : 1];
+}
+
+/** Express the concrete owner-projected reason instead of a vague "needs attention" label. */
+export function packageCatalogStatusLabel(item: AgentPackageLifecycleRef, locale: "zh" | "en"): string {
+  const zh = locale === "zh";
+  const state = packageCatalogState(item);
+  if (state === "not_installed" && item.installabilityReason === "package_install_source_unavailable") {
+    return zh ? "安装来源不可用" : "Install source unavailable";
+  }
+  if (state !== "attention") return catalogStateLabel(state, locale);
+  if (item.activeInstallationStatus === "conflict") return zh ? "安装冲突" : "Installation conflict";
+  if (packageAccessNeedsAttention(item)) return zh ? "需连接软件源" : "Connect source";
+  if (item.currentness === "needs_restart") return zh ? "待重启生效" : "Restart required";
+  if (item.currentness === "needs_reload") return zh ? "需重新加载" : "Reload required";
+  if (item.currentness === "staged") return zh ? "已暂存待生效" : "Staged";
+  if (item.readiness.reason === "hosted_agent_source_unavailable") return zh ? "安装不完整" : "Incomplete installation";
+  if (item.currentness === "failed_with_repair" || item.currentness === "skipped_manual_required"
+    || item.readiness.operationalReady === false || item.readiness.callable === false || item.readiness.launchAllowed === false) {
+    return zh ? "需恢复安装" : "Needs restore";
+  }
+  return catalogStateLabel(state, locale);
+}
+
+export function nativeCatalogStatusLabel(item: NativeSoftwareItemRef, locale: "zh" | "en"): string {
+  const zh = locale === "zh";
+  if (item.updateStatus === "needs_restart") return zh ? "待重启生效" : "Restart required";
+  if (item.activeInstallationStatus === "conflict") return zh ? "安装冲突" : "Installation conflict";
+  return catalogStateLabel(nativeCatalogState(item), locale);
 }
 
 export function catalogTypeLabel(item: Pick<AgentPackageLifecycleRef, "softwareType" | "catalogOrigin" | "catalogSource">, locale: "zh" | "en") {
@@ -93,4 +121,24 @@ export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLif
 /** The owner selects one update source independently of installed replicas. */
 export function nativeCatalogAvailableVersion(product: Pick<ReturnType<typeof nativeSoftwareProducts>[number], "item">, _locale: "zh" | "en") {
   return nativeAvailableDisplayVersion(product.item);
+}
+
+/** Currentness describes the dependency as a whole; presence can mean only a partial install. */
+export function runtimeDependencyStatus(dependency: ManagedRuntimeDependencyRef, locale: "zh" | "en"): {
+  state: SoftwareCatalogState; label?: string;
+} {
+  const zh = locale === "zh";
+  if (dependency.installed === false) return { state: "not_installed" };
+  if (dependency.installed !== true) return { state: "unknown" };
+  if (dependency.currentness === "missing") {
+    return { state: "attention", label: zh ? "组件安装不完整" : "Incomplete installation" };
+  }
+  if (dependency.currentness === "update_available") return { state: "update_available" };
+  if (["failed", "attention_required", "attention_needed", "unavailable"].includes(dependency.status)) {
+    return { state: "attention", label: zh ? "运行检查未通过" : "Runtime check failed" };
+  }
+  if (dependency.dependencyKind === "external_cli" && !dependency.version) {
+    return { state: "installed", label: zh ? "已检测到，版本未读" : "Detected, version not read" };
+  }
+  return { state: "installed" };
 }

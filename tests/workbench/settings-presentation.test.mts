@@ -243,7 +243,7 @@ test("updates page explains internal ownership for runtime dependencies and pack
   assert.match(settingsSource, /managed-runtime-dependencies/);
   assert.match(settingsSource, /由 OPL 托管自动更新/);
   assert.match(settingsSource, /仅检测并提示，不自动接管维护/);
-  assert.match(settingsSource, /Temporal 运行时/);
+  assert.match(settingsSource, /Temporal 工作流组件（OPL 内置）/);
   assert.match(settingsSource, /已安装 Agent 与能力包/);
   assert.match(settingsSource, /managed-package-states/);
 });
@@ -670,7 +670,7 @@ test("native software shares the application catalog and dispatches revision-bou
   }
 });
 
-async function withSettingsTestDom(run: (surface: { container: HTMLElement; render(node: unknown): void }) => void) {
+async function withSettingsTestDom(run: (surface: { container: HTMLElement; render(node: unknown): void }) => void | Promise<void>) {
   const { createElement } = await import("react");
   const { createRoot } = await import("react-dom/client");
   const { flushSync } = await import("react-dom");
@@ -687,7 +687,7 @@ async function withSettingsTestDom(run: (surface: { container: HTMLElement; rend
   browser.document.body.append(container);
   const root = createRoot(container as unknown as Element);
   try {
-    run({
+    await run({
       container: container as unknown as HTMLElement,
       render(node) { flushSync(() => root.render(node as ReturnType<typeof createElement>)); }
     });
@@ -747,8 +747,8 @@ test("runtime dependencies stay outside software counts and preserve owner maint
     assert.match(row.textContent ?? "", /Codex CLI/);
     assert.match(row.textContent ?? "", /1\.2\.3/);
     assert.match(row.textContent ?? "", /1\.2\.4/);
-    flushSync(() => [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看维护")!.click());
-    assert.deepEqual(tabs, ["installed", "updates"]);
+    flushSync(() => [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看更新与维护")!.click());
+    assert.deepEqual(tabs, ["updates"]);
   });
 });
 
@@ -937,7 +937,7 @@ test("managed Framework updates keep the exact installation owner across catalog
       ...state.app_state.agent_packages.sources, installed_products: [{ ...installed, update_status: "needs_restart", pending_version: "0.3.13", available_version: "0.3.14" }]
     } } } });
     render(createElement(OplSoftwareUpdates, { model: staged, locale: "zh", actionBusyKey: null, onAction: action => actions.push(action) }));
-    assert.match(container.textContent ?? "", /需要重启/);
+    assert.match(container.textContent ?? "", /待重启生效/);
     assert.match(container.textContent ?? "", /更新已暂存，重启应用后生效/);
     assert.match(container.textContent ?? "", /0\.3\.12 → 0\.3\.13/);
     assert.doesNotMatch(container.textContent ?? "", /0\.3\.14/);
@@ -1152,8 +1152,8 @@ test("source access attention opens sources and does not repair an installation"
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction: action => actions.push(action), onTabChange: tab => tabs.push(tab) }));
     const row = container.querySelector('[data-plugin-owner-package="private"]')!;
-    assert.match(row.textContent ?? "", /需要处理/);
-    assert.doesNotMatch(row.textContent ?? "", /修复/);
+    assert.match(row.textContent ?? "", /需连接软件源/);
+    assert.doesNotMatch(row.textContent ?? "", /修复|需要处理/);
     const sourceButton = [...row.querySelectorAll("button")].find(button => button.textContent === "检查软件源")!;
     flushSync(() => sourceButton.click());
     assert.deepEqual(tabs, ["sources"]);
@@ -1235,5 +1235,156 @@ test("offline media profile survives the Host bridge and dispatches from the exi
     assert.ok(button);
     flushSync(() => button.click());
     assert.deepEqual((calls[0] as { payload: unknown }).payload, payload);
+  });
+});
+
+test("a missing Weixin component distinguishes a directory version from a verified install action", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const packageId = "opl-channel-weixin";
+  const request = { action_id: "agent_package_install", action_ref: "app_state.actions#agent_package_install", semantic: "install",
+    payload: { package_id: packageId }, required_payload_fields: ["package_id"], confirmation_required: true };
+  const model = (installable: boolean) => deriveWorkbenchModelFromState({ app_state: {
+    actions: [{ action_id: "agent_package_install", label: "Install package", dry_run_supported: true, confirmation_required: true }],
+    agent_packages: { directory: { entries: [{
+    package_id: packageId, display_name: "OPL Channel Weixin", display_name_i18n: { "zh-CN": "微信远程" }, catalog_origin: "opl", catalog_scope: installable ? "software" : "host_component",
+    management_scope: "local_component", software_type: "capability", installed: false, selected_version: "0.2.0", installations: [],
+    installability: { installable, reason: installable ? null : "package_install_source_unavailable" },
+    available_actions: installable ? [request] : [],
+  }] } } } });
+  const actions: unknown[] = [];
+  await withSettingsTestDom(({ container, render }) => {
+    const show = (installable: boolean) => render(createElement(DshPluginManagerOwner, {
+      key: String(installable), kind: "all", model: model(installable), settings: { ...settingsDefaults, locale: "zh" },
+      actionBusyKey: null, onAction: action => actions.push(action),
+    }));
+    const click = (label: string) => flushSync(() => [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
+    show(false);
+    click("运行组件");
+    const row = container.querySelector(`[data-plugin-owner-package="${packageId}"]`)!;
+    assert.match(row.textContent ?? "", /安装来源不可用/);
+    assert.doesNotMatch(row.textContent ?? "", /0\.2\.0/);
+    click("微信远程");
+    assert.match(container.querySelector("[data-plugin-owner-detail]")?.textContent ?? "", /软件源暂未提供可验证的安装文件/);
+    assert.equal(actions.length, 0);
+
+    show(true);
+    assert.match(container.querySelector(`[data-plugin-owner-package="${packageId}"]`)?.textContent ?? "", /0\.2\.0/);
+    click("安装");
+    assert.deepEqual(actions, [{
+      key: `${packageId}:agent_package_install`, actionId: "agent_package_install", label: "安装 微信远程",
+      payload: { package_id: packageId }, confirmationRequired: true, dryRunSupported: true,
+    }]);
+  });
+});
+
+test("installed configurable plugin offers direct configure action from the software list and interactive summary filters work", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const opened: Array<{ destination: string; focus?: unknown }> = [];
+  const model = deriveWorkbenchModelFromState({ app_state: {
+    ui_contributions: {
+      surface_kind: "opl_app_ui_contributions_projection.v1",
+      entries: [{
+        contribution_key: "opl-channel-weixin:weixin-channel-access",
+        contribution_id: "weixin-channel-access",
+        package_id: "opl-channel-weixin",
+        slot: "settings.section",
+        contribution_kind: "view",
+        trust_tier: "declarative",
+        scope: "root",
+        sort_order: 30,
+        view: {
+          view_id: "weixin-channel-access",
+          view_type: "channel_access",
+          title_i18n: { "zh-CN": "微信", en: "Weixin" },
+          data_ref: "weixin.channel-access#state"
+        },
+        commands: [],
+        badges: []
+      }]
+    },
+    agent_packages: {
+      surface_kind: "opl_app_agent_packages_projection",
+      directory: {
+        entries: [
+          {
+            package_id: "opl-channel-weixin", display_name: "OPL Channel Weixin", display_name_i18n: { "zh-CN": "微信远程" },
+            catalog_origin: "opl", catalog_scope: "software", software_type: "capability",
+            installed: true, installed_version: "0.2.0", activated: true,
+            app_enabled: true, readiness: { operational_ready: true, callable: true, launch_allowed: true },
+            available_actions: []
+          },
+          {
+            package_id: "optional-agent", display_name: "Optional Agent", display_name_i18n: { "zh-CN": "可选智能体" },
+            catalog_origin: "opl", catalog_scope: "software", software_type: "agent",
+            installed: false, selected_version: "1.0.0", installability: { installable: true },
+            available_actions: []
+          }
+        ]
+      }
+    }
+  } });
+  await withSettingsTestDom(({ container, render }) => {
+    render(createElement(ApplicationManagementPage, {
+      model, settings: { ...settingsDefaults, locale: "zh" }, managedUpdate: null, nativeAppUpdate: null,
+      actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [], additionalMaintenanceActions: [] },
+      actionBusyKey: null, onAction() {}, onRefresh() {},
+      onOpenSettings: (destination, focus) => opened.push({ destination, focus })
+    }));
+    const weixinRow = container.querySelector('[data-plugin-owner-package="opl-channel-weixin"]')!;
+    assert.ok(weixinRow);
+    const configureButton = [...weixinRow.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "配置")!;
+    assert.ok(configureButton, "installed configurable plugin exposes one-click configure button");
+    flushSync(() => configureButton.click());
+    assert.deepEqual(opened, [{ destination: "resources", focus: { section: "remote", packageId: "opl-channel-weixin" } }]);
+
+    const notInstalledChip = [...container.querySelectorAll<HTMLButtonElement>("button.opl-summary-filter")].find(button => button.textContent?.includes("未安装"))!;
+    assert.ok(notInstalledChip);
+    flushSync(() => notInstalledChip.click());
+    assert.equal(container.querySelector('[data-plugin-owner-package="opl-channel-weixin"]'), null);
+    assert.ok(container.querySelector('[data-plugin-owner-package="optional-agent"]'));
+  });
+});
+
+test("updates tab surfaces actionable desktop app updates and collapses up-to-date extension components", async () => {
+  const { createElement } = await import("react");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginUpdates: async () => ({
+        plugins: { "@gaofeng21cn/opl-studio-client": { installed: "0.1.25", available: "0.1.25", state: "current" } }
+      })
+    };
+    try {
+      render(createElement(ApplicationManagementPage, {
+        model, settings: { ...settingsDefaults, locale: "zh" }, managedUpdate: null,
+        nativeAppUpdate: { schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron", operation: "status",
+          supported: true, state: "available", currentVersion: "26.11.20", targetVersion: "26.11.23" },
+        actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [], additionalMaintenanceActions: [] },
+        actionBusyKey: null, initialTab: "updates", onAction() {}, onRefresh() {}
+      }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const runtimeDetails = container.querySelector<HTMLDetailsElement>('[data-testid="opl-runtime-maintenance-details"]')!;
+      assert.equal(runtimeDetails.open, false);
+      assert.match(container.textContent ?? "", /26\.11\.20 -> 26\.11\.23/);
+      const extensions = container.querySelector<HTMLDetailsElement>('[data-testid="dsh-plugin-updates"]')!;
+      assert.equal(extensions.tagName, "DETAILS");
+      assert.equal(extensions.open, false);
+      assert.match(extensions.textContent ?? "", /应用扩展组件 · 已是最新/);
+      assert.doesNotMatch(extensions.textContent ?? "", /DSH cohort|Host 与客户端字节/);
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
   });
 });

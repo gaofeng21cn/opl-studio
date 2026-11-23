@@ -51,11 +51,18 @@ export async function frameworkUpdateEnvironment(env, { operation, plan } = {}) 
     throw blocked("framework_update_version_unverified");
   }
   assertForwardVersion(current, source.channel_version);
-  if (!/^ghcr\.io\/[^\s@]+$/.test(source.channel_artifact ?? "")
-    || !/^sha256:[0-9a-f]{64}$/.test(source.channel_artifact_digest ?? "")) {
+  const digest = source.channel_artifact_digest ?? "";
+  const artifact = source.channel_artifact ?? "";
+  if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
     throw blocked("framework_update_artifact_unverified");
   }
-  const repository = source.channel_artifact.replace(/:[^/:]+$/, "");
+  const digestAt = artifact.indexOf("@");
+  const rawRepository = digestAt >= 0 ? artifact.slice(0, digestAt) : artifact;
+  const embeddedDigest = digestAt >= 0 ? artifact.slice(digestAt + 1) : null;
+  if (!/^ghcr\.io\/[^\s@]+$/.test(rawRepository) || (embeddedDigest !== null && embeddedDigest !== digest)) {
+    throw blocked("framework_update_artifact_unverified");
+  }
+  const repository = rawRepository.replace(/:[^/:]+$/, "");
   // Bind apply to the inspected immutable artifact, even if the channel moves.
-  return { ...env, OPL_FRAMEWORK_ARTIFACT_REF: `${repository}@${source.channel_artifact_digest}` };
+  return { ...env, OPL_FRAMEWORK_ARTIFACT_REF: `${repository}@${digest}` };
 }

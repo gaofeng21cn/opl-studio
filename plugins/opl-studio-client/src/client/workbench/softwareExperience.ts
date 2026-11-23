@@ -1,5 +1,6 @@
+import { formatStatus } from "./settings/presentation";
 import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
-import { agentPackageNeedsAttention, packagePresentLocally } from "./settings/packages";
+import { agentPackageNeedsAttention, packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
 import { nativeCatalogState, packageCatalogState, softwareCatalogPackages, softwareCatalogNativeProducts } from "./softwareCatalog";
 import { knowledgeLibraryLabel, knowledgeSourceNeedsAttention } from "./knowledgeSources";
 
@@ -52,8 +53,12 @@ export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en
   for (const item of packages) {
     const independentFailure = item.activeInstallationStatus === "conflict" || agentPackageNeedsAttention(item);
     if (packageCatalogState(item) !== "attention" || (covered.has(item.packageId) && !independentFailure)) continue;
-    issues.push({ id: `package:${item.packageId}`, title: name(item.packageId),
-      detail: zh ? "查看此软件的配置、安装与恢复操作。" : "Review this software's setup, installation and recovery actions.",
+    const detail = item.activeInstallationStatus === "conflict" ? (zh ? "有多份安装被标记为当前使用。" : "Multiple installations are marked as in use.")
+      : packageAccessNeedsAttention(item) ? (zh ? "软件源访问受限。" : "Software source access is restricted.")
+      : ["staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(item.currentness)
+        ? formatStatus(item.currentness, locale)
+        : (zh ? "软件可用性检查未通过。" : "The software did not pass its availability check.");
+    issues.push({ id: `package:${item.packageId}`, title: name(item.packageId), detail,
       products: [], productIds: [item.packageId], destination: "applications", packageId: item.packageId });
   }
   for (const { productId, item } of softwareCatalogNativeProducts(model, "opl")) {

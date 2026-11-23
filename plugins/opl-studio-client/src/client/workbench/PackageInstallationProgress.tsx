@@ -8,8 +8,8 @@ import {
 } from './packageOperations';
 import './package-operations.css';
 
-export function PackageDownloadPreview({ plans, locale, products = {} }: {
-  plans: PackageDownloadPlan[]; locale: 'zh' | 'en'; products?: Record<string, PackageDisplayInfo>;
+export function PackageDownloadPreview({ plans, locale, products = {}, restoring = false }: {
+  plans: PackageDownloadPlan[]; locale: 'zh' | 'en'; products?: Record<string, PackageDisplayInfo>; restoring?: boolean;
 }) {
   const zh = locale === 'zh';
   return <div className="opl-package-download-preview">
@@ -31,6 +31,7 @@ export function PackageDownloadPreview({ plans, locale, products = {} }: {
         <details className="opl-package-technical"><summary>{zh ? '技术详情' : 'Technical details'}</summary><p>ID · <code>{plan.package_id}</code></p></details>
       </div>;
     })}
+    {restoring ? <p className="opl-package-background-note">{zh ? '重新准备所选软件的安装和必要依赖，完成后检查安装状态。' : 'Restore the selected software installation and its required dependencies, then check its status.'}</p> : null}
     <p className="opl-package-background-note">{zh ? '确认后在后台继续，你可以回到对话或离开此页面。下载中可取消；重试会校验并复用已缓存内容。' : 'Continues in the background, including when you return to your conversation. You can cancel during download; retries verify and reuse cached data.'}</p>
   </div>;
 }
@@ -107,9 +108,8 @@ export function PackageOperations({ operations, locale, labels, readError, cance
   };
 
   return <section className="opl-package-operations" aria-label={zh ? '安装与更新任务' : 'Installation and update tasks'}>
-    <div className="opl-package-operation-heading"><strong>{zh ? '安装与更新任务' : 'Installation and update tasks'}</strong>{active ? <span>{zh ? '后台继续，可返回对话' : 'Continues in the background'}</span> : null}</div>
     {readError ? <div className="opl-package-operation-read-error" role="alert"><p>{zh ? '暂时无法读取进度，任务可能仍在继续。重新读取后再决定下一步。' : 'Progress is unavailable; the task may still be running. Refresh before taking further action.'}</p><Button size="sm" variant="outline" onClick={onRefresh}>{zh ? '重新读取' : 'Refresh'}</Button></div> : null}
     {current.map(renderOperation)}
-    {history.length ? <details className="opl-package-operation-history" open={!current.length && history.length === 1}><summary>{zh ? `最近任务 · ${history.length}` : `Recent tasks · ${history.length}`}</summary>{history.map(renderOperation)}</details> : null}
+    {history.length ? <details className="opl-package-operation-history"><summary>{zh ? `最近任务 · ${history.length}` : `Recent tasks · ${history.length}`}</summary>{history.map(renderOperation)}</details> : null}
   </section>;
 }
