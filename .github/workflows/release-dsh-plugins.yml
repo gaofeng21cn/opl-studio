@@ -98,10 +98,15 @@ jobs:
             const changed = hasBase()
               ? execFileSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean)
               : null;
-            const sharedChanged = changed?.some(file => !file.startsWith("plugins/"));
-            selected = !changed || sharedChanged
+            // Test-only changes and edits to this workflow do not change a package's bytes.
+            const packageInputs = changed?.filter(file =>
+              file !== ".github/workflows/release-dsh-plugins.yml" &&
+              !(file.startsWith("src/") && file.endsWith(".test.mjs"))
+            );
+            const sharedChanged = packageInputs?.some(file => !file.startsWith("plugins/"));
+            selected = !packageInputs || sharedChanged
               ? PUBLISHABLE
-              : PUBLISHABLE.filter(name => changed.some(file => file.startsWith(`plugins/${name}/`)));
+              : PUBLISHABLE.filter(name => packageInputs.some(file => file.startsWith(`plugins/${name}/`)));
           }
 
           const output = process.env.GITHUB_OUTPUT;
