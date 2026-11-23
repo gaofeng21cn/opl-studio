@@ -27,7 +27,7 @@ public service deployment are separate acceptance surfaces.
 
 ## Connect within OPL App
 
-1. Open **Settings → Resources → OPL Link**, or **Software Center → Shared Resources → OPL Link**.
+1. Open **Settings → Connections & Deployment → Remote & web access → OPL Link**.
 2. Sign in from **OPL Account**. Phone access starts automatically unless you turned it off on this computer.
 3. In OPL Link on your iPhone or iPad, sign in to the same OPL Gateway account. Link connects automatically when one computer is online. If several are online, choose the one you want.
 4. To pause remote access on this computer, choose **Turn off phone access**. Existing remote sessions close and the setting persists across restarts. Choose **Enable phone access** to resume.
