@@ -4,8 +4,8 @@ Owner: `opl-studio` verification; App retains acceptance authority
 Purpose: `candidate_verification_boundary`
 State: `active_support`
 Machine boundary: Command and evidence interpretation guide. Passing commands
-proves only the named source, test, build, package, or local-smoke layer; it does
-not prove App adoption, release, owner acceptance, or production readiness.
+proves only the named source, test, build, package, or local-smoke layer; it
+does not prove App adoption, release, owner acceptance, or production readiness.
 
 ## Repository-Native Gate
 
@@ -14,92 +14,49 @@ npm ci
 npm test
 ```
 
-`npm test` runs the repository's `test:source` gate: typecheck, focused
-Desktop/headless/OCI and projection tests, Host/MCP and thread tests, Client
-Cordis checks, and the candidate validator. It does not construct carrier
-artifacts. Read `package.json` before relying on this summary because the script
-is the command owner.
-
-Source CI runs on pull requests, pushes to `main`, and manual dispatch. Feature
-branches use the pull-request check instead of a second push-triggered copy of
-the same suite. Mainline validation remains required after integration.
+`npm test` runs `test:source` (`test:ownership`, `typecheck`, `test:node-suite`,
+`test:bun-suites`, and `validate:candidate`). Source CI runs on PRs, pushes to
+`main`, and manual dispatch (`.github/workflows/non-release-validation.yml`). It
+does not build carrier packages or prove release readiness. Read `package.json`
+for exact script definitions.
 
 ## Focused Commands
 
 | Command | Evidence layer |
 | --- | --- |
 | `npm run typecheck` | TypeScript source consistency |
-| `npm run test:desktop` | Electron isolation, IPC adapter, updater, and guarded shutdown behavior |
-| `npm run test:headless` | Standalone bind/config validation, health/readiness, real child App Server startup, and bounded signal shutdown |
-| `npm run headless:install` / `headless:status` / `headless:stop` / `headless:start` / `headless:restart` / `headless:update` / `headless:rollback` / `headless:uninstall` | Current-user macOS/Linux native service lifecycle commands; platform support and public distribution remain separately admitted |
-| `npm run test:threads` | Standard Desktop/WebUI thread lifecycle, pagination, renderer, and Codex subagent projection tests |
-| `npm run test:webui-host` | DSH Host boot/profile/plugin inventory, authenticated DSH-tool MCP, persistent Codex ownership, shared Host core, HTTP/SSE, model/thread pagination, OPL projection, and read-only mutation guard |
-| `node --test scripts/dsh-profile-plugins.test.mjs` | Native profile add/remove, actual Superagent workbench boot with a fixture Codex transport, baseline restoration and source-selection guards |
-| `node --test scripts/desktop-runtime-pruning.test.mjs` | Execute YAML parsing after applying both desktop carriers' dependency pruning filters |
-| `node --test src/host/opl-passthrough.test.mjs` | Fast Host projection compression, managed-update envelope filtering, and bounded state transport |
-| `node --test src/host/link-internet.test.mjs` | Authenticated virtual Link routing, device/thread-scoped chunk receipts, bounded file ranges, version changes, and enrollment identity rejection, actual candidate classification/redaction, and ciphertext counters |
-| `node --test src/host/thread-workspace-service.test.mjs` | Canonical thread-workspace list/read/search behavior, bounds, UTF-8 handling, and traversal/symlink containment |
-| `bun test tests/workbench/runtime-projection.test.mts` | Workbench consumption of the compressed Framework managed-update and Flow dependency projection |
-| `bun test tests/workbench/project-progress.test.mts` | Exact workspace-to-project matching and explicit Stage/Attempt/attention/next-action projection without inferred current Stage |
-| `node --test tests/renderer/thread-renderer-source.test.mjs` | Renderer source contract, including the three Client Cordis Detail tools and their bounded UI paths |
-| `npm run test:client-cordis` | Studio Client Cordis policy, typed event/slot lifecycle, and exact contribution action request |
-| `npm run validate:client-conformance` | Fresh Framework -> App -> Studio Client compatibility and wire-ref readback |
-| `npm run validate:candidate` | Required source markers and false-ready guards |
-| `npm run verify:dsh-gui` | Exact file inventory, declared compatibility patch replay, and original upstream byte parity |
-| `npm run dsh:status` | Read-only current DSH ref, package cohort, GUI roots, and upgrade gate readback |
-| `npm run dsh:preflight -- --source <checkout>` | Read-only source identity, dirty-checkout warning, exact upgrade write-set, and manual acceptance plan |
-| `npm run test:dsh-upgrade` | Official source/cohort admission, replay and verification orchestration tests |
-| `npm run dsh:replay -- --source <checkout>` | Replay the pinned source and execute native plugin compatibility, profile, lifecycle and source gates |
-| `npm run dsh:verify -- --source <checkout>` | Execute the same compatibility checks without regenerating vendor sources |
-| `npm run validate:state-model` | Runtime-backed App-state projection mapping; requires a real `opl` CLI/state source and is not part of default PR/main source CI |
-| `npm run smoke:webui` | Local WebUI host/renderer smoke |
-| `npm run smoke:visual` | Source-level visual smoke |
-| `OPL_APP_REPO_ROOT=/absolute/app/root npm run package` | App-contract-driven three-carrier local qualification and exact-commit evidence: Electron `.app`, standalone WebUI archive, Docker smoke receipt, and candidate manifest; requires macOS, Docker, and tracked-clean committed Studio source |
-| `npm run validate:package` | Electron package and three-platform builder configuration structure |
-| `npm run dist:windows` | Unsigned Windows x64 unpacked app, NSIS, and ZIP construction with publishing disabled |
-| `node scripts/validate-desktop-package.mjs --distribution --write-receipt --identity stable --version <version>` | Post-pack byte qualification of the packaged Windows guest Host payload against its packaged manifest, plus the `opl_studio_windows_guest_host_payload_qualification.v1` receipt |
-| `npm run dist:linux` | Unsigned Linux x64 unpacked app and DEB construction with publishing disabled |
-| `npm run qualify:desktop:distribution` | Current-platform native package-set presence and executable-shape checks |
-| `npm run smoke:preview -- --require-codex-turn` | Packaged-identity, Framework readback, Settings/Runtime/inspector UI, Gateway action, and a non-simulated Codex turn proving provider connectivity; a structured `INSUFFICIENT_BALANCE` response passes as `connectivity_confirmed` instead of gating carrier delivery |
-| `npm run qualify:desktop:fixture-vm -- --dmg <DMG>` | Clean Tart VM install of the exact DMG driven by the synthetic App Server/Framework fixtures: feature states, Settings routes, Agent Package readiness, Runtime projection, canonical thread CRUD, workspace containment, attachments and native updater readback |
-| `npm run smoke:desktop-live` | Current-platform packaged executable startup, exact optional version readback, Chromium AX tree, and App Server cleanup smoke |
-| `npm run build:docker` | Local source-candidate OCI image construction only |
-| `npm run smoke:docker` | Local Docker build/run, health/readiness, non-root PID 1, persistent mounts, and guarded stop |
-
-## Three-Carrier Candidate Evidence
-
-For the standard MCP App host, `npm run test:mcp-apps` checks resource formats,
-canonical completed-call reuse, live tool/resource visibility, thread/server
-isolation, connection reset and close-during-dispatch races, CSP, and bounded
-model context. `npm run test:webui-host` covers the authenticated
-HTTP bridge and initialize extension negotiation. Both are included in the
-normal source suites. `node scripts/smoke-mcp-apps.mjs` renders the actual
-`McpAppWorkspace`, Host and official SDK in a browser with a synthetic domain
-transport. It checks save/readback, reopen, stale revision, revocation,
-unknown-without-retry and structured results without UI.
-
-Add `--relay-root /absolute/path/to/opl-relay` to run the same host against Relay's
-real stdio server and SQLite owner with a temporary synthetic mailbox. This mode
-opens the exact draft, saves a UI edit, reads it through the Agent tool, rejects an
-old revision and reopens the same draft. `OPL_MCP_APP_SMOKE_OUTPUT` optionally
-selects a directory for screenshots and machine-readable results. The smoke
-requires the existing Studio dependencies, Bun and Playwright CLI/browser runtime.
-It closes its server, browser, profile and connection after execution. Neither
-mode sends mail or publishes content. These source/browser checks do not constitute
-installed Desktop or published-carrier acceptance; use the actual installed
-carrier and its owner readback for that layer.
-
-`npm run package` reads the `opl-studio` carrier evidence contract from the App
-root selected by `OPL_APP_REPO_ROOT`. It rejects tracked source changes, binds
-the manifest to the exact Studio `HEAD`, runs the qualification commands named
-by the App contract, and writes the Electron, standalone WebUI, Docker smoke, and candidate manifest outputs.
-Run it only after the intended Studio source is committed. The App candidate
-wrapper supplies the current App worktree root explicitly.
-
-This proves that the three local candidate artifacts were constructed and
-qualified under that contract. It does not prove distribution/update wiring,
-signing, notarization, a public feed or registry image, release admission,
-active-shell adoption, or production readiness.
+| `npm run build:plugins` | Build `@gaofeng21cn/opl-plugin-ui-kit` and DSH plugin `lib/` payloads |
+| `npm run test:desktop` | Electron isolation, IPC adapter, updater, and guarded shutdown |
+| `npm run test:headless` | Standalone bind/config validation, `/healthz`/`/readyz`, child App Server, signal shutdown |
+| `npm run headless:install` / `status` / `stop` / `start` / `restart` / `update` / `rollback` / `uninstall` | Current-user macOS/Linux native service lifecycle |
+| `npm run test:threads` | Desktop/WebUI thread lifecycle, pagination, renderer, and subagent projection |
+| `npm run test:webui-host` | DSH Host boot/profile/inventory, authenticated MCP, Codex ownership, HTTP/SSE, OPL projection |
+| `npm run test:dsh-plugins` | Native profile add/remove, packed DSH plugin boot outside checkout, UI kit packaging |
+| `node --test scripts/dsh-profile-plugins.test.mjs` | Native profile override updates, Superagent workbench boot, baseline restore guards |
+| `node --test scripts/desktop-runtime-pruning.test.mjs` | YAML module survival under desktop dependency pruning filters |
+| `node --test src/host/opl-passthrough.test.mjs` | Fast Host projection compression and managed-update filtering |
+| `node --test src/host/link-internet.test.mjs` | Virtual Link routing, chunked receipts, bounded file ranges, and redaction |
+| `node --test src/host/thread-workspace-service.test.mjs` | Canonical thread workspace list/read/search bounds and symlink containment |
+| `npm run test:mcp-apps` | MCP App resource formats, CSP, thread isolation, reset/close races, model context |
+| `npm run test:features` | Feature status, workspace git, workbench task executor, and memory/resource projections |
+| `npm run test:client-cordis` | Studio Client Cordis policy, typed slot/event lifecycle, and contribution actions |
+| `npm run validate:client-conformance` | Framework -> App -> Studio Client compatibility and wire-ref readback |
+| `npm run validate:candidate` | Required source markers, DSH cohort alignment, and false-ready guards |
+| `npm run verify:dsh-gui` | Vendored DSH GUI inventory, patch replay, and upstream byte parity |
+| `npm run dsh:status` / `dsh:preflight` / `test:dsh-upgrade` / `dsh:replay` / `dsh:verify` | DSH upstream binding readback and replayable upgrade verification |
+| `npm run validate:state-model` | Live `opl` CLI state projection mapping (not in default source CI) |
+| `node scripts/acceptance/settings-ui.mjs --model-policy-only` | Rendered Settings model policy, bilingual search focus, opt-in switch, and blocked custom sends |
+| `node scripts/acceptance/rendered-ui.mjs` | Browser WebUI acceptance across layouts, inspector tabs, Settings, and `turn/steer` |
+| `node scripts/smoke-mcp-apps.mjs` | Browser `McpAppWorkspace` smoke (add `--relay-root <path>` for live Relay draft round-trip) |
+| `npm run smoke:webui` / `smoke:visual` | Local WebUI host/renderer and source-level visual smoke |
+| `OPL_APP_REPO_ROOT=/abs/app/root npm run package` | Three-carrier candidate outputs (Electron `.app`, WebUI archive, Docker receipt, manifest) from clean `HEAD` |
+| `npm run validate:package` | Electron/three-platform builder validation (`--distribution` validates Windows WSL payload post-pack) |
+| `npm run dist:mac` / `dist:windows` / `dist:linux` | Platform bundle construction (`dist:windows`/`dist:linux` publish disabled) |
+| `npm run qualify:desktop:mac` / `qualify:desktop:mac:release` / `qualify:desktop:updater:local` | macOS bundle trust, Gatekeeper/staple, and Squirrel.Mac loopback update verification |
+| `npm run qualify:desktop:clean-vm` / `qualify:desktop:fixture-vm` | Tart clean-VM install and synthetic fixture VM qualification |
+| `npm run smoke:preview` / `smoke:desktop-live` / `diagnose:gateway:persistence` | Live Preview CDP smoke, unpacked app AX/process cleanup, and Gateway persistence check |
+| `OPL_FRAMEWORK_REPO_ROOT=/path OPL_TEST_TEMPORAL_ADDRESS=127.0.0.1:18233 npm run test:workbench-services` | Real Framework + Temporal schedules/workflows integration with fake App Server |
+| `npm run build:docker` / `smoke:docker` / `smoke:docker:lifecycle` | Local OCI candidate build and container install/update/rollback/cleanup smoke |
 
 ## Client Qualification
 
@@ -107,345 +64,74 @@ active-shell adoption, or production readiness.
 npm run validate:client-conformance -- --out out/qualification/client-conformance.json
 ```
 
-The gate reads exact Framework and App remote-main refs plus Studio main, verifies
-local tracking refs against the wire, materializes the canonical Framework
-producer in a temporary directory, and exercises the Host projection through
-Studio Client Cordis. It checks the App `client_renderer_compatibility` profile,
-Studio's RPC/event/state/brand policy, and the exact App contribution action
-shape. AionUI is retired and is not a build, qualification, workflow, or
-regression-fixture input. Each ignored receipt records Framework, App, Studio
-main, and candidate commit/tree identities observed by that run.
-
-These gates establish candidate compatibility for Framework, App, and Studio.
-They do not qualify a release artifact or change App-owned release admission.
-
-The current service-status acceptance also requires the typed placement boundary:
-`service_status` contributions project to `settings.services.installed_services`,
-while `activity_log` remains destination-null and absent from ordinary Settings.
-Fleet telemetry and doctor are exercised through their descriptor-declared refs;
-their bounded summary may show local checks, but individual unavailable checks do
-not override a healthy top-level service state.
+Reads exact Framework and App refs alongside Studio `main`, materializes the
+canonical Framework producer in a temporary directory, and validates Studio
+Client Cordis compatibility, `client_renderer_compatibility`, typed slot/event/action
+shapes, `service_status` placement under `settings.services.installed_services`,
+and `activity_log` staying destination-null. Ignored receipts record observed
+commit/tree identities and do not qualify releases.
 
 ## DSH Upstream Upgrade Gate
 
-The upgrade owner is `packages/dsh-adapters/deepseekHarnessSourceManifest.json`. The
-repository now reads the DSH ref, package version, package cohort, GUI roots,
-and file inventory from that manifest through `scripts/dsh-upstream.mjs`; the
-vendor checker and candidate validator no longer carry a second hard-coded
-cohort.
+`packages/dsh-adapters/deepseekHarnessSourceManifest.json` owns the pinned DSH
+ref, package cohort, GUI roots, and file inventory consumed by
+`scripts/dsh-upstream.mjs`.
 
-Use the read-only binding check before touching an upgrade:
+1. Inspect binding and preflight against a clean upstream checkout:
+   ```bash
+   npm run dsh:status
+   npm run dsh:preflight -- --source /absolute/path/to/clean/deepseek-harness --version <ver> --branch <branch>
+   ```
+2. Update the manifest, `package.json`, and lockfile together, install, then run
+   `npm run dsh:replay -- --source <checkout>` (or `npm run dsh:verify -- --source <checkout>`
+   without regenerating vendor sources). Verification checks exact installed
+   cohort alignment, reverses and verifies the React 19 compatibility patch
+   digests, validates Desktop/Web schemas via official DSH APIs, and runs Host,
+   Client Cordis, headless, and candidate gates. For `0.2.2-rc.3`, the keyed
+   `main` slot uses `conversation` fallback (`activePanelId: null`).
 
-```bash
-npm run dsh:status
-npm run dsh:preflight -- --source /absolute/path/to/clean/deepseek-harness \
-  --version <target-dsh-version> --branch <target-branch>
-```
+## Three-Carrier And Rendered Acceptance
 
-`dsh:preflight` verifies the source checkout identity and emits the exact
-write-set, package-version policy, required validation commands, and manual
-authority/Preview acceptance steps. It never edits the repository and does not
-call an upgrade complete.
+- **Three-carrier candidate (`npm run package`):** Reads App's
+  `app-shell-candidates.json` from `OPL_APP_REPO_ROOT`, rejects dirty tracked
+  trees, binds outputs to Studio `HEAD`, and emits local Electron, WebUI, Docker
+  smoke, and manifest evidence without proving signing, feeds, or adoption.
+- **Rendered browser gates:** `node scripts/acceptance/rendered-ui.mjs` checks
+  wide/narrow layouts, inspector tabs, Settings modal focus, and `turn/steer`;
+  `node scripts/acceptance/settings-ui.mjs --model-policy-only` checks custom
+  model opt-in, bilingual search focus, draft retention, and blocked sends;
+  `node tests/renderer/history-pagination.fixture.mjs` + `history-pagination.mount-check.js`
+  and `FAKE_APP_SERVER_EXECUTION_DETAILS=1` + `execution-details.mount-check.js`
+  verify pagination and default-collapsed disclosures via Playwright CLI.
+- **Installed Preview acceptance:** Installs only isolated
+  `cn.onepersonlab.opl.studio.preview` (leaving Stable `/Applications/One Person Lab.app`
+  untouched) and verifies packaged Host/Codex startup, text-only header, native
+  permissions risk flow, Settings placement, Gateway projection, real Codex turn
+  round-trip, and inspector responsiveness against exact `app.asar` bytes.
 
-When a target cohort is selected, update the manifest/package cohort and lockfile
- together, install that lockfile, then run `npm run dsh:replay -- --source <checkout>`.
-The command verifies the actual installed cohort and native DSH plugin metadata,
-replays the existing vendor command, validates Desktop/Web profile schemas using
-official APIs, and runs packed-plugin inventory/lifecycle, Client Cordis, type,
-Host/MCP, headless and candidate gates. `dsh:verify` runs the same checks without
-regenerating vendor sources. The manifest explicitly lists the React 19
-compatibility patch and its digest; verification reverses it in a temporary copy
-and compares every original file digest. Optional `--source` also verifies these
-original bytes against the clean pinned upstream checkout.
-An unsupported or failing step stops execution for repair. Neither command
-installs or publishes the App.
+## Desktop, Headless, And OCI Qualification
 
-The manifest owns the exact upstream cohort. Host fallback initialization,
-static-index authorization, renderer binding, and composer submission must all
-be checked together; package installation or GUI byte parity does not prove
-these behavioral seams.
-
-Every direct `@deepseek-ai/dsh-*` runtime dependency must appear in the cohort;
-the binding check rejects omissions as well as package/lock version drift.
-For `0.2.2-rc.3`, the keyed `main` slot uses `conversation` as its fallback
-entry, while `activePanelId: null` denotes the current conversation. A non-null
-panel id suppresses the workspace tree's current-session selection.
-
-## Rendered WebUI Acceptance
-
-```bash
-node scripts/acceptance/rendered-ui.mjs
-```
-
-This CLI-first browser gate starts the shared WebUI against the repository fake
-App Server, checks the wide and narrow layouts, the three on-demand context
-tabs, all App-owned settings destinations, and Settings modal focus
-containment/restoration. It writes screenshots and an exact source/renderer/DSH
-cohort receipt under ignored `out/acceptance/`.
-
-The same gate switches between existing sessions and checks the selected row,
-then opens a running turn, checks the localized busy-send label, queues a
-message without starting or steering a turn, and verifies accelerated Enter
-sends `turn/steer` to the selected canonical thread and turn in the fake App
-Server's request log.
-
-This is local rendered candidate evidence. It does not establish human Pixel
-approval, screen-reader qualification, a packaged or installed carrier, active
-shell adoption, or Release readiness.
-
-When the App checkout mounts this repository at the expected candidate path,
-the App owner can also run `npm run validate:candidate:studio`. That is App
-candidate-conformance evidence, not release adoption.
-
-## Local Packaged-App Smoke
-
-```bash
-npm run smoke:desktop-live
-```
-
-This command launches the current-platform unpacked package, requires a real
-window and a passing Chromium accessibility-tree smoke, and verifies that
-quitting the App removes its Electron and Codex App Server processes. Its
-Electron process uses a smoke-owned working directory and `DSH_HOME`; the Codex
-test workspace remains the explicitly selected repository path. This prevents
-the package from resolving DSH profile modules through `~/.dsh` or an unrelated
-worktree. The packaged closure must contain the exact direct production
-dependencies required by the pinned Host, including `@deepseek-ai/dsh-error`, `@deepseek-ai/dsh-llm`,
-`@deepseek-ai/dsh-session`, and `@deepseek-ai/dsh-timeout`; profile fallback
-is not packaging evidence. The smoke output is candidate evidence only. It
-does not establish an installer flow,
-clean-VM behavior, shared Runtime parity, native screen-reader behavior,
-active-shell adoption, or release readiness.
-
-The native `afterPack` Host check copies the unpacked payload into a temporary
-directory outside the source checkout before starting it. This prevents Node
-from satisfying a missing packaged peer through an ancestor `node_modules`.
-DSH runtime peers imported by the active Host must be explicit production
-dependencies in the pinned cohort; an npm development install alone is not
-proof that Electron packaged them.
-
-## Installed Preview Acceptance
-
-An installed Preview pass is a separate live acceptance layer after package
-construction. Install only the isolated `cn.onepersonlab.opl.studio.preview`
-bundle through the App-owned atomic installer, then bind readback to the exact
-candidate commit and installed `app.asar` bytes. The Stable
-`/Applications/One Person Lab.app` bundle and running process must remain
-unchanged.
-
-The minimum installed pass verifies all of the following from
-`/Applications/One Person Lab Preview.app`:
-
-- the Electron main process, sandboxed renderer, pinned DSH Host plugins, and
-  persistent `codex app-server --stdio` child start from packaged resources;
-- desktop shows no OPL pseudo-logo, retains DSH's native hero/timeline placement,
-  and uses the Studio-owned text-only session/project header to keep the
-  conversation from touching the top edge. The wide sidebar title has an 18 px
-  top inset while preserving compact-rail geometry, the composer has a small
-  bottom clearance aligned with the sidebar footer, and the top drag region is
-  present before mount;
-- the composer keeps the existing DSH `+` capability entry and OPL standard-Agent
-  entry, and exposes a Chinese-labeled permission control using DSH's native
-  Menu/RiskConfirmation interaction. Selecting `工作区访问` or `只读` sends the
-  existing `/permission` command values; selecting `完全访问` requires the
-  native risk acknowledgement before the App-owned `agentPermissions` setting
-  is updated;
-- App-owned Settings placement shows `service_status` under Installed Services,
-  keeps raw technical data collapsed until explicitly opened, and keeps
-  `activity_log` absent from ordinary Settings;
-- Framework-owned Gateway and managed-companion projections render their real
-  connected, unavailable, or unconfigured states without inferring success;
-- one real Codex turn reaches `completed`, `thread/read(includeTurns=true)`
-  returns the user and agent items, graceful quit removes the Preview App Server
-  child, and the same canonical thread is readable and visible after restart.
-- the default conversation exposes one floating Task details entry, whose wide
-  form includes a text label and whose secondary menu selects Project progress,
-  Files and results, or Agents and capabilities without opening a permanent
-  third column;
-- on wide windows the open inspector reserves enough conversation space that
-  long messages and the composer end before the panel, and each tab is clickable
-  across its full height; on narrow windows the inspector is a full-viewport
-  modal whose Escape path restores focus to the floating entry;
-- Files and results shows exactly one of Workspace, Inputs, or Results at a time,
-  and workspace or artifact content opens as a drill-in preview with a back path.
-
-This pass closes only the installed candidate cohort whose exact bytes were
-tested. Any later Host, renderer, dependency, bridge, or contract change that
-affects the installed path requires a fresh package and installed acceptance.
-It does not set `active_shell_adopted`, qualify an update feed, replace the
-Stable App, or establish release, clean-VM, owner, or production readiness.
-
-## Daily Source Validation
-
-`.github/workflows/non-release-validation.yml` is the default PR/main gate. It
-runs source, type, contract, and unit validation only. It does not build a
-Desktop package, install a service, start Electron, or construct a Docker image.
-It also does not call the runtime-backed `validate:state-model` command or
-require an installed OPL Framework CLI.
-
-The local default `npm test` uses the same `test:source` boundary. The broader
-`npm run test:full` entry remains available for runtime state, visual smoke,
-App-contract-driven three-carrier candidate construction, and packaged-artifact
-validation. Because `test:full` reaches `npm run package`, run it only from a
-committed, tracked-clean Studio checkout with the intended App root and a
-working local Docker daemon.
-
-## macOS Desktop Release Qualification
-
-`.github/workflows/macos-desktop-release-qualification.yml` is a manual release
-qualification for the primary macOS arm64 Desktop carrier. It constructs the
-unsigned arm64 DMG/ZIP, validates the package and disk image, checks the exact
-executable architecture, launches the packaged app, reads its interaction tree,
-and proves child-process cleanup. Release signing, notarization, publication,
-and public feed readback remain separate App-owned release gates.
-
-## Additional Carrier Qualification
-
-`.github/workflows/additional-carrier-qualification.yml` runs manually. It
-builds and checks exact-head unsigned candidates on
-GitHub-hosted Windows x64 and Linux x64 runners:
-
-- Windows requires two unsigned unpacked/NSIS/ZIP cohorts under the same fixed
-  product identity, then proves base install, newer-version update, old-version
-  rollback, and exact uninstall. Every launch reads the running Electron version
-  rather than trusting the installer exit code or artifact filename;
-- Linux requires the unpacked executable and DEB, prepares the
-  packaged Chromium sandbox according to the runner's user-namespace support,
-  launches the unpacked executable under Xvfb, then uses APT for base install,
-  update, explicit downgrade rollback, and purge. The installed DEB metadata and
-  each running version must match the expected cohort;
-- both platform sequences reuse one bounded temporary Electron state directory
-  and require its pre-existing marker to survive update and rollback;
-- both platforms require a visible One Person Lab window, a Chromium AX tree,
-  and a process-bound native Windows UIA or Linux AT-SPI tree with no unnamed
-  interactive controls at base, update, and rollback; each launch also requires
-  bounded App Server cleanup;
-- every distribution command uses `--publish never`.
-
-This closes the unsigned NSIS and DEB install/update/rollback/uninstall
-lifecycle on ephemeral GitHub-hosted runners. AppImage is rejected from the supported target
-set because its FUSE mount cannot supply the setuid Chromium sandbox and Ubuntu
-24.04 requires an installed AppArmor policy for the user-namespace alternative.
-CI does not provision that policy, extract the image, or disable the sandbox to
-turn a prepared host into false portable evidence. The gate does not establish
-a dedicated clean-VM cohort; prove schema migration across incompatible state;
-run NVDA or Orca or otherwise prove screen-reader user experience; sign or
-publish artifacts; or establish platform support or release readiness.
-
-## Local Headless And Docker Smoke
-
-```bash
-npm run build:webui
-npm run start:headless
-```
-
-Read `/healthz` for liveness and `/readyz` for Codex App Server initialization.
-Stopping the process with SIGINT or SIGTERM must emit
-`headless_server_stopped` inside the configured shutdown bound.
-
-The hosted macOS and Linux Headless jobs read the exact Framework and App
-commits from `src/candidateContractEvidence.json`, prepare the Framework source
-CLI's workspace Packages, build the shared WebUI, pin the workflow-declared Codex CLI version, then
-install a base payload, update to the exact checkout, roll back to the kept base
-payload, and inspect the final state through the public commands. Every running
-transition requires a ready Codex App Server, successful Framework App-state
-command, `opl_app_state.v1`, and the expected installation-record version.
-macOS verifies its LaunchAgent; Linux verifies a non-root systemd user unit and
-also exercises explicit stop, start, and restart. Each `always()` cleanup proves
-the native service definition and install root are absent. The hosted clean
-runner gives the cold Framework source CLI one bounded two-minute owner-state
-read window; the normal interactive state-read default remains 30 seconds.
-These jobs do not qualify remote binding, a public installer, signing, release,
-or production.
-
-When a local Docker daemon is available:
-
-```bash
-npm run smoke:docker
-npm run smoke:docker:lifecycle
-```
-
-The first smoke builds an isolated candidate tag, starts it with isolated `/data` and
-`/projects` volumes, verifies HTTP health and readiness, UID 1000 and Node PID 1,
-then stops and removes its container, volumes, and image. The lifecycle smoke
-adds install, update, recreate, rollback, preserving uninstall, reinstall, and
-destructive cleanup with immutable local image IDs. The hosted non-release
-matrix constructs runner-local `linux/amd64` and `linux/arm64` OCI layouts with
-SBOM/provenance attestations on matching native GitHub-hosted runners, then runs
-the lifecycle on each architecture. None
-of these paths proves registry publication, digest/cohort authority, clean-host
-installation, remote access safety, or release readiness.
+- **Desktop CI:** `.github/workflows/macos-desktop-release-qualification.yml`
+  validates unsigned arm64 DMG/ZIP startup, architecture, AX tree, and cleanup;
+  `.github/workflows/additional-carrier-qualification.yml` validates Windows NSIS
+  and Linux DEB install/update/rollback/uninstall and UIA/AT-SPI trees with
+  `--publish never` (AppImage is excluded due to FUSE/AppArmor Chromium sandbox
+  constraints). See [Desktop distribution](delivery/desktop-distribution.md) for
+  signing, Squirrel.Mac loopback, Preview/Stable migration, and Windows WSL2 payload checks.
+- **Headless & OCI:** `npm run build:webui && npm run start:headless` serves
+  `/healthz` and `/readyz` with bounded SIGINT/SIGTERM shutdown; hosted headless
+  lanes exercise macOS LaunchAgent and Linux systemd install/update/rollback.
+  Docker/OCI lifecycle and dual-arch attestation rules live in
+  [OCI distribution](oci-distribution.md).
 
 ## False-Ready Guard
 
-The following remain false unless their owning App/runtime/domain/release gates
-provide exact fresh evidence:
+These fields in `src/candidateContractEvidence.json` stay `false` unless an
+owning App/runtime/domain/release gate supplies fresh evidence:
 
-- `active_shell_adopted`
-- `release_ready`
-- `production_ready`
-- `clean_vm_ready`
-- `remote_ready`
-- `domain_ready`
-- `owner_receipt`
-- `package_truth_owned`
-- `runtime_authority_transfer`
-- `domain_truth_owned`
+- `active_shell_adopted`, `release_ready`, `production_ready`, `clean_vm_ready`,
+  `remote_ready`, `domain_ready`, `owner_receipt`, `package_truth_owned`,
+  `runtime_authority_transfer`, `domain_truth_owned`.
 
-The machine-readable candidate marker requirements and false-ready fields live
-in `src/candidateContractEvidence.json`. This prose explains their meaning; it
-does not replace that validator input.
-
-## Workbench services integration
-
-Run `npm run test:features` for status, memory envelope and action/executor
-regressions. The Framework side also runs
-`node --test tests/src/workbench-resources.test.ts` for corrections, revision
-conflicts, paths, symlinks, exact cleanup previews and protected inventories.
-
-Build the intended Framework checkout first. Start an isolated loopback Temporal
-dev server with a disposable database; do not reuse personal or production
-schedules. Then run:
-
-```bash
-OPL_FRAMEWORK_REPO_ROOT=/path/to/one-person-lab \
-OPL_TEST_TEMPORAL_ADDRESS=127.0.0.1:18233 npm run test:workbench-services
-```
-
-This uses the real public Framework export, real Temporal schedules/workflows,
-and a fake App Server. It covers timed and manual dispatch, CRUD, time zones,
-revision conflict, host restart, retained history and canonical result refs.
-`OPL_WORKBENCH_RENDER=1` keeps an isolated WebUI open for browser interaction;
-its URL and fixture root are written to `/tmp/opl-workbench-ui-context.json`.
-After browser checks, write `ui-complete` inside that fixture root to close it.
-The receipt is `out/acceptance/workbench-services.json`.
-
-Framework's `tests/built/workbench-temporal.test.mjs`, with the same explicit
-`OPL_TEST_TEMPORAL_ADDRESS`, checks overlap and an actual one-minute timeout.
-These are functional integration evidence. Installed bundle, VM, updater,
-signing, publication and active-shell adoption remain separate gates.
-
-## Conversation History Interaction
-
-After `npm run build:webui`, run `node tests/renderer/history-pagination.fixture.mjs`.
-Open its loopback URL in a fresh browser session and execute
-`tests/renderer/history-pagination.mount-check.js` with Playwright CLI `run-code`.
-The fixture uses the shipped shared renderer and HTTP host with synthetic
-Codex/Framework services. It covers 0/40/41-message boundaries, complete history
-reachability, keyboard pagination, local submission from an older page, passive
-completion while reading history, and thread switching. It does not prove native
-Desktop packaging or real provider connectivity.
-
-For execution disclosures, start the same fixture with
-`FAKE_APP_SERVER_EXECUTION_DETAILS=1 FAKE_APP_SERVER_PENDING_APPROVAL=1` and run
-`tests/renderer/execution-details.mount-check.js` with Playwright CLI `run-code`.
-It checks unmounted default-collapsed bodies, visible final answers and failure
-summaries, full evidence expansion, keyboard controls, paging and thread-scoped
-choices, streaming-to-canonical continuity, and operable approval/input panels.
-`bun test tests/workbench/conversation-details.test.mts` covers protocol-only
-classification, retained source text, and current-turn progress isolation.
-
-The pinned DSH rc.3 cohort requires Node.js 24.9 or newer. Source CI and the
-Docker carrier use Node.js 26; the Docker image remains digest-pinned. The
-renderer build copies the unmodified Superagent vendor source before compiling
-the native delivery plugins.
+Runtime note: Studio requires Node.js `>=24.9.0` (`package.json#engines.node`);
+source CI and the digest-pinned Docker carrier run Node.js 26.

@@ -1,8 +1,7 @@
 # OCI Preview Distribution
 
 The OCI carrier packages the same React renderer and Node host core used by the
-desktop and standalone WebUI carriers. It does not contain Electron, AionUI, or
-AionCore. This reference covers the independently versioned Studio OCI Preview
+desktop and standalone WebUI carriers, running without Electron. This reference covers the independently versioned Studio OCI Preview
 and its Cloud handoff. The App's Studio-based Docker Stable line is separately
 owned by the [App distribution reference](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/distribution-and-install-ssot.md).
 Preview publication does not qualify that line or prove Cloud activation.

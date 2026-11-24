@@ -26,5 +26,4 @@ than kept as dormant maintenance surface: no cross-thread tool set, queue,
 ledger, bilateral receipt, or dynamic-tool host is a compatibility surface or a
 deferred backlog item. A new orchestration requirement needs an explicit App
 product decision and the current canonical owner. Standard Codex thread
-lifecycle and Codex-native subagent projection remain current Studio behavior,
-and AionUI Team stays a separate multi-executor shell facility.
+lifecycle and Codex-native subagent projection remain current Studio behavior.
