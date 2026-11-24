@@ -7,11 +7,12 @@
   "homepage": "https://github.com/gaofeng21cn/opl-studio",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "url": "git+https://github.com/gaofeng21cn/opl-studio.git",
     "directory": "packages/opl-plugin-ui-kit"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   },
   "license": "Apache-2.0",
   "main": "./dist/index.js",

@@ -268,6 +268,7 @@ test("public @gaofeng21cn/opl-plugin-ui-kit package and DevKit Tier 2 template m
   expect(manifest.name).toBe("@gaofeng21cn/opl-plugin-ui-kit");
   expect(manifest.private).toBe(false);
   expect(manifest.publishConfig?.registry).toBe("https://npm.pkg.github.com");
+  expect(manifest.publishConfig?.access).toBe("public");
   expect(manifest.repository?.directory).toBe("packages/opl-plugin-ui-kit");
   expect(manifest.exports?.["."]).toBeTruthy();
 
