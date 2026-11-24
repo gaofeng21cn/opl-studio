@@ -1,7 +1,19 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
-import type { OplStudioShellService, OplStudioShellSnapshot } from "@gaofeng21cn/opl-host-contracts";
 
 export const OPL_STUDIO_SHELL_SERVICE = "oplStudioShell";
+
+export type OplPluginShellSnapshot = {
+  locale: "zh" | "en";
+  stateStatus: "loading" | "ready" | "error";
+  stateError?: string;
+  snapshotSource: "live" | "cached" | "none";
+  snapshotCachedAt?: string;
+};
+
+export type OplPluginShellService<TSnapshot = OplPluginShellSnapshot> = {
+  getSnapshot(): TSnapshot;
+  subscribe(listener: () => void): () => void;
+};
 
 function detectLocale(): "zh" | "en" {
   if (typeof document !== "undefined") {
@@ -33,7 +45,9 @@ export function useOplLocale(preferred?: "zh" | "en"): "zh" | "en" {
 }
 
 /** Subscribe to a Cordis-injected OplStudioShellService snapshot cleanly across CJS plugin bundles. */
-export function useOplStudioShellSnapshot(shell: OplStudioShellService): OplStudioShellSnapshot {
+export function useOplStudioShellSnapshot<TSnapshot = OplPluginShellSnapshot>(
+  shell: OplPluginShellService<TSnapshot>
+): TSnapshot {
   return useSyncExternalStore(shell.subscribe, shell.getSnapshot, shell.getSnapshot);
 }
 

@@ -1,5 +1,4 @@
 import { createElement, type ComponentType } from "react";
-import type { OplBridge } from "@gaofeng21cn/opl-host-contracts";
 import { PluginErrorBoundary } from "./PluginErrorBoundary";
 
 export const OPL_SETTINGS_GROUP_DESTINATIONS = [
@@ -29,6 +28,19 @@ export type OplSettingsGroupMeta = {
   searchKeywords?: string;
 };
 
+export type OplBillionContextPreferenceSnapshot = {
+  enabled: boolean;
+  installed: boolean;
+  version: string | null;
+  availableVersion: string | null;
+  updateAvailable: boolean;
+  activeVersion: string | null;
+  active: boolean;
+  startupFailed: boolean;
+  pendingOperation?: "update" | "remove" | null;
+  pendingVersion?: string | null;
+};
+
 export type OplSettingsGroupOwner = {
   locale: "zh" | "en";
   developerDetails?: boolean;
@@ -38,19 +50,11 @@ export type OplSettingsGroupOwner = {
     destination: string,
     focus?: { packageId?: string; resourceId?: string; section?: "libraries" | "remote" }
   ) => void;
-  billionContext?: Pick<OplBridge, "readBillionContext" | "setBillionContext">;
+  billionContext?: {
+    readBillionContext?: () => Promise<OplBillionContextPreferenceSnapshot>;
+    setBillionContext?: (request: { enabled: boolean }) => Promise<OplBillionContextPreferenceSnapshot>;
+  };
 };
-
-declare module "@deepseek-ai/dsh-client-ui-slots" {
-  interface SlotMap {
-    "settings.group.models": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-    "settings.group.resources": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-    "settings.group.workspace": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-    "settings.group.capabilities": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-    "settings.group.services": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-    "settings.group.preferences": { kind: "list"; scope: "root"; owner: OplSettingsGroupOwner };
-  }
-}
 
 /** Shared global symbol so separately compiled plugin CJS bundles agree on metadata identity. */
 export const OPL_SETTINGS_GROUP_META = Symbol.for("opl.settings.group.meta.v1");

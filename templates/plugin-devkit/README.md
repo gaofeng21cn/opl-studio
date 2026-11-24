@@ -11,7 +11,7 @@ OPL App organizes extension UI & settings into three standardized tiers so plugi
 
 2. **Tier 2 — DSH Client Plugin (`tier2-dsh-client-plugin/`)**
    - Best for rich interactive panels or custom controls inside DSH slots.
-   - Import UI primitives, settings group helpers, localization, and `PluginErrorBoundary` **exclusively** from `@gaofeng21cn/opl-dsh-adapters/ui-kit` (never import `vendor/` relative paths).
+   - Import UI primitives, settings group helpers, localization, and `PluginErrorBoundary` **exclusively** from `@gaofeng21cn/opl-plugin-ui-kit` (never import `vendor/` relative paths or private host packages).
    - Register settings groups through `registerOplSettingsGroup` targeting a closed `settings.group.<destination>` slot with bilingual `titleI18n` and `searchKeywords`.
    - Wrap panel roots in `<PluginErrorBoundary>` so isolated render failures never break core conversation.
 

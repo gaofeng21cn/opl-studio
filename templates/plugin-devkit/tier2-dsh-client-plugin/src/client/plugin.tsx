@@ -10,7 +10,7 @@ import {
   useOplLocale,
   type OplSettingsGroupOwner,
   type OplSettingsGroupSlotRegistry
-} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
+} from "@gaofeng21cn/opl-plugin-ui-kit";
 
 export function ExampleTier2Panel() {
   const locale = useOplLocale();
@@ -27,8 +27,8 @@ export function ExampleTier2Panel() {
         <h2>{zh ? "示例 Tier 2 扩展面板" : "Example Tier 2 Extension Panel"}</h2>
         <p>
           {zh
-            ? "使用 @gaofeng21cn/opl-dsh-adapters/ui-kit 原语与 PluginErrorBoundary 构建，与宿主主题及错误隔离一致。"
-            : "Built exclusively with @gaofeng21cn/opl-dsh-adapters/ui-kit primitives and PluginErrorBoundary."}
+            ? "使用 @gaofeng21cn/opl-plugin-ui-kit 原语与 PluginErrorBoundary 构建，与宿主主题及错误隔离一致。"
+            : "Built exclusively with @gaofeng21cn/opl-plugin-ui-kit primitives and PluginErrorBoundary."}
         </p>
         <Button type="button" size="sm" variant="outline" onClick={() => setHealthy((current) => !current)}>
           {healthy ? (zh ? "切换为检查中" : "Mark checking") : (zh ? "恢复就绪" : "Mark ready")}

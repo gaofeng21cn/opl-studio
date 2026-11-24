@@ -10,6 +10,7 @@ on:
       - "vendor/**"
       - "src/**"
       - "scripts/build-dsh-plugins.mjs"
+      - "scripts/build-plugin-ui-kit.mjs"
       - "scripts/vite-build-renderer-entry.mjs"
       - "scripts/client-runtime-policy.mjs"
       - "scripts/build-dsh-client.mjs"
@@ -46,6 +47,8 @@ jobs:
     outputs:
       plugins: ${{ steps.detect.outputs.plugins }}
       has_plugins: ${{ steps.detect.outputs.has_plugins }}
+      sdk_packages: ${{ steps.detect.outputs.sdk_packages }}
+      has_sdk: ${{ steps.detect.outputs.has_sdk }}
       app_sha: ${{ steps.app-source.outputs.sha }}
     steps:
       - name: Checkout
@@ -79,15 +82,27 @@ jobs:
                 && pkg.publishConfig?.registry === "https://npm.pkg.github.com";
             }).map(entry => entry.name);
 
+          const PUBLISHABLE_SDKS = fs.readdirSync("packages", { withFileTypes: true })
+            .filter(entry => entry.isDirectory())
+            .filter(entry => {
+              const pkg = JSON.parse(fs.readFileSync(`packages/${entry.name}/package.json`, "utf8"));
+              return !pkg.private && pkg.name?.startsWith("@gaofeng21cn/")
+                && pkg.publishConfig?.registry === "https://npm.pkg.github.com";
+            }).map(entry => entry.name);
+
           const forceAll = process.env.FORCE_ALL === "true";
           const explicitInput = (process.env.PACKAGES_INPUT || "").trim();
 
           let selected;
+          let selectedSdks;
           if (forceAll) {
             selected = PUBLISHABLE;
+            selectedSdks = PUBLISHABLE_SDKS;
           } else if (explicitInput) {
-            selected = [...new Set(explicitInput.split(",").map(s => s.trim()))];
-            const unknown = selected.filter(name => !PUBLISHABLE.includes(name));
+            const requested = [...new Set(explicitInput.split(",").map(s => s.trim()))];
+            selected = requested.filter(name => PUBLISHABLE.includes(name));
+            selectedSdks = requested.filter(name => PUBLISHABLE_SDKS.includes(name));
+            const unknown = requested.filter(name => !PUBLISHABLE.includes(name) && !PUBLISHABLE_SDKS.includes(name));
             if (unknown.length) throw new Error(`Not publishable source packages: ${unknown.join(", ")}`);
           } else {
             const base = process.env.PUSH_BASE || "HEAD~1";
@@ -104,16 +119,24 @@ jobs:
               file !== "scripts/publish-dsh-plugin-feed.mjs" &&
               !(file.startsWith("src/") && file.endsWith(".test.mjs"))
             );
-            const sharedChanged = packageInputs?.some(file => !file.startsWith("plugins/"));
+            const sharedChanged = packageInputs?.some(file => !file.startsWith("plugins/") && !file.startsWith("packages/opl-plugin-ui-kit/"));
             selected = !packageInputs || sharedChanged
               ? PUBLISHABLE
               : PUBLISHABLE.filter(name => packageInputs.some(file => file.startsWith(`plugins/${name}/`)));
+            selectedSdks = !packageInputs || packageInputs.some(file =>
+              file === "scripts/build-plugin-ui-kit.mjs" || file.startsWith("packages/opl-plugin-ui-kit/")
+            )
+              ? PUBLISHABLE_SDKS
+              : [];
           }
 
           const output = process.env.GITHUB_OUTPUT;
           fs.appendFileSync(output, `plugins=${JSON.stringify(selected)}\n`);
           fs.appendFileSync(output, `has_plugins=${selected.length > 0}\n`);
+          fs.appendFileSync(output, `sdk_packages=${JSON.stringify(selectedSdks)}\n`);
+          fs.appendFileSync(output, `has_sdk=${selectedSdks.length > 0}\n`);
           console.log(`Selected plugins: ${selected.join(", ") || "(none)"}`);
+          console.log(`Selected SDK packages: ${selectedSdks.join(", ") || "(none)"}`);
           NODE
         env:
           FORCE_ALL: ${{ inputs.force_all || 'false' }}
@@ -123,7 +146,7 @@ jobs:
   publish:
     name: Build, test and publish selected DSH plugins
     needs: detect
-    if: github.ref == 'refs/heads/main' && needs.detect.outputs.has_plugins == 'true'
+    if: github.ref == 'refs/heads/main' && (needs.detect.outputs.has_plugins == 'true' || needs.detect.outputs.has_sdk == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -180,25 +203,38 @@ jobs:
             console.log(JSON.stringify(publication));
             if (publication.status === "unpublished") unpublished.push(id);
           }
+          const unpublishedSdks = [];
+          for (const id of JSON.parse(process.env.SELECTED_SDKS)) {
+            const publication = inspectPublication(`packages/${id}`);
+            console.log(JSON.stringify(publication));
+            if (publication.status === "unpublished") unpublishedSdks.push(id);
+          }
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `plugins=${JSON.stringify(unpublished)}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `sdk_packages=${JSON.stringify(unpublishedSdks)}\n`);
           NODE
         env:
           SELECTED_PLUGINS: ${{ needs.detect.outputs.plugins }}
+          SELECTED_SDKS: ${{ needs.detect.outputs.sdk_packages }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to GitHub Packages
-        if: steps.version-check.outputs.plugins != '[]'
+        if: steps.version-check.outputs.plugins != '[]' || steps.version-check.outputs.sdk_packages != '[]'
         shell: bash
         run: |
           set -euo pipefail
+          jq -r '.[]' <<< "$UNPUBLISHED_SDKS" | while IFS= read -r pkg; do
+            (cd "packages/$pkg" && npm publish --provenance)
+          done
           jq -r '.[]' <<< "$UNPUBLISHED_PLUGINS" | while IFS= read -r plugin; do
             (cd "plugins/$plugin" && npm publish --provenance)
           done
         env:
           UNPUBLISHED_PLUGINS: ${{ steps.version-check.outputs.plugins }}
+          UNPUBLISHED_SDKS: ${{ steps.version-check.outputs.sdk_packages }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish public DSH plugin feed
+        if: needs.detect.outputs.has_plugins == 'true'
         shell: bash
         run: node scripts/publish-dsh-plugin-feed.mjs
         env:

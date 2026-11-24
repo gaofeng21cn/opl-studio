@@ -258,9 +258,31 @@ test("Tier 2 settings slots declare bilingual titles and search keywords, and re
 
 test("CSS surfaces and PluginErrorBoundary obey theme CSS custom properties without hardcoded top-level hex colors", () => {
   const css = readFileSync(path.join(studioRoot, "plugins/opl-mcp-apps/src/client/mcp-apps.css"), "utf8");
-  const boundary = readFileSync(path.join(studioRoot, "packages/dsh-adapters/ui-kit/PluginErrorBoundary.tsx"), "utf8");
+  const boundary = readFileSync(path.join(studioRoot, "packages/opl-plugin-ui-kit/src/PluginErrorBoundary.tsx"), "utf8");
   expect(css).toContain("var(--dsw-");
   expect(boundary).toContain("var(--dsw-");
   expect(css).not.toMatch(/background(?:-color)?\s*:\s*#(?:fff|ffffff|000|000000)\b/i);
   expect(boundary).not.toMatch(/#(?:fff|ffffff|000|000000)\b/i);
+});
+
+test("public @gaofeng21cn/opl-plugin-ui-kit package and DevKit Tier 2 template maintain clean public SDK boundaries", () => {
+  const manifest = JSON.parse(readFileSync(path.join(studioRoot, "packages/opl-plugin-ui-kit/package.json"), "utf8"));
+  expect(manifest.name).toBe("@gaofeng21cn/opl-plugin-ui-kit");
+  expect(manifest.private).toBe(false);
+  expect(manifest.publishConfig?.registry).toBe("https://npm.pkg.github.com");
+  expect(manifest.repository?.directory).toBe("packages/opl-plugin-ui-kit");
+  expect(manifest.exports?.["."]).toBeTruthy();
+
+  for (const file of walkSourceFiles(path.join(studioRoot, "packages/opl-plugin-ui-kit/src"))) {
+    const code = readFileSync(file, "utf8");
+    expect(code).not.toContain("vendor/");
+    expect(code).not.toContain("@gaofeng21cn/opl-host-contracts");
+    expect(code).not.toContain("@deepseek-ai/dsh-client-ui-slots");
+  }
+
+  const devkitPkg = JSON.parse(readFileSync(path.join(studioRoot, "templates/plugin-devkit/tier2-dsh-client-plugin/package.json"), "utf8"));
+  expect(devkitPkg.dependencies?.["@gaofeng21cn/opl-plugin-ui-kit"]).toBeTruthy();
+  const devkitEntry = readFileSync(path.join(studioRoot, "templates/plugin-devkit/tier2-dsh-client-plugin/src/client/plugin.tsx"), "utf8");
+  expect(devkitEntry).toContain('from "@gaofeng21cn/opl-plugin-ui-kit"');
+  expect(devkitEntry).not.toContain("@gaofeng21cn/opl-dsh-adapters");
 });

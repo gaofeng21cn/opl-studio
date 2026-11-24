@@ -241,3 +241,29 @@ test("typed HTTP errors preserve the shared ABI across isolated plugin bundles",
   assert.equal(error.httpStatus, 400);
   assert.equal(Object.assign(new Error("untyped"), { name: "ThreadAdapterError", httpStatus: 400 }) instanceof ThreadAdapterError, false);
 });
+
+test("public @gaofeng21cn/opl-plugin-ui-kit packs clean dist bundle and declarations without private refs", async () => {
+  const pkgDir = path.join(root, "packages/opl-plugin-ui-kit");
+  const staging = await fs.mkdtemp(path.join(os.tmpdir(), "opl-ui-kit-pack-"));
+  try {
+    const packed = JSON.parse(spawnSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", staging], {
+      cwd: pkgDir, encoding: "utf8"
+    }).stdout);
+    const entry = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+    assert.equal(entry.name, "@gaofeng21cn/opl-plugin-ui-kit");
+    const tarball = path.join(staging, entry.filename);
+    const list = spawnSync("tar", ["-tzf", tarball], { encoding: "utf8" }).stdout.split("\n").filter(Boolean);
+    assert.ok(list.includes("package/dist/index.js"), "tarball must include built dist/index.js");
+    assert.ok(list.includes("package/dist/index.d.ts"), "tarball must include dist/index.d.ts");
+    assert.ok(list.includes("package/README.md"), "tarball must include README.md");
+    assert.ok(list.includes("package/LICENSE"), "tarball must include LICENSE");
+    const js = spawnSync("tar", ["-xOf", tarball, "package/dist/index.js"], { encoding: "utf8" }).stdout;
+    const dts = spawnSync("tar", ["-xOf", tarball, "package/dist/index.d.ts"], { encoding: "utf8" }).stdout;
+    for (const marker of ["vendor/", "@gaofeng21cn/opl-host-contracts", "@deepseek-ai/dsh-client-ui-slots"]) {
+      assert.equal(js.includes(marker), false, `dist/index.js must not reference ${marker}`);
+      assert.equal(dts.includes(marker), false, `dist/index.d.ts must not reference ${marker}`);
+    }
+  } finally {
+    await fs.rm(staging, { recursive: true, force: true });
+  }
+});

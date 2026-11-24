@@ -1,0 +1,38 @@
+{
+  "name": "@gaofeng21cn/opl-plugin-ui-kit",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Public UI Kit and Settings Slot SDK for Tier 2 OPL App DSH client plugins.",
+  "homepage": "https://github.com/gaofeng21cn/opl-studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "packages/opl-plugin-ui-kit"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.3 || >=0.2.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

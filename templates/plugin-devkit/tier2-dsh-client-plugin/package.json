@@ -7,8 +7,10 @@
   "deepseekHarness": {
     "client": "src/client/plugin.tsx"
   },
+  "dependencies": {
+    "@gaofeng21cn/opl-plugin-ui-kit": "^0.1.0"
+  },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "*",
-    "@gaofeng21cn/opl-dsh-adapters": ">=0.1.0"
+    "@deepseek-ai/cordis": "*"
   }
 }

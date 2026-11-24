@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-superagent",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {
