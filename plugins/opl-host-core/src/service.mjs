@@ -1,6 +1,12 @@
 import path from "node:path";
 import { checkRegistryUpdates, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
 import { clearProfileBootRecovery, readProfileBootRecovery } from "@gaofeng21cn/opl-host-kit/profile-boot-recovery";
+import {
+  appendDshPluginActivity,
+  buildDshPluginCatalog,
+  findDshPluginDescriptor,
+  setOptionalPluginEnabled
+} from "@gaofeng21cn/opl-host-kit/dsh-plugin-catalog";
 import { createSettingsSearchLog } from "./settings-search-log.mjs";
 import { EventEmitter } from "node:events";
 import { createNativeAppUpdaterFromEnvironment } from "./native-app-updater.mjs";
@@ -85,6 +91,37 @@ function defaultCarrierDiagnostics(env) {
     read: async () => unavailableCarrierDiagnostics(),
     setLogDirectory: async () => unsupportedLogDirectoryUpdate()
   };
+}
+
+export const CLIENT_ONLY_DSH_PACKAGES = new Set(["@gaofeng21cn/opl-studio-client"]);
+
+/**
+ * Reports whether an update batch can safely apply via lightweight renderer reload.
+ * First-time carrier-to-profile overrides still resolve outside `dshProfileDir/node_modules`
+ * until the host process restarts, so those and any server/mixed updates honestly require restart.
+ */
+export async function classifyAndRefreshDshPluginUpdate({ installed, dshProfileDir, clientModules }) {
+  const installedNames = Object.keys(installed ?? {});
+  if (installedNames.length === 0) return "restart_required";
+  if (installedNames.some((pkg) => !CLIENT_ONLY_DSH_PACKAGES.has(pkg))) return "restart_required";
+  if (typeof dshProfileDir !== "string" || !dshProfileDir.trim()) return "restart_required";
+  if (!clientModules || typeof clientModules.clientPath !== "function" || typeof clientModules.rebuilt !== "function") {
+    return "restart_required";
+  }
+  const profileNodeModules = path.resolve(dshProfileDir, "node_modules");
+  for (const pkg of installedNames) {
+    const resolved = clientModules.clientPath(pkg);
+    if (typeof resolved !== "string" || !resolved) return "restart_required";
+    const rel = path.relative(profileNodeModules, path.resolve(resolved));
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return "restart_required";
+    try {
+      const rev = await clientModules.rebuilt(pkg);
+      if (!rev) return "restart_required";
+    } catch {
+      return "restart_required";
+    }
+  }
+  return "renderer_reload";
 }
 
 export class OplHostCore extends EventEmitter {
@@ -322,14 +359,161 @@ export class OplHostCore extends EventEmitter {
       token: undefined,
       cwd: path.dirname(options.dshInstallAnchor)
     });
-    if (result.application === "restart-required") {
+    const installedCount = Object.keys(result.installed ?? {}).length;
+    const reloadMode = installedCount > 0
+      ? await classifyAndRefreshDshPluginUpdate({
+          installed: result.installed,
+          dshProfileDir: options.dshProfileDir,
+          clientModules: this.hostContext?.get("clientModules")
+        })
+      : undefined;
+    if (result.application === "restart-required" || installedCount > 0) {
       if (Object.keys(result.failures ?? {}).length === 0) {
         clearProfileBootRecovery(options.dshProfileDir);
         this.profileBootRecovery = null;
       }
-      this.emit("event", { method: "host/dsh-plugins-updated", params: { installed: result.installed ?? {} } });
+      this.emit("event", {
+        method: "host/dsh-plugins-updated",
+        params: { installed: result.installed ?? {}, reloadMode: reloadMode ?? "restart_required" }
+      });
     }
-    return result;
+    const now = new Date().toISOString();
+    for (const [packageName, targetVersion] of Object.entries(result.installed ?? {})) {
+      await appendDshPluginActivity(options.dshProfileDir, {
+        packageName,
+        action: "update",
+        status: reloadMode === "renderer_reload" ? "completed" : "staged_restart",
+        startedAt: now,
+        finishedAt: now,
+        targetVersion,
+        restartRequired: reloadMode !== "renderer_reload"
+      });
+    }
+    for (const [packageName, detail] of Object.entries(result.failures ?? {})) {
+      await appendDshPluginActivity(options.dshProfileDir, {
+        packageName,
+        action: "update",
+        status: "failed",
+        startedAt: now,
+        finishedAt: now,
+        detail
+      });
+    }
+    return reloadMode ? { ...result, reloadMode } : result;
+  }
+
+  async readDshPluginCatalog(payload = {}) {
+    const options = this.hostContext?.get("oplStudioHostOptions");
+    if (!options?.dshHome || !options?.dshInstallAnchor) {
+      throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
+    }
+    if (payload?.includeUpdates === true) {
+      try {
+        const projection = await checkRegistryUpdates({
+          home: options.dshHome,
+          installAnchor: options.dshInstallAnchor,
+          cwd: path.dirname(options.dshInstallAnchor)
+        });
+        const profileBootRecovery = this.profileBootRecovery ?? readProfileBootRecovery(options.dshProfileDir);
+        this.latestDshPluginUpdates = profileBootRecovery ? { ...projection, profileBootRecovery } : projection;
+      } catch {
+        // Keep catalog read usable offline when feed checks fail.
+      }
+    }
+    let billionContext;
+    try {
+      billionContext = this.codex.readBillionContext();
+    } catch {
+      billionContext = undefined;
+    }
+    return buildDshPluginCatalog({
+      dshProfileDir: options.dshProfileDir,
+      dshInstallAnchor: options.dshInstallAnchor,
+      disabledAtBoot: options.dshDisabledAtBoot,
+      billionContext,
+      updateProjection: this.latestDshPluginUpdates
+    });
+  }
+
+  async manageDshPlugin(payload = {}) {
+    const options = this.hostContext?.get("oplStudioHostOptions");
+    if (!options?.dshHome || !options?.dshInstallAnchor || !options?.dshProfileDir) {
+      throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
+    }
+    const { pluginId, operation } = payload;
+    const descriptor = findDshPluginDescriptor(pluginId);
+    if (!descriptor) {
+      throw new ThreadAdapterError("invalid_request", `Unknown DSH plugin: ${String(pluginId)}`, { pluginId }, 400);
+    }
+    const allowedOps = ["install", "update", "remove", "enable", "disable", "check", "cancel_pending"];
+    if (!allowedOps.includes(operation)) {
+      throw new ThreadAdapterError("invalid_request", `Unsupported DSH plugin operation: ${String(operation)}`, { operation }, 400);
+    }
+    const startedAt = new Date().toISOString();
+    if (descriptor.tier === "core_runtime") {
+      if (operation === "update") {
+        await this.updateDshPlugins({ packages: [descriptor.packageName] });
+        return this.readDshPluginCatalog({ includeUpdates: true });
+      }
+      throw new ThreadAdapterError("dsh_plugin_core_required", "Core DSH runtime plugins cannot be disabled or removed", { pluginId }, 409);
+    }
+    if (descriptor.pluginId === "billion-context") {
+      try {
+        const result = operation === "enable" || operation === "disable"
+          ? await this.codex.setBillionContext({ enabled: operation === "enable" })
+          : await this.codex.manageBillionContext({ operation });
+        const staged = Boolean(result.pendingOperation) || result.active !== result.enabled;
+        if (operation !== "check") {
+          await appendDshPluginActivity(options.dshProfileDir, {
+            pluginId: descriptor.pluginId,
+            packageName: descriptor.packageName,
+            action: operation,
+            status: staged ? "staged_restart" : "completed",
+            startedAt,
+            finishedAt: new Date().toISOString(),
+            targetVersion: result.pendingVersion ?? result.version,
+            restartRequired: staged
+          });
+        }
+      } catch (error) {
+        await appendDshPluginActivity(options.dshProfileDir, {
+          pluginId: descriptor.pluginId,
+          packageName: descriptor.packageName,
+          action: operation,
+          status: "failed",
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          detail: error instanceof Error ? error.message : String(error)
+        });
+        throw error;
+      }
+      return this.readDshPluginCatalog();
+    }
+    if (operation === "enable" || operation === "disable") {
+      await setOptionalPluginEnabled(options.dshProfileDir, descriptor.pluginId, operation === "enable");
+      const disabledAtBoot = new Set(options.dshDisabledAtBoot ?? []);
+      const wasActive = !disabledAtBoot.has(descriptor.pluginId);
+      const nextEnabled = operation === "enable";
+      const restartRequired = nextEnabled !== wasActive;
+      await appendDshPluginActivity(options.dshProfileDir, {
+        pluginId: descriptor.pluginId,
+        packageName: descriptor.packageName,
+        action: operation,
+        status: restartRequired ? "staged_restart" : "completed",
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        restartRequired
+      });
+      return this.readDshPluginCatalog();
+    }
+    if (operation === "update") {
+      await this.updateDshPlugins({ packages: [descriptor.packageName] });
+      return this.readDshPluginCatalog({ includeUpdates: true });
+    }
+    if (operation === "check") {
+      return this.readDshPluginCatalog({ includeUpdates: true });
+    }
+    throw new ThreadAdapterError("dsh_plugin_operation_unsupported", "Bundled optional plugin does not support install or uninstall", { pluginId, operation }, 409);
   }
 
   capabilities() {
@@ -382,9 +566,13 @@ export class OplHostCore extends EventEmitter {
         if (!options?.dshHome || !options?.dshInstallAnchor) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
         const projection = await checkRegistryUpdates({ home: options.dshHome, installAnchor: options.dshInstallAnchor, cwd: path.dirname(options.dshInstallAnchor) });
         const profileBootRecovery = this.profileBootRecovery ?? readProfileBootRecovery(options.dshProfileDir);
-        return profileBootRecovery ? { ...projection, profileBootRecovery } : projection;
+        const withRecovery = profileBootRecovery ? { ...projection, profileBootRecovery } : projection;
+        this.latestDshPluginUpdates = withRecovery;
+        return withRecovery;
       }
       case "updateDshPlugins": return this.updateDshPlugins(payload);
+      case "readDshPluginCatalog": return this.readDshPluginCatalog(payload);
+      case "manageDshPlugin": return this.manageDshPlugin(payload);
       case "readSuperagent": return this.hostContext.get("oplSuperagent").read();
       case "executeSuperagent": {
         const service = this.hostContext.get("oplSuperagent");

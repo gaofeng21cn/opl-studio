@@ -124,6 +124,8 @@ export function createBrowserBridge(): OplBridge {
     readBillionContext: candidate?.readBillionContext,
     setBillionContext: candidate?.setBillionContext,
     manageBillionContext: candidate?.manageBillionContext,
+    readDshPluginCatalog: candidate?.readDshPluginCatalog,
+    manageDshPlugin: candidate?.manageDshPlugin,
     readCodexModels() {
       const promise = candidate?.readCodexModels?.() ?? Promise.resolve({ models: [], simulated: true });
       return Promise.resolve(promise).then(normalizeCodexModelCatalog);
@@ -291,6 +293,14 @@ export function createBrowserBridge(): OplBridge {
     },
     restartNativeApp() {
       return candidate?.restartNativeApp?.() ?? Promise.resolve(nativeUpdaterPlaceholder("restart"));
+    },
+    reloadRenderer() {
+      if (candidate?.reloadRenderer) return Promise.resolve(candidate.reloadRenderer());
+      if (typeof window !== "undefined" && typeof window.location?.reload === "function") {
+        window.location.reload();
+        return Promise.resolve({ accepted: true, mode: "renderer_reload" as const });
+      }
+      return Promise.resolve({ accepted: false, mode: "renderer_reload" as const });
     },
     listThreads(request: ThreadListRequest = {}) {
       const promise = candidate?.listThreads?.(request) ?? Promise.resolve({ data: [], nextCursor: null });

@@ -196,6 +196,8 @@ export function installWebTransport(): void {
     readClientModuleGraph: () => requestJson("/api/client-modules/graph"),
     readDshPluginUpdates: () => requestJson("/api/host/plugin-updates"),
     updateDshPlugins: request => postJson("/api/host/plugin-update", request),
+    readDshPluginCatalog: (request) => requestJson(`/api/host/plugin-catalog${request?.includeUpdates ? "?includeUpdates=1" : ""}`),
+    manageDshPlugin: request => postJson("/api/host/plugin-manage", request),
     platformCapabilities: {
       workspaceRootSelection: false,
       nativeWorkspaceFileAccess: false,
@@ -282,6 +284,13 @@ export function installWebTransport(): void {
     checkNativeAppUpdate: () => postJson("/api/native-app-update/check", {}),
     applyNativeAppUpdate: () => postJson("/api/native-app-update/apply", {}),
     restartNativeApp: () => postJson("/api/native-app-update/restart", {}),
+    reloadRenderer: async () => {
+      if (typeof window !== "undefined" && typeof window.location?.reload === "function") {
+        window.location.reload();
+        return { accepted: true, mode: "renderer_reload" as const };
+      }
+      return { accepted: false, mode: "renderer_reload" as const };
+    },
     listThreads: (request = {}) => postJson("/api/threads/list", request),
     readThread: (request) => postJson("/api/threads/read", request),
     resumeThread: (request) => postJson("/api/threads/resume", request),

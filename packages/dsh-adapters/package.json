@@ -6,6 +6,16 @@
   "exports": {
     "./visual-source": "./deepseekHarnessSourceManifest.json",
     "./workspace-preview": "./workspace-preview.ts",
-    "./ui-kit": "./ui-kit.ts"
+    "./ui-kit": "./ui-kit.ts",
+    "./dsh-shell": {
+      "types": "./dsh-shell.d.mts",
+      "default": "./dsh-shell.mjs"
+    },
+    "./dsh-locales": "./dsh-locales.ts",
+    "./dsh-theme": {
+      "types": "./dsh-theme.d.mts",
+      "default": "./dsh-theme.mjs"
+    },
+    "./dsh-theme-styles": "./dsh-theme-styles.ts"
   }
 }

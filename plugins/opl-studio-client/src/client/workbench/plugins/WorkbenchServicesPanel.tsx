@@ -1,11 +1,11 @@
 import "./WorkbenchServicesPanel.css";
-import { Button } from "../../../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/Button";
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SettingsActionRequest } from '../settingsActions';
 import { TaskManagerPage, createEditorStore, scheduleManagerEn, scheduleManagerZh } from '../../integrations/deepseek-harness/scheduleComponents.mjs';
 import { createDshScheduleController } from '../../composition/dshScheduleController';
 import { taskOwnerValues, timingFromOplDraft, validTaskOwnerValues } from '../../composition/dshScheduleAdapterModel';
-import { bindSnapshotSelector } from '../../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/bind.ts';
+import { bindSnapshotSelector } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 
 export type WorkbenchServicesClient = {
   read(operation: string, input?: Record<string, unknown>): Promise<unknown>;

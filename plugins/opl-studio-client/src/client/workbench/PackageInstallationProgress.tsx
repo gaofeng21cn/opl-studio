@@ -1,6 +1,7 @@
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ArrowRight, Download, Check, CircleAlert, Clock3, X } from 'lucide-react';
 import type { SettingsActionRequest } from './settingsActions';
+import type { DshPluginActivityRecord } from '@gaofeng21cn/opl-host-contracts';
 import { formatBytes } from './settings/presentation';
 import {
   latestPackageOperations, operationErrorMessage, packageActionVerb, packageRemainingTime, packageStagePresentation,
@@ -52,8 +53,20 @@ export function PackageActivityButton({ activity, locale, onOpen }: { activity: 
   </button>;
 }
 
-export function PackageOperations({ operations, locale, labels, readError, cancelError = false, cancelling, onCancel, onRetry, onRefresh, onUse, readyPackageIds = [], onOpenLocation }: {
-  operations: PackageOperation[]; locale: 'zh' | 'en'; labels: Record<string, string>; readError: boolean; cancelError?: boolean;
+function dshActivityActionLabel(action: DshPluginActivityRecord["action"], zh: boolean): string {
+  return ({
+    install: zh ? "安装" : "Install",
+    update: zh ? "更新" : "Update",
+    remove: zh ? "卸载" : "Uninstall",
+    enable: zh ? "启用" : "Enable",
+    disable: zh ? "停用" : "Disable",
+    check: zh ? "检查更新" : "Check updates",
+    cancel_pending: zh ? "取消待生效变更" : "Cancel staged change"
+  })[action];
+}
+
+export function PackageOperations({ operations, dshActivity = [], locale, labels, readError, cancelError = false, cancelling, onCancel, onRetry, onRefresh, onUse, readyPackageIds = [], onOpenLocation }: {
+  operations: PackageOperation[]; dshActivity?: DshPluginActivityRecord[]; locale: 'zh' | 'en'; labels: Record<string, string>; readError: boolean; cancelError?: boolean;
   cancelling: string | null; onCancel: (id: string) => void; onRetry: (request: SettingsActionRequest) => void; onRefresh: () => void;
   onUse?: (packageId: string) => void; readyPackageIds?: readonly string[]; onOpenLocation?: (path: string) => void;
 }) {
@@ -62,7 +75,9 @@ export function PackageOperations({ operations, locale, labels, readError, cance
   const active = latest.some(item => item.status === 'running');
   const current = latest.filter(item => ['running', 'failed', 'interrupted'].includes(item.status));
   const history = latest.filter(item => !current.includes(item));
-  if (!operations.length && !readError && !cancelError) return null;
+  const activeDsh = dshActivity.filter(item => item.status === "failed" || item.status === "staged_restart");
+  const completedDsh = dshActivity.filter(item => item.status === "completed");
+  if (!operations.length && !dshActivity.length && !readError && !cancelError) return null;
 
   const renderOperation = (operation: PackageOperation) => {
     const running = operation.status === 'running';
@@ -107,10 +122,29 @@ export function PackageOperations({ operations, locale, labels, readError, cance
     </article>;
   };
 
+  const renderDshRecord = (item: DshPluginActivityRecord) => {
+    const label = item.labelI18n[locale] ?? item.pluginId;
+    const actionText = dshActivityActionLabel(item.action, zh);
+    const statusText = item.status === "staged_restart"
+      ? (zh ? "已暂存，重启应用后生效" : "Staged, applies after restart")
+      : item.status === "failed"
+        ? (zh ? "未完成" : "Failed")
+        : (zh ? "已完成" : "Completed");
+    return <article key={item.id} className="opl-package-operation" data-plugin-id={item.pluginId} data-status={item.status} aria-label={label}>
+      <div className="opl-package-operation-title">
+        {item.status === "failed" ? <CircleAlert size={16} aria-hidden="true" /> : item.status === "staged_restart" ? <Clock3 size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+        <strong>{label}</strong>
+        <span role="status">{actionText} · {statusText}{item.targetVersion ? ` (${item.targetVersion})` : ""}</span>
+      </div>
+      {item.detail ? <p>{item.detail}</p> : null}
+    </article>;
+  };
+
   return <section className="opl-package-operations" aria-label={zh ? '安装与更新任务' : 'Installation and update tasks'}>
     {readError ? <div className="opl-package-operation-read-error" role="alert"><p>{zh ? '暂时无法读取进度，任务可能仍在继续。重新读取后再决定下一步。' : 'Progress is unavailable; the task may still be running. Refresh before taking further action.'}</p><Button size="sm" variant="outline" onClick={onRefresh}>{zh ? '重新读取' : 'Refresh'}</Button></div> : null}
     {cancelError ? <div className="opl-package-operation-read-error" role="alert"><p>{zh ? '取消请求未成功，任务可能仍在继续；请刷新后查看最新状态。' : 'Cancel request did not succeed; the task may still be running. Refresh to check the latest status.'}</p><Button size="sm" variant="outline" onClick={onRefresh}>{zh ? '重新读取' : 'Refresh'}</Button></div> : null}
     {current.map(renderOperation)}
-    {history.length ? <details className="opl-package-operation-history"><summary>{zh ? `最近任务 · ${history.length}` : `Recent tasks · ${history.length}`}</summary>{history.map(renderOperation)}</details> : null}
+    {activeDsh.map(renderDshRecord)}
+    {(history.length > 0 || completedDsh.length > 0) ? <details className="opl-package-operation-history"><summary>{zh ? `最近任务 · ${history.length + completedDsh.length}` : `Recent tasks · ${history.length + completedDsh.length}`}</summary>{history.map(renderOperation)}{completedDsh.map(renderDshRecord)}</details> : null}
   </section>;
 }

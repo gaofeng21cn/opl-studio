@@ -103,7 +103,7 @@ import {
   type WorkbenchSettings
 } from "./settingsModel";
 import { codexWorkbenchStyles } from "./codexWorkbenchStyles";
-import { ApplicationManagementPage, type ApplicationManagementTab } from "./ApplicationManagementPage";
+import { type ApplicationManagementTab } from "./ApplicationManagementPage";
 import {
   readRuntimeOverviewCache,
   runtimeOverviewModelFromCache,
@@ -116,7 +116,6 @@ import {
 } from "./modelPolicy";
 import {
   nativeAppUpdateFeedback,
-  SettingsPanel,
   type SettingsDestinationId
 } from "./SettingsPanel";
 import {
@@ -156,18 +155,14 @@ import {
   type TrackedComposerTurn
 } from "./composerSubmissionLifecycle";
 import type {
-  OplSettingsGroupDestination,
-  OplSettingsGroupOwner
-} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
-import type {
   OplContributionAction,
   OplUiContribution,
   OplUiContributionCommand,
   OplUiContributionsProjection,
   RenderOplContributionSlot
 } from "../composition/contributionProjection";
-import { settingsEntriesForNativeAppSurface } from "../composition/contributionProjection";
-import { SettingsPluginSections } from "../composition/SettingsPluginSections";
+import { SettingsSurface } from "../composition/surfaces/SettingsSurface";
+import { SoftwareCenterSurface } from "../composition/surfaces/SoftwareCenterSurface";
 import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
@@ -298,7 +293,10 @@ type AppProps = {
   detailTabs: readonly OplStudioDetailTab[];
   renderShell: RenderOplStudioShell;
   renderContributionSlot?: RenderOplContributionSlot;
-  renderSettingsGroupSlot?: (destination: OplSettingsGroupDestination, owner: OplSettingsGroupOwner) => ReactNode;
+  renderSettingsGroupSlot?: (
+    destination: import("@gaofeng21cn/opl-dsh-adapters/ui-kit").OplSettingsGroupDestination,
+    owner: import("@gaofeng21cn/opl-dsh-adapters/ui-kit").OplSettingsGroupOwner
+  ) => ReactNode;
   onHostStateChange?: (state: unknown) => void;
   onHostStateDispose?: () => void;
 };
@@ -1525,7 +1523,7 @@ export function App({
     }
     if (method === "host/dsh-plugins-updated") {
       const installed = params.installed && typeof params.installed === "object" ? Object.keys(params.installed as Record<string, unknown>) : [];
-      if (installed.length > 0) setDshPluginRestartRequired(true);
+      if (installed.length > 0 && params.reloadMode !== "renderer_reload") setDshPluginRestartRequired(true);
     }
     if (method === "host/managed-update" && typeof params.status === "string") {
       setMaintenanceError(typeof params.errorCode === "string" ? params.errorCode : null);
@@ -2526,7 +2524,7 @@ export function App({
 
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
-    <SettingsPanel
+    <SettingsSurface
       resourceFocus={settingsNavigation?.resourceFocus}
       onPickKnowledgeDirectory={bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined}
       onOpenSchedules={() => { onClose?.(); setPrimaryView("schedules"); }}
@@ -2594,31 +2592,24 @@ export function App({
       pendingConfirmation={null}
       onConfirmAction={() => void confirmSettingsAction()}
       onCancelAction={cancelSettingsAction}
-      renderSettingsContributions={(destination) => {
-        const entries = settingsEntriesForNativeAppSurface(model.uiContributions.entries, destination, settings.developerDetails);
-        if (!entries.length) return null;
-        const labels = new Map(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n?.[settings.locale] ?? item.label]));
-        return <SettingsPluginSections entries={entries} labels={labels} collapsible={destination !== 'resources'} focusedPackageId={settingsNavigation?.resourceFocus?.packageId} renderEntry={entry => renderContribution?.({ only: entry.contributionKey }) ?? null} />;
+      packageLifecycle={model.packageLifecycle}
+      uiContributionEntries={model.uiContributions.entries}
+      focusedPackageId={settingsNavigation?.resourceFocus?.packageId}
+      renderContribution={renderContribution}
+      renderSettingsGroupSlot={renderSettingsGroupSlot}
+      onOpenSoftwareCenterRoute={(section = "applications", packageId) => {
+        onClose?.();
+        setSoftwareCenterFocus(current => packageId ? { packageId, revision: (current?.revision ?? 0) + 1 } : undefined);
+        setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
+        setApplicationManagementTab(section);
+        setPrimaryView("applications");
       }}
-      renderSettingsGroupSlot={(destination) => renderSettingsGroupSlot?.(destination, {
-        locale: settings.locale,
-        developerDetails: settings.developerDetails,
-        focusedPackageId: settingsNavigation?.resourceFocus?.packageId,
-        openSoftwareCenter: (section = "applications", packageId) => {
-          onClose?.();
-          setSoftwareCenterFocus(current => packageId ? { packageId, revision: (current?.revision ?? 0) + 1 } : undefined);
-          setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
-          setApplicationManagementTab(section);
-          setPrimaryView("applications");
-        },
-        openSettingsDestination: (targetDestination, focus) => setSettingsNavigation(current => ({
-          open: true,
-          destination: targetDestination as SettingsDestinationId,
-          resourceFocus: focus,
-          revision: (current?.revision ?? 0) + 1
-        })),
-        billionContext: bridge
-      })}
+      onOpenSettingsDestination={(targetDestination, focus) => setSettingsNavigation(current => ({
+        open: true,
+        destination: targetDestination,
+        resourceFocus: focus,
+        revision: (current?.revision ?? 0) + 1
+      }))}
     />
   );
 
@@ -2793,7 +2784,7 @@ export function App({
       || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")
       || nativeSoftwareProducts(model.softwareSources).some(product => product.item.updateStatus === "needs_restart"),
     onRestartForUpdates: () => void restartForPendingUpdates(),
-    applicationManagement: <ApplicationManagementPage
+    applicationManagement: <SoftwareCenterSurface
       packageOperations={packageOperations}
       model={model}
       capabilityCatalog={capabilityCatalog}

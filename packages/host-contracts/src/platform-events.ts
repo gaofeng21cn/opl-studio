@@ -148,7 +148,13 @@ export type DshPluginUpdateProjection = {
   plugins: Record<string, { installed: string | null; available: string | null; state: "current" | "update_available" | "unavailable"; reason?: string }>;
   profileBootRecovery?: DshProfileBootRecovery | null;
 };
-export type DshPluginUpdateResult = Record<string, unknown> & { operation?: string; application?: string; installed?: Record<string, string>; failures?: Record<string, string> };
+export type DshPluginUpdateResult = Record<string, unknown> & {
+  operation?: string;
+  application?: string;
+  reloadMode?: "renderer_reload" | "restart_required";
+  installed?: Record<string, string>;
+  failures?: Record<string, string>;
+};
 
 export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
 export type LinkInternetStatus = { status: "disabled" | "account_required" | "connecting" | "reconnecting" | "ready" | "error"; enabled?: boolean; reasonCode?: string };
@@ -163,19 +169,81 @@ export type LinkCompanionManagement = {
   revokeDevice(request: { id: string }): Promise<{ id: string; revoked: boolean }>;
 };
 
+export type DshPluginTier = "optional_product" | "external_plugin" | "core_runtime";
+export type DshPluginIntentCategory = "agent" | "application" | "efficiency" | "runtime";
+
+export type DshPluginCatalogEntry = {
+  pluginId: string;
+  packageName: string;
+  tier: DshPluginTier;
+  origin: "opl" | "external";
+  intentCategory: DshPluginIntentCategory;
+  canToggle: boolean;
+  canInstall: boolean;
+  canUninstall: boolean;
+  settingsDestination?: "models" | "resources" | "workspace" | "capabilities" | "services" | "preferences";
+  upstreamUrl?: string;
+  labelI18n: { zh: string; en: string };
+  descriptionI18n: { zh: string; en: string };
+  permissionsI18n: { zh: string[]; en: string[] };
+  installed: boolean;
+  enabled: boolean;
+  active: boolean;
+  version: string | null;
+  activeVersion: string | null;
+  availableVersion: string | null;
+  updateAvailable: boolean;
+  startupFailed: boolean;
+  pendingRestart: boolean;
+  pendingOperation: "update" | "remove" | null;
+  pendingVersion: string | null;
+  checkErrorReason?: string;
+};
+
+export type DshPluginActivityRecord = {
+  id: string;
+  pluginId: string;
+  packageName: string;
+  labelI18n: { zh: string; en: string };
+  action: "install" | "update" | "remove" | "enable" | "disable" | "check" | "cancel_pending";
+  status: "completed" | "staged_restart" | "failed";
+  startedAt: string;
+  finishedAt: string;
+  targetVersion?: string | null;
+  restartRequired?: boolean;
+  detail?: string;
+};
+
+export type DshPluginCatalogProjection = {
+  schema: "opl_dsh_plugin_catalog.v1";
+  checkedAt: string;
+  entries: DshPluginCatalogEntry[];
+  activity: DshPluginActivityRecord[];
+  restartRequired: boolean;
+  profileBootRecovery?: DshProfileBootRecovery | null;
+};
+
+export type DshPluginManageRequest = {
+  pluginId: string;
+  operation: "install" | "update" | "remove" | "enable" | "disable" | "check" | "cancel_pending";
+};
+
 export type OplStudioSurface = Pick<
   OplBridge,
   keyof McpAppsBridge | "readSuperagent" | "executeSuperagent" | "readTeamBots" | "executeTeamBot" | "requestSettingsSearchLog" | "platformCapabilities" | "beginWindowDrag" | "readState" | "readInitialize" | "readFullDrilldown" | "readContribution" | "readDomainDetailView" | "executeAction" | "readCodexModels" | "readCodexCapabilities" | "readCodexPermissionProfiles" | "listPendingServerRequests" | "respondToServerRequest" | "pickFiles" | "pickDirectory" | "revealLocalPath" | "resolveDroppedInputs" | "releaseInputs" | "notifyCompletion" | "listThreadWorkspace" | "readThreadWorkspaceFile" | "readThreadWorkspaceGit" | "readThreadWorkspaceBytes" | "searchThreadWorkspace" | "accessThreadWorkspace" | "openLogDirectory" | "setLogDirectory" | "sendMessage" | "steerTurn" | "interruptTurn" | "loginGatewayAccount" | "configureCodexApiKey" | "approveConnectionAccess" | "readNativeAppUpdateStatus" | "checkNativeAppUpdate" | "applyNativeAppUpdate" | "restartNativeApp" | "subscribeEvents"
 > & Partial<CodexThreadAdapterBridge> & {
   readBillionContext?: () => Promise<BillionContextPreference>;
   setBillionContext?: (request: { enabled: boolean }) => Promise<BillionContextPreference>;
-  manageBillionContext?: (request: { operation: "check" | "install" | "update" | "remove" }) => Promise<BillionContextPreference>;
+  manageBillionContext?: (request: { operation: "check" | "install" | "update" | "remove" | "cancel_pending" }) => Promise<BillionContextPreference>;
+  readDshPluginCatalog?: (request?: { includeUpdates?: boolean }) => Promise<DshPluginCatalogProjection>;
+  manageDshPlugin?: (request: DshPluginManageRequest) => Promise<DshPluginCatalogProjection>;
   linkCompanion?: LinkCompanionManagement;
   eventSourceUrl?: string;
   readClientModuleGraph?: () => Promise<DshClientModuleGraph>;
   readClientModuleBoot?: () => Promise<import("@deepseek-ai/dsh-host-webserver").IndexInjection[]>;
   readDshPluginUpdates?: () => Promise<DshPluginUpdateProjection>;
   updateDshPlugins?: (request: { all?: boolean; packages?: string[] }) => Promise<DshPluginUpdateResult>;
+  reloadRenderer?: () => Promise<{ accepted: boolean; mode: "renderer_reload" }>;
   listMaterialSpaces?: (request?: { refresh?: boolean }) => Promise<MaterialSpaceCatalog>;
   scanProjectDeliverables?: (request: { projectId: string; workItemId?: string; query?: string; category?: string }) => Promise<ProjectDeliverablesScan>;
   listProjectWorkspace?: (request: { projectId: string; relativePath?: string }) => Promise<ProjectWorkspaceListing>;
@@ -195,12 +263,17 @@ export type BillionContextPreference = {
   activeVersion: string | null;
   active: boolean;
   startupFailed: boolean;
+  pendingOperation?: "update" | "remove" | null;
+  pendingVersion?: string | null;
 };
 
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   readBillionContext?: OplStudioSurface["readBillionContext"];
   setBillionContext?: OplStudioSurface["setBillionContext"];
   manageBillionContext?: OplStudioSurface["manageBillionContext"];
+  readDshPluginCatalog?: OplStudioSurface["readDshPluginCatalog"];
+  manageDshPlugin?: OplStudioSurface["manageDshPlugin"];
+  reloadRenderer?: OplStudioSurface["reloadRenderer"];
   platformCapabilities: OplPlatformCapabilities;
   readSuperagent(): Promise<SuperagentState>;
   executeSuperagent(request: { operation: "start" | "stop" }): Promise<SuperagentState>;

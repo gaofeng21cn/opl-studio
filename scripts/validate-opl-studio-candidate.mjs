@@ -439,6 +439,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const alignment = evidence.default_home_layout?.primary_visual_reference;
   const visualStyle = evidence.default_home_layout?.visual_style_reference;
   const slotHost = readSlotHostSource();
+  const dshShellAdapter = read("packages/dsh-adapters/dsh-shell.mjs");
   const rendererShell = read("src/renderer-shell.html");
   const appSource = read("plugins/opl-studio-client/src/client/workbench/App.tsx");
   const mainSource = read("src/main.tsx");
@@ -475,8 +476,9 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
     assert(slotHost.includes(marker), `missing DeepSeek Harness slot lifecycle marker ${marker}`);
   }
   assert(
-    slotHost.includes('import { createSlotRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx"'),
-    "createSlotRenderer must come from the pinned pinned DSH source cohort"
+    slotHost.includes('from "@gaofeng21cn/opl-dsh-adapters/dsh-shell"')
+      && dshShellAdapter.includes('export { createSlotRenderer } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx"'),
+    "createSlotRenderer must come from the pinned DSH source cohort via @gaofeng21cn/opl-dsh-adapters/dsh-shell"
   );
   for (const [component, moduleName] of [
     ["AppFrame", "@opl-vendor/dsh-app-frame"],

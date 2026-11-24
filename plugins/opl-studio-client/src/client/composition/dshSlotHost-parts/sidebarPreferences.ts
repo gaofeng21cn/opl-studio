@@ -1,4 +1,4 @@
-import { createPanelPins } from "../../../../../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/panel-pins";
+import { createPanelPins } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 
 declare global { var __OPL_SIDEBAR_DEFAULT_PINS__: readonly string[] | undefined; }
 

@@ -1,0 +1,38 @@
+{
+  "schema_version": "opl-app-contributions.v1",
+  "views": [
+    {
+      "view_id": "example-settings-view",
+      "view_type": "settings_form",
+      "settings_destination": "capabilities",
+      "title_i18n": {
+        "zh-CN": "示例扩展配置",
+        "en-US": "Example Extension Configuration"
+      },
+      "data_ref": "example-tier1.settings.v1#state",
+      "command_ids": ["save-settings"]
+    }
+  ],
+  "commands": [
+    {
+      "command_id": "save-settings",
+      "label_i18n": {
+        "zh-CN": "保存配置",
+        "en-US": "Save configuration"
+      },
+      "action_ref": "example-tier1.settings.v1#save",
+      "confirmation_required": false
+    }
+  ],
+  "ui": [
+    {
+      "contribution_id": "example-tier1-settings",
+      "slot": "settings.section",
+      "contribution_kind": "view",
+      "trust_tier": "declarative",
+      "scope": "root",
+      "sort_order": 50,
+      "view_id": "example-settings-view"
+    }
+  ]
+}

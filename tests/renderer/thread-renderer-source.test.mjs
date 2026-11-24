@@ -38,6 +38,10 @@ const materialsSpaceSource = [
 const applicationManagementPage = read("plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/SharedResourcesPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection.tsx");
 const runtimeCache = read("plugins/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts");
 const settingsPanel = read("plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx") + read("plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx") + fs.readdirSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
+const settingsSurface = read("plugins/opl-studio-client/src/client/composition/surfaces/SettingsSurface.tsx");
+const softwareCenterSurface = read("plugins/opl-studio-client/src/client/composition/surfaces/SoftwareCenterSurface.tsx");
+const dshShellAdapter = read("packages/dsh-adapters/dsh-shell.mjs");
+const dshThemeAdapter = read("packages/dsh-adapters/dsh-theme.mjs");
 const styleSources = [
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleFoundation.ts",
   "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleStartup.ts",
@@ -203,7 +207,8 @@ test("Studio exposes a first-party Tier 2 Materials Space plugin with Desktop an
 test("Studio exposes one App-owned application management surface", () => {
   assert.match(slotHost, /name: "main", key: "applications", registrant: "opl-studio"/);
   assert.match(slotHost, /export function ApplicationMainSlot\(\) \{ return <\>\{useStudio\(\)\.applicationManagement\}<\/>; \}/);
-  assert.match(app, /<ApplicationManagementPage/);
+  assert.match(app, /<SoftwareCenterSurface/);
+  assert.match(softwareCenterSurface, /<ApplicationManagementPage/);
   assert.match(app, /applicationManagement:/);
   assert.match(read("plugins/opl-studio-client/src/client/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
   assert.match(applicationManagementPage, /data-testid="opl-app-management"/);
@@ -824,7 +829,8 @@ test("DSH controls resolve to the complete pinned source cohort and OPL-owned sl
   }
 
   assert.match(scopedSlots, /export function createSlotRenderer/);
-  assert.match(slotHost, /ui-renderer\/src\/client\/scoped-slots\.tsx/);
+  assert.match(slotHost, /from "@gaofeng21cn\/opl-dsh-adapters\/dsh-shell"/);
+  assert.match(dshShellAdapter, /ui-renderer\/src\/client\/scoped-slots\.tsx/);
   for (const slot of ["sidebar.brand.mark", "sidebar.brand.name", "conversation.hero.brand.mark", "conversation.input.attachments"]) {
     assert.ok(slotHost.includes(`register({ name: "${slot}", registrant: "opl-studio" }`));
   }
@@ -948,7 +954,8 @@ test("DSH Settings content consumes the canonical Gateway account read model", (
   assert.match(model, /gatewayAccountRecord\?\.display_name/);
   assert.match(model, /gatewayAccountProjection\.connection_mode === "account"/);
   assert.match(model, /gatewayConnectionMode/);
-  assert.match(app, /<SettingsPanel/);
+  assert.match(app, /<SettingsSurface/);
+  assert.match(settingsSurface, /<SettingsPanel/);
   assert.match(app, /renderSettings: renderStudioSettings/);
   assert.match(slotHost, /<SettingsRoot/);
   assert.match(settingsPanel, /opl-settings-gateway-username/);
@@ -1042,7 +1049,8 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
 });
 
 test("Settings directly reuses DSH appearance controls and applies the selected palette", () => {
-  assert.match(settingsPanel, /from "(?:\.\.\/)+vendor\/deepseek-harness\/packages\/client\/ui-theme\/src\/client\/AppearanceRow"/);
+  assert.match(settingsPanel, /from "@gaofeng21cn\/opl-dsh-adapters\/dsh-theme"/);
+  assert.match(dshThemeAdapter, /vendor\/deepseek-harness\/packages\/client\/ui-theme\/src\/client\/AppearanceRow/);
   assert.match(settingsPanel, /<StudioAppearanceRow/);
   assert.match(app, /document\.body\.toggleAttribute\("data-ds-dark-theme", dark\)/);
   assert.match(app, /matchMedia\?\.\("\(prefers-color-scheme: dark\)"\)/);

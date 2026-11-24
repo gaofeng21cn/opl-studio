@@ -5,6 +5,7 @@ import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/p
 
 export type SoftwareCatalogScope = "all" | "opl" | "external" | "components";
 export type SoftwareCatalogState = "not_installed" | "installed" | "update_available" | "attention" | "unknown";
+export type SoftwareIntentCategory = "agent" | "application" | "efficiency" | "channel";
 
 /** Maintenance origin is supplied by Framework; technical package roles never select the source. */
 export function packageCatalogScope(item: AgentPackageLifecycleRef): Exclude<SoftwareCatalogScope, "all"> {
@@ -78,7 +79,68 @@ export function nativeCatalogStatusLabel(item: NativeSoftwareItemRef, locale: "z
 
 export function catalogTypeLabel(item: Pick<AgentPackageLifecycleRef, "softwareType" | "catalogOrigin" | "catalogSource">, locale: "zh" | "en") {
   if (item.catalogOrigin !== "opl" && item.catalogSource?.manager === "codex_plugin_manager") return locale === "zh" ? "Codex 插件" : "Codex plugin";
-  return ({ application: ["应用", "Application"], agent: ["智能体", "Agent"], capability: ["能力包", "Capability"], unknown: ["未分类", "Unclassified"] })[item.softwareType ?? "unknown"][locale === "zh" ? 0 : 1];
+  return ({ application: ["应用", "Application"], agent: ["智能体", "Agent"], capability: ["效率扩展", "Extension"], unknown: ["扩展", "Extension"] })[item.softwareType ?? "unknown"][locale === "zh" ? 0 : 1];
+}
+
+export function intentCategoryLabel(category: SoftwareIntentCategory, locale: "zh" | "en") {
+  return ({
+    agent: ["智能体", "Agents"],
+    application: ["应用", "Applications"],
+    efficiency: ["效率扩展", "Efficiency extensions"],
+    channel: ["连接通道", "Channels"]
+  })[category][locale === "zh" ? 0 : 1];
+}
+
+export function packageIntentCategory(
+  item: Pick<AgentPackageLifecycleRef, "packageId" | "softwareType">,
+  model?: Pick<WorkbenchModel, "uiContributions">
+): SoftwareIntentCategory {
+  if (model?.uiContributions.entries.some(entry => entry.packageId === item.packageId && entry.view?.viewType === "channel_access")) {
+    return "channel";
+  }
+  if (item.softwareType === "agent") return "agent";
+  if (item.softwareType === "application") return "application";
+  return "efficiency";
+}
+
+export function packagePermissionsSummary(
+  item: Pick<AgentPackageLifecycleRef, "packageId" | "access" | "catalogOrigin" | "catalogSource" | "catalogScope">,
+  model: Pick<WorkbenchModel, "applicationManagement" | "knowledgeSources">,
+  locale: "zh" | "en"
+): string[] {
+  const zh = locale === "zh";
+  const permissions: string[] = [];
+  if (item.catalogScope === "host_component") {
+    permissions.push(zh ? "作为宿主核心运行组件自动维护" : "Automatically maintained as a host runtime component");
+  }
+  if (item.access?.visibility === "authorized_only") {
+    permissions.push(zh ? "仅授权账号可检查、下载或更新此软件" : "Requires an authorized source account to inspect or download");
+  }
+  const connections = (model.applicationManagement?.sharedResources ?? []).filter(
+    resource => resource.resourceKind === "connection" && resource.consumerPackageIds.includes(item.packageId)
+  );
+  for (const resource of connections) {
+    const label = resource.labelI18n?.[locale] ?? resource.label;
+    permissions.push(zh ? `外部连接权限：${label}` : `External connection access: ${label}`);
+  }
+  const libraries = (model.knowledgeSources?.entries ?? []).filter(
+    source => source.connected !== false && source.consumerPackageIds.includes(item.packageId)
+  );
+  for (const library of libraries) {
+    const canPropose = model.knowledgeSources?.consumers.some(
+      consumer => consumer.packageId === item.packageId && library.writeDomainIds.includes(consumer.domainId)
+    );
+    permissions.push(zh
+      ? `资料库访问：${library.label}（${canPropose ? "可提议修改" : "只读"}）`
+      : `Library access: ${library.label} (${canPropose ? "can propose changes" : "read-only"})`);
+  }
+  const manager = item.catalogSource?.manager;
+  if (manager === "codex_plugin_manager") {
+    permissions.push(zh ? "以 Codex 扩展形式接入，受当前线程审批策略约束" : "Runs as a Codex extension governed by active thread approval policy");
+  } else if (permissions.length === 0) {
+    permissions.push(zh ? "按需使用已授权的工作区、资料库与连接资源" : "Uses explicitly authorized workspace, library, and connection resources");
+  }
+  return permissions;
 }
 
 export function catalogManagerLabel(manager: string | undefined, locale: "zh" | "en") {

@@ -640,6 +640,19 @@ app.whenReady().then(async () => {
         quitApp: () => app.quit()
       });
     }
+    if (request?.method === "reloadRenderer") {
+      const target = event.sender && !event.sender.isDestroyed()
+        ? event.sender
+        : (mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null);
+      if (!target) return { accepted: false, mode: "renderer_reload" };
+      setImmediate(() => {
+        if (!target.isDestroyed()) {
+          if (typeof target.reloadIgnoringCache === "function") target.reloadIgnoringCache();
+          else target.reload();
+        }
+      });
+      return { accepted: true, mode: "renderer_reload" };
+    }
     const updateOperation = {
       readNativeAppUpdateStatus: "status", checkNativeAppUpdate: "check",
       applyNativeAppUpdate: "apply"

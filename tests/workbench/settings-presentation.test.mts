@@ -1705,3 +1705,162 @@ test("ShellOverlaySlot shows global lightweight restart pill outside Software Ce
     assert.equal(container.querySelector('[data-testid="opl-global-restart-trigger"]'), null);
   });
 });
+
+test("Software Center generic DSH catalog renders optional plugins, staged single-restart Billion Context, core runtime under components, and unified activity tab", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const model = deriveWorkbenchModelFromState({
+    app_state: {
+      agent_packages: {
+        directory: {
+          entries: [
+            { package_id: "wechat-bridge", display_name: "WeChat Remote", catalog_scope: "software", catalog_origin: "opl", software_type: "capability", installed: true, installed_version: "0.2.0" }
+          ]
+        }
+      }
+    }
+  });
+  const managedActions: Array<{ pluginId: string; operation: string }> = [];
+  let restartSignaled = 0;
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    const baseCatalog = {
+      schema: "opl_dsh_plugin_catalog.v1",
+      checkedAt: "2026-11-23T12:00:00Z",
+      restartRequired: true,
+      activity: [
+        {
+          id: "act-1",
+          pluginId: "billion-context",
+          packageName: "billion-context",
+          labelI18n: { zh: "Billion Context", en: "Billion Context" },
+          action: "update",
+          status: "staged_restart",
+          startedAt: "2026-11-23T12:00:00Z",
+          finishedAt: "2026-11-23T12:00:00Z",
+          targetVersion: "0.3.2",
+          restartRequired: true
+        }
+      ],
+      entries: [
+        {
+          pluginId: "opl-team-bots",
+          packageName: "@gaofeng21cn/opl-team-bots",
+          tier: "optional_product",
+          origin: "opl",
+          intentCategory: "efficiency",
+          canToggle: true,
+          canInstall: false,
+          canUninstall: false,
+          settingsDestination: "capabilities",
+          labelI18n: { zh: "智能体协作", en: "Agent Collaboration" },
+          descriptionI18n: { zh: "多智能体协同对话。", en: "Collaborative workbench." },
+          permissionsI18n: { zh: ["复用当前 Codex 会话"], en: ["Reuses Codex threads"] },
+          installed: true,
+          enabled: true,
+          active: true,
+          version: "0.1.0",
+          activeVersion: "0.1.0",
+          availableVersion: null,
+          updateAvailable: false,
+          startupFailed: false,
+          pendingRestart: false,
+          pendingOperation: null,
+          pendingVersion: null
+        },
+        {
+          pluginId: "billion-context",
+          packageName: "billion-context",
+          tier: "external_plugin",
+          origin: "external",
+          intentCategory: "efficiency",
+          canToggle: true,
+          canInstall: true,
+          canUninstall: true,
+          settingsDestination: "models",
+          labelI18n: { zh: "Billion Context", en: "Billion Context" },
+          descriptionI18n: { zh: "压缩长对话。", en: "Compress long conversations." },
+          permissionsI18n: { zh: ["Codex 启动包装代理"], en: ["Codex launcher wrapper"] },
+          installed: true,
+          enabled: true,
+          active: true,
+          version: "0.3.0",
+          activeVersion: "0.3.0",
+          availableVersion: "0.3.2",
+          updateAvailable: true,
+          startupFailed: false,
+          pendingRestart: true,
+          pendingOperation: "update",
+          pendingVersion: "0.3.2"
+        },
+        {
+          pluginId: "opl-host-core",
+          packageName: "@gaofeng21cn/opl-host-core",
+          tier: "core_runtime",
+          origin: "opl",
+          intentCategory: "runtime",
+          canToggle: false,
+          canInstall: false,
+          canUninstall: false,
+          labelI18n: { zh: "OPL 宿主核心服务", en: "OPL Host Core" },
+          descriptionI18n: { zh: "核心服务。", en: "Core runtime." },
+          permissionsI18n: { zh: ["必需核心服务"], en: ["Required core runtime"] },
+          installed: true,
+          enabled: true,
+          active: true,
+          version: "0.1.0",
+          activeVersion: "0.1.0",
+          availableVersion: null,
+          updateAvailable: false,
+          startupFailed: false,
+          pendingRestart: false,
+          pendingOperation: null,
+          pendingVersion: null
+        }
+      ]
+    };
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginCatalog: async () => baseCatalog,
+      manageDshPlugin: async ({ pluginId, operation }: { pluginId: string; operation: string }) => {
+        managedActions.push({ pluginId, operation });
+        return baseCatalog;
+      },
+      restartNativeApp: async () => ({ schema: "opl_native_app_updater.v1", owner: "desktop", host: "electron", operation: "restart", supported: false, state: "restart_scheduled", accepted: true })
+    };
+    try {
+      render(createElement(ApplicationManagementPage, {
+        model,
+        settings: { ...settingsDefaults, locale: "zh" },
+        managedUpdate: null,
+        actionViewModel: { gatewayActions: [], agentLifecycle: [], managedUpdates: [], additionalMaintenanceActions: [] },
+        nativeAppUpdate: null,
+        actionBusyKey: null,
+        onAction() {},
+        onRefresh() {},
+        onDshRestartRequired: () => { restartSignaled += 1; }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      // All-software view shows optional plugin and staged external plugin, hides core_runtime
+      assert.ok(container.querySelector('[data-plugin-owner-package="opl-team-bots"]'));
+      assert.ok(container.querySelector('[data-plugin-owner-package="billion-context"]'));
+      assert.equal(container.querySelector('[data-plugin-owner-package="opl-host-core"]'), null);
+      assert.ok(restartSignaled >= 1);
+
+      // Components view reveals core_runtime
+      const componentsBtn = container.querySelector<HTMLButtonElement>('#opl-catalog-scope-components')!;
+      flushSync(() => componentsBtn.click());
+      assert.ok(container.querySelector('[data-plugin-owner-package="opl-host-core"]'));
+
+      // Activity tab shows unified DSH plugin staged record
+      const activityTab = [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(el => el.textContent?.includes("安装记录"))!;
+      flushSync(() => activityTab.click());
+      assert.match(container.textContent ?? "", /Billion Context/);
+      assert.match(container.textContent ?? "", /已暂存，重启应用后生效/);
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
+  });
+});

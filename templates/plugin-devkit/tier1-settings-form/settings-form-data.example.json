@@ -1,0 +1,62 @@
+{
+  "schema_version": "opl-app-settings-form.v1",
+  "status": "ready",
+  "submit_command_id": "save-settings",
+  "fields": [
+    {
+      "field_id": "enabled",
+      "field_type": "boolean",
+      "label_i18n": { "zh-CN": "启用示例扩展", "en-US": "Enable example extension" },
+      "description_i18n": { "zh-CN": "开启后在执行工具前进行预处理", "en-US": "Run preprocessing hooks before tool execution" },
+      "effect_timing": "immediate"
+    },
+    {
+      "field_id": "mode",
+      "field_type": "enum",
+      "label_i18n": { "zh-CN": "运行模式", "en-US": "Execution mode" },
+      "effect_timing": "next_task",
+      "options": [
+        { "value": "balanced", "label_i18n": { "zh-CN": "均衡", "en-US": "Balanced" } },
+        { "value": "strict", "label_i18n": { "zh-CN": "严格", "en-US": "Strict" } }
+      ]
+    },
+    {
+      "field_id": "endpoint",
+      "field_type": "string",
+      "label_i18n": { "zh-CN": "服务端点", "en-US": "Service endpoint" },
+      "placeholder_i18n": { "zh-CN": "https://api.example.invalid", "en-US": "https://api.example.invalid" },
+      "effect_timing": "restart_required",
+      "required": true,
+      "max_length": 256
+    },
+    {
+      "field_id": "concurrency",
+      "field_type": "number",
+      "label_i18n": { "zh-CN": "最大并发", "en-US": "Max concurrency" },
+      "effect_timing": "immediate",
+      "min": 1,
+      "max": 8,
+      "step": 1
+    },
+    {
+      "field_id": "workspace_cache",
+      "field_type": "directory",
+      "label_i18n": { "zh-CN": "工作目录", "en-US": "Working directory" },
+      "effect_timing": "next_task"
+    },
+    {
+      "field_id": "api_token",
+      "field_type": "secret_ref",
+      "label_i18n": { "zh-CN": "访问令牌", "en-US": "Access token" },
+      "effect_timing": "immediate",
+      "secret_configured": false
+    }
+  ],
+  "values": {
+    "enabled": true,
+    "mode": "balanced",
+    "endpoint": "https://api.example.invalid",
+    "concurrency": 2,
+    "workspace_cache": ""
+  }
+}

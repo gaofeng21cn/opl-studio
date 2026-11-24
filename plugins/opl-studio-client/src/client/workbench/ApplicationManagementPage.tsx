@@ -6,7 +6,7 @@ import { packageActivity } from "./packageOperations";
 import { SoftwareCenterOverview } from "./SoftwareCenterOverview";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { CodexCapabilityCatalog, NativeAppUpdateResult } from "../bridge/oplBridge";
+import type { CodexCapabilityCatalog, DshPluginCatalogProjection, NativeAppUpdateResult } from "../bridge/oplBridge";
 import type { ActionReceiptView } from "./actionReceiptView";
 import type { ManagedUpdateProjection, WorkbenchModel } from "./workbenchModel";
 import type { WorkbenchSettings } from "./settingsModel";
@@ -23,7 +23,7 @@ export type ApplicationManagementTab = "applications" | "updates" | "activity" |
 
 type UpdatesPageProps = Parameters<typeof UpdatesSettingsPage>[0];
 
-type ApplicationManagementPageProps = {
+export type ApplicationManagementPageProps = {
   packageOperations?: ReturnType<typeof usePackageOperations>;
   model: WorkbenchModel;
   stateStatus?: "loading" | "ready" | "error";
@@ -114,7 +114,21 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     || resources.some(resource => resource.status === "unknown");
   const observedAt = model.stateGeneratedAt && Number.isFinite(Date.parse(model.stateGeneratedAt))
     ? new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(Date.parse(model.stateGeneratedAt)) : null;
-  const refreshAll = () => { accessChecks.current.clear(); onRefresh(); packageOperations?.refresh(); };
+  const [dshCatalog, setDshCatalog] = useState<DshPluginCatalogProjection | null>(null);
+  const [dshCatalogRevision, setDshCatalogRevision] = useState(0);
+  const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
+  useEffect(() => {
+    let active = true;
+    if (typeof bridge?.readDshPluginCatalog !== "function") return;
+    void bridge.readDshPluginCatalog().then(
+      catalog => { if (active) setDshCatalog(catalog); },
+      () => undefined
+    );
+    return () => { active = false; };
+  }, [bridge, dshCatalogRevision, tab]);
+  const dshActivity = dshCatalog?.activity ?? [];
+  const dshUpdateCount = dshCatalog?.entries.filter(entry => entry.updateAvailable).length ?? 0;
+  const refreshAll = () => { accessChecks.current.clear(); setDshCatalogRevision(n => n + 1); onRefresh(); packageOperations?.refresh(); };
   const updatesProps: UpdatesPageProps = {
     actionViewModel,
     managedUpdate,
@@ -126,19 +140,20 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     onAction,
     onHostAction,
     onRefresh: refreshAll,
-    dshRestartRequired: dshPluginRestartRequired,
+    dshRestartRequired: dshPluginRestartRequired || dshCatalog?.restartRequired === true,
     onDshRestartRequired
   };
   const desktopHasUpdate = Boolean(nativeAppUpdate?.supported && ["available", "downloading", "downloaded"].includes(nativeAppUpdate.state));
-  const pendingUpdatesCount = inventory.updates + (desktopHasUpdate ? 1 : 0) + (dshPluginRestartRequired ? 1 : 0);
+  const pendingUpdatesCount = inventory.updates + dshUpdateCount + (desktopHasUpdate ? 1 : 0) + ((dshPluginRestartRequired || dshCatalog?.restartRequired) ? 1 : 0);
   const updatesLabel = pendingUpdatesCount > 0 ? (zh ? `更新 (${pendingUpdatesCount})` : `Updates (${pendingUpdatesCount})`) : (zh ? "更新" : "Updates");
   const activityLabel = activity.running > 0 ? (zh ? `安装记录 (${activity.running})` : `Activity (${activity.running})`) : (zh ? "安装记录" : "Installation activity");
+  const hasActivity = Boolean((packageOperations && (packageOperations.operations.length || packageOperations.readError || packageOperations.cancelError)) || dshActivity.length);
   const pageTabs = [
     { id: "updates", label: updatesLabel, content: <UpdatesSettingsPage {...updatesProps} catalogOrigin="all" onManageSources={() => navigate("sources")} /> },
-    { id: "activity", label: activityLabel, content: packageOperations && (packageOperations.operations.length || packageOperations.readError || packageOperations.cancelError)
-      ? <PackageOperations operations={packageOperations.operations} locale={settings.locale}
+    { id: "activity", label: activityLabel, content: hasActivity
+      ? <PackageOperations operations={packageOperations?.operations ?? []} dshActivity={dshActivity} locale={settings.locale}
           labels={Object.fromEntries(model.packageLifecycle.map(item => [item.packageId, item.displayNameI18n[settings.locale] ?? item.label]))}
-          readError={packageOperations.readError} cancelError={packageOperations.cancelError} cancelling={packageOperations.cancelling} onCancel={id => void packageOperations.cancel(id)}
+          readError={Boolean(packageOperations?.readError)} cancelError={Boolean(packageOperations?.cancelError)} cancelling={packageOperations?.cancelling ?? null} onCancel={id => void packageOperations?.cancel(id)}
           onRetry={runAction} onRefresh={refreshAll} onUse={onUseSoftware}
           readyPackageIds={stateStatus === "ready" ? model.packageLifecycle.filter(softwareCanStart).map(item => item.packageId) : []}
           onOpenLocation={onOpenInstallationLocation} />
@@ -181,5 +196,5 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     </> : null}
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}</div>;
-  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "按需安装、组合与更新软件和插件。" : "Install, compose, and update software and plugins."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} /></div>;
+  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "按需安装、组合与更新软件和插件。" : "Install, compose, and update software and plugins."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} dshCatalogRevision={dshCatalogRevision} onDshRestartRequired={onDshRestartRequired} onDshPluginActivityChange={catalog => { setDshCatalog(catalog); if (catalog.restartRequired) onDshRestartRequired?.(); }} /></div>;
 }

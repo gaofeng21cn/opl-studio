@@ -296,7 +296,7 @@
     "test:package-projection": "bun test tests/workbench/package-projection.test.mts",
     "test:runtime-projection": "bun test tests/workbench/runtime-projection.test.mts tests/workbench/runtime-status-plugin.test.tsx tests/workbench/service-recovery-model.test.mts",
     "test:materials-space": "bun test tests/workbench/materials-space.test.tsx",
-    "test:ui-contributions": "bun test tests/workbench/remote-settings.test.tsx tests/workbench/link-companion.test.tsx tests/workbench/plugin-ui-standard.test.tsx && bun test tests/workbench/native-settings-lifecycle.test.mts tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts tests/workbench/dsh-schedule-adapter.test.mts && bun test tests/workbench/conversation-workspace-model.test.mts tests/workbench/conversation-workspace.test.tsx",
+    "test:ui-contributions": "bun test tests/workbench/remote-settings.test.tsx tests/workbench/link-companion.test.tsx tests/workbench/plugin-ui-standard.test.tsx tests/workbench/plugin-conformance-gate.test.tsx && bun test tests/workbench/native-settings-lifecycle.test.mts tests/workbench/ui-contribution-composition.test.mts tests/workbench/workspace-contributions.test.mts tests/workbench/voice-input.test.mts tests/workbench/dsh-schedule-adapter.test.mts && bun test tests/workbench/conversation-workspace-model.test.mts tests/workbench/conversation-workspace.test.tsx",
     "test:client-cordis": "bun test tests/conformance/client-cordis-conformance.test.mts",
     "validate:client-conformance": "bun run scripts/validate-client-conformance.mjs",
     "test:storage-migration": "bun test tests/workbench/storage-migration.test.mts",

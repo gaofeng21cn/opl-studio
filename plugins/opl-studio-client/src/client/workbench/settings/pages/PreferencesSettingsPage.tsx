@@ -3,7 +3,7 @@ import { ShortcutSettings } from "../ShortcutSettings";
 import { voiceRecognitionProvider } from "../../VoiceInput";
 
 
-import { en as themeEn, zh as themeZh } from "../../../../../../../vendor/deepseek-harness/packages/client/ui-theme/src/client/locales";
+import { themeEn, themeZh } from "@gaofeng21cn/opl-dsh-adapters/dsh-locales";
 
 import { StudioAppearanceRow, StudioFontSizeRow } from "../types";
 

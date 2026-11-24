@@ -3,7 +3,10 @@ import { FilesBody } from "@opl-vendor/dsh-files-body";
 import { createFilesStore } from "@opl-vendor/dsh-files-store";
 import { filesFace, type DirectoryResult } from "@opl-vendor/dsh-files-face";
 import { parseFileAddress } from "@deepseek-ai/dsh-util-workspace-path";
-import { en, zh } from "../../../../../../vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/locales";
+import {
+  sidebarFilesEn as en,
+  sidebarFilesZh as zh
+} from "@gaofeng21cn/opl-dsh-adapters/dsh-locales";
 import type { ThreadWorkspaceListing } from "../../bridge/oplBridge";
 
 export type WorkspaceFilesTreeProps = {

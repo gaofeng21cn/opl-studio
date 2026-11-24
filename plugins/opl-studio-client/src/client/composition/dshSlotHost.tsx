@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef } from "react";
-import { IconAlarmClockOutlineRegular, IconAppsAddOutlineRegular } from "../../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/icons/index.tsx";
+import {
+  createSettingsShellStore,
+  createSlotRenderer,
+  IconAlarmClockOutlineRegular,
+  IconAppsAddOutlineRegular,
+  SlotRegistry
+} from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 import type { Context } from "@deepseek-ai/cordis";
 import { installIconSprite } from "../integrations/deepseek-harness/iconSprite.mjs";
-import { SlotRegistry } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { PanelIcon } from "../integrations/deepseek-harness/sidebarComponents.mjs";
-import { createSettingsShellStore } from "../../../../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";
 import { createComposerFileIntake } from "@opl-vendor/dsh-file-intake";
 import { CodexThreadScope } from "./codexThreadScope";
 import type { OplStudioSurface } from "./oplStudioSurface";
 import type { StudioShellStore } from "./studioShellStore";
-import { createSlotRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx";
 import App from "../workbench/App";
 import { ProjectedContribution } from "./contributionComponents";
 import type { OplClientContributionsService } from "./clientCordis";

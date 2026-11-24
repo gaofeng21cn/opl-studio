@@ -10,7 +10,7 @@ import { McpAppsClientContext } from "./mcpAppsClient";
 import { createStudioShellStore } from "./studioShellStore";
 import "../integrations/deepseek-harness/theme";
 
-export type { UiRendererService as OplStudioUiRenderer } from "../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/index.ts";
+export type { UiRendererService as OplStudioUiRenderer } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 
 export const name = "opl-studio-client";
 

@@ -5,13 +5,21 @@ import type {
   SettingsOnboardingOwnerProps,
   SettingsSectionOwnerProps,
 } from "@deepseek-ai/dsh-client-ui-settings/client";
-import type { SlotRegistry } from "../../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
-import { zh as sidebarZh, en as sidebarEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-sidebar/src/client/locales.ts";
-import { zh as workspaceZh, en as workspaceEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/locales.ts";
-import { zh as conversationZh, en as conversationEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-conversation/src/client/locales.ts";
-import { zh as modelZh, en as modelEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-model-selection/src/client/locales.ts";
-import { zh as agentZh, en as agentEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-agent-preset/src/client/locales.ts";
-import { zh as settingsZh, en as settingsEn } from "../../../../../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/locales.ts";
+import type { SlotRegistry } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
+import {
+  agentEn,
+  agentZh,
+  conversationEn,
+  conversationZh,
+  modelEn,
+  modelZh,
+  settingsEn,
+  settingsZh,
+  sidebarEn,
+  sidebarZh,
+  workspaceEn,
+  workspaceZh
+} from "@gaofeng21cn/opl-dsh-adapters/dsh-locales";
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 export { SettingsNavigationContext } from "../../workbench/settings/types";
 import type { OplStudioSurface } from "../oplStudioSurface";

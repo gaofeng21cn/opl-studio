@@ -5,7 +5,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { Menu, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { SettingsRoot } from "@opl-vendor/dsh-settings-root";
 import type { PropsStore } from "@deepseek-ai/dsh-client-store";
-import type { createSettingsShellStore } from "../../../../../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store";
+import type { createSettingsShellStore } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 import { createEcosystemLocale, mountSettingsSearch } from "../../integrations/deepseek-harness/ecosystemClients";
 import { installSettingsSearchInteraction, type SettingsSearchTarget } from "../../integrations/deepseek-harness/ecosystemSettingsSearch";
 import { settingsDestinations, settingsSubDestinations, searchableSettings, type SettingsDestinationId } from "../../workbench/SettingsPanel";

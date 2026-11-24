@@ -1,1 +1,1 @@
-export { ConversationContent } from "../../../../../../vendor/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx";
+export { ConversationContent } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";

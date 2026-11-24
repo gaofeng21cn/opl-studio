@@ -4,7 +4,16 @@ import path from "node:path";
 import { CHANNEL_CALLBACK_SCHEMA, CodexAppServerTransport } from "./app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
-import { hasContextUpdate, readContextPlugin, setContextPluginEnabled, manageContextPlugin } from "./billion-context.mjs";
+import {
+  applyPendingContextOperation,
+  clearPendingContextOperation,
+  hasContextUpdate,
+  manageContextPlugin,
+  readContextPlugin,
+  readPendingContextOperation,
+  setContextPluginEnabled,
+  stageContextPluginOperation
+} from "./billion-context.mjs";
 import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 
 const defaultWorkspaceRoot = process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD
@@ -60,25 +69,15 @@ export class OplCodexNative extends EventEmitter {
     });
     this.transport.channelBindingStore ??= channelBindingStore;
     this.contextProfile = { dshProfileDir, dshInstallAnchor, dshHome };
+    this.billionContextAdmitted = billionContextAdmitted;
+    this.hasExplicitTransport = Boolean(transport);
     this.contextLaunch = null;
     this.contextError = false;
     this.contextVersion = null;
     this.contextAvailable = null;
-    if (!transport && dshProfileDir) {
-      try {
-        const { enabled, entry, version } = readContextPlugin(this.contextProfile);
-        if (enabled && (!billionContextAdmitted || !entry)) this.contextError = true;
-        if (enabled && billionContextAdmitted && entry) {
-          const { command, args, env: nativeEnv } = this.transport;
-          const launcherEnv = { ...nativeEnv, BILI_CLIENT_BIN: command,
-            ACP_AUTO_UPDATE: "0", BILI_ADVISORY_CHECK: "0" };
-          this.contextLaunch = { command, args, env: nativeEnv };
-          this.contextVersion = version;
-          Object.assign(this.transport, { command: process.execPath, args: [entry, "codex", ...args], env: launcherEnv });
-        }
-      } catch {
-        this.contextError = true;
-      }
+    this.pendingContextOperationOnBoot = !transport && dshProfileDir ? readPendingContextOperation(dshProfileDir) : null;
+    if (!this.pendingContextOperationOnBoot && !transport && dshProfileDir) {
+      this.#prepareContextLauncher();
     }
     this.threads = new CodexThreadAdapter(this.transport);
     this.channelCallbackAdapter = typeof this.transport.createChannelCallbackAdapter === "function"
@@ -106,7 +105,35 @@ export class OplCodexNative extends EventEmitter {
     });
   }
 
+  #prepareContextLauncher() {
+    if (this.hasExplicitTransport || !this.contextProfile.dshProfileDir || this.contextLaunch) return;
+    try {
+      const { enabled, entry, version } = readContextPlugin(this.contextProfile);
+      if (enabled && (!this.billionContextAdmitted || !entry)) this.contextError = true;
+      if (enabled && this.billionContextAdmitted && entry) {
+        const { command, args, env: nativeEnv } = this.transport;
+        const launcherEnv = {
+          ...nativeEnv,
+          BILI_CLIENT_BIN: command,
+          ACP_AUTO_UPDATE: "0",
+          BILI_ADVISORY_CHECK: "0"
+        };
+        this.contextLaunch = { command, args, env: nativeEnv };
+        this.contextVersion = version;
+        Object.assign(this.transport, { command: process.execPath, args: [entry, "codex", ...args], env: launcherEnv });
+      }
+    } catch {
+      this.contextError = true;
+    }
+  }
+
   async start() {
+    if (this.pendingContextOperationOnBoot) {
+      const stagedOutcome = await applyPendingContextOperation(this.contextProfile);
+      this.pendingContextOperationOnBoot = null;
+      if (stagedOutcome.error) this.contextError = true;
+      this.#prepareContextLauncher();
+    }
     try {
       try {
         await this.transport.start();
@@ -130,15 +157,18 @@ export class OplCodexNative extends EventEmitter {
 
   readBillionContext() {
     const { enabled, version, entry } = readContextPlugin(this.contextProfile);
+    const pending = readPendingContextOperation(this.contextProfile.dshProfileDir);
     return {
       enabled,
       installed: Boolean(entry),
       version,
-      availableVersion: this.contextAvailable,
+      availableVersion: this.contextAvailable ?? pending?.targetVersion ?? null,
       updateAvailable: hasContextUpdate(this.contextAvailable, version),
       activeVersion: this.contextLaunch && this.transport.initialized ? this.contextVersion : null,
       active: this.contextLaunch !== null && this.transport.initialized === true,
-      startupFailed: this.contextError
+      startupFailed: this.contextError,
+      pendingOperation: pending?.operation ?? null,
+      pendingVersion: pending?.targetVersion ?? null
     };
   }
 
@@ -151,15 +181,29 @@ export class OplCodexNative extends EventEmitter {
   }
 
   async manageBillionContext({ operation }) {
-    if (!["check", "install", "update", "remove"].includes(operation))
+    if (!["check", "install", "update", "remove", "cancel_pending"].includes(operation))
       throw new ThreadAdapterError("invalid_request", "Unknown Billion Context package operation", {}, 400);
-    if (this.contextLaunch && operation !== "check")
-      throw new ThreadAdapterError("dsh_plugin_in_use", "Turn off Billion Context and restart before updating or removing it", {}, 409);
+    if (operation === "cancel_pending") {
+      clearPendingContextOperation(this.contextProfile.dshProfileDir);
+      return this.readBillionContext();
+    }
     const { version } = this.readBillionContext();
     if ((operation === "update" || operation === "remove") && !version) return this.readBillionContext();
     if (operation === "install" && version) return this.readBillionContext();
     if (this.contextPackageOperation)
       throw new ThreadAdapterError("dsh_plugin_busy", "A Billion Context package operation is running", {}, 409);
+    if (this.contextLaunch && (operation === "update" || operation === "remove")) {
+      this.contextPackageOperation = stageContextPluginOperation(this.contextProfile, operation, version);
+      try {
+        const result = await this.contextPackageOperation;
+        if (result?.availableVersion !== undefined) {
+          this.contextAvailable = result.availableVersion;
+        }
+      } finally {
+        this.contextPackageOperation = null;
+      }
+      return this.readBillionContext();
+    }
     this.contextPackageOperation = manageContextPlugin(this.contextProfile, operation, version);
     try {
       this.contextAvailable = await this.contextPackageOperation;

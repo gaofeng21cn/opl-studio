@@ -2,7 +2,7 @@ import { type WorkbenchServicesClient } from "../plugins/WorkbenchServicesPanel"
 
 import type { ActionReceiptView } from "../actionReceiptView";
 
-import { FontSizeRow } from "../../../../../../vendor/deepseek-harness/packages/client/ui-theme/src/client/FontSizeRow";
+import { AppearanceRow, FontSizeRow } from "@gaofeng21cn/opl-dsh-adapters/dsh-theme";
 
 import { createContext, type ReactNode } from "react";
 import type { CarrierDiagnosticsReadback, CodexCapabilityCatalog, NativeAppUpdateResult, OplBridge, OplInitializeReadback } from "../../bridge/oplBridge";
@@ -11,7 +11,6 @@ import { type ResolvedCodexModelOption } from "../modelPolicy";
 import type { WorkbenchSettings } from "../settingsModel";
 
 import { type SettingsActionRequest, type SettingsHostActionIntent, type SettingsActionViewModel } from "../settingsActions";
-import { AppearanceRow } from "../../../../../../vendor/deepseek-harness/packages/client/ui-theme/src/client/AppearanceRow";
 
 import { SettingsActionConfirmation } from "./presentation";
 

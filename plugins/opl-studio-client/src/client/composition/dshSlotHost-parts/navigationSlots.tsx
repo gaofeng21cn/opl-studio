@@ -7,13 +7,18 @@ import { SidebarRoot } from "@opl-vendor/dsh-sidebar-root";
 import { ConversationRoot } from "@opl-vendor/dsh-conversation-root";
 import { ConversationContent } from "../../integrations/deepseek-harness/conversationContent.mjs";
 import { WorkspaceBrowser } from "@opl-vendor/dsh-workspace-browser";
-import { WorkspacePicker } from "../../../../../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/WorkspacePicker.tsx";
-import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from "../../../../../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/contract/slots.ts";
+import {
+  Button,
+  createWorkspaceViewStore,
+  IconPinOutlineRegular,
+  MenuItemButton,
+  WorkspacePicker,
+  type DirectoryFlowOwnerProps,
+  type WorkspacePickerProps
+} from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 import { NativeDirectoryFlow } from "@deepseek-ai/dsh-client-ui-directory-picker-native/src/client/flow.ts";
 import type { WorkspaceSnapshot } from "@deepseek-ai/dsh-api-workspace-controller/client";
 import { SessionNodeItem, type DshSessionNode } from "@opl-vendor/dsh-session-node";
-import { Button, IconPinOutlineRegular, MenuItemButton } from "../../../../../../vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts";
-import { createWorkspaceViewStore } from "../../../../../../vendor/deepseek-harness/packages/client/ui-workspace/src/client/stores.ts";
 import { createSnapshotStore, type SessionListState, type WorkspaceListState } from "../../integrations/deepseek-harness/runtimeShim";
 import { useStudioMenus } from "./studioMenus";
 import type { OplStudioSurface } from "../oplStudioSurface";

@@ -6,6 +6,7 @@
   "exports": {
     "./profile-plugin-updates": "./profile-plugin-updates.mjs",
     "./profile-boot-recovery": "./profile-boot-recovery.mjs",
+    "./dsh-plugin-catalog": "./dsh-plugin-catalog.mjs",
     "./app-server-protocol": "./app-server-protocol.mjs",
     "./staged-inputs": "./staged-inputs.mjs",
     "./webui-auth": "./webui-auth.mjs",

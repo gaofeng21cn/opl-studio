@@ -9,7 +9,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 
 import { type SettingsActionRequest } from "./settingsActions";
 
-import { type ThemeKey } from "../../../../../vendor/deepseek-harness/packages/client/ui-theme/src/client/locales";
+import { type ThemeKey } from "@gaofeng21cn/opl-dsh-adapters/dsh-locales";
 export type { SettingsActionRequest } from "./settingsActions";
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface LocaleNamespaceMap {

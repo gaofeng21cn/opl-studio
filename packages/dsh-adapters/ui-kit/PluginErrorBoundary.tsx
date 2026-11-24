@@ -5,6 +5,7 @@ export type PluginErrorBoundaryProps = {
   pluginId?: string;
   pluginLabel?: string;
   locale?: "zh" | "en";
+  onReloadView?: () => void;
   onOpenSoftwareCenter?: () => void;
   resetKey?: string | number;
   children: ReactNode;
@@ -75,6 +76,11 @@ export class PluginErrorBoundary extends Component<PluginErrorBoundaryProps, Plu
           <Button type="button" size="sm" variant="outline" onClick={this.reset}>
             {zh ? "重新加载" : "Reload"}
           </Button>
+          {this.props.onReloadView ? (
+            <Button type="button" size="sm" variant="outline" onClick={this.props.onReloadView}>
+              {zh ? "刷新界面" : "Reload view"}
+            </Button>
+          ) : null}
           {this.props.onOpenSoftwareCenter ? (
             <Button type="button" size="sm" variant="ghost" onClick={this.props.onOpenSoftwareCenter}>
               {zh ? "前往软件中心" : "Open Software Center"}

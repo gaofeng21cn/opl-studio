@@ -6,7 +6,7 @@ import {
   type ContextMenus, type ContextMenuTarget, type MenuPoint,
   type SessionRenameTarget, type WorkspaceActionRequest,
 } from "../../integrations/deepseek-harness/studioMenus.mjs";
-import type { SlotRegistry } from "../../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry";
+import type { SlotRegistry } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 import { createEcosystemLocale } from "../../integrations/deepseek-harness/ecosystemClients";
 import type { OplStudioSurface } from "../oplStudioSurface";
 import { translate, useClientContext, useDshSnapshot, useStudio } from "./studioContext";

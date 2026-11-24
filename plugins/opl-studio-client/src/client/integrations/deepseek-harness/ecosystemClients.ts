@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Context, Service } from "@deepseek-ai/cordis";
-import type { SlotRegistry } from "../../../../../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry";
+import type { SlotRegistry } from "@gaofeng21cn/opl-dsh-adapters/dsh-shell";
 type ClientPlugin = { apply(context: Context): void; inject?: string[] };
 
 export type EcosystemTranslate = (key: string, values?: Record<string, unknown>) => string;

@@ -99,6 +99,16 @@ async function dispatchApi(req, res, hostCore) {
     json(res, 200, await hostCore.invoke("updateDshPlugins", await body(req)));
     return;
   }
+  if (req.method === "GET" && url.pathname === "/api/host/plugin-catalog") {
+    json(res, 200, await hostCore.invoke("readDshPluginCatalog", {
+      includeUpdates: url.searchParams.get("includeUpdates") === "1"
+    }));
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/api/host/plugin-manage") {
+    json(res, 200, await hostCore.invoke("manageDshPlugin", await body(req)));
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/opl/state") {
     json(res, 200, await hostCore.invoke("readState", { profile: url.searchParams.get("profile") ?? "fast" }));
     return;
