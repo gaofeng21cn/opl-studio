@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import studioPackage from "../../../package.json" with { type: "json" };
+import pluginPackage from "../package.json" with { type: "json" };
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -10,7 +10,7 @@ import {
 
 export const DSH_TOOL_MCP_PATH = "/mcp/dsh-tools";
 export const DSH_TOOL_MCP_TOKEN_ENV = "OPL_STUDIO_DSH_MCP_TOKEN";
-const studioVersion = studioPackage.version;
+const studioVersion = process.env.OPL_STUDIO_VERSION || pluginPackage.version;
 
 class DshToolMcpHttpError extends Error {
   constructor(status, message) {

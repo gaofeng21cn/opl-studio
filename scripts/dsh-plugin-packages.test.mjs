@@ -46,6 +46,7 @@ test("plugin sources use public workspace package boundaries", async () => {
         if (!specifier.startsWith(".")) continue;
         const target = path.relative(root, path.resolve(path.dirname(filename), specifier)).split(path.sep);
         if (target[0] === "src" || target[0] === "scripts" || target[0] === "packages"
+            || (target.length === 1 && target[0] === "package.json")
             || (target[0] === "vendor" && (target[1] === "deepseek-harness" || path.relative(sourceRoot, filename).split(path.sep)[0] === "client"))
             || (target[0] === "plugins" && target[1] !== plugin.name)) {
           violations.push(`${path.relative(root, filename)} -> ${specifier}`);
