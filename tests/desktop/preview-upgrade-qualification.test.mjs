@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { loadPreviewCheckpoint, selectPreviewBaselines, validatePreviewUpgradeReceipt } from "../../scripts/desktop/stable-qualify-preview-upgrade.mjs";
+import { loadPreviewCheckpoint, parsePreviewUpgradeArgs, selectPreviewBaselines, validatePreviewUpgradeReceipt } from "../../scripts/desktop/stable-qualify-preview-upgrade.mjs";
 import { qualifyPrepublicationUpdate } from "../../scripts/desktop/macos-distribution.mjs";
 import { assertHostUpdaterPlanDisabled } from "../../scripts/desktop/qualify-local-updater.mjs";
 
@@ -66,4 +66,26 @@ test("direct host updater rejects enabled packaged handoff plans and malformed p
   await assert.rejects(assertHostUpdaterPlanDisabled(app), /isolated Tart VMs/);
   fs.writeFileSync(file, JSON.stringify({ enabled: false }));
   await assert.rejects(assertHostUpdaterPlanDisabled(app), /Invalid packaged/);
+});
+
+test("Preview upgrade qualification CLI parser validates required flags and identities", () => {
+  const valid = [
+    "--checkpoint-root", "/tmp/cp",
+    "--checkpoint-sha256", "a".repeat(64),
+    "--source-vm", "base-vm",
+    "--artifacts", "/tmp/out",
+    "--framework-source-archive", "/tmp/fw.tgz",
+    "--framework-ref", "b".repeat(40),
+    "--codex-platform-package-tarball", "/tmp/codex.tgz",
+    "--codex-version", "0.147.0",
+    "--gateway-account-email-file", "/tmp/email",
+    "--gateway-account-password-file", "/tmp/pass",
+    "--product-profile", "/tmp/profile.json"
+  ];
+  const parsed = parsePreviewUpgradeArgs(valid);
+  assert.equal(parsed.checkpointRoot, "/tmp/cp");
+  assert.equal(parsed.user, "admin");
+  assert.throws(() => parsePreviewUpgradeArgs([...valid, "--bogus", "1"]), /Invalid argument --bogus/);
+  assert.throws(() => parsePreviewUpgradeArgs([...valid, "--source-vm"]), /Invalid argument --source-vm/);
+  assert.throws(() => parsePreviewUpgradeArgs(valid.slice(2)), /Missing Preview qualification input: checkpointRoot/);
 });

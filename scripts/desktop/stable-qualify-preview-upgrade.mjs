@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import semver from "semver";
 import { validateTarget, readPreviewHandoff } from "../../desktop/preview-handoff.mjs";
 import { verifyApp } from "../../desktop/handoff-installer.mjs";
@@ -200,9 +201,26 @@ async function runBaseline({ options, candidate, target, stableAsset, baseline, 
 }
 
 export function parsePreviewUpgradeArgs(argv) {
-  const keys = { "--checkpoint-root": "checkpointRoot", "--checkpoint-sha256": "checkpointSha256", "--source-vm": "sourceVm", "--guest-user": "user", "--ssh-key": "sshKey", "--artifacts": "artifacts", "--framework-source-archive": "frameworkArchive", "--framework-ref": "frameworkRef", "--codex-platform-package-tarball": "codexTarball", "--codex-version": "codexVersion", "--gateway-account-email-file": "emailFile", "--gateway-account-password-file": "passwordFile", "--product-profile": "productProfile" };
+  const keys = { "checkpoint-root": "checkpointRoot", "checkpoint-sha256": "checkpointSha256", "source-vm": "sourceVm", "guest-user": "user", "ssh-key": "sshKey", artifacts: "artifacts", "framework-source-archive": "frameworkArchive", "framework-ref": "frameworkRef", "codex-platform-package-tarball": "codexTarball", "codex-version": "codexVersion", "gateway-account-email-file": "emailFile", "gateway-account-password-file": "passwordFile", "product-profile": "productProfile" };
   const options = { user: "admin", sshKey: path.join(os.homedir(), ".ssh/opl_first_run_tart_ed25519") };
-  for (let index = 0; index < argv.length; index++) { invariant(keys[argv[index]] && argv[index + 1], `Invalid argument ${argv[index]}`); options[keys[argv[index]]] = argv[++index]; }
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: Object.fromEntries(Object.keys(keys).map((name) => [name, { type: "string" }]))
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    throw new Error(`Invalid argument ${token}`);
+  }
+  for (const [flagName, field] of Object.entries(keys)) {
+    const raw = parsed.values[flagName];
+    if (raw === undefined) continue;
+    invariant(raw, `Invalid argument --${flagName}`);
+    options[field] = raw;
+  }
   for (const key of Object.values(keys)) invariant(options[key], `Missing Preview qualification input: ${key}`);
   invariant(/^(sha256:)?[0-9a-f]{64}$/.test(options.checkpointSha256) && /^[0-9a-f]{40}$/.test(options.frameworkRef), "Exact checkpoint and Framework identities are required");
   return options;

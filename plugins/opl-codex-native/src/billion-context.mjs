@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { readProfileManifest } from "@deepseek-ai/dsh-app-boot";
-import { withFileLock } from "@deepseek-ai/dsh-atomic-write";
+import { withFileLock, writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import { bundleManifest, runPluginCommand, runProfilePnpm, saveManifest, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
 import semver from "semver";
 import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
@@ -34,16 +34,9 @@ export function clearPendingContextOperation(dshProfileDir) {
   }
 }
 
-function writePendingContextOperation(dshProfileDir, payload) {
+async function writePendingContextOperation(dshProfileDir, payload) {
   const filePath = path.join(dshProfileDir, PENDING_FILE);
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  try {
-    writeFileSync(tempPath, JSON.stringify(payload, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
-    renameSync(tempPath, filePath);
-  } finally {
-    rmSync(tempPath, { force: true });
-  }
+  await writeFileAtomic(filePath, JSON.stringify(payload, null, 2) + "\n", { mode: 0o600 });
 }
 
 export function hasContextUpdate(available, installed) {
@@ -98,7 +91,7 @@ export async function stageContextPluginOperation({ dshProfileDir: dir, dshInsta
   if (!dir) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
   if (operation === "remove") {
     await withFileLock(path.join(dir, "package.json"), async () => {
-      writePendingContextOperation(dir, {
+      await writePendingContextOperation(dir, {
         schema: "opl_billion_context_pending.v1",
         operation: "remove",
         targetVersion: null,
@@ -113,7 +106,7 @@ export async function stageContextPluginOperation({ dshProfileDir: dir, dshInsta
     return { staged: false, availableVersion: version };
   }
   await withFileLock(path.join(dir, "package.json"), async () => {
-    writePendingContextOperation(dir, {
+    await writePendingContextOperation(dir, {
       schema: "opl_billion_context_pending.v1",
       operation: "update",
       targetVersion: version,

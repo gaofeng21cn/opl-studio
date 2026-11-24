@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import tls from "node:tls";
 import { fileURLToPath } from "node:url";
+import { parseArgs as parseCliArgs } from "node:util";
 import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 import {
   PREVIEW_PRODUCT,
@@ -288,54 +289,81 @@ export function parseArgs(argv) {
     frameworkSourceArchive: null,
     frameworkRef: null
   };
+  const smokeBooleanFlags = new Set(["require-gateway-setup", "require-codex-turn"]);
+  const smokeValueFlags = new Set([
+    "carrier", "product-name", "bundle-id", "cdp-port", "runtime-profiles",
+    "gateway-credentials-file", "codex-turn-hook-file", "codex-turn-prompt",
+    "timeout-ms", "app-path", "screenshots-dir"
+  ]);
+  let parsed;
+  try {
+    parsed = parseCliArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+      options: {
+        "keep-vm": { type: "boolean" },
+        "skip-clone": { type: "boolean" },
+        attach: { type: "boolean" },
+        "allow-actions": { type: "boolean" },
+        "source-vm": { type: "string" },
+        dmg: { type: "string" },
+        "guest-user": { type: "string" },
+        "ssh-key": { type: "string" },
+        "vm-name": { type: "string" },
+        out: { type: "string" },
+        "codex-platform-package-tarball": { type: "string" },
+        "codex-version": { type: "string" },
+        "framework-source-archive": { type: "string" },
+        "framework-ref": { type: "string" },
+        "require-gateway-setup": { type: "boolean" },
+        "require-codex-turn": { type: "boolean" },
+        carrier: { type: "string" },
+        "product-name": { type: "string" },
+        "bundle-id": { type: "string" },
+        "cdp-port": { type: "string" },
+        "runtime-profiles": { type: "string" },
+        "gateway-credentials-file": { type: "string" },
+        "codex-turn-hook-file": { type: "string" },
+        "codex-turn-prompt": { type: "string" },
+        "timeout-ms": { type: "string" },
+        "app-path": { type: "string" },
+        "screenshots-dir": { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`missing value for ${token}`);
+    throw new Error(`unsupported argument: ${token}`);
+  }
   const smokeArgv = [];
-  const takeValue = (arg, index) => {
-    const value = argv[index + 1];
-    invariant(value, `missing value for ${arg}`);
-    return value;
+  const requireValue = (token) => {
+    invariant(token.value, `missing value for ${token.rawName}`);
+    return token.value;
   };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--keep-vm") { cleanOptions.keepVm = true; continue; }
-    if (arg === "--skip-clone") { cleanOptions.skipClone = true; continue; }
-    if (arg === "--attach") { cleanOptions.attach = true; continue; }
-    if (arg === "--allow-actions") { cleanOptions.allowActions = true; continue; }
-    if (arg === "--source-vm") { cleanOptions.sourceVm = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--dmg") { cleanOptions.dmg = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--guest-user") { cleanOptions.guestUser = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--ssh-key") { cleanOptions.sshKey = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--vm-name") { cleanOptions.vmName = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--out") { cleanOptions.outPath = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--codex-platform-package-tarball") {
-      cleanOptions.codexPlatformPackageTarball = path.resolve(takeValue(arg, index));
-      index += 1;
-      continue;
-    }
-    if (arg === "--codex-version") {
-      cleanOptions.codexVersion = takeValue(arg, index).trim();
+  for (const token of parsed.tokens) {
+    if (token.kind !== "option") throw new Error(`unsupported argument: ${token.value ?? "--"}`);
+    if (token.name === "keep-vm") cleanOptions.keepVm = true;
+    else if (token.name === "skip-clone") cleanOptions.skipClone = true;
+    else if (token.name === "attach") cleanOptions.attach = true;
+    else if (token.name === "allow-actions") cleanOptions.allowActions = true;
+    else if (token.name === "source-vm") cleanOptions.sourceVm = requireValue(token);
+    else if (token.name === "dmg") cleanOptions.dmg = path.resolve(requireValue(token));
+    else if (token.name === "guest-user") cleanOptions.guestUser = requireValue(token);
+    else if (token.name === "ssh-key") cleanOptions.sshKey = path.resolve(requireValue(token));
+    else if (token.name === "vm-name") cleanOptions.vmName = requireValue(token);
+    else if (token.name === "out") cleanOptions.outPath = path.resolve(requireValue(token));
+    else if (token.name === "codex-platform-package-tarball") cleanOptions.codexPlatformPackageTarball = path.resolve(requireValue(token));
+    else if (token.name === "codex-version") {
+      cleanOptions.codexVersion = requireValue(token).trim();
       invariant(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(cleanOptions.codexVersion), "--codex-version must be a package version");
-      index += 1;
-      continue;
-    }
-    if (arg === "--framework-source-archive") {
-      cleanOptions.frameworkSourceArchive = path.resolve(takeValue(arg, index));
-      index += 1;
-      continue;
-    }
-    if (arg === "--framework-ref") {
-      cleanOptions.frameworkRef = takeValue(arg, index).trim();
+    } else if (token.name === "framework-source-archive") cleanOptions.frameworkSourceArchive = path.resolve(requireValue(token));
+    else if (token.name === "framework-ref") {
+      cleanOptions.frameworkRef = requireValue(token).trim();
       invariant(/^[0-9a-f]{40}$/.test(cleanOptions.frameworkRef), "--framework-ref must be an exact lowercase 40-character SHA");
-      index += 1;
-      continue;
-    }
-    if (["--require-gateway-setup", "--require-codex-turn"].includes(arg)) { smokeArgv.push(arg); continue; }
-    if (["--carrier", "--product-name", "--bundle-id", "--cdp-port", "--runtime-profiles", "--gateway-credentials-file", "--codex-turn-hook-file", "--codex-turn-prompt", "--timeout-ms", "--app-path", "--screenshots-dir"].includes(arg)) {
-      const value = takeValue(arg, index);
-      index += 1;
-      smokeArgv.push(arg, value);
-      continue;
-    }
-    throw new Error(`unsupported argument: ${arg}`);
+    } else if (smokeBooleanFlags.has(token.name)) smokeArgv.push(token.rawName);
+    else if (smokeValueFlags.has(token.name)) smokeArgv.push(token.rawName, requireValue(token));
   }
   const smokeOptions = parsePreviewSmokeArgs(smokeArgv, {
     env: {

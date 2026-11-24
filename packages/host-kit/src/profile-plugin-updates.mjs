@@ -7,7 +7,7 @@ import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
 import * as yaml from "js-yaml";
 import { runPluginCommand, runProfilePnpm, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { classifyInstallFailure } from "@deepseek-ai/dsh-plugin-manager";
-import { withFileLock } from "@deepseek-ai/dsh-atomic-write";
+import { withFileLock, writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import semver from "semver";
 import {
   readInstalledExternalPackageManifest,
@@ -215,11 +215,7 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
   } };
   visit(patches);
   if (changed) {
-    const temporary = `${patchFile}.${process.pid}.tmp`;
-    try {
-      fs.writeFileSync(temporary, yaml.dump(patches, { schema: entryListSchema, noRefs: true }), { mode: 0o600 });
-      fs.renameSync(temporary, patchFile);
-    } finally { fs.rmSync(temporary, { force: true }); }
+    await writeFileAtomic(patchFile, yaml.dump(patches, { schema: entryListSchema, noRefs: true }), { mode: 0o600 });
   }
   return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed || bundlesChanged };
 }
@@ -326,13 +322,7 @@ export async function downloadVerifiedPluginTarball({ name, version, tarballUrl,
   if (!matchesIntegrity(bytes, parsedIntegrity)) {
     throw Object.assign(new Error(`Tarball integrity mismatch for ${name}@${version}`), { code: "integrity_mismatch" });
   }
-  const temporary = `${destination}.${process.pid}.tmp`;
-  try {
-    fs.writeFileSync(temporary, bytes, { mode: 0o600 });
-    fs.renameSync(temporary, destination);
-  } finally {
-    fs.rmSync(temporary, { force: true });
-  }
+  await writeFileAtomic(destination, bytes, { mode: 0o600 });
   return destination;
 }
 

@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, readFile, rm } from "node:fs/promises";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import WebSocket from "ws";
 import { ConnectionController, HostServerApi, HostServerConnection, IdentityStore, RpcRouter, ServerCredentialStore, resolveConfig } from "../../../vendor/dsh-remote/host.mjs";
 import { LinkLoopback } from "./link-loopback.mjs";
@@ -96,9 +97,8 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
   let identityError;
   let closed = false;
   async function saveMetadata(value) {
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const temporary = `${metadataFile}.${crypto.randomUUID()}.tmp`;
-    await writeFile(temporary, JSON.stringify(value), { mode: 0o600 }); await rename(temporary, metadataFile); await chmod(metadataFile, 0o600); metadata = value;
+    await writeFileAtomic(metadataFile, JSON.stringify(value), { mode: 0o600, dirMode: 0o700 });
+    metadata = value;
   }
   function status() {
     const reasonCode = errorCode ?? connection?.lastError();

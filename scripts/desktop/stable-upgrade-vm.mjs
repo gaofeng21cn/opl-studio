@@ -2,6 +2,7 @@ import { spawnSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { evaluatePage, waitForPageReady, waitForPageTarget } from "./cdp.mjs";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,8 +16,25 @@ function run(command, args, allowFailure = false) {
 
 export function parseUpgradeVmArgs(argv) {
   const values = { timeoutMs: 900_000, cdpPort: 19339, user: "admin", networkMode: "controlled_exact_candidate" };
-  const keys = { "--vm": "vm", "--route": "route", "--ssh-key": "sshKey", "--user": "user", "--target-version": "targetVersion", "--preview-target-version": "previewTargetVersion", "--out": "out", "--cdp-port": "cdpPort", "--timeout-ms": "timeoutMs", "--network-mode": "networkMode" };
-  for (let i = 0; i < argv.length; i++) { invariant(keys[argv[i]] && argv[i + 1], `Invalid argument ${argv[i]}`); const field = keys[argv[i]]; values[field] = ["timeoutMs", "cdpPort"].includes(field) ? Number(argv[++i]) : argv[++i]; }
+  const keys = { vm: "vm", route: "route", "ssh-key": "sshKey", user: "user", "target-version": "targetVersion", "preview-target-version": "previewTargetVersion", out: "out", "cdp-port": "cdpPort", "timeout-ms": "timeoutMs", "network-mode": "networkMode" };
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: Object.fromEntries(Object.keys(keys).map((name) => [name, { type: "string" }]))
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    throw new Error(`Invalid argument ${token}`);
+  }
+  for (const [flagName, field] of Object.entries(keys)) {
+    const raw = parsed.values[flagName];
+    if (raw === undefined) continue;
+    invariant(raw, `Invalid argument --${flagName}`);
+    values[field] = ["timeoutMs", "cdpPort"].includes(field) ? Number(raw) : raw;
+  }
   invariant(/^opl-studio-cutover-[a-z0-9-]+$/.test(values.vm ?? ""), "Only task-owned isolated upgrade VMs are permitted");
   invariant(["preview", "studio"].includes(values.route), "Upgrade route must be preview or studio");
   invariant(values.sshKey && values.out && /^\d+\.\d+\.\d+$/.test(values.targetVersion ?? ""), "SSH key, receipt and exact target version are required");

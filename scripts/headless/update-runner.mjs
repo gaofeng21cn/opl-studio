@@ -1,9 +1,10 @@
 import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import { realpathSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import semver from "semver";
 import { restartLoadedHeadlessService } from "./service-manager.mjs";
 
 const modulePath = fileURLToPath(import.meta.url);
@@ -34,38 +35,19 @@ async function exists(target) {
   }
 }
 
-function parseVersion(value, name) {
-  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?$/.exec(value);
-  if (!match) throw new Error(`${name} must be a semantic version`);
-  return { raw: value, core: match.slice(1, 4).map(Number), prerelease: match[4]?.split(".") ?? [] };
+export function parseVersion(value, name) {
+  if (typeof value !== "string" || value !== value.trim()) {
+    throw new Error(`${name} must be a semantic version`);
+  }
+  const parsed = semver.parse(value);
+  if (!parsed) throw new Error(`${name} must be a semantic version`);
+  return parsed;
 }
 
-function compareIdentifiers(left, right) {
-  const leftNumber = /^\d+$/.test(left) ? Number(left) : null;
-  const rightNumber = /^\d+$/.test(right) ? Number(right) : null;
-  if (leftNumber !== null && rightNumber !== null) return Math.sign(leftNumber - rightNumber);
-  if (leftNumber !== null) return -1;
-  if (rightNumber !== null) return 1;
-  return left.localeCompare(right);
-}
-
-function compareVersions(leftValue, rightValue) {
+export function compareVersions(leftValue, rightValue) {
   const left = parseVersion(leftValue, "version");
   const right = parseVersion(rightValue, "version");
-  for (let index = 0; index < left.core.length; index += 1) {
-    if (left.core[index] !== right.core[index]) return Math.sign(left.core[index] - right.core[index]);
-  }
-  if (!left.prerelease.length && !right.prerelease.length) return 0;
-  if (!left.prerelease.length) return 1;
-  if (!right.prerelease.length) return -1;
-  const length = Math.max(left.prerelease.length, right.prerelease.length);
-  for (let index = 0; index < length; index += 1) {
-    if (left.prerelease[index] === undefined) return -1;
-    if (right.prerelease[index] === undefined) return 1;
-    const compared = compareIdentifiers(left.prerelease[index], right.prerelease[index]);
-    if (compared !== 0) return compared;
-  }
-  return 0;
+  return semver.compare(left, right);
 }
 
 async function sourceVersion(sourceRoot) {
@@ -331,15 +313,32 @@ export function createHeadlessUpdateRunner({
   };
 }
 
-function parseArguments(argv) {
+export function parseArguments(argv) {
   const [operation, ...rest] = argv;
   if (!operations.has(operation)) throw new Error("Headless updater requires status, check, apply, rollback, or restart");
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: rest,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        "install-root": { type: "string" },
+        source: { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? "missing";
+    throw new Error(`Unknown updater argument: ${token}`);
+  }
   const options = {};
-  for (let index = 0; index < rest.length; index += 2) {
-    const flag = rest[index];
-    const value = rest[index + 1];
-    if (!value || !["--install-root", "--source"].includes(flag)) throw new Error(`Unknown updater argument: ${flag ?? "missing"}`);
-    options[flag === "--install-root" ? "installRoot" : "sourceRoot"] = value;
+  if (parsed.values["install-root"] !== undefined) {
+    if (!parsed.values["install-root"]) throw new Error("Unknown updater argument: --install-root");
+    options.installRoot = parsed.values["install-root"];
+  }
+  if (parsed.values.source !== undefined) {
+    if (!parsed.values.source) throw new Error("Unknown updater argument: --source");
+    options.sourceRoot = parsed.values.source;
   }
   if (!options.installRoot) throw new Error("--install-root is required");
   return { operation, ...options };

@@ -1,7 +1,7 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { CodexTeamAdapter, PROVIDER } from "./codex-adapter.mjs";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 export const name = "opl-codex-agents";
 export const inject = ["oplStudioHostOptions", "oplCodexNative", "agents", "sessions", "llm", "tools"];
 
@@ -16,10 +16,7 @@ export class CodexAgentBindings {
     const pending = this.serial.then(async () => {
       const next = structuredClone(this.state);
       const result = await operation(next);
-      await mkdir(path.dirname(this.file), { recursive: true });
-      const temporary = `${this.file}.${randomUUID()}.tmp`;
-      await writeFile(temporary, `${JSON.stringify(next)}\n`, { mode: 0o600 });
-      await rename(temporary, this.file);
+      await writeFileAtomic(this.file, `${JSON.stringify(next)}\n`, { mode: 0o600 });
       this.state = next;
       return result;
     });

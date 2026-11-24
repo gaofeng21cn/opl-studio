@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 
 const BINDING_SCHEMA = "opl_studio_channel_transport_bindings.v1";
 
@@ -174,18 +174,9 @@ export class ChannelBindingStore {
   }
 
   async #write(document) {
-    const directory = path.dirname(this.filePath);
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const temporary = path.join(directory, `.${path.basename(this.filePath)}.${process.pid}.${randomUUID()}.tmp`);
-    try {
-      await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
-        encoding: "utf8",
-        flag: "wx",
-        mode: 0o600
-      });
-      await rename(temporary, this.filePath);
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    await writeFileAtomic(this.filePath, `${JSON.stringify(document, null, 2)}\n`, {
+      mode: 0o600,
+      dirMode: 0o700
+    });
   }
 }

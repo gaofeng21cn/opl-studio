@@ -4,6 +4,7 @@ import { readFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs as parseCliArgs } from "node:util";
 import { parseArgs as parseCleanArgs, qualifyCleanVm } from "./qualify-clean-vm.mjs";
 import { runStableSmoke, STABLE_PRODUCT } from "./stable-smoke.mjs";
 
@@ -13,13 +14,29 @@ const quote = (value) => `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 export function parseStableArgs(argv) {
   const own = { artifacts: null, expectedSha256: null, expectedVersion: null, expectedTeamId: null, accountEmailFile: null, accountPasswordFile: null, productProfile: null, runtimeProfile: "standard", channel: "stable", requireGatekeeper: false };
   const forwarded = [];
-  const keys = { "--artifacts": "artifacts", "--expected-sha256": "expectedSha256", "--expected-version": "expectedVersion", "--expected-team-id": "expectedTeamId", "--gateway-account-email-file": "accountEmailFile", "--gateway-account-password-file": "accountPasswordFile", "--runtime-profile": "runtimeProfile", "--product-profile": "productProfile", "--channel": "channel" };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--require-gatekeeper") { own.requireGatekeeper = true; continue; }
-    invariant(!["--attach", "--skip-clone", "--require-codex-turn", "--codex-turn-hook-file", "--codex-turn-prompt", "--product-name", "--bundle-id", "--runtime-profiles"].includes(arg), `Stable qualification forbids ${arg}`);
-    if (keys[arg]) { invariant(argv[index + 1], `Missing value for ${arg}`); own[keys[arg]] = argv[++index]; }
-    else forwarded.push(arg);
+  const keys = { artifacts: "artifacts", "expected-sha256": "expectedSha256", "expected-version": "expectedVersion", "expected-team-id": "expectedTeamId", "gateway-account-email-file": "accountEmailFile", "gateway-account-password-file": "accountPasswordFile", "runtime-profile": "runtimeProfile", "product-profile": "productProfile", channel: "channel" };
+  const forbidden = new Set(["attach", "skip-clone", "require-codex-turn", "codex-turn-hook-file", "codex-turn-prompt", "product-name", "bundle-id", "runtime-profiles"]);
+  const parsed = parseCliArgs({
+    args: argv,
+    strict: false,
+    allowPositionals: true,
+    tokens: true,
+    options: {
+      "require-gatekeeper": { type: "boolean" },
+      ...Object.fromEntries(Object.keys(keys).map((name) => [name, { type: "string" }]))
+    }
+  });
+  for (const token of parsed.tokens) {
+    if (token.kind === "option") {
+      invariant(!forbidden.has(token.name), `Stable qualification forbids ${token.rawName}`);
+      if (token.name === "require-gatekeeper") { own.requireGatekeeper = true; continue; }
+      if (Object.hasOwn(keys, token.name)) { invariant(token.value, `Missing value for ${token.rawName}`); own[keys[token.name]] = token.value; continue; }
+      forwarded.push(token.inlineValue ? `${token.rawName}=${token.value}` : token.rawName);
+    } else if (token.kind === "positional") {
+      forwarded.push(token.value);
+    } else {
+      forwarded.push("--");
+    }
   }
   invariant(own.artifacts && own.accountEmailFile && own.accountPasswordFile, "Artifact directory and dedicated Gateway credential files are required");
   invariant(own.productProfile, "App-owned Official Profile source is required");

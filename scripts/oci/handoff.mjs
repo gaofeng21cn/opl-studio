@@ -1,5 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
 
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
@@ -92,20 +93,43 @@ export function createCloudWorkspaceImageHandoff(input) {
   };
 }
 
-function parse(argv) {
+export function parseHandoffArgs(argv) {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        version: { type: "string" },
+        "studio-ref": { type: "string" },
+        "app-ref": { type: "string" },
+        "framework-ref": { type: "string" },
+        "dsh-ref": { type: "string" },
+        "index-digest": { type: "string" },
+        "amd64-digest": { type: "string" },
+        "arm64-digest": { type: "string" },
+        "previous-digest": { type: "string" },
+        verification: { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`Missing value for ${token}`);
+    throw new Error(`Unknown option: ${token}`);
+  }
   const options = {};
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (!value) throw new Error(`Missing value for ${flag}`);
-    options[flag.replace(/^--/, "").replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())] = value;
+  for (const [flagName, value] of Object.entries(parsed.values)) {
+    if (value === undefined) continue;
+    if (!value) throw new Error(`Missing value for --${flagName}`);
+    options[flagName.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())] = value;
   }
   return options;
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   try {
-    process.stdout.write(`${JSON.stringify(createCloudWorkspaceImageHandoff(parse(process.argv.slice(2))), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(createCloudWorkspaceImageHandoff(parseHandoffArgs(process.argv.slice(2))), null, 2)}\n`);
   } catch (error) {
     process.stderr.write(`${JSON.stringify({ status: "handoff_failed", message: error.message })}\n`);
     process.exitCode = 1;

@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { mkdir, readFile, writeFile, rename, chmod } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import { pipeline } from "node:stream/promises";
 import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 import { createWebUiAuth } from "@gaofeng21cn/opl-host-kit/webui-auth";
@@ -74,9 +75,7 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
   function persist() {
     const value = JSON.stringify({ schema: "opl_link_host_devices.v1", hostId: host.id, devices: [...devices.values()], operations: [...operations].map(([key, value]) => ({ key, hash: value.hash })) });
     const operation = writes.catch(() => {}).then(async () => {
-      await mkdir(path.dirname(storeFile), { recursive: true, mode: 0o700 });
-      const temporary = `${storeFile}.${crypto.randomUUID()}.tmp`;
-      await writeFile(temporary, value, { mode: 0o600 }); await rename(temporary, storeFile); await chmod(storeFile, 0o600);
+      await writeFileAtomic(storeFile, value, { mode: 0o600, dirMode: 0o700 });
     });
     writes = operation;
     return operation;

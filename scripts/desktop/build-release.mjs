@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { parse, stringify } from 'yaml';
 import semver from 'semver';
@@ -13,15 +14,39 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export function resolveStableBuildPlan(argv, env = process.env, host = { platform: process.platform, arch: process.arch }) {
   let arch = host.arch, platform = host.platform, directoryOnly = false, reuseRenderer = false;
   const builderOptions = [];
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-    if (argument === '--dir-only') directoryOnly = true;
-    else if (argument === '--skip-vite') reuseRenderer = true;
-    else if (argument === '--platform') platform = argv[++index];
-    else if (argument === '--arch') arch = argv[++index];
-    else if (['x64', 'arm64', 'universal'].includes(argument)) arch = argument;
-    else if (argument === '--config.nsis.differentialPackage=true') builderOptions.push(argument);
-    else throw new Error(`Unsupported Stable build option: ${argument}`);
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: true,
+      tokens: true,
+      options: {
+        'dir-only': { type: 'boolean' },
+        'skip-vite': { type: 'boolean' },
+        platform: { type: 'string' },
+        arch: { type: 'string' },
+        'config.nsis.differentialPackage': { type: 'string' }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(' ')[0] ?? argv[0];
+    throw new Error(`Unsupported Stable build option: ${token}`);
+  }
+  for (const token of parsed.tokens) {
+    if (token.kind === 'positional') {
+      if (['x64', 'arm64', 'universal'].includes(token.value)) arch = token.value;
+      else throw new Error(`Unsupported Stable build option: ${token.value}`);
+    } else if (token.kind === 'option') {
+      if (token.name === 'dir-only') directoryOnly = true;
+      else if (token.name === 'skip-vite') reuseRenderer = true;
+      else if (token.name === 'platform') platform = token.value;
+      else if (token.name === 'arch') arch = token.value;
+      else if (token.name === 'config.nsis.differentialPackage' && token.inlineValue && token.value === 'true') builderOptions.push('--config.nsis.differentialPackage=true');
+      else throw new Error(`Unsupported Stable build option: ${token.rawName}${token.inlineValue ? `=${token.value}` : ''}`);
+    } else {
+      throw new Error('Unsupported Stable build option: --');
+    }
   }
   if (!['darwin', 'win32', 'linux'].includes(platform) || !['arm64', 'x64', 'universal'].includes(arch)
     || (arch === 'universal' && platform !== 'darwin')) throw new Error('Unsupported release platform or architecture');

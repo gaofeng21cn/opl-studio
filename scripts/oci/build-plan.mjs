@@ -1,5 +1,6 @@
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
 
 export const multiArchPlatforms = Object.freeze(["linux/amd64", "linux/arm64"]);
 
@@ -68,26 +69,48 @@ export function createMultiArchBuildPlan({ image, sourceRevision, frameworkRef, 
   };
 }
 
-function parse(argv) {
+export function parseBuildPlanArgs(argv) {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        image: { type: "string" },
+        "source-revision": { type: "string" },
+        "framework-ref": { type: "string" },
+        "app-ref": { type: "string" },
+        output: { type: "string" },
+        platform: { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`Missing value for ${token}`);
+    throw new Error(`Unknown option: ${token}`);
+  }
+  const fieldMap = [
+    ["image", "image"],
+    ["source-revision", "sourceRevision"],
+    ["framework-ref", "frameworkRef"],
+    ["app-ref", "appRef"],
+    ["output", "output"],
+    ["platform", "platform"]
+  ];
   const options = {};
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (!value) throw new Error(`Missing value for ${flag}`);
-    if (flag === "--image") options.image = value;
-    else if (flag === "--source-revision") options.sourceRevision = value;
-    else if (flag === "--framework-ref") options.frameworkRef = value;
-    else if (flag === "--app-ref") options.appRef = value;
-    else if (flag === "--output") options.output = value;
-    else if (flag === "--platform") options.platform = value;
-    else throw new Error(`Unknown option: ${flag}`);
+  for (const [flagName, field] of fieldMap) {
+    const value = parsed.values[flagName];
+    if (value === undefined) continue;
+    if (!value) throw new Error(`Missing value for --${flagName}`);
+    options[field] = value;
   }
   return options;
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   try {
-    process.stdout.write(`${JSON.stringify(createMultiArchBuildPlan(parse(process.argv.slice(2))), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(createMultiArchBuildPlan(parseBuildPlanArgs(process.argv.slice(2))), null, 2)}\n`);
   } catch (error) {
     process.stderr.write(`${JSON.stringify({ status: "oci_build_plan_failed", message: error.message }, null, 2)}\n`);
     process.exitCode = 1;

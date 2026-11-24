@@ -14,6 +14,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs as parseCliArgs } from "node:util";
 import { capturePageScreenshot, waitForPageReady } from "./cdp.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -211,7 +212,7 @@ window.__oplVm = (() => {
 true;
 `;
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     dmg: null,
     sourceVm: defaultSourceVm,
@@ -225,26 +226,58 @@ function parseArgs(argv) {
     attach: false,
     timeoutMs: 60_000
   };
-  const takeValue = (flag, index) => {
-    const value = argv[index + 1];
-    invariant(value && !value.startsWith("--"), `${flag} requires a value`);
+  let parsed;
+  try {
+    parsed = parseCliArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        "keep-vm": { type: "boolean" },
+        attach: { type: "boolean" },
+        dmg: { type: "string" },
+        "source-vm": { type: "string" },
+        "vm-name": { type: "string" },
+        "ssh-key": { type: "string" },
+        "guest-user": { type: "string" },
+        "cdp-port": { type: "string" },
+        "timeout-ms": { type: "string" },
+        out: { type: "string" },
+        "screenshots-dir": { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`${token} requires a value`);
+    throw new Error(`unsupported argument: ${token}`);
+  }
+  const { values } = parsed;
+  if (values["keep-vm"]) options.keepVm = true;
+  if (values.attach) options.attach = true;
+  const takeValue = (name) => {
+    const value = values[name];
+    if (value === undefined) return undefined;
+    invariant(value && !value.startsWith("--"), `--${name} requires a value`);
     return value;
   };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--keep-vm") { options.keepVm = true; continue; }
-    if (arg === "--attach") { options.attach = true; continue; }
-    if (arg === "--dmg") { options.dmg = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--source-vm") { options.sourceVm = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--vm-name") { options.vmName = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--ssh-key") { options.sshKey = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--guest-user") { options.guestUser = takeValue(arg, index); index += 1; continue; }
-    if (arg === "--cdp-port") { options.cdpPort = Number(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--timeout-ms") { options.timeoutMs = Number(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--out") { options.outPath = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    if (arg === "--screenshots-dir") { options.screenshotsDir = path.resolve(takeValue(arg, index)); index += 1; continue; }
-    throw new Error(`unsupported argument: ${arg}`);
-  }
+  const dmg = takeValue("dmg");
+  if (dmg !== undefined) options.dmg = path.resolve(dmg);
+  const sourceVm = takeValue("source-vm");
+  if (sourceVm !== undefined) options.sourceVm = sourceVm;
+  const vmName = takeValue("vm-name");
+  if (vmName !== undefined) options.vmName = vmName;
+  const sshKey = takeValue("ssh-key");
+  if (sshKey !== undefined) options.sshKey = path.resolve(sshKey);
+  const guestUser = takeValue("guest-user");
+  if (guestUser !== undefined) options.guestUser = guestUser;
+  const cdpPort = takeValue("cdp-port");
+  if (cdpPort !== undefined) options.cdpPort = Number(cdpPort);
+  const timeoutMs = takeValue("timeout-ms");
+  if (timeoutMs !== undefined) options.timeoutMs = Number(timeoutMs);
+  const out = takeValue("out");
+  if (out !== undefined) options.outPath = path.resolve(out);
+  const screenshotsDir = takeValue("screenshots-dir");
+  if (screenshotsDir !== undefined) options.screenshotsDir = path.resolve(screenshotsDir);
   invariant(Number.isInteger(options.cdpPort) && options.cdpPort > 1024, "--cdp-port must be a host port");
   if (!options.attach) invariant(options.dmg, "--dmg is required unless --attach is used");
   return options;

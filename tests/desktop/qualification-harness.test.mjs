@@ -17,6 +17,7 @@ import {
   qualifyCleanVm,
   parseArgs as parseCleanVmArgs
 } from "../../scripts/desktop/qualify-clean-vm.mjs";
+import { parseArgs as parseFixtureVmArgs } from "../../scripts/desktop/qualify-fixture-vm.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
 
@@ -264,4 +265,25 @@ test("a failed Tart process reports its startup cause without waiting for DHCP",
   const child = spawn(process.execPath, ["-e", "process.stderr.write('maximum supported VM count exceeded');process.exit(2)"], { stdio: ["ignore", "ignore", "pipe"] });
   await assert.rejects(waitForVmIp("fixture-vm", { vmProcess: child, timeoutMs: 1000, pollMs: 10,
     readIp: () => ({ status: 1, stdout: "" }) }), /Tart failed to start fixture-vm: maximum supported VM count exceeded/);
+});
+
+test("fixture VM CLI parser validates required DMG, flags, and port bounds", () => {
+  const parsed = parseFixtureVmArgs([
+    "--dmg", "out/preview.dmg",
+    "--source-vm", "base-vm",
+    "--vm-name", "fixture-1",
+    "--cdp-port", "19444",
+    "--timeout-ms", "90000",
+    "--keep-vm"
+  ]);
+  assert.equal(parsed.dmg, path.resolve(root, "out/preview.dmg"));
+  assert.equal(parsed.sourceVm, "base-vm");
+  assert.equal(parsed.vmName, "fixture-1");
+  assert.equal(parsed.cdpPort, 19444);
+  assert.equal(parsed.timeoutMs, 90000);
+  assert.equal(parsed.keepVm, true);
+  assert.equal(parseFixtureVmArgs(["--attach"]).attach, true);
+  assert.throws(() => parseFixtureVmArgs([]), /--dmg is required unless --attach is used/);
+  assert.throws(() => parseFixtureVmArgs(["--dmg", "--attach"]), /--dmg requires a value/);
+  assert.throws(() => parseFixtureVmArgs(["--attach", "--unknown"]), /unsupported argument: --unknown/);
 });
