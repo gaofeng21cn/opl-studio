@@ -1,6 +1,7 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import path from "node:path";
 import { capturePageScreenshot, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
 
@@ -95,26 +96,67 @@ export function parsePreviewSmokeArgs(argv, { env = process.env } = {}) {
     requireGatewaySetup: env.OPL_STUDIO_REQUIRE_GATEWAY_SETUP === "1",
     requireCodexTurn: env.OPL_STUDIO_REQUIRE_CODEX_TURN === "1"
   };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--require-gateway-setup") { options.requireGatewaySetup = true; continue; }
-    if (arg === "--require-codex-turn") { options.requireCodexTurn = true; continue; }
-    const value = argv[++index];
-    invariant(value, `missing value for ${arg}`);
-    if (arg === "--carrier") options.carrier = value;
-    else if (arg === "--product-name") options.productName = value;
-    else if (arg === "--bundle-id") options.bundleId = value;
-    else if (arg === "--cdp-port") options.cdpPort = Number(value);
-    else if (arg === "--runtime-profiles") options.runtimeProfiles = parseRuntimeProfiles(value);
-    else if (arg === "--gateway-credentials-file") options.gatewayCredentialsFile = path.resolve(value);
-    else if (arg === "--codex-turn-hook-file") options.codexTurnHookFile = path.resolve(value);
-    else if (arg === "--codex-turn-prompt") options.codexTurnPrompt = value;
-    else if (arg === "--timeout-ms") options.timeoutMs = Number(value);
-    else if (arg === "--out") options.outPath = path.resolve(value);
-    else if (arg === "--screenshots-dir") options.screenshotsDir = path.resolve(value);
-    else if (arg === "--app-path") options.appPath = path.resolve(value);
-    else throw new Error(`unsupported argument: ${arg}`);
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        "require-gateway-setup": { type: "boolean" },
+        "require-codex-turn": { type: "boolean" },
+        carrier: { type: "string" },
+        "product-name": { type: "string" },
+        "bundle-id": { type: "string" },
+        "cdp-port": { type: "string" },
+        "runtime-profiles": { type: "string" },
+        "gateway-credentials-file": { type: "string" },
+        "codex-turn-hook-file": { type: "string" },
+        "codex-turn-prompt": { type: "string" },
+        "timeout-ms": { type: "string" },
+        out: { type: "string" },
+        "screenshots-dir": { type: "string" },
+        "app-path": { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? argv[0];
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`missing value for ${token}`);
+    throw new Error(`unsupported argument: ${token}`);
   }
+  const { values } = parsed;
+  if (values["require-gateway-setup"]) options.requireGatewaySetup = true;
+  if (values["require-codex-turn"]) options.requireCodexTurn = true;
+  const takeValue = (name) => {
+    const value = values[name];
+    if (value === undefined) return undefined;
+    invariant(value, `missing value for --${name}`);
+    return value;
+  };
+  const carrier = takeValue("carrier");
+  if (carrier !== undefined) options.carrier = carrier;
+  const productName = takeValue("product-name");
+  if (productName !== undefined) options.productName = productName;
+  const bundleId = takeValue("bundle-id");
+  if (bundleId !== undefined) options.bundleId = bundleId;
+  const cdpPort = takeValue("cdp-port");
+  if (cdpPort !== undefined) options.cdpPort = Number(cdpPort);
+  const runtimeProfiles = takeValue("runtime-profiles");
+  if (runtimeProfiles !== undefined) options.runtimeProfiles = parseRuntimeProfiles(runtimeProfiles);
+  const gatewayCredentialsFile = takeValue("gateway-credentials-file");
+  if (gatewayCredentialsFile !== undefined) options.gatewayCredentialsFile = path.resolve(gatewayCredentialsFile);
+  const codexTurnHookFile = takeValue("codex-turn-hook-file");
+  if (codexTurnHookFile !== undefined) options.codexTurnHookFile = path.resolve(codexTurnHookFile);
+  const codexTurnPrompt = takeValue("codex-turn-prompt");
+  if (codexTurnPrompt !== undefined) options.codexTurnPrompt = codexTurnPrompt;
+  const timeoutMs = takeValue("timeout-ms");
+  if (timeoutMs !== undefined) options.timeoutMs = Number(timeoutMs);
+  const out = takeValue("out");
+  if (out !== undefined) options.outPath = path.resolve(out);
+  const screenshotsDir = takeValue("screenshots-dir");
+  if (screenshotsDir !== undefined) options.screenshotsDir = path.resolve(screenshotsDir);
+  const appPath = takeValue("app-path");
+  if (appPath !== undefined) options.appPath = path.resolve(appPath);
   invariant(options.carrier.trim(), "carrier is required");
   invariant(options.productName.trim(), "product name is required");
   invariant(options.bundleId.trim(), "bundle id is required");

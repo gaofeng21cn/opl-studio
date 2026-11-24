@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createMultiArchBuildPlan, multiArchPlatforms } from "../../scripts/oci/build-plan.mjs";
-import { createOciManager, OciManagerError } from "../../scripts/oci/manage.mjs";
+import { createMultiArchBuildPlan, multiArchPlatforms, parseBuildPlanArgs } from "../../scripts/oci/build-plan.mjs";
+import { createOciManager, OciManagerError, parseCli } from "../../scripts/oci/manage.mjs";
 
 const imageA = {
   id: `sha256:${"a".repeat(64)}`,
@@ -322,4 +322,99 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     output: "./out/image.tar",
     platform: "linux/s390x"
   }), /platform/);
+});
+
+test("manager rejects active lock contention, recovers stale crashed locks, and unlocks on error", async () => {
+  const paths = await fixture();
+  const base = { allowLocalImage: true, stateDirectory: paths.stateDirectory, projectName: "opl-lock", port: 49185 };
+  const lockPath = path.join(paths.stateDirectory, ".operation.lock");
+
+  // 1. Active concurrent operation rejects with operation_in_progress.
+  let releaseInFlight;
+  let enteredInFlight;
+  const enteredPromise = new Promise((resolve) => { enteredInFlight = resolve; });
+  const gatePromise = new Promise((resolve) => { releaseInFlight = resolve; });
+  const blockingDocker = fakeDocker({ images: new Map([["fixture:a", imageA]]) });
+  const managerA = createOciManager({
+    sourceRoot: paths.sourceRoot,
+    execute: async (command, args, options) => {
+      if (command === "docker" && args[0] === "info") {
+        enteredInFlight();
+        await gatePromise;
+      }
+      return blockingDocker.execute(command, args, options);
+    }
+  });
+  const managerB = createOciManager({ execute: blockingDocker.execute, sourceRoot: paths.sourceRoot });
+  const firstRun = managerA.run("install", { ...base, image: "fixture:a" });
+  await enteredPromise;
+  await assert.rejects(
+    managerB.run("install", { ...base, image: "fixture:a" }),
+    (error) => error instanceof OciManagerError && error.code === "operation_in_progress"
+  );
+  releaseInFlight();
+  assert.equal((await firstRun).status, "oci_installed");
+  await assert.rejects(access(lockPath), /ENOENT/);
+
+  // 2. Stale/crashed proper-lockfile lock directory recovers cleanly and unlocks in finally.
+  await mkdir(lockPath, { recursive: true });
+  const past = new Date(Date.now() - 60_000);
+  await utimes(lockPath, past, past);
+  assert.equal((await managerB.run("recreate", base)).status, "oci_recreated");
+  await assert.rejects(access(lockPath), /ENOENT/);
+
+  // 3. Stale legacy regular-file .operation.lock also recovers cleanly.
+  await writeFile(lockPath, JSON.stringify({ pid: 999999, startedAt: past.toISOString() }), { mode: 0o600 });
+  await utimes(lockPath, past, past);
+  assert.equal((await managerB.run("start", base)).status, "oci_started");
+  await assert.rejects(access(lockPath), /ENOENT/);
+
+  // 4. Failed operation releases the lock cleanly so subsequent operations proceed.
+  const failingManager = createOciManager({
+    sourceRoot: paths.sourceRoot,
+    execute: async () => ({ exitCode: 1, signal: null, stdout: "", stderr: "docker down" })
+  });
+  await assert.rejects(failingManager.run("start", base), (error) => error.code === "docker_unavailable");
+  await assert.rejects(access(lockPath), /ENOENT/);
+  assert.equal((await managerB.run("start", base)).status, "oci_started");
+});
+
+test("OCI CLI argument parsers preserve flags and error contracts", () => {
+  assert.deepEqual(
+    parseCli(["install", "--image", "fixture:a", "--state-dir", "/tmp/state", "--project-name", "opl", "--port", "4178", "--allow-local-image", "--purge-data"]),
+    {
+      action: "install",
+      options: {
+        image: "fixture:a",
+        stateDirectory: "/tmp/state",
+        projectName: "opl",
+        port: "4178",
+        allowLocalImage: true,
+        purgeData: true
+      }
+    }
+  );
+  assert.throws(() => parseCli(["install", "--unknown"]), (error) => error instanceof OciManagerError && error.code === "invalid_argument");
+  assert.throws(() => parseCli(["install", "--image"]), (error) => error instanceof OciManagerError && error.code === "invalid_argument");
+
+  assert.deepEqual(
+    parseBuildPlanArgs([
+      "--image", "ghcr.io/example/opl:v1",
+      "--source-revision", "a".repeat(40),
+      "--framework-ref", "b".repeat(40),
+      "--app-ref", "c".repeat(40),
+      "--output", "./out/image.tar",
+      "--platform", "linux/arm64"
+    ]),
+    {
+      image: "ghcr.io/example/opl:v1",
+      sourceRevision: "a".repeat(40),
+      frameworkRef: "b".repeat(40),
+      appRef: "c".repeat(40),
+      output: "./out/image.tar",
+      platform: "linux/arm64"
+    }
+  );
+  assert.throws(() => parseBuildPlanArgs(["--image"]), /Missing value for --image/);
+  assert.throws(() => parseBuildPlanArgs(["--bogus", "x"]), /Unknown option: --bogus/);
 });

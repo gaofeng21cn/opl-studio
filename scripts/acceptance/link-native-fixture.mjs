@@ -2,17 +2,27 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtemp, mkdir, writeFile, rename, rm } from "node:fs/promises";
+import { parseArgs } from "node:util";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
 import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
 
 // A disposable canonical Host for public WSS/native qualification. Account
 // authorization uses the real Framework bridge; no token is accepted as an argument.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const index = process.argv.indexOf("--qr-file");
-if (index < 0 || !process.argv[index + 1]) throw new Error("Provide --qr-file inside a private directory.");
-const qrFile = path.resolve(process.argv[index + 1]);
-const checkFixture = process.argv.includes("--check-fixture");
+const { values: cliValues } = parseArgs({
+  args: process.argv.slice(2),
+  strict: false,
+  allowPositionals: true,
+  options: {
+    "qr-file": { type: "string" },
+    "check-fixture": { type: "boolean" }
+  }
+});
+if (typeof cliValues["qr-file"] !== "string" || !cliValues["qr-file"]) throw new Error("Provide --qr-file inside a private directory.");
+const qrFile = path.resolve(cliValues["qr-file"]);
+const checkFixture = Boolean(cliValues["check-fixture"]);
 const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-native-public-"));
 let host; let ownsQr = false; let refreshing = false; let disconnectMonitor; let evidencePending = false;
 const observations = new Map();
@@ -36,8 +46,7 @@ async function pair() {
   refreshing = true;
   try {
     const value = await host.core.invoke("createLinkPairing", {});
-    const pending = `${qrFile}.${crypto.randomUUID()}.tmp`;
-    await writeFile(pending, value.pairingURL, { mode: 0o600, flag: "wx" }); await rename(pending, qrFile);
+    await writeFileAtomic(qrFile, value.pairingURL, { mode: 0o600, dirMode: 0o700 });
     console.log(JSON.stringify({ stage: "native_public_pairing_ready", pid: process.pid, expiresAt: value.expiresAt }));
   } finally { refreshing = false; }
 }

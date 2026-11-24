@@ -7,8 +7,11 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  compareVersions,
   createHeadlessUpdateRunner,
-  installHeadlessPayload
+  installHeadlessPayload,
+  parseArguments,
+  parseVersion
 } from "../../scripts/headless/update-runner.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -165,4 +168,27 @@ test("an incomplete plugin cannot replace a working installed payload", async ()
     assert.equal(JSON.parse(await readFile(path.join(installRoot, "installation.json"), "utf8")).version, "1.0.0");
     assert.match(await readFile(path.join(installRoot, "current", "dist", "webui", "index.html"), "utf8"), /working/);
   } finally { for (const directory of [installRoot, current, broken]) await rm(directory, { recursive: true, force: true }); }
+});
+
+test("headless updater SemVer parsing handles v-prefixes, prereleases, and rejects invalid versions", () => {
+  assert.equal(parseVersion("v1.2.3", "version").version, "1.2.3");
+  assert.equal(compareVersions("v1.2.3", "1.2.3"), 0);
+  assert.equal(compareVersions("1.0.0-alpha.2", "1.0.0-alpha.10"), -1);
+  assert.equal(compareVersions("1.0.0-alpha.10", "1.0.0-beta.1"), -1);
+  assert.equal(compareVersions("1.0.0-beta.1", "1.0.0"), -1);
+  assert.equal(compareVersions("v1.1.0", "1.0.9"), 1);
+  for (const invalid of ["", "1.2", "01.2.3", " 1.0.0 ", "not-a-version", null, undefined]) {
+    assert.throws(() => parseVersion(invalid, "candidate"), /candidate must be a semantic version/);
+  }
+});
+
+test("headless updater CLI parser enforces operation, required install-root, and valid options", () => {
+  assert.deepEqual(
+    parseArguments(["check", "--install-root", "/tmp/headless", "--source", "/tmp/src"]),
+    { operation: "check", installRoot: "/tmp/headless", sourceRoot: "/tmp/src" }
+  );
+  assert.throws(() => parseArguments(["invalid", "--install-root", "/tmp/headless"]), /requires status, check, apply, rollback, or restart/);
+  assert.throws(() => parseArguments(["status"]), /--install-root is required/);
+  assert.throws(() => parseArguments(["status", "--install-root"]), /Unknown updater argument/);
+  assert.throws(() => parseArguments(["status", "--bogus", "1"]), /Unknown updater argument/);
 });

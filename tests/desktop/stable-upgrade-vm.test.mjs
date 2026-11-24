@@ -9,4 +9,6 @@ test("upgrade VM driver is restricted to task-owned Tart guests and exact target
   assert.throws(() => parseUpgradeVmArgs(args.filter((value) => value !== "--preview-target-version" && value !== "26.9.23")), /terminal bridge version/);
   assert.throws(() => parseUpgradeVmArgs([...args, "--route", "aion"]), /preview or studio/);
   assert.throws(() => parseUpgradeVmArgs([...args, "--target-version", "latest"]), /exact target version/);
+  assert.throws(() => parseUpgradeVmArgs([...args, "--unknown", "1"]), /Invalid argument --unknown/);
+  assert.throws(() => parseUpgradeVmArgs([...args, "--cdp-port"]), /Invalid argument --cdp-port/);
 });

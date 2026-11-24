@@ -2,6 +2,7 @@ import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { resolveCurrentNodeEntrypoint } from "../../desktop/node-host-runtime.mjs";
 import { createHeadlessServiceManager } from "./service-manager.mjs";
 import { createHeadlessUpdateRunner, installHeadlessPayload } from "./update-runner.mjs";
@@ -222,25 +223,51 @@ export function createHeadlessInstaller({
   };
 }
 
-function parseArguments(argv) {
+export function parseArguments(argv) {
   const [action, ...rest] = argv;
   if (!actions.has(action)) {
     throw new Error("Usage: install-headless.mjs <install|status|start|stop|restart|update|rollback|uninstall> [options]");
   }
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: rest,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        source: { type: "string" },
+        "install-root": { type: "string" },
+        host: { type: "string" },
+        port: { type: "string" },
+        workspace: { type: "string" },
+        "readback-timeout-ms": { type: "string" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? "option";
+    if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") throw new Error(`Missing value for ${token}`);
+    throw new Error(`Unknown installer option: ${token}`);
+  }
   const options = {};
   const env = { ...process.env };
-  for (let index = 0; index < rest.length; index += 2) {
-    const flag = rest[index];
-    const value = rest[index + 1];
-    if (!value) throw new Error(`Missing value for ${flag ?? "option"}`);
-    if (flag === "--source") options.sourceRoot = value;
-    else if (flag === "--install-root") options.installRoot = value;
-    else if (flag === "--host") env.OPL_HEADLESS_HOST = value;
-    else if (flag === "--port") env.OPL_HEADLESS_PORT = value;
-    else if (flag === "--workspace") env.OPL_HEADLESS_WORKSPACE_ROOT = value;
-    else if (flag === "--readback-timeout-ms") options.readbackTimeoutMs = Number(value);
-    else throw new Error(`Unknown installer option: ${flag}`);
-  }
+  const requireValue = (flagName) => {
+    const value = parsed.values[flagName];
+    if (value === undefined) return undefined;
+    if (!value) throw new Error(`Missing value for --${flagName}`);
+    return value;
+  };
+  const sourceRoot = requireValue("source");
+  if (sourceRoot !== undefined) options.sourceRoot = sourceRoot;
+  const installRoot = requireValue("install-root");
+  if (installRoot !== undefined) options.installRoot = installRoot;
+  const host = requireValue("host");
+  if (host !== undefined) env.OPL_HEADLESS_HOST = host;
+  const port = requireValue("port");
+  if (port !== undefined) env.OPL_HEADLESS_PORT = port;
+  const workspace = requireValue("workspace");
+  if (workspace !== undefined) env.OPL_HEADLESS_WORKSPACE_ROOT = workspace;
+  const readbackTimeoutMs = requireValue("readback-timeout-ms");
+  if (readbackTimeoutMs !== undefined) options.readbackTimeoutMs = Number(readbackTimeoutMs);
   return { action, options: { ...options, env } };
 }
 

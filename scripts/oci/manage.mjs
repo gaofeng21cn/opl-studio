@@ -4,16 +4,16 @@ import {
   chmod,
   copyFile,
   mkdir,
-  open,
   readFile,
-  rename,
   rm,
-  rmdir,
-  writeFile
+  rmdir
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
+import lockfile from "proper-lockfile";
 
 const actions = new Set(["install", "status", "start", "update", "recreate", "rollback", "uninstall"]);
 const modulePath = fileURLToPath(import.meta.url);
@@ -139,7 +139,8 @@ export function createOciManager({
   sourceRoot = repositoryRoot,
   sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
   now = () => new Date().toISOString(),
-  healthTimeoutMs = 60_000
+  healthTimeoutMs = 60_000,
+  lockStaleMs = 10_000
 } = {}) {
   async function docker(args, { allowFailure = false, extraEnv = {} } = {}) {
     const result = await execute("docker", args, { env: { ...env, ...extraEnv } });
@@ -273,29 +274,45 @@ export function createOciManager({
   }
 
   async function writeState(paths, value) {
-    const temporaryPath = `${paths.statePath}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-    await chmod(temporaryPath, 0o600);
-    await rename(temporaryPath, paths.statePath);
+    await writeFileAtomic(paths.statePath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 });
   }
 
   async function withLock(paths, operation) {
     await mkdir(paths.stateDirectory, { recursive: true, mode: 0o700 });
-    let handle;
+    const lockOptions = {
+      lockfilePath: paths.lockPath,
+      realpath: false,
+      retries: 0,
+      stale: Math.max(lockStaleMs, 2_000),
+      onCompromised: () => {}
+    };
+    let release;
     try {
-      handle = await open(paths.lockPath, "wx", 0o600);
+      release = await lockfile.lock(paths.stateDirectory, lockOptions);
     } catch (error) {
-      if (error.code === "EEXIST") {
+      if (error.code === "ENOTDIR") {
+        // Recover stale legacy regular-file lock left by an older crashed manager.
+        await rm(paths.lockPath, { force: true });
+        try {
+          release = await lockfile.lock(paths.stateDirectory, lockOptions);
+        } catch (retryError) {
+          if (retryError.code === "ELOCKED") {
+            throw new OciManagerError("operation_in_progress", "Another OCI lifecycle operation is already in progress");
+          }
+          throw retryError;
+        }
+      } else if (error.code === "ELOCKED") {
         throw new OciManagerError("operation_in_progress", "Another OCI lifecycle operation is already in progress");
+      } else {
+        throw error;
       }
-      throw error;
     }
     try {
-      await handle.writeFile(`${JSON.stringify({ pid: process.pid, startedAt: now() })}\n`, "utf8");
       return await operation();
     } finally {
-      await handle.close();
-      await rm(paths.lockPath, { force: true });
+      await release().catch((error) => {
+        if (error?.code !== "ERELEASED" && error?.code !== "ENOTACQUIRED") throw error;
+      });
     }
   }
 
@@ -519,32 +536,34 @@ export function createOciManager({
   return { run };
 }
 
-function parseCli(argv) {
+export function parseCli(argv) {
   const [action, ...rest] = argv;
-  const options = {};
-  const valueFlags = new Map([
-    ["--image", "image"],
-    ["--state-dir", "stateDirectory"],
-    ["--project-name", "projectName"],
-    ["--port", "port"]
-  ]);
-  for (let index = 0; index < rest.length; index += 1) {
-    const token = rest[index];
-    if (token === "--allow-local-image") {
-      options.allowLocalImage = true;
-      continue;
-    }
-    if (token === "--purge-data") {
-      options.purgeData = true;
-      continue;
-    }
-    const key = valueFlags.get(token);
-    if (!key || index + 1 >= rest.length) {
-      throw new OciManagerError("invalid_argument", `Unknown or incomplete option: ${token}`);
-    }
-    options[key] = rest[index + 1];
-    index += 1;
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: rest,
+      strict: true,
+      allowPositionals: false,
+      options: {
+        image: { type: "string" },
+        "state-dir": { type: "string" },
+        "project-name": { type: "string" },
+        port: { type: "string" },
+        "allow-local-image": { type: "boolean" },
+        "purge-data": { type: "boolean" }
+      }
+    });
+  } catch (error) {
+    const token = error.message.match(/'([^']+)'/)?.[1]?.split(" ")[0] ?? rest[0] ?? "";
+    throw new OciManagerError("invalid_argument", `Unknown or incomplete option: ${token}`);
   }
+  const options = {};
+  if (parsed.values["allow-local-image"]) options.allowLocalImage = true;
+  if (parsed.values["purge-data"]) options.purgeData = true;
+  if (parsed.values.image !== undefined) options.image = parsed.values.image;
+  if (parsed.values["state-dir"] !== undefined) options.stateDirectory = parsed.values["state-dir"];
+  if (parsed.values["project-name"] !== undefined) options.projectName = parsed.values["project-name"];
+  if (parsed.values.port !== undefined) options.port = parsed.values.port;
   return { action, options };
 }
 

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { createHeadlessInstaller } from "../../scripts/headless/installer.mjs";
+import { createHeadlessInstaller, parseArguments } from "../../scripts/headless/installer.mjs";
 import { createHeadlessServiceManager } from "../../scripts/headless/service-manager.mjs";
 
 async function sourceFixture(version = "1.0.0") {
@@ -218,4 +218,26 @@ test("installer rejects remote binding until the HTTP bridge has authentication"
     }),
     /requires a loopback host/
   );
+});
+
+test("installer CLI parser maps options and rejects missing or unknown flags", () => {
+  const parsed = parseArguments([
+    "install",
+    "--source", "/tmp/src",
+    "--install-root", "/tmp/root",
+    "--host", "127.0.0.1",
+    "--port", "4190",
+    "--workspace", "/tmp/ws",
+    "--readback-timeout-ms", "30000"
+  ]);
+  assert.equal(parsed.action, "install");
+  assert.equal(parsed.options.sourceRoot, "/tmp/src");
+  assert.equal(parsed.options.installRoot, "/tmp/root");
+  assert.equal(parsed.options.readbackTimeoutMs, 30000);
+  assert.equal(parsed.options.env.OPL_HEADLESS_HOST, "127.0.0.1");
+  assert.equal(parsed.options.env.OPL_HEADLESS_PORT, "4190");
+  assert.equal(parsed.options.env.OPL_HEADLESS_WORKSPACE_ROOT, "/tmp/ws");
+  assert.throws(() => parseArguments(["bad"]), /Usage: install-headless\.mjs/);
+  assert.throws(() => parseArguments(["status", "--port"]), /Missing value for --port/);
+  assert.throws(() => parseArguments(["status", "--unknown", "1"]), /Unknown installer option: --unknown/);
 });

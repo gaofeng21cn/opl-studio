@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 
 const CHECK_INTERVAL = 6 * 60 * 60_000;
 const FAILURE_RETRY_INTERVAL = 30 * 60_000;
@@ -43,10 +43,7 @@ export function createManagedUpdateMaintenance({
   };
   const persist = async () => {
     if (!stateFile) return;
-    await fs.mkdir(path.dirname(stateFile), { recursive: true });
-    const temporary = `${stateFile}.${process.pid}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(state)}\n`, { mode: 0o600 });
-    await fs.rename(temporary, stateFile);
+    await writeFileAtomic(stateFile, `${JSON.stringify(state)}\n`, { mode: 0o600 });
   };
   const run = async () => {
     // Reserve the next automatic attempt before invoking an external writer.
