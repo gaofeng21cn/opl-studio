@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import semver from "semver";
+import { parsePlistDocument, readPlistKey } from "./plist.mjs";
 import { qualifyLocalUpdater } from "./qualify-local-updater.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -228,7 +229,7 @@ export async function validateMacPublicUpdateFeed({
 }
 
 function plistValue(plistPath, key) {
-  return command("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plistPath]).stdout.trim();
+  return readPlistKey(plistPath, key);
 }
 
 function signatureDetails(appPath) {
@@ -284,7 +285,9 @@ async function extractedUpdaterApp(zipPath, directory) {
 
 function dmgFormat(dmgPath) {
   const imageInfo = command("/usr/bin/hdiutil", ["imageinfo", "-plist", dmgPath]).stdout;
-  return command("/usr/bin/plutil", ["-extract", "Format", "raw", "-o", "-", "-"], { input: imageInfo }).stdout.trim();
+  const format = parsePlistDocument(imageInfo)?.Format;
+  invariant(typeof format === "string" && format.trim().length > 0, `hdiutil imageinfo did not report Format for ${dmgPath}`);
+  return format.trim();
 }
 
 export async function qualifyPrepublicationUpdate({ handoffPlan, requireReleaseTrust, requirePublicFeed, releaseTrustAccepted,

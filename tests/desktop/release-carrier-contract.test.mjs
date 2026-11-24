@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { materializeFrameworkBootstrap } from "../../scripts/desktop/materialize-framework-bootstrap.mjs";
+import { resolveAppRepoRoot } from "../../scripts/resolve-app-repo-root.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -112,4 +114,39 @@ test("Studio declares one branded preview carrier for the App-owned desktop rele
   assert.equal(full.runtime_boundary.framework_managed_codex_payload_in_app_bundle_allowed, false);
   assert.equal(full.full_append_policy.same_tag, true);
   assert.equal(full.full_append_policy.standard_assets_immutable, true);
+});
+
+test("Standard Framework bootstrap installer is materialized from App SSOT and not duplicated in Studio Git", async () => {
+  const tracked = spawnSync("git", [
+    "ls-files",
+    "--error-unmatch",
+    "resources/opl-framework-bootstrap/opl-install.sh"
+  ], { cwd: root, encoding: "utf8" });
+  assert.notEqual(
+    tracked.status,
+    0,
+    "resources/opl-framework-bootstrap/opl-install.sh must not be duplicated in opl-studio Git"
+  );
+
+  const appRoot = resolveAppRepoRoot(root);
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-studio-bootstrap-materialize-"));
+  try {
+    const frameworkRef = "a".repeat(40);
+    const manifest = materializeFrameworkBootstrap({
+      studioRoot: root,
+      targetRoot: tempRoot,
+      appRoot,
+      frameworkRef
+    });
+    assert.equal(manifest.schema, "opl_studio_standard_framework_bootstrap.v1");
+    assert.equal(manifest.framework_ref, frameworkRef);
+    assert.equal(manifest.installer_path, "resources/opl-framework-bootstrap/opl-install.sh");
+    const materializedInstaller = await readFile(
+      path.join(tempRoot, "resources", "opl-framework-bootstrap", "opl-install.sh"),
+      "utf8"
+    );
+    assert.match(materializedInstaller, new RegExp(`OPL_FRAMEWORK_SOURCE_REF=.*${frameworkRef}`));
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
 });

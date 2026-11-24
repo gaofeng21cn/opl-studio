@@ -15,7 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseCliArgs } from "node:util";
-import { capturePageScreenshot, waitForPageReady } from "./cdp.mjs";
+import { CdpSession, capturePageScreenshot, waitForPageReady } from "./cdp.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixtureSource = path.join(repositoryRoot, "tests/fixtures/studio-vm-fixture");
@@ -66,93 +66,6 @@ async function waitForIp(vmName, timeoutMs = 180_000) {
     await delay(2_000);
   }
   throw new Error(`timed out waiting for a Tart IP for ${vmName}`);
-}
-
-/** One CDP socket reused for evaluation, file input and screenshots. */
-class CdpSession {
-  constructor(socket) {
-    this.socket = socket;
-    this.pending = new Map();
-    this.nextId = 0;
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      const settle = this.pending.get(message.id);
-      if (!settle) return;
-      this.pending.delete(message.id);
-      clearTimeout(settle.timer);
-      if (message.error) settle.reject(new Error(JSON.stringify(message.error)));
-      else settle.resolve(message.result);
-    };
-    socket.onerror = () => this.close();
-  }
-  static async connect(port, timeoutMs = 60_000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError = null;
-    while (Date.now() < deadline) {
-      try {
-        const response = await fetch(`http://127.0.0.1:${port}/json/list`);
-        const targets = await response.json();
-        const target = targets.find((entry) => entry?.type === "page" && typeof entry.webSocketDebuggerUrl === "string");
-        if (target) {
-          const socket = new WebSocket(target.webSocketDebuggerUrl);
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error("timed out opening the CDP socket")), 10_000);
-            socket.onopen = () => { clearTimeout(timer); resolve(); };
-          });
-          return new CdpSession(socket);
-        }
-      } catch (error) {
-        lastError = error;
-      }
-      await delay(300);
-    }
-    throw new Error(`timed out waiting for a CDP page on ${port}${lastError ? `: ${lastError.message}` : ""}`);
-  }
-  send(method, params = {}, timeoutMs = 30_000) {
-    return new Promise((resolve, reject) => {
-      const id = ++this.nextId;
-      const timer = setTimeout(() => {
-        if (!this.pending.has(id)) return;
-        this.pending.delete(id);
-        reject(new Error(`timed out running ${method}`));
-      }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
-      this.socket.send(JSON.stringify({ id, method, params }));
-    });
-  }
-  async evaluate(expression, timeoutMs = 30_000) {
-    const result = await this.send("Runtime.evaluate", {
-      expression, awaitPromise: true, returnByValue: true, userGesture: true
-    }, timeoutMs);
-    if (result.exceptionDetails) {
-      throw new Error(result.exceptionDetails.exception?.description ?? JSON.stringify(result.exceptionDetails));
-    }
-    return result.result?.value;
-  }
-  async waitFor(expression, { timeoutMs = 20_000, description = expression } = {}) {
-    const deadline = Date.now() + timeoutMs;
-    let last;
-    while (Date.now() < deadline) {
-      last = await this.evaluate(expression);
-      if (last) return last;
-      await delay(250);
-    }
-    throw new Error(`timed out waiting for ${description}`);
-  }
-  async setFileInput(selector, files) {
-    const document = await this.send("DOM.getDocument", { depth: -1, pierce: true });
-    const found = await this.send("DOM.querySelector", { nodeId: document.root.nodeId, selector });
-    invariant(found.nodeId, `no file input matched ${selector}`);
-    await this.send("DOM.setFileInputFiles", { nodeId: found.nodeId, files });
-  }
-  close() {
-    for (const entry of this.pending.values()) {
-      clearTimeout(entry.timer);
-      entry.reject(new Error("CDP socket closed"));
-    }
-    this.pending.clear();
-    try { this.socket.close(); } catch {}
-  }
 }
 
 /** Accessible-name based helpers injected into the packaged renderer. */
@@ -566,11 +479,8 @@ async function qualifyFixtureVm(options) {
     await session.send("Runtime.enable");
     await session.send("Log.enable").catch(() => undefined);
     const runtimeExceptions = [];
-    session.socket.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data);
-      if (message.method === "Runtime.exceptionThrown") {
-        runtimeExceptions.push(message.params?.exceptionDetails?.exception?.description ?? "unknown exception");
-      }
+    session.onExceptionThrown((params) => {
+      runtimeExceptions.push(params?.exceptionDetails?.exception?.description ?? "unknown exception");
     });
     receipt.checks = await runChecks(session, options, runtimeExceptions);
     receipt.pageErrors = runtimeExceptions;

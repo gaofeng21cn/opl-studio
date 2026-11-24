@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { parse as parsePlist } from "plist";
 
 import {
   createHeadlessServiceManager,
@@ -289,4 +290,37 @@ test("macOS uninstall preserves the service definition when launchd absence cann
     /service remained loaded after bootout/
   );
   assert.deepEqual(removed, []);
+});
+
+test("macOS LaunchAgent plist serializes via plist package and round-trips XML special characters cleanly", async () => {
+  const { manager, files } = harness("darwin", {
+    homeDirectory: "/Users/o&p<l>",
+    uid: 501,
+    serviceEnvironment: {
+      OPL_SPECIAL: "a&b<c>\"'d"
+    }
+  });
+
+  await manager.run("install");
+  const plistFile = files.find((file) => file.operation === "writeFile");
+  const parsed = parsePlist(plistFile.contents);
+  assert.deepEqual(parsed, {
+    Label: "com.onepersonlab.headless",
+    ProgramArguments: ["/usr/bin/node", "/opt/one-person-lab/scripts/headless/run.mjs"],
+    WorkingDirectory: "/opt/one-person-lab",
+    EnvironmentVariables: { OPL_SPECIAL: "a&b<c>\"'d" },
+    RunAtLoad: true,
+    KeepAlive: true,
+    ProcessType: "Background",
+    StandardOutPath: "/Users/o&p<l>/Library/Logs/One Person Lab/headless.stdout.log",
+    StandardErrorPath: "/Users/o&p<l>/Library/Logs/One Person Lab/headless.stderr.log"
+  });
+
+  const { manager: emptyEnvManager, files: emptyEnvFiles } = harness("darwin", {
+    homeDirectory: "/Users/opl",
+    uid: 501
+  });
+  await emptyEnvManager.run("install");
+  const parsedWithoutEnv = parsePlist(emptyEnvFiles.find((file) => file.operation === "writeFile").contents);
+  assert.equal("EnvironmentVariables" in parsedWithoutEnv, false);
 });

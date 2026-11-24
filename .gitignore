@@ -9,6 +9,8 @@ coverage/
 .worktrees/
 .codegraph/
 resources/opl-official-profile/
+resources/opl-framework-bootstrap/opl-install.sh
+resources/opl-framework-bootstrap/manifest.json
 resources/opl-wsl-host/
 packaged-runtimes/
 .playwright-cli/

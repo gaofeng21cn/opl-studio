@@ -1,9 +1,9 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import path from "node:path";
 import { capturePageScreenshot, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
+import { readPlistKey } from "./plist.mjs";
 
 export const PREVIEW_PRODUCT = Object.freeze({
   productName: "One Person Lab Preview",
@@ -774,10 +774,7 @@ export async function verifyPreviewIdentity({ appPath, productName = PREVIEW_PRO
   const plistPath = path.join(appPath, "Contents", "Info.plist");
   try {
     await stat(plistPath);
-    const readPlist = (key) => {
-      const result = spawnSync("plutil", ["-extract", key, "raw", "-o", "-", plistPath], { encoding: "utf8" });
-      return result.status === 0 ? result.stdout.trim() : null;
-    };
+    const readPlist = (key) => readPlistKey(plistPath, key, { allowFailure: true });
     const actualProductName = readPlist("CFBundleDisplayName") || readPlist("CFBundleName");
     const actualBundleId = readPlist("CFBundleIdentifier");
     return {
