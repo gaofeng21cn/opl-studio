@@ -69,6 +69,7 @@ jobs:
         shell: bash
         run: |
           npm run build:desktop
+          npm run materialize:bootstrap
           npx electron-builder --mac --arm64 --config electron-builder.yml --publish never
 
       - name: Validate macOS arm64 package and update metadata

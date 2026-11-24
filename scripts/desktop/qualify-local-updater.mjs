@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
+import { readPlistKey } from "./plist.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const defaultProductName = "One Person Lab Preview";
@@ -72,14 +73,7 @@ async function buildApp(options) {
 }
 
 function plistValue(plistPath, key, { allowFailure = false } = {}) {
-  const result = spawnSync("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plistPath], {
-    encoding: "utf8"
-  });
-  if (result.status !== 0) {
-    if (allowFailure) return null;
-    throw new Error(`plutil failed for ${key}: ${(result.stderr || result.stdout).trim()}`);
-  }
-  return result.stdout.trim();
+  return readPlistKey(plistPath, key, { allowFailure });
 }
 
 async function waitFor(predicate, timeoutMs, label) {

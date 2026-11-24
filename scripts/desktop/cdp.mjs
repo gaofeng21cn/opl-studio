@@ -1,11 +1,22 @@
 import { randomUUID } from "node:crypto";
+import CDP from "chrome-remote-interface";
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function pageTarget(port) {
-  const response = await fetch(`http://127.0.0.1:${port}/json/list`);
-  if (!response.ok) throw new Error(`CDP target lookup failed with HTTP ${response.status}`);
-  const targets = await response.json();
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), Math.max(1, timeoutMs));
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function pageTarget(port, timeoutMs = 5_000) {
+  const targets = await withTimeout(
+    CDP.List({ host: "127.0.0.1", port }),
+    timeoutMs,
+    `timed out listing CDP targets on ${port}`
+  );
   return targets.find((target) => target?.type === "page" && typeof target.webSocketDebuggerUrl === "string");
 }
 
@@ -14,7 +25,7 @@ export async function waitForPageTarget({ port, timeoutMs = 30_000 } = {}) {
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const target = await pageTarget(port);
+      const target = await pageTarget(port, Math.min(5_000, Math.max(250, deadline - Date.now())));
       if (target) return target;
     } catch (error) {
       lastError = error;
@@ -22,6 +33,102 @@ export async function waitForPageTarget({ port, timeoutMs = 30_000 } = {}) {
     await delay(200);
   }
   throw new Error(`timed out waiting for a CDP page on ${port}${lastError ? `: ${lastError.message}` : ""}`);
+}
+
+async function openPageClient({ port, timeoutMs = 30_000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  const target = await waitForPageTarget({ port, timeoutMs });
+  const remaining = Math.max(250, deadline - Date.now());
+  let timedOut = false;
+  const connectPromise = CDP({
+    host: "127.0.0.1",
+    port,
+    target: target.webSocketDebuggerUrl,
+    local: true
+  }).then((client) => {
+    if (timedOut) client.close().catch(() => {});
+    return client;
+  });
+  const client = await withTimeout(connectPromise, remaining, "timed out opening CDP socket").catch((error) => {
+    timedOut = true;
+    throw error;
+  });
+  return { client, deadline };
+}
+
+/** One CDP session reused for evaluation, DOM file input, events, and screenshots. */
+export class CdpSession {
+  constructor(client) {
+    this.client = client;
+    this.closed = false;
+    client.once("disconnect", () => {
+      this.closed = true;
+    });
+  }
+
+  static async connect(port, timeoutMs = 60_000) {
+    const { client } = await openPageClient({ port, timeoutMs });
+    return new CdpSession(client);
+  }
+
+  async send(method, params = {}, timeoutMs = 30_000) {
+    if (this.closed) throw new Error("CDP socket closed");
+    return withTimeout(
+      this.client.send(method, params),
+      timeoutMs,
+      `timed out running ${method}`
+    ).catch((error) => {
+      if (this.closed || /WebSocket connection closed/i.test(error?.message ?? "")) {
+        throw new Error("CDP socket closed");
+      }
+      throw error;
+    });
+  }
+
+  async evaluate(expression, timeoutMs = 30_000, { userGesture = true } = {}) {
+    if (!expression) throw new Error("CDP expression is required");
+    const result = await this.send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+      userGesture
+    }, timeoutMs);
+    if (result?.exceptionDetails) {
+      throw new Error(
+        result.exceptionDetails.exception?.description
+        ?? result.exceptionDetails.text
+        ?? JSON.stringify(result.exceptionDetails)
+      );
+    }
+    return result?.result?.value;
+  }
+
+  async waitFor(expression, { timeoutMs = 20_000, description = expression } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const value = await this.evaluate(expression);
+      if (value) return value;
+      await delay(250);
+    }
+    throw new Error(`timed out waiting for ${description}`);
+  }
+
+  async setFileInput(selector, files) {
+    const document = await this.send("DOM.getDocument", { depth: -1, pierce: true });
+    const found = await this.send("DOM.querySelector", { nodeId: document.root.nodeId, selector });
+    if (!found?.nodeId) throw new Error(`no file input matched ${selector}`);
+    await this.send("DOM.setFileInputFiles", { nodeId: found.nodeId, files });
+  }
+
+  onExceptionThrown(listener) {
+    this.client.Runtime.exceptionThrown(listener);
+  }
+
+  close() {
+    if (this.closed) return Promise.resolve();
+    this.closed = true;
+    return this.client.close().catch(() => {});
+  }
 }
 
 export async function waitForPageReady({ port, timeoutMs = 30_000 } = {}) {
@@ -43,56 +150,19 @@ export async function waitForPageReady({ port, timeoutMs = 30_000 } = {}) {
 
 export async function evaluatePage({ port, expression, timeoutMs = 30_000 } = {}) {
   if (!expression) throw new Error("CDP expression is required");
-  const target = await waitForPageTarget({ port, timeoutMs });
-  const socket = new WebSocket(target.webSocketDebuggerUrl);
-  const pending = new Map();
-  let nextId = 0;
-  const close = () => {
-    for (const entry of pending.values()) {
-      clearTimeout(entry.timer);
-      entry.reject(new Error("CDP socket closed"));
-    }
-    pending.clear();
-    try { socket.close(); } catch {}
-  };
-  socket.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    const settle = pending.get(message.id);
-    if (!settle) return;
-    pending.delete(message.id);
-    clearTimeout(settle.timer);
-    if (message.error) settle.reject(new Error(JSON.stringify(message.error)));
-    else settle.resolve(message.result);
-  };
-  socket.onerror = () => close();
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timed out opening CDP socket")), timeoutMs);
-    socket.onopen = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-  });
-  const result = await new Promise((resolve, reject) => {
-    const id = ++nextId;
-    const timer = setTimeout(() => {
-      if (!pending.has(id)) return;
-      pending.delete(id);
-      reject(new Error("timed out evaluating CDP expression"));
-    }, timeoutMs);
-    pending.set(id, { resolve, reject, timer });
-    socket.send(JSON.stringify({
-      id,
-      method: "Runtime.evaluate",
-      params: { expression, awaitPromise: true, returnByValue: true }
-    }));
-  });
+  const { client, deadline } = await openPageClient({ port, timeoutMs });
   try {
+    const result = await withTimeout(
+      client.Runtime.evaluate({ expression, awaitPromise: true, returnByValue: true }),
+      Math.max(250, deadline - Date.now()),
+      "timed out evaluating CDP expression"
+    );
     if (result?.exceptionDetails) {
       throw new Error(result.exceptionDetails.text ?? "CDP expression failed");
     }
     return result?.result?.value;
   } finally {
-    close();
+    await client.close().catch(() => {});
   }
 }
 
@@ -161,55 +231,18 @@ export async function evaluatePageStable({
 }
 
 export async function capturePageScreenshot({ port, timeoutMs = 30_000 } = {}) {
-  const target = await waitForPageTarget({ port, timeoutMs });
-  const socket = new WebSocket(target.webSocketDebuggerUrl);
-  const pending = new Map();
-  let nextId = 0;
-  const close = () => {
-    for (const entry of pending.values()) {
-      clearTimeout(entry.timer);
-      entry.reject(new Error("CDP socket closed"));
-    }
-    pending.clear();
-    try { socket.close(); } catch {}
-  };
-  socket.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    const settle = pending.get(message.id);
-    if (!settle) return;
-    pending.delete(message.id);
-    clearTimeout(settle.timer);
-    if (message.error) settle.reject(new Error(JSON.stringify(message.error)));
-    else settle.resolve(message.result);
-  };
-  socket.onerror = () => close();
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timed out opening CDP socket")), timeoutMs);
-    socket.onopen = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-  });
+  const { client, deadline } = await openPageClient({ port, timeoutMs });
   try {
-    const result = await new Promise((resolve, reject) => {
-      const id = ++nextId;
-      const timer = setTimeout(() => {
-        if (!pending.has(id)) return;
-        pending.delete(id);
-        reject(new Error("timed out capturing CDP screenshot"));
-      }, timeoutMs);
-      pending.set(id, { resolve, reject, timer });
-      socket.send(JSON.stringify({
-        id,
-        method: "Page.captureScreenshot",
-        params: { format: "png", fromSurface: true, captureBeyondViewport: false }
-      }));
-    });
+    const result = await withTimeout(
+      client.Page.captureScreenshot({ format: "png", fromSurface: true, captureBeyondViewport: false }),
+      Math.max(250, deadline - Date.now()),
+      "timed out capturing CDP screenshot"
+    );
     if (typeof result?.data !== "string" || result.data.length === 0) {
       throw new Error("CDP screenshot did not return image data");
     }
     return Buffer.from(result.data, "base64");
   } finally {
-    close();
+    await client.close().catch(() => {});
   }
 }

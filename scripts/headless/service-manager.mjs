@@ -4,6 +4,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { build as buildPlist } from "plist";
 import { resolveCurrentNodeEntrypoint } from "../../desktop/node-host-runtime.mjs";
 
 const serviceIds = {
@@ -75,42 +76,19 @@ function normalizedEnvironment(environment) {
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-function launchEnvironment(entries) {
-  if (!entries.length) return "";
-  return `  <key>EnvironmentVariables</key>
-  <dict>
-${entries.map(([name, value]) => `    <key>${name}</key>\n    <string>${xml(value)}</string>`).join("\n")}
-  </dict>
-`;
-}
-
 function launchAgent({ nodeExecutable, headlessEntry, workingDirectory, stdoutPath, stderrPath, environment }) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${serviceIds.darwin}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${xml(nodeExecutable)}</string>
-    <string>${xml(headlessEntry)}</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>${xml(workingDirectory)}</string>
-${launchEnvironment(environment)}  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ProcessType</key>
-  <string>Background</string>
-  <key>StandardOutPath</key>
-  <string>${xml(stdoutPath)}</string>
-  <key>StandardErrorPath</key>
-  <string>${xml(stderrPath)}</string>
-</dict>
-</plist>
-`;
+  const definition = {
+    Label: serviceIds.darwin,
+    ProgramArguments: [nodeExecutable, headlessEntry],
+    WorkingDirectory: workingDirectory,
+    ...(environment.length ? { EnvironmentVariables: Object.fromEntries(environment) } : {}),
+    RunAtLoad: true,
+    KeepAlive: true,
+    ProcessType: "Background",
+    StandardOutPath: stdoutPath,
+    StandardErrorPath: stderrPath
+  };
+  return `${buildPlist(definition)}\n`;
 }
 
 function systemdUnit({ nodeExecutable, headlessEntry, workingDirectory, environment }) {

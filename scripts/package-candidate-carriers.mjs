@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
+import { materializeFrameworkBootstrap } from "./desktop/materialize-framework-bootstrap.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appRoot = resolveAppRepoRoot(root);
@@ -136,17 +137,9 @@ function main() {
   const evidence = readJson(path.join(root, "src", "candidateContractEvidence.json"));
   const frameworkRef = process.env.OPL_STANDARD_PAYLOAD_FRAMEWORK_REF
     ?? evidence.candidate_runtime_qualification?.external_cohort?.framework_commit;
-  if (!/^[0-9a-f]{40}$/.test(frameworkRef ?? "")) throw new Error("candidate Framework ref must be an exact SHA");
-  // Use the release owner's materializer, not a stale ignored resources directory.
-  const prepared = spawnSync(process.execPath, ["--experimental-strip-types",
-    path.join(appRoot, "scripts", "prepare-standard-release-payload.ts"), "studio",
-    "--target-root", root, "--framework-ref", frameworkRef
-  ], { cwd: root, env: process.env, stdio: "inherit" });
-  if (prepared.status !== 0) throw new Error("candidate Framework bootstrap materialization failed");
-  if (readJson(path.join(root, "resources", "opl-framework-bootstrap", "manifest.json")).framework_ref !== frameworkRef) {
-    throw new Error("candidate Framework bootstrap ref mismatch");
-  }
-  assertTrackedSourceClean("after Framework bootstrap materialization; commit the prepared resources before retrying");
+  // Materialize gitignored bootstrap resources from the single canonical App installer.
+  materializeFrameworkBootstrap({ studioRoot: root, targetRoot: root, appRoot, frameworkRef });
+  assertTrackedSourceClean("after Framework bootstrap materialization");
 
   const manifestPath = path.resolve(root, contract.manifest_path);
   const standaloneArtifact = "out/standalone-headless-webui.tgz";
