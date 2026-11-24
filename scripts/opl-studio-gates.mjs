@@ -15,12 +15,12 @@ export const requiredDeliverySurfaceKeys = [
 
 export const slotHostSourcePaths = [
   "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioMenus.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/composerSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/firstRunOnboarding.tsx"
+  "plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx",
+  "plugins/opl-studio-client/src/client/composition/slotHost/studioMenus.tsx",
+  "plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/slotHost/composerSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx",
+  "plugins/opl-studio-client/src/client/composition/slotHost/firstRunOnboarding.tsx"
 ];
 
 export const rendererSourcePaths = [

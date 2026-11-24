@@ -36,7 +36,7 @@ const {
 } = await import("../../plugins/opl-studio-client/src/client/composition/contributionProjection");
 type OplContributionSlotOwner = import("../../plugins/opl-studio-client/src/client/composition/contributionProjection").OplContributionSlotOwner;
 const { ProjectedContribution } = await import("../../plugins/opl-studio-client/src/client/composition/contributionComponents");
-const { settingsSearchTargets } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots");
+const { settingsSearchTargets } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots");
 const { CapabilitiesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage");
 const { CodexThreadScope } = await import("../../plugins/opl-studio-client/src/client/composition/codexThreadScope");
 const { McpAppWorkspace } = await import("../../plugins/opl-mcp-apps/src/client/McpAppWorkspace");

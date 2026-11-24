@@ -9,7 +9,7 @@ import { DshPluginManagerOwner } from "../../plugins/opl-studio-client/src/clien
 import { McpAppWorkspace } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
 import { KnowledgeSourcesSection } from "../../plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
 import { readKnowledgeSourcesProjection } from "../../plugins/opl-studio-client/src/client/workbench/knowledgeSources";
-import { compactPackageRows } from "../../plugins/opl-framework-bridge/src/opl-passthrough-parts/contributions-packages.mjs";
+import { compactPackageRows } from "../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs";
 
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {

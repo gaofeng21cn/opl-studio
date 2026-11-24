@@ -239,7 +239,7 @@ test("new task and runtime entries use the pinned DSH sidebar controls", () => {
 });
 
 test("DSH More menu does not duplicate the pinned OPL application management entry", () => {
-  const navigationSlots = read("plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx");
+  const navigationSlots = read("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   assert.match(navigationSlots, /entries\.filter\(entry => !entry\.pinned\)/);
   assert.doesNotMatch(navigationSlots, /管理应用与扩展|Manage apps and extensions/);
 });

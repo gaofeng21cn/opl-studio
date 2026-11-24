@@ -1225,7 +1225,7 @@ test("first installation dispatches the owner version and revision without inven
 test("offline media profile survives the Host bridge and dispatches from the existing product", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough-parts/contributions-packages.mjs");
+  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
   const { SoftwareInstallations } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
   const payload = { package_id: "fixture-media", expected_revision: "catalog-r3", operation: "install", version: "1.2.3", profile: "offline" };
@@ -1690,8 +1690,8 @@ test("UpdatesSettingsPage Update All orchestrates DSH plugins, desktop updates, 
 test("ShellOverlaySlot shows global lightweight restart pill outside Software Center and hides inside it", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx");
-  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx");
+  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
   let restarted = 0;
   await withSettingsTestDom(({ container, render }) => {
     const baseSurface = {
@@ -1873,8 +1873,8 @@ test("Software Center generic DSH catalog renders optional plugins, staged singl
 test("ShellOverlaySlot shows global reload pill for renderer_reload updates outside Software Center", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx");
-  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx");
+  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
   let reloaded = 0;
   await withSettingsTestDom(({ container, render }) => {
     const baseSurface = {

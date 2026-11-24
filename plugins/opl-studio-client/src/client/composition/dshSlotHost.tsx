@@ -37,9 +37,9 @@ import {
   SettingsCloseSlot,
   ShellOverlaySlot,
   settingsSectionId,
-} from "./dshSlotHost-parts/shellSettingsSlots";
-import { installStudioMenus } from "./dshSlotHost-parts/studioMenus";
-import { FirstRunOnboardingSlot } from "./dshSlotHost-parts/firstRunOnboarding";
+} from "./slotHost/shellSettingsSlots";
+import { installStudioMenus } from "./slotHost/studioMenus";
+import { FirstRunOnboardingSlot } from "./slotHost/firstRunOnboarding";
 import {
   ConversationBodySlot,
   ConversationHeaderSlot,
@@ -54,7 +54,7 @@ import {
   SidebarLeadingSlot,
   SidebarWorkspacesSlot,
   StudioFrame
-} from "./dshSlotHost-parts/navigationSlots";
+} from "./slotHost/navigationSlots";
 import {
   ComposerModelSlot,
   ComposerOverlaySlot,
@@ -64,12 +64,12 @@ import {
   InputBarSlot,
   OplBrandNameSlot,
   QueueDockSlot
-} from "./dshSlotHost-parts/composerSlots";
+} from "./slotHost/composerSlots";
 import {
   SlotCoreContext,
   ClientContext,
   useStudio
-} from "./dshSlotHost-parts/studioContext";
+} from "./slotHost/studioContext";
 
 type ActiveRegistration = { fingerprint: string; dispose(): void };
 
@@ -250,4 +250,4 @@ export class OplStudioDshSlotHost {
 }
 
 export { OPL_UI_CONTRIBUTION_SLOTS };
-export { settingsSearchTargets } from "./dshSlotHost-parts/shellSettingsSlots";
+export { settingsSearchTargets } from "./slotHost/shellSettingsSlots";

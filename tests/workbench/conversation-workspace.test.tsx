@@ -11,7 +11,7 @@ import {
   StudioContext,
   useStudioDirectoryFlow,
   type StudioContextValue
-} from "../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx";
+} from "../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx";
 
 const readSource = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const sourceSection = (source: string, start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
@@ -37,7 +37,7 @@ test("native directory picking is a direct pinned cohort dependency", () => {
 
 test("native directory picking uses the package public source entrypoint", () => {
   // Given the static composition importing the official flow.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx");
+  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   const picker = JSON.parse(readFileSync(
     new URL("../../node_modules/@deepseek-ai/dsh-client-ui-directory-picker-native/package.json", import.meta.url),
     "utf8"
@@ -52,7 +52,7 @@ test("native directory picking uses the package public source entrypoint", () =>
 
 test("sidebar Workspace composition preserves the official renderSlot seam and hook order", () => {
   // Given the Studio sidebar and picker adapters.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx");
+  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   const sidebar = sourceSection(navigation, "export function SidebarWorkspacesSlot", "function RecentSessionsSection");
 
   // When the composed component is inspected.
@@ -64,7 +64,7 @@ test("sidebar Workspace composition preserves the official renderSlot seam and h
 
 test("blank hero and sidebar compose official directory-flow occupants", () => {
   // Given the current static DSH composition.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/navigationSlots.tsx");
+  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   const host = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx");
 
   // When the two picker surfaces are inspected.

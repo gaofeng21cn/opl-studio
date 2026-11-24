@@ -2,7 +2,7 @@ import "virtual:opl-client-runtime-policy";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "../../plugins/opl-studio-client/src/client/workbench/App";
-import { StudioContext, useStudioRemoteAccess } from "../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext";
+import { StudioContext, useStudioRemoteAccess } from "../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext";
 
 function SessionAccess() {
   return <button disabled={!useStudioRemoteAccess("session/create")}>New session</button>;

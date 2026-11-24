@@ -8,7 +8,7 @@ import {
   frameworkActionPayload,
   jsonValue,
   run
-} from "./opl-passthrough-parts/command-runtime.mjs";
+} from "./opl-passthrough/command-runtime.mjs";
 import {
   compactAction,
   compactHomeShortcutPreferences,
@@ -17,7 +17,7 @@ import {
   compactSoftwareSources,
   compactUiContributions,
   selectedFields
-} from "./opl-passthrough-parts/contributions-packages.mjs";
+} from "./opl-passthrough/contributions-packages.mjs";
 // Package readback keeps the bounded dependency_readiness projection in its lower owner.
 import {
   compactCodexPersonalization,
@@ -25,15 +25,15 @@ import {
   compactProvider,
   compactRuntimeSourceCarriers,
   compactSettingsReadModel
-} from "./opl-passthrough-parts/settings-provider.mjs";
-import { compactInitialize, compactWorkItemProjection } from "./opl-passthrough-parts/workitems-initialize.mjs";
+} from "./opl-passthrough/settings-provider.mjs";
+import { compactInitialize, compactWorkItemProjection } from "./opl-passthrough/workitems-initialize.mjs";
 import {
   channelAccessEntry,
   hostActionReceipt,
   mergeChannelProviderState,
   validateChannelCallbackAdapter,
   validateChannelProviderHost
-} from "./opl-passthrough-parts/channel-provider.mjs";
+} from "./opl-passthrough/channel-provider.mjs";
 
 function firstRecords(value, limit = 8) {
   if (Array.isArray(value)) return value.slice(0, limit);
