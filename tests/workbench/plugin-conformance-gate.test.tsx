@@ -1,6 +1,7 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
@@ -155,7 +156,8 @@ test("plugin panels enforce PluginErrorBoundary isolation and support lightweigh
 });
 
 test("DevKit Tier 1 template conforms to opl-app-contributions.schema.json and renders via DeclarativeSettingsForm", async () => {
-  const schemaPath = path.join(appRepoRoot, "contracts/opl-app-contributions.schema.json");
+  const schemaPath = process.env.OPL_DEVKIT_CONTRIBUTIONS_SCHEMA
+    || path.join(appRepoRoot, "contracts/opl-app-contributions.schema.json");
   const manifestPath = path.join(studioRoot, "templates/plugin-devkit/tier1-settings-form/app-contributions.example.json");
   const dataPath = path.join(studioRoot, "templates/plugin-devkit/tier1-settings-form/settings-form-data.example.json");
 
@@ -163,20 +165,16 @@ test("DevKit Tier 1 template conforms to opl-app-contributions.schema.json and r
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const formData = JSON.parse(readFileSync(dataPath, "utf8"));
 
-  expect(manifest.schema_version).toBe(schema.properties.schema_version.const);
-  const allowedDestinations = schema.$defs.view.properties.settings_destination.enum as string[];
-  const allowedFieldTypes = schema.$defs.settings_form_field.properties.field_type.enum as string[];
-  const allowedTimings = schema.$defs.settings_form_field.properties.effect_timing.enum as string[];
+  const validator = new Ajv2020({ strict: false, validateFormats: false, allErrors: true });
+  const validateManifest = validator.compile(schema);
+  const validateForm = validator.compile({ $ref: `${schema.$id}#/$defs/settings_form_result` });
+  validateManifest(manifest);
+  expect(validateManifest.errors).toBeNull();
+  validateForm(formData);
+  expect(validateForm.errors).toBeNull();
 
   expect(manifest.views[0].view_type).toBe("settings_form");
-  expect(allowedDestinations).toContain(manifest.views[0].settings_destination);
   expect(manifest.ui[0].slot).toBe("settings.section");
-  expect(formData.schema_version).toBe(schema.$defs.settings_form_result.properties.schema_version.const);
-
-  for (const field of formData.fields) {
-    expect(allowedFieldTypes).toContain(field.field_type);
-    expect(allowedTimings).toContain(field.effect_timing);
-  }
 
   const projection = readUiContributionsProjection({
     ui_contributions: {

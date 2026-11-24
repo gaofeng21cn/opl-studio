@@ -48,6 +48,17 @@ jobs:
           path: app-product
           persist-credentials: false
 
+      - name: Checkout App's Tier 1 DevKit schema
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gaofeng21cn/one-person-lab-app
+          # This App revision introduces the settings_form contract exercised by the DevKit.
+          ref: 4a05abe5e90f3120232462399d780856a0864a6c
+          path: app-devkit-contract
+          sparse-checkout: /contracts/opl-app-contributions.schema.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -69,4 +80,6 @@ jobs:
         run: npm ci
 
       - name: Run source-only validation
+        env:
+          OPL_DEVKIT_CONTRIBUTIONS_SCHEMA: ${{ github.workspace }}/app-devkit-contract/contracts/opl-app-contributions.schema.json
         run: npm run test:source
