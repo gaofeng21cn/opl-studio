@@ -95,6 +95,8 @@ export type OplStudioSurface = {
   openPackageActivity?(): void;
   pendingUpdateRestart?: boolean;
   onRestartForUpdates?(): void;
+  pendingUpdateReload?: boolean;
+  onReloadForUpdates?(): void;
   scheduledTasks: ReactNode;
   shellSnapshot: OplStudioShellSnapshot;
   shellHandlers: StudioShellCommandHandlers;

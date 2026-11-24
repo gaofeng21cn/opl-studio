@@ -9,8 +9,14 @@ import {
   readDisabledOptionalPluginIds,
   readDisabledPluginPatches,
   readDshPluginActivity,
-  setOptionalPluginEnabled
+  readUserExternalDshPlugins,
+  reconcileUserExternalPluginsOnBoot,
+  setOptionalPluginEnabled,
+  validateExternalDshPackageName
 } from "../../packages/host-kit/dsh-plugin-catalog.mjs";
+import {
+  manageExternalNpmDshPlugin
+} from "../../packages/host-kit/src/profile-plugin-updates.mjs";
 import {
   clearPendingContextOperation,
   readPendingContextOperation
@@ -178,6 +184,124 @@ test("classifyAndRefreshDshPluginUpdate honestly separates renderer_reload from 
       }),
       "restart_required"
     );
+
+    assert.equal(
+      await classifyAndRefreshDshPluginUpdate({
+        installed: { "@gaofeng21cn/opl-runtime-status": "0.1.2" },
+        dshProfileDir: profileDir,
+        clientModules: {
+          clientPath: () => path.join(profileDir, "node_modules/@gaofeng21cn/opl-runtime-status/lib/client.js"),
+          rebuilt: async () => "rev-runtime-0.1.2"
+        }
+      }),
+      "renderer_reload"
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("validateExternalDshPackageName and open external npm DSH plugin lifecycle enforce safety and reconcile on boot", async () => {
+  assert.equal(validateExternalDshPackageName("  @community/dsh-notes "), "@community/dsh-notes");
+  assert.throws(() => validateExternalDshPackageName("@gaofeng21cn/opl-host-core"), /First-party/);
+  assert.throws(() => validateExternalDshPackageName("billion-context"), /already managed/);
+  assert.throws(() => validateExternalDshPackageName("https://evil.test/pkg.tgz"), /Invalid npm package name/);
+  assert.throws(() => validateExternalDshPackageName("--flag"), /Invalid npm package name/);
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-open-dsh-plugin-"));
+  const home = path.join(root, "home");
+  const profileDir = path.join(root, "profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  try {
+    await assert.rejects(
+      manageExternalNpmDshPlugin({
+        home,
+        dir: profileDir,
+        packageName: "plain-npm-lib",
+        operation: "install",
+        view: async () => ({
+          exitCode: 0,
+          stdout: JSON.stringify({ name: "plain-npm-lib", version: "1.0.0", engines: { node: ">=20" } })
+        })
+      }),
+      /"dsh" field missing/i
+    );
+
+    let remoteVersion = "1.2.0";
+    const view = async (_dir, target) => {
+      assert.ok(target.startsWith("@community/dsh-notes@"));
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          name: "@community/dsh-notes",
+          version: remoteVersion,
+          description: "Community notes workbench",
+          homepage: "https://example.org/dsh-notes",
+          engines: { node: ">=20" },
+          dsh: { manifestVersion: 1, title: "Notes Extension", client: "./lib/client.js" }
+        })
+      };
+    };
+    const run = async (profileCtx, args) => {
+      assert.ok(args.includes("--ignore-scripts"));
+      const pkgDir = path.join(profileCtx.dir, "node_modules", "@community", "dsh-notes");
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
+        name: "@community/dsh-notes",
+        version: remoteVersion,
+        dsh: { manifestVersion: 1, client: "./lib/client.js" }
+      }));
+      return { exitCode: 0, timedOut: false };
+    };
+    const runRemove = async (profileCtx) => {
+      fs.rmSync(path.join(profileCtx.dir, "node_modules", "@community", "dsh-notes"), { recursive: true, force: true });
+      return { exitCode: 0, timedOut: false };
+    };
+
+    const installed = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-notes", operation: "install", view, run, runRemove
+    });
+    assert.equal(installed.version, "1.2.0");
+    assert.equal(installed.restartRequired, true);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-notes"]?.installedVersion, "1.2.0");
+
+    remoteVersion = "1.3.0";
+    const checked = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-notes", operation: "check", view, run, runRemove
+    });
+    assert.equal(checked.updateAvailable, true);
+    assert.equal(checked.availableVersion, "1.3.0");
+
+    const updated = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-notes", operation: "update", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(updated.version, "1.3.0");
+
+    const catalogBeforeBoot = buildDshPluginCatalog({
+      dshProfileDir: profileDir,
+      activeExternalPlugins: ["@community/dsh-notes"]
+    });
+    const entry = catalogBeforeBoot.entries.find(e => e.packageName === "@community/dsh-notes");
+    assert.equal(entry?.origin, "external");
+    assert.equal(entry?.pendingOperation, "update");
+    assert.equal(entry?.pendingVersion, "1.3.0");
+    assert.equal(catalogBeforeBoot.restartRequired, true);
+
+    reconcileUserExternalPluginsOnBoot(profileDir);
+    const catalogAfterBoot = buildDshPluginCatalog({
+      dshProfileDir: profileDir,
+      activeExternalPlugins: ["@community/dsh-notes"]
+    });
+    const settled = catalogAfterBoot.entries.find(e => e.packageName === "@community/dsh-notes");
+    assert.equal(settled?.pendingOperation, null);
+    assert.equal(settled?.version, "1.3.0");
+
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-notes", operation: "remove", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-notes"]?.pendingOperation, "remove");
+    reconcileUserExternalPluginsOnBoot(profileDir);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-notes"], undefined);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

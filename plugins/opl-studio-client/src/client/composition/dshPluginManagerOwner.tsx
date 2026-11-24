@@ -103,11 +103,17 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const [localStatusFilter, setLocalStatusFilter] = useState("all");
   const statusFilter = props.statusFilter ?? localStatusFilter;
   const setStatusFilter = (next: string) => { setLocalStatusFilter(next); props.onStatusFilterChange?.(next); };
-  const [installOpen, setInstallOpen] = useState(false);
-  const [manifestUrl, setManifestUrl] = useState("");
-  const [trustTier, setTrustTier] = useState("third_party_unverified");
-  const navigation = useMemo(() => createNavigationStore().create(), []);
-  const useStore = useMemo(() => bindSnapshotSelector(navigation), [navigation]);
+    const [installOpen, setInstallOpen] = useState(false);
+    const [manifestUrl, setManifestUrl] = useState("");
+    const [trustTier, setTrustTier] = useState("third_party_unverified");
+    const [openPluginModalOpen, setOpenPluginModalOpen] = useState(false);
+    const [openPluginPackageName, setOpenPluginPackageName] = useState("");
+    const [dshPendingConfirm, setDshPendingConfirm] = useState<{
+      entry: DshPluginCatalogEntry;
+      operation: "install" | "update" | "remove";
+    } | null>(null);
+    const navigation = useMemo(() => createNavigationStore().create(), []);
+    const useStore = useMemo(() => bindSnapshotSelector(navigation), [navigation]);
   const modelRef = useRef(model);
   modelRef.current = model;
   useEffect(() => {
@@ -194,13 +200,13 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     return () => { mounted = false; };
   }, [dshBridge, kind, props.selectedTab, props.dshCatalogRevision]);
 
-  async function runDshPluginAction(pluginId: string, operation: DshPluginManageRequest["operation"]) {
+  async function runDshPluginAction(pluginId: string, operation: DshPluginManageRequest["operation"], packageName?: string) {
     setDshBusyId(pluginId);
     setDshError("");
     try {
       let nextCatalog: DshPluginCatalogProjection | undefined;
       if (dshBridge?.manageDshPlugin) {
-        nextCatalog = await dshBridge.manageDshPlugin({ pluginId, operation });
+        nextCatalog = await dshBridge.manageDshPlugin({ pluginId, ...(packageName ? { packageName } : {}), operation });
       } else if (pluginId === "billion-context") {
         const bc = operation === "enable" || operation === "disable"
           ? await dshBridge?.setBillionContext?.({ enabled: operation === "enable" })
@@ -451,17 +457,18 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
         ? <Button size="sm" variant="primary" onClick={() => props.onTabChange?.("updates")}>{isZh ? "去更新" : "Update"}</Button>
         : <Button size="sm" variant="outline" onClick={() => navigation.actions.setView({ kind: "item", id: entry.pluginId })}>{isZh ? "查看详情" : "Details"}</Button>)
       : !entry.installed && entry.canInstall && canManage
-        ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "install")}>{isZh ? "安装" : "Install"}</Button>
+        ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => setDshPendingConfirm({ entry, operation: "install" })}>{entryBusy ? (isZh ? "安装中…" : "Installing…") : (isZh ? "安装" : "Install")}</Button>
         : pendingRestart && dshBridge?.restartNativeApp
           ? <Button size="sm" variant="primary" disabled={entryBusy || restarting} onClick={() => void restartForDshPlugin(entry.pluginId)}>{restarting ? (isZh ? "正在重启…" : "Restarting…") : (isZh ? "重启应用生效" : "Restart to apply")}</Button>
           : entry.updateAvailable && canManage
-            ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "update")}>{isZh ? "更新" : "Update"}</Button>
+            ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => setDshPendingConfirm({ entry, operation: "update" })}>{entryBusy ? (isZh ? "更新中…" : "Updating…") : (isZh ? "更新" : "Update")}</Button>
             : entry.enabled && entry.settingsDestination && props.onOpenSettings
               ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => props.onOpenSettings?.(entry.settingsDestination!, { packageId: entry.pluginId })}>{isZh ? "配置" : "Configure"}</Button>
               : !entry.enabled && canToggle
-                ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "enable")}>{isZh ? "启用" : "Enable"}</Button>
+                ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "enable", entry.packageName)}>{isZh ? "启用" : "Enable"}</Button>
                 : <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => navigation.actions.setView({ kind: "item", id: entry.pluginId })}>{isZh ? "查看详情" : "Details"}</Button>;
 
+    const restartNoteForMutate = Boolean(entry.requiresRestartOnMutate ?? (entry.active && entry.tier === "external_plugin"));
     return {
       id: entry.pluginId,
       title,
@@ -471,7 +478,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
       status: <CatalogState state={state} locale={locale} label={statusLabel} />,
       actions: <span className="opl-catalog-row-actions">{rowAction}</span>,
       detailActions: entry.installed && canToggle
-        ? <Switch checked={entry.enabled} disabled={entryBusy} label={isZh ? `在 OPL App 中启用 ${title}` : `Enable ${title} in OPL App`} onChange={next => void runDshPluginAction(entry.pluginId, next ? "enable" : "disable")} />
+        ? <Switch checked={entry.enabled} disabled={entryBusy} label={isZh ? `在 OPL App 中启用 ${title}` : `Enable ${title} in OPL App`} onChange={next => void runDshPluginAction(entry.pluginId, next ? "enable" : "disable", entry.packageName)} />
         : undefined,
       detail: <>
         <section className="opl-dsh-owner-section">
@@ -481,6 +488,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
           <dl>
             <div><dt>{isZh ? "插件 ID" : "Plugin ID"}</dt><dd><code>{entry.pluginId}</code></dd></div>
             <div><dt>{isZh ? "包名" : "Package"}</dt><dd><code>{entry.packageName}</code></dd></div>
+            <div><dt>{isZh ? "来源" : "Source"}</dt><dd>{entry.sourceLabel ?? (entry.origin === "opl" ? "OPL" : "npm")}</dd></div>
             <div><dt>{isZh ? "当前版本" : "Current version"}</dt><dd>{entry.version ?? "—"}</dd></div>
             {entry.activeVersion ? <div><dt>{isZh ? "运行版本" : "Running version"}</dt><dd>{entry.activeVersion}</dd></div> : null}
             <div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{entry.availableVersion ?? "—"}</dd></div>
@@ -492,15 +500,15 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
                 ? (isZh ? "已暂存卸载请求，重启应用后自动完成清理。" : "Removal is staged and completes automatically after restart.")
                 : (isZh ? "状态变更已保存，重启应用后生效。" : "Changes are saved and apply after restarting the app.")}</p>
             {typeof dshBridge?.restartNativeApp === "function" ? <Button size="sm" variant="primary" disabled={entryBusy || restarting} onClick={() => void restartForDshPlugin(entry.pluginId)}>{restarting ? (isZh ? "正在重启…" : "Restarting…") : (isZh ? "立即重启应用" : "Restart app now")}</Button> : null}
-            {entry.pendingOperation && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "cancel_pending")}>{isZh ? "取消待生效变更" : "Cancel staged change"}</Button> : null}
+            {entry.pendingOperation && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "cancel_pending", entry.packageName)}>{isZh ? "取消待生效变更" : "Cancel staged change"}</Button> : null}
           </div> : null}
           {entry.installed && entry.tier !== "core_runtime" ? <div className="opl-dsh-plugin-actions">
-            {canToggle ? <Button size="sm" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, entry.enabled ? "disable" : "enable")}>{entry.enabled ? (isZh ? "停用" : "Disable") : (isZh ? "启用" : "Enable")}</Button> : null}
-            {canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "check")}>{isZh ? "检查更新" : "Check for updates"}</Button> : null}
-            {entry.updateAvailable && canManage ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "update")}>{entry.active && entry.pluginId === "billion-context" ? (isZh ? "更新（重启后生效）" : "Update (applies on restart)") : (isZh ? "更新" : "Update")}</Button> : null}
-            {entry.canUninstall && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "remove")}>{entry.active && entry.pluginId === "billion-context" ? (isZh ? "卸载（重启后生效）" : "Uninstall (applies on restart)") : (isZh ? "卸载" : "Uninstall")}</Button> : null}
+            {canToggle ? <Button size="sm" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, entry.enabled ? "disable" : "enable", entry.packageName)}>{entry.enabled ? (isZh ? "停用" : "Disable") : (isZh ? "启用" : "Enable")}</Button> : null}
+            {canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "check", entry.packageName)}>{isZh ? "检查更新" : "Check for updates"}</Button> : null}
+            {entry.updateAvailable && canManage ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => setDshPendingConfirm({ entry, operation: "update" })}>{restartNoteForMutate ? (isZh ? "更新（重启后生效）" : "Update (applies on restart)") : (isZh ? "更新" : "Update")}</Button> : null}
+            {entry.canUninstall && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => setDshPendingConfirm({ entry, operation: "remove" })}>{restartNoteForMutate ? (isZh ? "卸载（重启后生效）" : "Uninstall (applies on restart)") : (isZh ? "卸载" : "Uninstall")}</Button> : null}
             {entry.enabled && entry.settingsDestination && props.onOpenSettings ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => props.onOpenSettings?.(entry.settingsDestination!, { packageId: entry.pluginId })}>{isZh ? "打开设置" : "Open settings"}</Button> : null}
-          </div> : !entry.installed && entry.canInstall && canManage ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "install")}>{isZh ? "安装" : "Install"}</Button> : null}
+          </div> : !entry.installed && entry.canInstall && canManage ? <Button size="sm" variant="primary" disabled={entryBusy} onClick={() => setDshPendingConfirm({ entry, operation: "install" })}>{entryBusy ? (isZh ? "安装中…" : "Installing…") : (isZh ? "安装" : "Install")}</Button> : null}
         </section>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "权限与运行方式" : "Permissions & runtime"}</h4>
           <ul>{entry.permissionsI18n[locale].map(line => <li key={line}>{line}</li>)}</ul>
@@ -529,10 +537,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
 
   const groups = scope === "external"
     ? [
-      { id: "dsh-plugins", label: isZh ? "DSH 插件" : "DSH plugins", items: visibleDshExternalItems },
-      { id: "codex-plugins", label: isZh ? "Codex 插件" : "Codex plugins", items: sortItems(visible.filter(item => item.catalogSource?.manager === "codex_plugin_manager").map(packageItem)) },
-      { id: "codex-skills", label: isZh ? "独立 Skills" : "Independent Skills", items: sortItems(skillItems) },
-      { id: "other-sources", label: isZh ? "其他软件与待确认来源" : "Other software and unconfirmed sources", items: sortItems([...visible.filter(item => item.catalogSource?.manager !== "codex_plugin_manager").map(packageItem), ...visibleNative.map(nativeItem)]) }
+      { id: "external-software", label: isZh ? "第三方软件与插件" : "Third-party software & plugins", items: sortItems([...visibleDshExternalItems, ...visible.map(packageItem), ...visibleNative.map(nativeItem), ...skillItems]) }
     ].filter(group => group.items.length)
     : scope === "all"
       ? [{ id: "all-software", label: isZh ? "全部软件与插件" : "All software & plugins", items: sortItems([...visible.map(packageItem), ...visibleNative.map(nativeItem), ...visibleDshExternalItems, ...visibleDshOplItems]) }].filter(group => group.items.length)
@@ -546,22 +551,58 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   const dict = isZh ? zh : en;
   const translate = ((key: PluginManagerLocaleKey | "back", values?: Record<string, string>) => (key === "crumbRoot" ? isZh ? "软件目录" : "Software catalog" : key === "backToList" || key === "back" ? isZh ? "返回软件目录" : "Back to software catalog" : dict[key as PluginManagerLocaleKey]).replace(/\{([^}]+)\}/g, (_, value: string) => values?.[value] ?? `{${value}}`)) as PluginManagerOwnerPageProps["t"];
   const manifestEnabled = Boolean(props.manifestInstallAction?.dryRunSupported && props.manifestInstallAction.confirmationRequired && props.manifestInstallAction.payloadFields.includes("manifest_url") && props.manifestInstallAction.payloadFields.includes("trust_tier"));
+  const openNpmPluginSupported = Boolean(dshBridge?.manageDshPlugin);
   const changeScope = (value: string) => { setScope(value as SoftwareCatalogScope); setTypeFilter("all"); setStatusFilter("all"); };
   const scopeNote = scope === "all" || scope === "opl" ? null
-    : scope === "external" ? (isZh ? "外部扩展保留原来源与管理器；插件内置的 Skills 随插件维护。" : "External extensions keep their original sources and managers; packaged Skills stay with their plugin.")
+    : scope === "external" ? (isZh ? "第三方扩展与软件沿用同一目录、权限预检与更新流程。" : "Third-party extensions and software share the same catalog, permissions review, and update flow.")
       : (isZh ? "底层运行组件随 OPL 基座或原安装器自动维护，无需手动单独安装。" : "Runtime dependencies are maintained with OPL Base or their original installers; no manual setup required.");
   const filters = <div className="opl-catalog-controls">
     <div className="opl-catalog-scope"><div className="opl-catalog-scope-options" role="group" aria-label={isZh ? "软件来源" : "Software origin"}>{[{ value: "all", label: isZh ? "全部软件" : "All software" }, { value: "opl", label: isZh ? "OPL 软件" : "OPL software" }, { value: "external", label: isZh ? "其他来源" : "Other sources" }, { value: "components", label: isZh ? "运行组件" : "Runtime components" }].map(option => <Button key={option.value} id={`opl-catalog-scope-${option.value}`} size="sm" variant="outline" aria-pressed={scope === option.value} onClick={() => changeScope(option.value)}>{option.label}</Button>)}</div>{scopeNote ? <p>{scopeNote}</p> : null}</div>
     <div className="opl-dsh-owner-filters"><Input type="search" aria-label={isZh ? "搜索软件、名称或来源" : "Search software, name or source"} value={query} placeholder={isZh ? "搜索软件或插件" : "Search software or plugins"} onChange={event => setQuery(event.target.value)} />
-      {scope !== "components" ? <select aria-label={isZh ? "按类型筛选" : "Filter by type"} value={typeFilter} onChange={event => setTypeFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部类型" : "All types"}</option><option value="agent">{intentCategoryLabel("agent", locale)}</option><option value="application">{intentCategoryLabel("application", locale)}</option><option value="efficiency">{intentCategoryLabel("efficiency", locale)}</option><option value="channel">{intentCategoryLabel("channel", locale)}</option>{scope === "external" ? <option value="skill">Skills</option> : null}</select> : null}
+      {scope !== "components" ? <select aria-label={isZh ? "按类型筛选" : "Filter by type"} value={typeFilter} onChange={event => setTypeFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部类型" : "All types"}</option><option value="agent">{intentCategoryLabel("agent", locale)}</option><option value="application">{intentCategoryLabel("application", locale)}</option><option value="efficiency">{intentCategoryLabel("efficiency", locale)}</option><option value="channel">{intentCategoryLabel("channel", locale)}</option>{scope === "external" ? <option value="skill">{isZh ? "独立技能" : "Independent Skills"}</option> : null}</select> : null}
       <select aria-label={isZh ? "按状态筛选" : "Filter by status"} value={statusFilter} onChange={event => setStatusFilter(event.currentTarget.value)}><option value="all">{isZh ? "全部状态" : "All statuses"}</option>{(["installed", "update_available", "not_installed", "attention", "unknown"] as const).map(state => <option key={state} value={state}>{catalogStateLabel(state, locale)}</option>)}</select>
     </div>
-    {scope === "external" ? <div className="opl-catalog-external-status"><span>{props.capabilityStatus === "loading" ? (isZh ? "正在读取独立 Skills…" : "Reading independent Skills…") : props.capabilityStatus === "error" ? (props.capabilityError || (isZh ? "Skills 读取失败，请重试。" : "Could not read Skills. Try again.")) : props.capabilityStatus === "ready" ? (isZh ? `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} 个 Codex 插件 · ${looseSkills.length} 个独立 Skills` : `${packages.filter(item => item.catalogSource?.manager === "codex_plugin_manager").length} Codex plugins · ${looseSkills.length} independent Skills`) : (isZh ? "独立 Skills 尚未读取" : "Independent Skills have not been read")}</span>{props.onRefreshCapabilities ? <Button size="sm" variant="outline" disabled={props.capabilityStatus === "loading"} onClick={props.onRefreshCapabilities}>{isZh ? "刷新 Skills" : "Refresh Skills"}</Button> : null}<Button size="sm" variant="outline" disabled={busy} onClick={() => setInstallOpen(true)}>{isZh ? "从清单导入" : "Import manifest"}</Button></div> : null}
+    {scope === "external" ? <div className="opl-catalog-external-status"><span>{props.capabilityStatus === "loading" ? (isZh ? "正在读取独立技能…" : "Reading independent Skills…") : props.capabilityStatus === "error" ? (props.capabilityError || (isZh ? "读取失败，请重试。" : "Could not load external extensions. Try again.")) : props.capabilityStatus === "ready" ? (isZh ? `已读取 ${visibleDshExternalItems.length + visible.length + visibleNative.length} 项第三方扩展与软件 · ${looseSkills.length} 项独立技能` : `${visibleDshExternalItems.length + visible.length + visibleNative.length} third-party items · ${looseSkills.length} independent Skills`) : (isZh ? "按需安装或检查第三方扩展。" : "Install or inspect third-party extensions on demand.")}</span>{props.onRefreshCapabilities ? <Button size="sm" variant="outline" disabled={props.capabilityStatus === "loading"} onClick={props.onRefreshCapabilities}>{isZh ? "刷新列表" : "Refresh"}</Button> : null}{openNpmPluginSupported ? <Button size="sm" variant="outline" data-testid="opl-open-dsh-install-trigger" disabled={busy || dshBusyId !== null} onClick={() => setOpenPluginModalOpen(true)}>{isZh ? "按包名安装插件…" : "Install plugin by name…"}</Button> : null}<Button size="sm" variant="outline" disabled={busy} onClick={() => setInstallOpen(true)}>{isZh ? "从清单导入" : "Import manifest"}</Button></div> : null}
   </div>;
   return <div className="opl-dsh-plugin-manager opl-software-center" data-testid="opl-settings-agent-catalog" data-catalog-scope={scope}>
     <PluginManagerOwnerPage t={translate} title={props.pageTitle ?? (isZh ? "软件目录" : "Software catalog")} intro={props.pageIntro ?? (isZh ? "按需安装、组合与更新软件和插件" : "Install, compose, and update software and plugins")} installedLabel={isZh ? "软件" : "Software"} groups={groups} tabs={props.contributedTabs} selectedTab={props.selectedTab} onTabChange={props.onTabChange} onRefresh={props.onRefresh}
       useStore={useStore} actions={navigation.actions} createHeaderRef={typeof ResizeObserver === "undefined" ? () => noop : createPluginHeaderRef} headerStatus={<>{props.headerStatus}{(props.selectedTab ?? "installed") === "installed" ? filters : null}</>}
-      toolbar={<>{props.onTabChange ? <Button variant="outline" size="sm" onClick={() => props.onTabChange?.("sources")}>{isZh ? "管理软件源" : "Manage sources"}</Button> : null}{model.officialProfileRestore ? <details className="opl-catalog-more"><summary>{isZh ? "更多" : "More"}</summary><div className="opl-catalog-more-menu"><Button variant="outline" size="sm" data-testid="settings-agents-restore-official-profile" disabled={busy} onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id, label: isZh ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" }, confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>{isZh ? "恢复官方组合" : "Restore official combination"}</Button></div></details> : null}</>} empty={<p>{props.stateStatus === "loading" ? (isZh ? "正在读取软件目录…" : "Reading the software catalog…") : (isZh ? scope === "components" ? "当前没有单独列出的运行组件。" : "没有符合条件的软件。请调整筛选或刷新目录。" : scope === "components" ? "No runtime components are listed separately." : "No matching software. Adjust filters or refresh the catalog.")}</p>} />
+      toolbar={<>{openNpmPluginSupported ? <Button variant="outline" size="sm" data-testid="opl-toolbar-open-dsh-install" disabled={busy || dshBusyId !== null} onClick={() => setOpenPluginModalOpen(true)}>{isZh ? "安装扩展包…" : "Install extension…"}</Button> : null}{props.onTabChange ? <Button variant="outline" size="sm" onClick={() => props.onTabChange?.("sources")}>{isZh ? "管理软件源" : "Manage sources"}</Button> : null}{model.officialProfileRestore ? <details className="opl-catalog-more"><summary>{isZh ? "更多" : "More"}</summary><div className="opl-catalog-more-menu"><Button variant="outline" size="sm" data-testid="settings-agents-restore-official-profile" disabled={busy} onClick={() => onAction({ key: "official-profile:restore", actionId: model.officialProfileRestore!.id, label: isZh ? "恢复官方组合" : "Restore official combination", payload: { intent: "explicit_restore" }, confirmationRequired: true, dryRunSupported: model.officialProfileRestore!.dryRunSupported })}>{isZh ? "恢复官方组合" : "Restore official combination"}</Button></div></details> : null}</>} empty={<p>{props.stateStatus === "loading" ? (isZh ? "正在读取软件目录…" : "Reading the software catalog…") : (isZh ? scope === "components" ? "当前没有单独列出的运行组件。" : "没有符合条件的软件。请调整筛选或刷新目录。" : scope === "components" ? "No runtime components are listed separately." : "No matching software. Adjust filters or refresh the catalog.")}</p>} />
+    {dshPendingConfirm ? <Modal open onClose={() => setDshPendingConfirm(null)} closeLabel={isZh ? "关闭" : "Close"} title={
+      dshPendingConfirm.operation === "install"
+        ? (isZh ? `确认安装 ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}` : `Confirm install ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}`)
+        : dshPendingConfirm.operation === "update"
+          ? (isZh ? `确认更新 ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}` : `Confirm update ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}`)
+          : (isZh ? `确认卸载 ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}` : `Confirm uninstall ${dshPendingConfirm.entry.labelI18n[locale] ?? dshPendingConfirm.entry.pluginId}`)
+    } description={
+      dshPendingConfirm.entry.requiresRestartOnMutate
+        ? (isZh ? "操作完成后需要重启 OPL App 生效，期间禁用第三方安装生命周期脚本（--ignore-scripts）。" : "Takes effect after restarting OPL App; package lifecycle scripts are disabled (--ignore-scripts).")
+        : (isZh ? "操作由 OPL App 校验并写入插件配置目录，失败时可回退。" : "Verified and staged by OPL App with automatic boot fallback on startup issues.")
+    } footer={<><Button variant="outline" onClick={() => setDshPendingConfirm(null)}>{isZh ? "取消" : "Cancel"}</Button><Button variant="primary" data-testid="opl-dsh-confirm-submit" disabled={dshBusyId !== null} onClick={() => {
+      const pending = dshPendingConfirm;
+      setDshPendingConfirm(null);
+      void runDshPluginAction(pending.entry.pluginId, pending.operation, pending.entry.packageName);
+    }}>{dshPendingConfirm.operation === "install" ? (isZh ? "确认安装" : "Confirm install") : dshPendingConfirm.operation === "update" ? (isZh ? "确认更新" : "Confirm update") : (isZh ? "确认卸载" : "Confirm uninstall")}</Button></>}>
+      <div data-testid="opl-dsh-confirm-modal">
+        <dl>
+          <div><dt>{isZh ? "包名" : "Package"}</dt><dd><code>{dshPendingConfirm.entry.packageName}</code></dd></div>
+          <div><dt>{isZh ? "来源" : "Source"}</dt><dd>{dshPendingConfirm.entry.sourceLabel ?? (dshPendingConfirm.entry.origin === "opl" ? "OPL" : "npm")}</dd></div>
+          {dshPendingConfirm.entry.availableVersion ? <div><dt>{isZh ? "目标版本" : "Target version"}</dt><dd>{dshPendingConfirm.entry.availableVersion}</dd></div> : null}
+        </dl>
+        {dshPendingConfirm.entry.permissionsI18n[locale].length ? <><h4>{isZh ? "所需权限与运行说明" : "Permissions & runtime notes"}</h4><ul>{dshPendingConfirm.entry.permissionsI18n[locale].map(line => <li key={line}>{line}</li>)}</ul></> : null}
+      </div>
+    </Modal> : null}
+    {openPluginModalOpen ? <Modal open onClose={() => setOpenPluginModalOpen(false)} closeLabel={isZh ? "关闭" : "Close"} title={isZh ? "安装 npm DSH 扩展包" : "Install npm DSH plugin"} description={isZh ? "输入公开 npm 包名（例如 @scope/dsh-plugin 或 community-dsh-plugin）。安装过程将校验 DSH 兼容声明与 Node 版本，并禁用脚本执行（--ignore-scripts）。" : "Enter a public npm package name. OPL validates its DSH manifest and engine compatibility and installs with --ignore-scripts."} footer={<><Button variant="outline" onClick={() => setOpenPluginModalOpen(false)}>{isZh ? "取消" : "Cancel"}</Button><Button variant="primary" data-testid="opl-open-dsh-install-submit" disabled={!openPluginPackageName.trim() || !openNpmPluginSupported || busy || dshBusyId !== null} onClick={() => {
+      const pkg = openPluginPackageName.trim();
+      setOpenPluginModalOpen(false);
+      setOpenPluginPackageName("");
+      void runDshPluginAction(pkg, "install", pkg);
+    }}>{isZh ? "校验并安装" : "Verify & install"}</Button></>}>
+      <div data-testid="opl-open-dsh-install-modal">
+        <Input aria-label={isZh ? "npm 包名" : "npm package name"} placeholder="@scope/dsh-plugin" value={openPluginPackageName} onChange={event => setOpenPluginPackageName(event.target.value)} />
+        {dshError ? <p role="alert">{dshError}</p> : null}
+      </div>
+    </Modal> : null}
     {installOpen ? <Modal open onClose={() => setInstallOpen(false)} title={isZh ? "添加软件" : "Add software"} closeLabel={isZh ? "关闭" : "Close"} description={isZh ? "提供软件清单，由软件包负责人检查后安装。" : "Provide a software manifest for its Package owner to verify and install."} footer={<><Button variant="outline" onClick={() => setInstallOpen(false)}>{isZh ? "取消" : "Cancel"}</Button><Button variant="primary" disabled={!manifestEnabled || !manifestUrl.trim() || busy} onClick={() => { if (props.manifestInstallAction) onAction({ key: "package:manifest-install", actionId: props.manifestInstallAction.actionId, label: isZh ? "从清单添加软件" : "Add software from manifest", payload: { manifest_url: manifestUrl.trim(), trust_tier: trustTier }, confirmationRequired: true, dryRunSupported: props.manifestInstallAction.dryRunSupported }); setInstallOpen(false); }}>{isZh ? "检查并安装" : "Check and install"}</Button></>}><Input aria-label={isZh ? "清单地址" : "Manifest URL"} value={manifestUrl} onChange={event => setManifestUrl(event.target.value)} /><SegmentedTabs size="sm" label={isZh ? "清单信任级别" : "Manifest trust"} value={trustTier} onChange={setTrustTier} items={[{ value: "third_party_unverified", label: isZh ? "尚未验证" : "Unverified", id: "opl-manifest-unverified", panelId: "opl-manifest-trust" }, { value: "third_party_verified", label: isZh ? "已验证" : "Verified", id: "opl-manifest-verified", panelId: "opl-manifest-trust" }]} />{!manifestEnabled ? <p>{isZh ? "当前 App 尚未提供清单安装通道。" : "Manifest installation is unavailable."}</p> : null}</Modal> : null}
   </div>;
 }

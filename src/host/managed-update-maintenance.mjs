@@ -27,6 +27,7 @@ export function createManagedUpdateMaintenance({
     nextAttemptAt: null,
     reloadPending: false,
     dshPluginRestartRequired: false,
+    dshPluginReloadReady: false,
     dshPluginUpdateStatus: "idle",
     updatedDshPlugins: {},
     failureRetryCount: 0,
@@ -97,15 +98,29 @@ export function createManagedUpdateMaintenance({
         const dshResult = await syncDshPlugins();
         const installedPlugins = dshResult?.installed ?? {};
         const dshFailures = dshResult?.failures ?? {};
-        if (dshResult?.application === "restart-required" || Object.keys(installedPlugins).length > 0) {
+        const externalStaged = Array.isArray(dshResult?.externalStaged) ? dshResult.externalStaged : [];
+        const hasInstalled = Object.keys(installedPlugins).length > 0;
+        if (
+          dshResult?.reloadMode === "renderer_reload"
+          && hasInstalled
+          && !state.dshPluginRestartRequired
+          && externalStaged.length === 0
+        ) {
+          emit({
+            dshPluginReloadReady: true,
+            dshPluginUpdateStatus: "reload_ready",
+            updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
+          });
+        } else if (dshResult?.application === "restart-required" || hasInstalled || externalStaged.length > 0) {
           emit({
             dshPluginRestartRequired: true,
+            dshPluginReloadReady: false,
             dshPluginUpdateStatus: "restart_required",
             updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
           });
         } else if (Object.keys(dshFailures).length > 0) {
           emit({ dshPluginUpdateStatus: "failed" });
-        } else {
+        } else if (!state.dshPluginRestartRequired && !state.dshPluginReloadReady) {
           emit({ dshPluginUpdateStatus: "current" });
         }
       } catch {
@@ -154,8 +169,9 @@ export function createManagedUpdateMaintenance({
           state.reloadPending = saved.reloadPending === true;
           // A cold restart has already activated any previously installed DSH profile overrides.
           state.dshPluginRestartRequired = false;
+          state.dshPluginReloadReady = false;
           state.updatedDshPlugins = {};
-          if (typeof saved.dshPluginUpdateStatus === "string" && saved.dshPluginUpdateStatus !== "restart_required") {
+          if (typeof saved.dshPluginUpdateStatus === "string" && !["restart_required", "reload_ready"].includes(saved.dshPluginUpdateStatus)) {
             state.dshPluginUpdateStatus = saved.dshPluginUpdateStatus;
           }
           if (Number.isInteger(saved.failureRetryCount) && saved.failureRetryCount >= 0) {

@@ -70,6 +70,14 @@ export function ShellOverlaySlot() {
         <RotateCw size={15} aria-hidden="true" />
         <span role="status">{studio.locale === 'zh' ? '更新已就绪 · 重启生效' : 'Updates ready · Restart'}</span>
       </button>
+    </div> : !studio.pendingUpdateRestart && studio.pendingUpdateReload && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
+      <button type="button" className="opl-package-activity-trigger" data-testid="opl-global-reload-trigger" data-tone="active"
+        onClick={() => studio.onReloadForUpdates ? studio.onReloadForUpdates() : studio.openPrimaryView('applications')}
+        aria-label={studio.locale === 'zh' ? '界面更新已就绪，点击刷新生效' : 'UI updates ready, click to reload window'}
+        title={studio.locale === 'zh' ? '新的界面扩展已准备就绪，刷新界面即可立即生效' : 'Updated interface extensions are ready; reload the view to apply immediately'}>
+        <RotateCw size={15} aria-hidden="true" />
+        <span role="status">{studio.locale === 'zh' ? '界面更新已就绪 · 刷新生效' : 'UI updates ready · Reload'}</span>
+      </button>
     </div> : null}
     {studio.primaryView === "conversation" && !detailsOpen ? (
       <div className="opl-context-inspector-trigger-wrap">

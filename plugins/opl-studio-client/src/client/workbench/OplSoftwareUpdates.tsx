@@ -6,8 +6,8 @@ import { activeSoftwareInstallation, catalogInstalledVersion, nativeCatalogAvail
 import { packageAccessNeedsAttention, packageActionLabel } from "./settings/packages";
 import { nativeCarrierInstalled, nativeInstalledDisplayVersion, softwareSourceActionLabel } from "./softwareSources";
 import { availableInstallationActions, installationActionLabel, installationActionRequest } from "./SoftwareInstallations";
-import { useEffect, useState } from "react";
-import type { BillionContextPreference, DshPluginUpdateProjection, NativeAppUpdateResult } from "../bridge/oplBridge";
+import { useEffect, useMemo, useState } from "react";
+import type { DshPluginCatalogEntry, DshPluginCatalogProjection, DshPluginUpdateProjection, NativeAppUpdateResult } from "../bridge/oplBridge";
 
 export function restartOutcomeMessage(result: NativeAppUpdateResult | undefined, zh: boolean): string {
   if (result?.reasonCode === "app_server_busy") {
@@ -109,12 +109,22 @@ export function packageUpdateRequests(model: WorkbenchModel, locale: "zh" | "en"
   return [...packageRequests, ...nativeRequests];
 }
 
-function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevision = 0, onSummaryChange, onRestartRequired }: {
+export type SoftwareUpdatesSummary = {
+  dshUpdatesCount: number;
+  externalUpdatablePlugins: Array<{ pluginId: string; label: string }>;
+  billionContextUpdateReady: boolean;
+};
+
+function DshPluginUpdates({ locale, dshCatalog, externalRestartRequired = false, externalReloadReady = false, hideBulkUpdateButton = false, refreshRevision = 0, onSummaryChange, onRestartRequired, onReloadReady }: {
   locale: "zh" | "en";
+  dshCatalog?: DshPluginCatalogProjection | null;
   externalRestartRequired?: boolean;
+  externalReloadReady?: boolean;
+  hideBulkUpdateButton?: boolean;
   refreshRevision?: number;
   onSummaryChange?: (updatesCount: number) => void;
   onRestartRequired?: () => void;
+  onReloadReady?: () => void;
 }) {
   const zh = locale === "zh";
   const [projection, setProjection] = useState<DshPluginUpdateProjection | null>(null);
@@ -135,6 +145,9 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
     );
     return () => { active = false; };
   }, [bridge, refreshRevision, checkNonce]);
+  const friendlyLabelMap = useMemo(() => new Map(
+    (dshCatalog?.entries ?? []).map(entry => [entry.packageName, entry.labelI18n[locale] ?? entry.pluginId])
+  ), [dshCatalog, locale]);
   const entries = Object.entries(projection?.plugins ?? {});
   const updates = entries.filter(([, item]) => item.state === "update_available");
   const unavailable = entries.filter(([, item]) => item.state === "unavailable");
@@ -144,6 +157,7 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
   }, [onSummaryChange, updates.length]);
   if (typeof bridge?.readDshPluginUpdates !== "function") return null;
   const pendingRestart = restartRequired || externalRestartRequired;
+  const pendingReload = !pendingRestart && (reloadReady || externalReloadReady);
   const requestRestart = async () => {
     if (!bridge.restartNativeApp || restarting) return;
     setRestarting(true);
@@ -188,6 +202,7 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
       const installedCount = Object.keys(result.installed ?? {}).length;
       if (installedCount > 0 && result.reloadMode === "renderer_reload") {
         setReloadReady(true);
+        onReloadReady?.();
       } else if (result.application === "restart-required" || installedCount > 0) {
         setRestartRequired(true);
         onRestartRequired?.();
@@ -195,15 +210,15 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
       const failures = Object.entries(result.failures ?? {});
       if (failures.length) {
         setError((zh ? "部分扩展组件未完成更新：" : "Some extension components could not be updated: ")
-          + failures.map(([name, reason]) => `${name.replace(/^@gaofeng21cn\//, "")}（${dshPluginFailureMessage(reason, zh)}）`).join("、"));
+          + failures.map(([name, reason]) => `${friendlyLabelMap.get(name) ?? name.replace(/^@gaofeng21cn\//, "")}（${dshPluginFailureMessage(reason, zh)}）`).join("、"));
       }
       setProjection(await bridge.readDshPluginUpdates!());
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
   };
-  const allCurrent = Boolean(projection) && updates.length === 0 && unavailable.length === 0 && !pendingRestart && !reloadReady && !error && !bootRecovery;
+  const allCurrent = Boolean(projection) && updates.length === 0 && unavailable.length === 0 && !pendingRestart && !pendingReload && !error && !bootRecovery;
   const rows = entries.map(([name, item]) => <div className="opl-package-update-row" key={name}>
-    <div><strong>{name.replace(/^@gaofeng21cn\//, "")}</strong><span>{item.installed ?? "—"}{item.available && item.available !== item.installed ? ` → ${item.available}` : ""}</span></div>
+    <div><strong>{friendlyLabelMap.get(name) ?? name.replace(/^@gaofeng21cn\//, "")}</strong><span>{item.installed ?? "—"}{item.available && item.available !== item.installed ? ` → ${item.available}` : ""}</span></div>
     <span>{item.state === "update_available" ? (zh ? "可更新" : "Update available") : item.state === "unavailable" ? dshPluginFailureMessage(item.reason, zh) : (zh ? "已是最新" : "Current")}</span>
   </div>);
   if (allCurrent) {
@@ -218,17 +233,17 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
     {bootRecovery ? <div className="opl-app-management-feedback" data-testid="dsh-profile-boot-recovery" data-tone="attention" role="alert">
       <p>{zh ? "上次启动检测到更新后的扩展组件异常，已自动回退至内置稳定版本以保障正常使用。你可以重新检查更新。" : "An updated extension failed on the previous launch and was automatically reverted to the built-in baseline to keep the app working. Check for updates to retry."}</p>
       <details className="settings-secondary-details"><summary>{zh ? "回退详情" : "Rollback details"}</summary>
-        <dl>{Object.entries(bootRecovery.quarantinedPackages).map(([pkg, ver]) => <div key={pkg}><dt>{pkg.replace(/^@gaofeng21cn\//, "")}</dt><dd>{ver}</dd></div>)}</dl>
+        <dl>{Object.entries(bootRecovery.quarantinedPackages).map(([pkg, ver]) => <div key={pkg}><dt>{friendlyLabelMap.get(pkg) ?? pkg.replace(/^@gaofeng21cn\//, "")}</dt><dd>{ver}</dd></div>)}</dl>
         {bootRecovery.reason ? <small>{bootRecovery.reason}</small> : null}
       </details>
     </div> : null}
     <p>{pendingRestart
       ? (zh ? "新的应用扩展组件已在后台准备就绪，重启应用即可生效。" : "Updated extension components are staged and will take effect after restarting the app.")
-      : reloadReady
+      : pendingReload
         ? (zh ? "新的界面扩展已准备就绪，刷新界面即可立即生效，无需重启应用。" : "Updated interface extensions are ready. Reload the view to apply immediately without restarting the app.")
       : projection
         ? (updates.length
-            ? (zh ? `${updates.length} 个扩展组件有可用更新，更新后重启应用即可生效。` : `${updates.length} extension component updates are available. Restart the app after updating to apply them.`)
+            ? (zh ? `${updates.length} 个扩展组件有可用更新，更新后可一键生效。` : `${updates.length} extension component updates are available.`)
             : unavailable.length
               ? (zh ? `${unavailable.length} 个扩展组件暂未完成版本检查（已安装功能可继续使用）。` : `${unavailable.length} extension component(s) could not finish checking; installed features keep working.`)
               : (zh ? "当前没有可独立更新的扩展组件。" : "No extension components support independent updates."))
@@ -237,8 +252,8 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
           : (zh ? "正在检查扩展组件版本…" : "Checking extension component versions…")}</p>
     {error ? <p role="alert">{error}</p> : null}
     <div className="opl-plugin-update-actions">
-      {updates.length > 0 && typeof bridge.updateDshPlugins === "function" ? <button type="button" className="settings-action-button primary" disabled={busy || restarting || reloading} onClick={() => void runUpdate()}>{busy ? (zh ? "更新中…" : "Updating…") : (zh ? "更新全部扩展组件" : "Update all extensions")}</button> : null}
-      {reloadReady && !pendingRestart ? <button type="button" className="settings-action-button primary" disabled={busy || restarting || reloading} onClick={() => void requestReloadView()}>{reloading ? (zh ? "正在刷新…" : "Reloading…") : (zh ? "刷新界面立即生效" : "Reload interface now")}</button> : null}
+      {!hideBulkUpdateButton && updates.length > 0 && typeof bridge.updateDshPlugins === "function" ? <button type="button" className="settings-action-button primary" disabled={busy || restarting || reloading} onClick={() => void runUpdate()}>{busy ? (zh ? "更新中…" : "Updating…") : (zh ? "更新全部扩展组件" : "Update all extensions")}</button> : null}
+      {pendingReload ? <button type="button" className="settings-action-button primary" disabled={busy || restarting || reloading} onClick={() => void requestReloadView()}>{reloading ? (zh ? "正在刷新…" : "Reloading…") : (zh ? "刷新界面立即生效" : "Reload interface now")}</button> : null}
       {pendingRestart && typeof bridge.restartNativeApp === "function" ? <button type="button" className="settings-action-button primary" disabled={busy || restarting || reloading} onClick={() => void requestRestart()}>{restarting ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用使更新生效" : "Restart app to apply updates")}</button> : null}
       {(unavailable.length > 0 || error || bootRecovery) ? <button type="button" className="settings-action-button" disabled={busy || restarting || reloading} onClick={() => setCheckNonce(n => n + 1)}>{zh ? "重新检查" : "Check again"}</button> : null}
     </div>
@@ -246,92 +261,112 @@ function DshPluginUpdates({ locale, externalRestartRequired = false, refreshRevi
   </section>;
 }
 
-function ThirdPartyDshPluginsUpdates({ locale, refreshRevision = 0, onSummaryChange, onRestartRequired }: {
-  locale: "zh" | "en";
-  refreshRevision?: number;
-  onSummaryChange?: (updateReady: boolean) => void;
-  onRestartRequired?: () => void;
-}) {
-  const zh = locale === "zh";
-  const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
-  const [contextPlugin, setContextPlugin] = useState<BillionContextPreference | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let active = true;
-    if (typeof bridge?.readBillionContext !== "function") return;
-    void bridge.readBillionContext().then(value => {
-      if (active && value?.installed) setContextPlugin(value);
-      else if (active) setContextPlugin(null);
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, [bridge, refreshRevision]);
-  const updateReady = Boolean(contextPlugin?.installed && contextPlugin.updateAvailable && !contextPlugin.pendingOperation && typeof bridge?.manageBillionContext === "function");
-  useEffect(() => {
-    onSummaryChange?.(updateReady);
-  }, [onSummaryChange, updateReady]);
-  const needsRestart = Boolean(contextPlugin && (contextPlugin.active !== contextPlugin.enabled || contextPlugin.pendingOperation));
-  if (!contextPlugin?.installed || (!contextPlugin.updateAvailable && !needsRestart)) return null;
-  const runAction = async () => {
-    if (!bridge || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      if (needsRestart && bridge.restartNativeApp) {
-        const outcome = await bridge.restartNativeApp();
-        if (outcome && outcome.accepted === false) setError(restartOutcomeMessage(outcome, zh));
-        return;
-      }
-      if (bridge.manageBillionContext) {
-        const next = await bridge.manageBillionContext({ operation: "update" });
-        setContextPlugin(next);
-        if (next.pendingOperation || next.active !== next.enabled) {
-          onRestartRequired?.();
-        }
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <div className="opl-package-update-row" data-testid="third-party-dsh-plugin-update">
-    <div><strong>Billion Context</strong><span>{contextPlugin.version ?? "—"}{(contextPlugin.updateAvailable || contextPlugin.pendingVersion) && (contextPlugin.pendingVersion ?? contextPlugin.availableVersion) ? ` → ${contextPlugin.pendingVersion ?? contextPlugin.availableVersion}` : ""}</span></div>
-    <span>{needsRestart ? (zh ? "待重启生效" : "Restart required") : (zh ? "可更新" : "Update available")}</span>
-    {needsRestart && bridge?.restartNativeApp
-      ? <button type="button" className="settings-action-button primary" disabled={busy} onClick={() => void runAction()}>{busy ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用生效" : "Restart to apply")}</button>
-      : contextPlugin.updateAvailable && bridge?.manageBillionContext
-        ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => void runAction()}>{busy ? (zh ? "更新中…" : "Updating…") : (contextPlugin.active ? (zh ? "更新（重启后生效）" : "Update (applies on restart)") : (zh ? "更新" : "Update"))}</button>
-        : <span className="opl-update-owner-note">{zh ? "当前运行环境未提供更新动作" : "Update action is unavailable"}</span>}
-    {error ? <p role="alert">{error}</p> : null}
-  </div>;
-}
-
 /** Unified software & plugin updates view across all origins without carrier discrimination. */
-export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onManageSources, dshRestartRequired = false, refreshRevision = 0, onPluginUpdateSummary, onDshRestartRequired }: {
+export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onManageSources, dshCatalog, dshRestartRequired = false, dshReloadReady = false, hideBulkDshUpdateButton = false, refreshRevision = 0, onPluginUpdateSummary, onDshRestartRequired, onDshReloadReady }: {
   model: WorkbenchModel;
   locale: "zh" | "en";
   actionBusyKey: string | null;
   onAction(request: SettingsActionRequest): void;
   onManageSources?: () => void;
+  dshCatalog?: DshPluginCatalogProjection | null;
   dshRestartRequired?: boolean;
+  dshReloadReady?: boolean;
+  hideBulkDshUpdateButton?: boolean;
   refreshRevision?: number;
-  onPluginUpdateSummary?: (summary: { dshUpdatesCount: number; billionContextUpdateReady: boolean }) => void;
+  onPluginUpdateSummary?: (summary: SoftwareUpdatesSummary) => void;
   onDshRestartRequired?: () => void;
+  onDshReloadReady?: () => void;
 }) {
   const zh = locale === "zh";
   const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
   const [restartError, setRestartError] = useState("");
   const [restarting, setRestarting] = useState(false);
   const [dshUpdatesCount, setDshUpdatesCount] = useState(0);
-  const [billionContextUpdateReady, setBillionContextUpdateReady] = useState(false);
+  const [localDshCatalog, setLocalDshCatalog] = useState<DshPluginCatalogProjection | null>(null);
+  const [externalBusyId, setExternalBusyId] = useState<string | null>(null);
+  const [externalErrorById, setExternalErrorById] = useState<Record<string, string>>({});
+
   useEffect(() => {
-    onPluginUpdateSummary?.({ dshUpdatesCount, billionContextUpdateReady });
-  }, [billionContextUpdateReady, dshUpdatesCount, onPluginUpdateSummary]);
+    let active = true;
+    if (dshCatalog) {
+      setLocalDshCatalog(dshCatalog);
+      return;
+    }
+    if (typeof bridge?.readDshPluginCatalog === "function") {
+      void bridge.readDshPluginCatalog().then(
+        value => { if (active) setLocalDshCatalog(value); },
+        () => undefined
+      );
+      return () => { active = false; };
+    }
+    if (typeof bridge?.readBillionContext === "function") {
+      void bridge.readBillionContext().then(bc => {
+        if (!active || !bc?.installed) return;
+        setLocalDshCatalog({
+          schema: "opl_dsh_plugin_catalog.v1",
+          checkedAt: new Date().toISOString(),
+          restartRequired: Boolean(bc.pendingOperation) || bc.active !== bc.enabled,
+          activity: [],
+          entries: [{
+            pluginId: "billion-context",
+            packageName: "billion-context",
+            tier: "external_plugin",
+            origin: "external",
+            intentCategory: "efficiency",
+            canToggle: true,
+            canInstall: true,
+            canUninstall: true,
+            labelI18n: { zh: "Billion Context", en: "Billion Context" },
+            descriptionI18n: { zh: "", en: "" },
+            permissionsI18n: { zh: [], en: [] },
+            installed: bc.installed,
+            enabled: bc.enabled,
+            active: bc.active,
+            version: bc.version,
+            activeVersion: bc.activeVersion,
+            availableVersion: bc.availableVersion,
+            updateAvailable: bc.updateAvailable,
+            startupFailed: bc.startupFailed,
+            pendingRestart: Boolean(bc.pendingOperation) || bc.active !== bc.enabled,
+            pendingOperation: bc.pendingOperation ?? null,
+            pendingVersion: bc.pendingVersion ?? null,
+            requiresRestartOnMutate: Boolean(bc.active || bc.pendingOperation)
+          }]
+        });
+      }).catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [bridge, dshCatalog, refreshRevision]);
+
+  const effectiveCatalog = dshCatalog ?? localDshCatalog;
+  const externalActionable = useMemo(() =>
+    (effectiveCatalog?.entries ?? []).filter((entry): entry is DshPluginCatalogEntry =>
+      entry.tier === "external_plugin"
+      && entry.installed
+      && (entry.updateAvailable || entry.pendingRestart || Boolean(entry.pendingOperation) || entry.active !== entry.enabled)
+    ), [effectiveCatalog]);
+  const externalUpdatablePlugins = useMemo(() =>
+    externalActionable
+      .filter(entry => entry.updateAvailable && !entry.pendingOperation)
+      .map(entry => ({ pluginId: entry.pluginId, label: entry.labelI18n[locale] ?? entry.pluginId })),
+    [externalActionable, locale]);
+  const billionContextUpdateReady = useMemo(() =>
+    externalUpdatablePlugins.some(item => item.pluginId === "billion-context"),
+    [externalUpdatablePlugins]);
+
+  useEffect(() => {
+    onPluginUpdateSummary?.({
+      dshUpdatesCount,
+      externalUpdatablePlugins,
+      billionContextUpdateReady
+    });
+  }, [billionContextUpdateReady, dshUpdatesCount, externalUpdatablePlugins, onPluginUpdateSummary]);
+
   const packages = softwareCatalogPackages(model, "all");
   const actionable = packages.filter(item => ["update_available", "attention"].includes(packageCatalogState(item)));
   const native = softwareCatalogNativeProducts(model, "all").filter(({ item }) => ["update_available", "attention"].includes(nativeCatalogState(item)));
-  const count = actionable.length + native.length;
+  const count = actionable.length + native.length + externalActionable.length;
+
   const triggerRestart = async () => {
     if (!bridge?.restartNativeApp || restarting) return;
     setRestarting(true);
@@ -347,6 +382,54 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
       setRestarting(false);
     }
   };
+
+  const runExternalAction = async (entry: DshPluginCatalogEntry) => {
+    if (!bridge || externalBusyId) return;
+    const needsRestart = entry.pendingRestart || Boolean(entry.pendingOperation) || entry.active !== entry.enabled;
+    setExternalBusyId(entry.pluginId);
+    setExternalErrorById(prev => ({ ...prev, [entry.pluginId]: "" }));
+    try {
+      if (needsRestart && bridge.restartNativeApp) {
+        const outcome = await bridge.restartNativeApp();
+        if (outcome && outcome.accepted === false) {
+          setExternalErrorById(prev => ({ ...prev, [entry.pluginId]: restartOutcomeMessage(outcome, zh) }));
+        }
+        return;
+      }
+      if (typeof bridge.manageDshPlugin === "function") {
+        const next = await bridge.manageDshPlugin({ pluginId: entry.pluginId, packageName: entry.packageName, operation: "update" });
+        setLocalDshCatalog(next);
+        if (next.restartRequired) onDshRestartRequired?.();
+        return;
+      }
+      if (entry.pluginId === "billion-context" && typeof bridge.manageBillionContext === "function") {
+        const bc = await bridge.manageBillionContext({ operation: "update" });
+        const staged = Boolean(bc.pendingOperation) || bc.active !== bc.enabled;
+        setLocalDshCatalog(current => current ? {
+          ...current,
+          restartRequired: current.restartRequired || staged,
+          entries: current.entries.map(item => item.pluginId === "billion-context" ? {
+            ...item,
+            installed: bc.installed,
+            enabled: bc.enabled,
+            active: bc.active,
+            version: bc.version,
+            availableVersion: bc.availableVersion,
+            updateAvailable: bc.updateAvailable,
+            pendingOperation: bc.pendingOperation ?? null,
+            pendingVersion: bc.pendingVersion ?? null,
+            pendingRestart: staged
+          } : item)
+        } : current);
+        if (staged) onDshRestartRequired?.();
+      }
+    } catch (reason) {
+      setExternalErrorById(prev => ({ ...prev, [entry.pluginId]: reason instanceof Error ? reason.message : String(reason) }));
+    } finally {
+      setExternalBusyId(null);
+    }
+  };
+
   return <><section className="opl-package-updates" data-testid="opl-package-update-summary"><h2>{zh ? "软件与插件更新" : "Software & plugin updates"}</h2>
     <p>{count ? (zh ? `${count} 项软件或插件可更新或需确认状态` : `${count} software item(s) can be updated or need review`) : (zh ? "所有已检查的软件和插件均为当前最新。" : "All checked software and plugins are up to date.")}</p>
     {restartError ? <p role="alert">{restartError}</p> : null}
@@ -371,6 +454,22 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
           : <span className="opl-update-owner-note">{item.updateStatus === "needs_restart" ? (zh ? "更新已暂存，重启应用后生效。" : "The update is staged and will take effect after restarting the app.") : (zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details")}</span>}
       </div>;
     })}
-    <ThirdPartyDshPluginsUpdates locale={locale} refreshRevision={refreshRevision} onSummaryChange={setBillionContextUpdateReady} onRestartRequired={onDshRestartRequired} />
-  </section><DshPluginUpdates locale={locale} externalRestartRequired={dshRestartRequired} refreshRevision={refreshRevision} onSummaryChange={setDshUpdatesCount} onRestartRequired={onDshRestartRequired} /></>;
+    {externalActionable.map(entry => {
+      const label = entry.labelI18n[locale] ?? entry.pluginId;
+      const needsRestart = entry.pendingRestart || Boolean(entry.pendingOperation) || entry.active !== entry.enabled;
+      const rowError = externalErrorById[entry.pluginId];
+      const busy = externalBusyId === entry.pluginId;
+      const canUpdate = entry.updateAvailable && (typeof bridge?.manageDshPlugin === "function" || (entry.pluginId === "billion-context" && typeof bridge?.manageBillionContext === "function"));
+      return <div className="opl-package-update-row" key={entry.pluginId} data-testid={entry.pluginId === "billion-context" ? "third-party-dsh-plugin-update" : `external-dsh-plugin-update-${entry.pluginId}`}>
+        <div><strong>{label}</strong><span>{entry.version ?? "—"}{(entry.updateAvailable || entry.pendingVersion) && (entry.pendingVersion ?? entry.availableVersion) ? ` → ${entry.pendingVersion ?? entry.availableVersion}` : ""}</span></div>
+        <span>{needsRestart ? (zh ? "待重启生效" : "Restart required") : (zh ? "可更新" : "Update available")}</span>
+        {needsRestart && bridge?.restartNativeApp
+          ? <button type="button" className="settings-action-button primary" disabled={busy || externalBusyId !== null} onClick={() => void runExternalAction(entry)}>{busy ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用生效" : "Restart to apply")}</button>
+          : canUpdate
+            ? <button type="button" className="settings-action-button" disabled={busy || externalBusyId !== null} onClick={() => void runExternalAction(entry)}>{busy ? (zh ? "更新中…" : "Updating…") : ((entry.requiresRestartOnMutate ?? entry.active) ? (zh ? "更新（重启后生效）" : "Update (applies on restart)") : (zh ? "更新" : "Update"))}</button>
+            : <span className="opl-update-owner-note">{zh ? "当前运行环境未提供更新动作" : "Update action is unavailable"}</span>}
+        {rowError ? <p role="alert">{rowError}</p> : null}
+      </div>;
+    })}
+  </section><DshPluginUpdates locale={locale} dshCatalog={effectiveCatalog} externalRestartRequired={dshRestartRequired} externalReloadReady={dshReloadReady} hideBulkUpdateButton={hideBulkDshUpdateButton} refreshRevision={refreshRevision} onSummaryChange={setDshUpdatesCount} onRestartRequired={onDshRestartRequired} onReloadReady={onDshReloadReady} /></>;
 }

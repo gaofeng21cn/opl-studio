@@ -36,9 +36,11 @@ export function useSettingsActions({
   const [dockerDiagnostic, setDockerDiagnostic] = useState<SettingsDockerDiagnostic | null>(null);
   const [settingsActionConfirmation, setSettingsActionConfirmation] = useState<SettingsActionConfirmation | null>(null);
   const workbenchActionResolver = useRef<{ key: string; resolve(value: { status: string; [key: string]: unknown }): void } | null>(null);
+  const queuedActionsRef = useRef<SettingsActionRequest[]>([]);
   useEffect(() => () => {
     workbenchActionResolver.current?.resolve({ status: "cancelled" });
     workbenchActionResolver.current = null;
+    queuedActionsRef.current = [];
   }, []);
   function settingsReceiptFeedback(receipt: OplActionReceipt, label: string): SettingsActionFeedback {
     if (receipt.status === "preview_ready") {
@@ -72,12 +74,22 @@ export function useSettingsActions({
     };
   }
 
+  function advanceBatchQueue() {
+    const [next, ...rest] = queuedActionsRef.current;
+    if (!next) return;
+    queuedActionsRef.current = rest;
+    queueMicrotask(() => {
+      void runSettingsAction(next);
+    });
+  }
+
   function acceptPackageOperation(receipt: OplActionReceipt, request: SettingsActionRequest) {
     if (request.actionId !== 'package_operation_start' || !packageOperations.accept(receipt)) return false;
     setSettingsActionConfirmation(null);
     setSettingsActionReceipt(null);
     setSettingsActionFeedback(null);
     settleWorkbenchAction(request.key, { status: 'running' });
+    advanceBatchQueue();
     return true;
   }
 
@@ -90,6 +102,7 @@ export function useSettingsActions({
 
   function cancelSettingsAction() {
     if (settingsActionBusyKey !== null) return;
+    queuedActionsRef.current = [];
     if (settingsActionConfirmation) settleWorkbenchAction(settingsActionConfirmation.request.key, { status: "cancelled" });
     setSettingsActionConfirmation(null);
   }
@@ -200,7 +213,13 @@ export function useSettingsActions({
         message: settings.locale === "zh" ? "操作结果已返回，但最新状态暂未读取成功。请刷新核实，无需再次提交。" : "The action returned a result, but its latest state could not be read. Refresh to verify; do not submit it again."
       } : settingsReceiptFeedback(receipt, confirmation.request.label));
       setSettingsActionConfirmation(null);
+      if (["executed", "preview_ready", "no_op"].includes(receipt.status)) {
+        advanceBatchQueue();
+      } else {
+        queuedActionsRef.current = [];
+      }
     } catch (error) {
+      queuedActionsRef.current = [];
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
       settleWorkbenchAction(confirmation.request.key, { status: "failed", error: String(error) });
       setSettingsActionConfirmation(null);
@@ -209,10 +228,16 @@ export function useSettingsActions({
     }
   }
 
+  function runSettingsActionBatch(requests: SettingsActionRequest[]) {
+    if (!requests.length) return;
+    queuedActionsRef.current = requests.slice(1);
+    void runSettingsAction(requests[0]);
+  }
+
   return {
     settingsActionReceipt, settingsActionBusyKey, settingsActionFeedback, dockerDiagnostic,
     settingsActionConfirmation, workbenchActionResolver,
     setSettingsActionReceipt, setSettingsActionBusyKey, setSettingsActionFeedback,
-    runSettingsAction, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback
+    runSettingsAction, runSettingsActionBatch, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback
   };
 }

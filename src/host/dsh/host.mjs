@@ -16,7 +16,11 @@ import {
   readProfileBootRecovery,
   readProfileOplOverrides
 } from "../../../packages/host-kit/profile-boot-recovery.mjs";
-import { readDisabledOptionalPluginIds, readDisabledPluginPatches } from "../../../packages/host-kit/dsh-plugin-catalog.mjs";
+import {
+  readDisabledOptionalPluginIds,
+  readDisabledPluginPatches,
+  reconcileUserExternalPluginsOnBoot
+} from "../../../packages/host-kit/dsh-plugin-catalog.mjs";
 
 const dshRoot = path.dirname(fileURLToPath(import.meta.url));
 const profilePath = path.join(dshRoot, "cordis.yml");
@@ -46,9 +50,11 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   initProfile(profileDir, []);
 
   async function attemptBoot() {
+    reconcileUserExternalPluginsOnBoot(profileDir);
     const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
     const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
     const disabledAtBoot = readDisabledOptionalPluginIds(profileDir);
+    const activeExternalPlugins = dshProfile.layers.map(layer => layer.packageName).filter(Boolean);
     const patches = [
       ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
       // This bundle also ships an agent-loop integration. Studio consumes its
@@ -83,6 +89,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
           dshInstallAnchor: installAnchor,
           dshProfileDir: profileDir,
           dshDisabledAtBoot: disabledAtBoot,
+          dshActiveExternalPlugins: activeExternalPlugins,
           billionContextAdmitted: dshProfile.layers.some(layer => layer.packageName === "billion-context")
         }));
         await ctx.plugin(PluginPackages, { resolution });

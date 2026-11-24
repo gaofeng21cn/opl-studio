@@ -35,6 +35,7 @@ export type ApplicationManagementPageProps = {
   nativeAppUpdate: NativeAppUpdateResult | null;
   actionBusyKey: string | null;
   onAction: (request: SettingsActionRequest) => void;
+  onActionBatch?: (requests: SettingsActionRequest[]) => void;
   onHostAction?: (intent: SettingsHostActionIntent) => void;
   onRefresh: () => void;
   manifestInstallAction?: {
@@ -57,10 +58,12 @@ export type ApplicationManagementPageProps = {
   onPickKnowledgeDirectory?: () => Promise<string | undefined>;
   onOpenInstallationLocation?: (path: string) => void;
   dshPluginRestartRequired?: boolean;
+  dshPluginReloadReady?: boolean;
   onDshRestartRequired?: () => void;
+  onDshReloadReady?: () => void;
 };
 
-export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation, dshPluginRestartRequired = false, onDshRestartRequired }: ApplicationManagementPageProps) {
+export function ApplicationManagementPage({ packageOperations, model, stateStatus = "ready", stateError, onApproveConnectionAccess, settings, managedUpdate, actionViewModel, nativeAppUpdate, actionBusyKey, onAction, onActionBatch, onHostAction, onRefresh, manifestInstallAction, onOpenSettings, initialTab = "applications", requestedFocus, onTabChange, actionFeedback, actionReceipt, capabilityCatalog, capabilityStatus, capabilityError, onRefreshCapabilities, onUseSoftware, onPickKnowledgeDirectory, onOpenInstallationLocation, dshPluginRestartRequired = false, dshPluginReloadReady = false, onDshRestartRequired, onDshReloadReady }: ApplicationManagementPageProps) {
   const [tab, setTab] = useState<ApplicationManagementTab>(initialTab);
   useEffect(() => setTab(initialTab), [initialTab]);
   const zh = settings.locale === "zh";
@@ -138,10 +141,14 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     model,
     actionBusyKey: effectiveBusyKey,
     onAction,
+    onActionBatch,
     onHostAction,
     onRefresh: refreshAll,
+    dshCatalog,
     dshRestartRequired: dshPluginRestartRequired || dshCatalog?.restartRequired === true,
-    onDshRestartRequired
+    dshReloadReady: dshPluginReloadReady,
+    onDshRestartRequired,
+    onDshReloadReady
   };
   const desktopHasUpdate = Boolean(nativeAppUpdate?.supported && ["available", "downloading", "downloaded"].includes(nativeAppUpdate.state));
   const pendingUpdatesCount = inventory.updates + dshUpdateCount + (desktopHasUpdate ? 1 : 0) + ((dshPluginRestartRequired || dshCatalog?.restartRequired) ? 1 : 0);
@@ -164,6 +171,12 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     {dshPluginRestartRequired && tab !== "updates" ? <div className="opl-software-continuation" data-testid="opl-dsh-restart-banner">
       <span role="status">{zh ? "新的应用扩展更新已准备就绪，重启应用即可生效。" : "Updated app extensions are ready. Restart the app to apply them."}</span>
       <Button size="sm" variant="primary" onClick={() => navigate("updates")}>{zh ? "查看更新" : "View updates"}</Button>
+    </div> : !dshPluginRestartRequired && dshPluginReloadReady && tab !== "updates" ? <div className="opl-software-continuation" data-testid="opl-dsh-reload-banner">
+      <span role="status">{zh ? "新的界面扩展更新已准备就绪，刷新界面即可立即生效。" : "Updated UI extensions are ready. Reload the view to apply immediately."}</span>
+      <Button size="sm" variant="primary" onClick={() => {
+        if (typeof bridge?.reloadRenderer === "function") void bridge.reloadRenderer();
+        else navigate("updates");
+      }}>{zh ? "刷新界面立即生效" : "Reload now"}</Button>
     </div> : null}
     {tab === "applications" ? <>
       <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown}

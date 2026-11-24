@@ -17,6 +17,7 @@ export function BillionContextSettingsSection({
   bridge?: Pick<OplBridge, "readBillionContext" | "setBillionContext">;
   onManage?: () => void;
 }) {
+  const hostBridge = typeof window === "undefined" ? undefined : window.oplStudio;
   const read = bridge?.readBillionContext;
   const write = bridge?.setBillionContext;
   const [preference, setPreference] = useState<BillionContextPreference>();
@@ -25,15 +26,35 @@ export function BillionContextSettingsSection({
 
   useEffect(() => {
     let mounted = true;
-    read?.().then(value => {
-      if (mounted) setPreference(value);
+    const loadFromCatalog = typeof hostBridge?.readDshPluginCatalog === "function"
+      ? hostBridge.readDshPluginCatalog().then(catalog => {
+        const entry = catalog.entries.find(item => item.pluginId === "billion-context");
+        if (!entry) return undefined;
+        return {
+          enabled: entry.enabled,
+          installed: entry.installed,
+          version: entry.version,
+          availableVersion: entry.availableVersion,
+          updateAvailable: entry.updateAvailable,
+          activeVersion: entry.activeVersion,
+          active: entry.active,
+          startupFailed: entry.startupFailed,
+          pendingOperation: entry.pendingOperation,
+          pendingVersion: entry.pendingVersion
+        } satisfies BillionContextPreference;
+      })
+      : undefined;
+    const loader = read ? read() : loadFromCatalog;
+    loader?.then(value => {
+      if (mounted && value) setPreference(value);
     }, () => {
       if (mounted) setError(true);
     });
     return () => { mounted = false; };
-  }, [read]);
+  }, [hostBridge, read]);
 
-  if (!read || !write) return null;
+  if (!read && !hostBridge?.readDshPluginCatalog) return null;
+  if (!write && !hostBridge?.manageDshPlugin) return null;
   const detail = zh
     ? "通过本机代理压缩 Codex 长对话，并在本机保存可恢复的上下文。重启后应用。"
     : "Compress long Codex conversations through a local proxy and store recoverable context on this host. Applies after restart.";
@@ -49,7 +70,26 @@ export function BillionContextSettingsSection({
     setBusy(true);
     setError(false);
     try {
-      setPreference(await write!({ enabled }));
+      if (write) {
+        setPreference(await write({ enabled }));
+      } else if (hostBridge?.manageDshPlugin) {
+        const catalog = await hostBridge.manageDshPlugin({ pluginId: "billion-context", operation: enabled ? "enable" : "disable" });
+        const entry = catalog.entries.find(item => item.pluginId === "billion-context");
+        if (entry) {
+          setPreference({
+            enabled: entry.enabled,
+            installed: entry.installed,
+            version: entry.version,
+            availableVersion: entry.availableVersion,
+            updateAvailable: entry.updateAvailable,
+            activeVersion: entry.activeVersion,
+            active: entry.active,
+            startupFailed: entry.startupFailed,
+            pendingOperation: entry.pendingOperation,
+            pendingVersion: entry.pendingVersion
+          });
+        }
+      }
     } catch {
       setError(true);
     } finally {

@@ -5,9 +5,19 @@ import { createRequire } from "node:module";
 import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadOptionalPatches, loadProfile, readProfileManifest, resolveProfileDir, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
 import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
 import * as yaml from "js-yaml";
-import { runPluginCommand, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
+import { runPluginCommand, runProfilePnpm, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { classifyInstallFailure } from "@deepseek-ai/dsh-plugin-manager";
+import { withFileLock } from "@deepseek-ai/dsh-atomic-write";
 import semver from "semver";
+import {
+  readInstalledExternalPackageManifest,
+  readUserExternalDshPlugins,
+  removeUserExternalDshPlugin,
+  upsertUserExternalDshPlugin,
+  validateExternalDshPackageName
+} from "../dsh-plugin-catalog.mjs";
+
+const NPM_PUBLIC_REGISTRY = "https://registry.npmjs.org/";
 
 const profile = "opl-studio";
 
@@ -499,4 +509,289 @@ export async function inspectProfile({ installAnchor, home }) {
   });
   return { profile, home, installAnchor, skippedBundles: loaded.skippedBundles,
     overrides: local };
+}
+
+function externalUpstreamUrl(metadata) {
+  if (typeof metadata?.homepage === "string" && /^https?:\/\//i.test(metadata.homepage)) return metadata.homepage;
+  const repoUrl = typeof metadata?.repository === "string" ? metadata.repository : metadata?.repository?.url;
+  if (typeof repoUrl === "string") {
+    const normalized = repoUrl.replace(/^git\+/, "").replace(/\.git$/, "");
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+  }
+  return undefined;
+}
+
+function externalPermissionsForManifest(metadata) {
+  const hasClient = Boolean(metadata?.dsh?.client);
+  return {
+    zh: [
+      ...(hasClient ? ["向 OPL App 界面槽位注册扩展组件（以 PluginErrorBoundary 隔离）"] : ["在 DSH 服务进程内运行扩展能力"]),
+      "从 npm 安装且全程禁用生命周期脚本（--ignore-scripts）",
+      "启用、停用、更新与卸载需重启应用后生效"
+    ],
+    en: [
+      ...(hasClient ? ["Registers client UI extensions inside PluginErrorBoundary"] : ["Runs extension services inside the DSH host"]),
+      "Installed from npm with lifecycle scripts disabled (--ignore-scripts)",
+      "Changes take effect after restarting the app"
+    ]
+  };
+}
+
+async function setExternalBundleActiveInProfile(dir, packageName, enabled) {
+  const manifest = readProfileManifest(profile, dir);
+  const current = Array.isArray(manifest.dsh?.profile?.bundles) ? manifest.dsh.profile.bundles : [];
+  const next = enabled
+    ? (current.includes(packageName) ? current : [...current, packageName])
+    : current.filter(name => name !== packageName);
+  if (JSON.stringify(next) !== JSON.stringify(current)) {
+    writeProfileBundles(dir, manifest, next);
+  }
+}
+
+async function lookupExternalNpmDshRelease({
+  dir,
+  installAnchor,
+  packageName,
+  view = viewProfilePackage,
+  registry = NPM_PUBLIC_REGISTRY
+}) {
+  const pnpmExec = resolveBundledPnpm(installAnchor);
+  const command = pnpmExec.command ?? process.execPath;
+  const args = pnpmExec.args ?? [];
+  const lookup = await view(dir, `${packageName}@latest`, {
+    command,
+    args,
+    registry,
+    fields: ["name", "version", "description", "engines", "dsh", "homepage", "repository"],
+    timeoutMs: 15000
+  });
+  if (lookup.exitCode !== 0) {
+    throw Object.assign(new Error(`Could not inspect ${packageName} on npm`), { code: "dsh_plugin_registry_unavailable" });
+  }
+  const metadata = typeof lookup.stdout === "string" ? JSON.parse(lookup.stdout) : lookup.stdout;
+  if (!metadata || metadata.name !== packageName || !semver.valid(metadata.version) || semver.prerelease(metadata.version)) {
+    throw Object.assign(new Error(`Invalid npm metadata returned for ${packageName}`), { code: "dsh_plugin_incompatible" });
+  }
+  if (!metadata.dsh || typeof metadata.dsh !== "object") {
+    throw Object.assign(new Error(`${packageName} does not declare a DSH plugin manifest ("dsh" field missing)`), { code: "dsh_plugin_incompatible" });
+  }
+  if (metadata.engines?.node && !semver.satisfies(process.versions.node, metadata.engines.node)) {
+    throw Object.assign(new Error(`${packageName}@${metadata.version} is incompatible with Node ${process.versions.node}`), { code: "dsh_plugin_incompatible" });
+  }
+  if (installAnchor) {
+    const { runtimeVersion } = readPackageMetadataResolvers(dir, installAnchor);
+    const compat = evaluatePluginCompatibility(metadata, {}, runtimeVersion);
+    if (compat && !compat.exempted) {
+      throw Object.assign(new Error(`${packageName}@${metadata.version} is incompatible with DSH ${runtimeVersion}`), { code: "dsh_plugin_incompatible" });
+    }
+  }
+  return { command, args, metadata };
+}
+
+/**
+ * Manages open community/external npm DSH plugins inside the DSH profile with strict
+ * package name validation, compatibility admission, --ignore-scripts execution, and activity history.
+ */
+export async function manageExternalNpmDshPlugin({
+  home,
+  installAnchor,
+  dir: explicitDir,
+  packageName: rawPackageName,
+  operation,
+  activeAtBoot = false,
+  cwd = process.cwd(),
+  view = viewProfilePackage,
+  run = runPluginCommand,
+  runRemove = runProfilePnpm
+}) {
+  const packageName = validateExternalDshPackageName(rawPackageName);
+  const dir = explicitDir ?? resolveProfileDir(profile, home);
+  if (!dir) throw Object.assign(new Error("DSH profile directory is unavailable"), { code: "dsh_profile_unavailable" });
+  initProfile(dir, []);
+  const profileCtx = { profile, dir, installAnchor, home, cwd };
+  const existing = readUserExternalDshPlugins(dir)[packageName];
+  const installedManifest = readInstalledExternalPackageManifest(dir, packageName);
+  const installedVersion = installedManifest?.version ?? existing?.installedVersion ?? null;
+
+  if (operation === "enable" || operation === "disable") {
+    const nextEnabled = operation === "enable";
+    if (!installedManifest && nextEnabled) {
+      throw Object.assign(new Error(`${packageName} is not installed`), { code: "dsh_plugin_not_installed" });
+    }
+    await withFileLock(path.join(dir, "package.json"), async () => {
+      await setExternalBundleActiveInProfile(dir, packageName, nextEnabled);
+      await upsertUserExternalDshPlugin(dir, {
+        ...existing,
+        packageName,
+        enabled: nextEnabled,
+        installedVersion
+      });
+    }, { waitMs: 10000 });
+    return {
+      operation,
+      packageName,
+      version: installedVersion,
+      restartRequired: nextEnabled !== activeAtBoot,
+      record: readUserExternalDshPlugins(dir)[packageName]
+    };
+  }
+
+  if (operation === "cancel_pending") {
+    await withFileLock(path.join(dir, "package.json"), async () => {
+      if (existing?.pendingOperation === "remove" && installedManifest) {
+        await setExternalBundleActiveInProfile(dir, packageName, true);
+      }
+      if (existing) {
+        await upsertUserExternalDshPlugin(dir, {
+          ...existing,
+          packageName,
+          enabled: existing.pendingOperation === "remove" && installedManifest ? true : existing.enabled !== false,
+          pendingOperation: null,
+          pendingVersion: null
+        });
+      }
+    }, { waitMs: 10000 });
+    return { operation, packageName, version: installedVersion, restartRequired: false };
+  }
+
+  if (operation === "remove") {
+    if (!existing && !installedManifest) {
+      return { operation, packageName, version: null, restartRequired: false };
+    }
+    const pnpmExec = resolveBundledPnpm(installAnchor);
+    await withFileLock(path.join(dir, "package.json"), async () => {
+      await setExternalBundleActiveInProfile(dir, packageName, false);
+      const manifest = readProfileManifest(profile, dir);
+      if (Object.hasOwn(manifest.dependencies ?? {}, packageName)) {
+        const result = await runRemove(profileCtx, ["remove", packageName], {
+          command: pnpmExec.command ?? process.execPath,
+          args: pnpmExec.args ?? [],
+          execution: "service",
+          idleTimeoutMs: 60000
+        });
+        if (result.exitCode !== 0 || result.timedOut) {
+          throw Object.assign(new Error(`Could not remove ${packageName}`), { code: "dsh_plugin_remove_failed" });
+        }
+      }
+      if (activeAtBoot) {
+        await upsertUserExternalDshPlugin(dir, {
+          ...existing,
+          packageName,
+          installedVersion,
+          enabled: false,
+          pendingOperation: "remove",
+          pendingVersion: null,
+          updateAvailable: false
+        });
+      } else {
+        await removeUserExternalDshPlugin(dir, packageName);
+      }
+    }, { waitMs: 120000 });
+    return {
+      operation,
+      packageName,
+      version: installedVersion,
+      restartRequired: Boolean(activeAtBoot)
+    };
+  }
+
+  const { command, args, metadata } = await lookupExternalNpmDshRelease({ dir, installAnchor, packageName, view });
+  const latestVersion = metadata.version;
+  const upstreamUrl = externalUpstreamUrl(metadata);
+  const label = metadata.dsh?.title || metadata.dsh?.name || packageName;
+  const description = typeof metadata.description === "string" && metadata.description.trim()
+    ? metadata.description.trim()
+    : undefined;
+  const baseRecord = {
+    packageName,
+    labelI18n: { zh: label, en: label },
+    ...(description ? { descriptionI18n: { zh: description, en: description } } : {}),
+    permissionsI18n: externalPermissionsForManifest(metadata),
+    ...(upstreamUrl ? { upstreamUrl } : {})
+  };
+
+  if (operation === "check") {
+    const updateAvailable = Boolean(installedVersion && semver.valid(installedVersion) && semver.gt(latestVersion, installedVersion));
+    if (existing || installedManifest) {
+      await upsertUserExternalDshPlugin(dir, {
+        ...existing,
+        ...baseRecord,
+        installedVersion,
+        availableVersion: latestVersion,
+        updateAvailable,
+        checkErrorReason: undefined
+      });
+    }
+    return {
+      operation,
+      packageName,
+      version: installedVersion,
+      availableVersion: latestVersion,
+      updateAvailable,
+      restartRequired: false
+    };
+  }
+
+  if (operation === "update" && installedVersion && !semver.gt(latestVersion, installedVersion)) {
+    if (existing) {
+      await upsertUserExternalDshPlugin(dir, {
+        ...existing,
+        ...baseRecord,
+        installedVersion,
+        availableVersion: latestVersion,
+        updateAvailable: false
+      });
+    }
+    return {
+      operation,
+      packageName,
+      version: installedVersion,
+      availableVersion: latestVersion,
+      updateAvailable: false,
+      staged: false,
+      restartRequired: false
+    };
+  }
+
+  if (operation !== "install" && operation !== "update") {
+    throw Object.assign(new Error(`Unsupported external plugin operation: ${String(operation)}`), { code: "invalid_request" });
+  }
+
+  const result = await run(profileCtx, [
+    "add", "--save-exact", "--ignore-scripts", `--registry=${NPM_PUBLIC_REGISTRY}`, `${packageName}@${latestVersion}`
+  ], {
+    command,
+    args,
+    execution: "service",
+    activateNewBundles: false,
+    expected: { name: packageName, version: latestVersion },
+    idleTimeoutMs: 120000,
+    lockWaitMs: 120000
+  });
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw Object.assign(new Error(`Could not install ${packageName}@${latestVersion}`), { code: "dsh_plugin_install_failed" });
+  }
+  const installedPkgManifest = readInstalledExternalPackageManifest(dir, packageName) ?? metadata;
+  await withFileLock(path.join(dir, "package.json"), async () => {
+    await setExternalBundleActiveInProfile(dir, packageName, true);
+    await upsertUserExternalDshPlugin(dir, {
+      ...existing,
+      ...baseRecord,
+      permissionsI18n: externalPermissionsForManifest(installedPkgManifest),
+      installedVersion: latestVersion,
+      availableVersion: latestVersion,
+      updateAvailable: false,
+      enabled: true,
+      pendingOperation: activeAtBoot ? "update" : null,
+      pendingVersion: activeAtBoot ? latestVersion : null
+    });
+  }, { waitMs: 10000 });
+  return {
+    operation,
+    packageName,
+    version: latestVersion,
+    availableVersion: latestVersion,
+    staged: true,
+    restartRequired: true
+  };
 }

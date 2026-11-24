@@ -1588,6 +1588,11 @@ test("DshPluginManagerOwner unified all-software scope displays Billion Context 
       const installBtn = [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "安装")!;
       assert.ok(installBtn);
       flushSync(() => installBtn.click());
+      const confirmModal = document.body.querySelector('[data-testid="opl-dsh-confirm-modal"]');
+      assert.ok(confirmModal);
+      const confirmBtn = document.body.querySelector<HTMLButtonElement>('[data-testid="opl-dsh-confirm-submit"]')!;
+      assert.ok(confirmBtn);
+      flushSync(() => confirmBtn.click());
       await new Promise(resolve => setTimeout(resolve, 20));
       assert.deepEqual(ops, ["install"]);
       assert.ok([...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "重启应用生效"));
@@ -1859,6 +1864,208 @@ test("Software Center generic DSH catalog renders optional plugins, staged singl
       flushSync(() => activityTab.click());
       assert.match(container.textContent ?? "", /Billion Context/);
       assert.match(container.textContent ?? "", /已暂存，重启应用后生效/);
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
+  });
+});
+
+test("ShellOverlaySlot shows global reload pill for renderer_reload updates outside Software Center", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost-parts/studioContext.tsx");
+  let reloaded = 0;
+  await withSettingsTestDom(({ container, render }) => {
+    const baseSurface = {
+      locale: "zh", primaryView: "conversation", overlay: null, detailsOpen: false, detailTabs: [],
+      pendingUpdateRestart: false, pendingUpdateReload: true, onReloadForUpdates: () => { reloaded += 1; }, openPrimaryView() {}
+    } as never;
+    render(createElement(StudioContext.Provider, { value: baseSurface }, createElement(ShellOverlaySlot)));
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="opl-global-reload-trigger"]')!;
+    assert.ok(trigger);
+    assert.match(trigger.textContent ?? "", /界面更新已就绪 · 刷新生效/);
+    flushSync(() => trigger.click());
+    assert.equal(reloaded, 1);
+
+    const hiddenSurface = { ...baseSurface, primaryView: "applications" } as never;
+    render(createElement(StudioContext.Provider, { value: hiddenSurface }, createElement(ShellOverlaySlot)));
+    assert.equal(container.querySelector('[data-testid="opl-global-reload-trigger"]'), null);
+  });
+});
+
+test("UpdatesSettingsPage Update All handles opl_base, renderer_reload, external DSH plugins, and batch package queue without duplicate DSH bulk button", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { UpdatesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
+  const makePkg = (id: string) => ({
+    package_id: id, display_name: id, catalog_origin: "opl", catalog_scope: "software",
+    installed: true, installed_version: "1.0.0", selected_version: "1.1.0",
+    package_currentness: { status: "update_available" },
+    available_actions: [{ action_id: "agent_package_update", action_ref: "app_state.actions#agent_package_update", semantic: "update", status: "available", payload: { package_id: id }, required_payload_fields: ["package_id"] }]
+  });
+  const model = deriveWorkbenchModelFromState({ app_state: {
+    actions: [{ action_id: "agent_package_update", label: "Update package", dry_run_supported: true, confirmation_required: true }],
+    agent_packages: { directory: { entries: [makePkg("pkg-a"), makePkg("pkg-b")] } }
+  } });
+  const baseApply: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+    transport: "managed_update_host", key: "base-apply", label: "应用基础服务更新", operation: "apply",
+    componentIds: ["opl_base"], confirmationRequired: false, availability: "ready", sourceRef: "host:base"
+  };
+  const hostActions: unknown[] = [];
+  const batches: unknown[][] = [];
+  let reloadReadySignaled = 0;
+  let restartSignaled = 0;
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginUpdates: async () => ({
+        schema: "opl_dsh_plugin_updates.v1",
+        profile: "opl-studio",
+        checkedAt: "2026-11-24T01:00:00Z",
+        plugins: { "@gaofeng21cn/opl-runtime-status": { installed: "0.1.1", available: "0.1.2", state: "update_available" } }
+      }),
+      readDshPluginCatalog: async () => ({
+        schema: "opl_dsh_plugin_catalog.v1",
+        checkedAt: "2026-11-24T01:00:00Z",
+        restartRequired: false,
+        activity: [],
+        entries: [{
+          pluginId: "opl-runtime-status",
+          packageName: "@gaofeng21cn/opl-runtime-status",
+          tier: "optional_product",
+          origin: "opl",
+          intentCategory: "efficiency",
+          canToggle: true,
+          canInstall: false,
+          canUninstall: false,
+          labelI18n: { zh: "运行概览", en: "Runtime Overview" },
+          descriptionI18n: { zh: "", en: "" },
+          permissionsI18n: { zh: [], en: [] },
+          installed: true,
+          enabled: true,
+          active: true,
+          version: "0.1.1",
+          activeVersion: "0.1.1",
+          availableVersion: "0.1.2",
+          updateAvailable: true,
+          startupFailed: false,
+          pendingRestart: false,
+          pendingOperation: null,
+          pendingVersion: null
+        }]
+      }),
+      updateDshPlugins: async () => ({
+        application: "renderer-reload",
+        reloadMode: "renderer_reload",
+        installed: { "@gaofeng21cn/opl-runtime-status": "0.1.2" },
+        failures: {}
+      })
+    };
+    try {
+      render(createElement(UpdatesSettingsPage, {
+        actionViewModel: {
+          gatewayActions: [],
+          agentLifecycle: [],
+          managedUpdates: [{
+            componentId: "opl_base",
+            component: { componentId: "opl_base", lifecycleOwner: "opl", label: "基础服务", state: "update_available", currentness: "update_available", autoApplyEligible: true, backgroundSafe: true },
+            actions: [baseApply]
+          }],
+          additionalMaintenanceActions: []
+        },
+        managedUpdate: null, projection: model.settingsProjection, settings: { ...settingsDefaults, locale: "zh" },
+        nativeAppUpdate: null, model, actionBusyKey: null,
+        onAction() {},
+        onActionBatch: items => batches.push(items),
+        onHostAction: intent => hostActions.push(intent),
+        catalogOrigin: "all",
+        onDshRestartRequired: () => { restartSignaled += 1; },
+        onDshReloadReady: () => { reloadReadySignaled += 1; }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      assert.equal([...container.querySelectorAll<HTMLButtonElement>("button")].some(b => b.textContent === "更新全部扩展组件"), false);
+      assert.match(container.textContent ?? "", /运行概览/);
+      const updateAllBtn = container.querySelector<HTMLButtonElement>('[data-testid="opl-update-all"]')!;
+      assert.ok(updateAllBtn);
+      flushSync(() => updateAllBtn.click());
+      await new Promise(resolve => setTimeout(resolve, 30));
+      assert.equal(reloadReadySignaled, 1);
+      assert.equal(restartSignaled, 0);
+      assert.deepEqual(hostActions, [baseApply]);
+      assert.equal(batches.length, 1);
+      assert.equal(batches[0].length, 2);
+      assert.match(container.textContent ?? "", /界面扩展已更新，刷新界面即可立即生效/);
+    } finally {
+      (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
+    }
+  });
+});
+
+test("DshPluginManagerOwner unifies external scope without jargon groups and opens npm install modal", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [{
+    package_id: "codex-plugin-a", display_name: "Codex Tool", catalog_origin: "external", catalog_scope: "software",
+    catalog_source: { manager: "codex_plugin_manager" }, installed: true, installed_version: "1.0.0"
+  }] } } } });
+  const managedCalls: Array<{ pluginId: string; packageName?: string; operation: string }> = [];
+  await withSettingsTestDom(async ({ container, render }) => {
+    const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
+    const baseCatalog = {
+      schema: "opl_dsh_plugin_catalog.v1",
+      checkedAt: "2026-11-24T01:00:00Z",
+      restartRequired: false,
+      activity: [],
+      entries: []
+    };
+    (window as unknown as { oplStudio?: unknown }).oplStudio = {
+      readDshPluginCatalog: async () => baseCatalog,
+      manageDshPlugin: async (req: { pluginId: string; packageName?: string; operation: string }) => {
+        managedCalls.push(req);
+        return { ...baseCatalog, restartRequired: true };
+      }
+    };
+    try {
+      render(createElement(DshPluginManagerOwner, {
+        kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {}
+      }));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      const extBtn = container.querySelector<HTMLButtonElement>('#opl-catalog-scope-external')!;
+      flushSync(() => extBtn.click());
+      const headings = [...container.querySelectorAll("h2, h3, summary")].map(el => el.textContent ?? "");
+      assert.equal(headings.some(text => text === "DSH 插件" || text === "Codex 插件" || text === "独立 Skills"), false);
+      assert.match(container.textContent ?? "", /Codex Tool/);
+
+      const openInstallBtn = container.querySelector<HTMLButtonElement>('[data-testid="opl-open-dsh-install-trigger"]')!;
+      flushSync(() => openInstallBtn.click());
+      const modal = document.body.querySelector('[data-testid="opl-open-dsh-install-modal"]')!;
+      assert.ok(modal);
+      const input = modal.querySelector<HTMLInputElement>("input")!;
+      const win = window as unknown as {
+        HTMLInputElement: typeof HTMLInputElement;
+        Event: typeof Event;
+        KeyboardEvent: typeof KeyboardEvent;
+      };
+      Object.assign(input, { attachEvent() {}, detachEvent() {} });
+      flushSync(() => input.focus());
+      flushSync(() => {
+        const setter = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, "value")!.set!;
+        setter.call(input, "@community/dsh-notes");
+        input.dispatchEvent(new win.Event("input", { bubbles: true }));
+        input.dispatchEvent(new win.Event("change", { bubbles: true }));
+        input.dispatchEvent(new win.KeyboardEvent("keyup", { key: "s", bubbles: true }));
+      });
+      const submitBtn = document.body.querySelector<HTMLButtonElement>('[data-testid="opl-open-dsh-install-submit"]')!;
+      assert.equal(submitBtn.disabled, false);
+      flushSync(() => submitBtn.click());
+      await new Promise(resolve => setTimeout(resolve, 20));
+      assert.deepEqual(managedCalls, [{ pluginId: "@community/dsh-notes", packageName: "@community/dsh-notes", operation: "install" }]);
     } finally {
       (window as unknown as { oplStudio?: unknown }).oplStudio = previousBridge;
     }

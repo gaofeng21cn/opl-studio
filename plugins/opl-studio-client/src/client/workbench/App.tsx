@@ -339,6 +339,7 @@ export function App({
   const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
   const [dshPluginRestartRequired, setDshPluginRestartRequired] = useState(false);
+  const [dshPluginReloadReady, setDshPluginReloadReady] = useState(false);
   const [projectedManagedUpdateActions, setProjectedManagedUpdateActions] = useState<ProjectedManagedUpdateAction[]>([]);
   const [projectedSetupActions, setProjectedSetupActions] = useState<ProjectedSetupAction[]>([]);
   const [projectedManifestInstallAction, setProjectedManifestInstallAction] = useState<ProjectedManifestInstallAction>();
@@ -842,6 +843,9 @@ export function App({
         if (typeof state.managedUpdateMaintenance?.dshPluginRestartRequired === "boolean") {
           setDshPluginRestartRequired(state.managedUpdateMaintenance.dshPluginRestartRequired);
         }
+        if (typeof state.managedUpdateMaintenance?.dshPluginReloadReady === "boolean") {
+          setDshPluginReloadReady(state.managedUpdateMaintenance.dshPluginReloadReady);
+        }
         const nextGatewayActions = readGatewayActionsFromState(state);
         projectedGatewayActionsRef.current = nextGatewayActions;
         setProjectedGatewayActions(nextGatewayActions);
@@ -892,7 +896,7 @@ export function App({
     settingsActionReceipt, settingsActionBusyKey, settingsActionFeedback, dockerDiagnostic,
     settingsActionConfirmation, workbenchActionResolver,
     setSettingsActionReceipt, setSettingsActionBusyKey, setSettingsActionFeedback,
-    runSettingsAction, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback
+    runSettingsAction, runSettingsActionBatch, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback
   } = useSettingsActions({
     bridge, settings, model, packageOperations, captureManagedUpdateReceipt, loadState, loadInitialize
   });
@@ -956,6 +960,27 @@ export function App({
       setSettingsActionFeedback({ tone: "attention", message: String(error) });
       setApplicationManagementTab("updates");
       setPrimaryView("applications");
+    } finally {
+      setSettingsActionBusyKey(null);
+    }
+  }
+
+  async function reloadForPendingUpdates() {
+    setSettingsActionBusyKey("host:reloadForPendingUpdates");
+    try {
+      if (typeof bridge.reloadRenderer === "function") {
+        const outcome = await bridge.reloadRenderer();
+        if (outcome && outcome.accepted === false) {
+          setSettingsActionFeedback({
+            tone: "attention",
+            message: settings.locale === "zh" ? "当前窗口未能自动刷新，请手动重新打开或刷新页面。" : "Could not reload the interface automatically. Reopen or refresh the window."
+          });
+        }
+        return;
+      }
+      window.location?.reload?.();
+    } catch (error) {
+      setSettingsActionFeedback({ tone: "attention", message: String(error) });
     } finally {
       setSettingsActionBusyKey(null);
     }
@@ -1523,13 +1548,19 @@ export function App({
     }
     if (method === "host/dsh-plugins-updated") {
       const installed = params.installed && typeof params.installed === "object" ? Object.keys(params.installed as Record<string, unknown>) : [];
-      if (installed.length > 0 && params.reloadMode !== "renderer_reload") setDshPluginRestartRequired(true);
+      if (installed.length > 0) {
+        if (params.reloadMode === "renderer_reload") setDshPluginReloadReady(true);
+        else setDshPluginRestartRequired(true);
+      }
     }
     if (method === "host/managed-update" && typeof params.status === "string") {
       setMaintenanceError(typeof params.errorCode === "string" ? params.errorCode : null);
       setMaintenanceStatus(params.status);
       if (typeof params.dshPluginRestartRequired === "boolean") {
         setDshPluginRestartRequired(params.dshPluginRestartRequired);
+      }
+      if (typeof params.dshPluginReloadReady === "boolean") {
+        setDshPluginReloadReady(params.dshPluginReloadReady);
       }
       if (params.status === "completed") void loadState(settings.runtimeProfile);
     }
@@ -2784,6 +2815,8 @@ export function App({
       || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")
       || nativeSoftwareProducts(model.softwareSources).some(product => product.item.updateStatus === "needs_restart"),
     onRestartForUpdates: () => void restartForPendingUpdates(),
+    pendingUpdateReload: dshPluginReloadReady,
+    onReloadForUpdates: () => void reloadForPendingUpdates(),
     applicationManagement: <SoftwareCenterSurface
       packageOperations={packageOperations}
       model={model}
@@ -2802,9 +2835,12 @@ export function App({
       actionViewModel={settingsActionViewModel}
       nativeAppUpdate={nativeAppUpdate}
       dshPluginRestartRequired={dshPluginRestartRequired}
+      dshPluginReloadReady={dshPluginReloadReady}
       onDshRestartRequired={() => setDshPluginRestartRequired(true)}
+      onDshReloadReady={() => setDshPluginReloadReady(true)}
       actionBusyKey={settingsActionBusyKey}
       onAction={(request) => void runSettingsAction(request)}
+      onActionBatch={(requests) => runSettingsActionBatch(requests)}
       onHostAction={(intent) => void runSettingsHostAction(intent)}
       onRefresh={() => void loadState(settings.runtimeProfile)}
       manifestInstallAction={projectedManifestInstallAction}

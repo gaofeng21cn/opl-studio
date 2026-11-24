@@ -154,6 +154,7 @@ export type DshPluginUpdateResult = Record<string, unknown> & {
   reloadMode?: "renderer_reload" | "restart_required";
   installed?: Record<string, string>;
   failures?: Record<string, string>;
+  externalStaged?: string[];
 };
 
 export type LinkPairedDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; expiresAt: string };
@@ -197,6 +198,8 @@ export type DshPluginCatalogEntry = {
   pendingRestart: boolean;
   pendingOperation: "update" | "remove" | null;
   pendingVersion: string | null;
+  requiresRestartOnMutate?: boolean;
+  sourceLabel?: string;
   checkErrorReason?: string;
 };
 
@@ -225,6 +228,7 @@ export type DshPluginCatalogProjection = {
 
 export type DshPluginManageRequest = {
   pluginId: string;
+  packageName?: string;
   operation: "install" | "update" | "remove" | "enable" | "disable" | "check" | "cancel_pending";
 };
 

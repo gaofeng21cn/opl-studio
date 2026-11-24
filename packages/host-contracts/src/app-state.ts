@@ -118,6 +118,7 @@ export type OplStateReadback = {
     status: string;
     lastCompletedAt: number | null;
     dshPluginRestartRequired?: boolean;
+    dshPluginReloadReady?: boolean;
     dshPluginUpdateStatus?: string | null;
     updatedDshPlugins?: Record<string, string>;
   };

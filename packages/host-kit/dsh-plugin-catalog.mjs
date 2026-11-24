@@ -5,7 +5,9 @@ import { withFileLock } from "@deepseek-ai/dsh-atomic-write";
 
 const PREFERENCES_FILE = "opl-plugin-preferences.json";
 const ACTIVITY_FILE = "opl-plugin-activity.json";
+const USER_EXTERNAL_PLUGINS_FILE = "opl-external-dsh-plugins.json";
 const MAX_ACTIVITY_RECORDS = 50;
+const NPM_PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 
 /**
  * Closed catalog metadata for DSH Cordis plugins and external DSH extensions.
@@ -275,6 +277,27 @@ export function findDshPluginDescriptor(idOrPackageName) {
   return DESCRIPTOR_BY_ID.get(idOrPackageName) ?? DESCRIPTOR_BY_PKG.get(idOrPackageName);
 }
 
+/**
+ * Validates and normalizes an external npm DSH plugin package name.
+ * Rejects reserved first-party scopes, descriptor collisions, URLs, traversal, and flags.
+ */
+export function validateExternalDshPackageName(rawName) {
+  if (typeof rawName !== "string") {
+    throw Object.assign(new Error("External DSH plugin package name must be a non-empty string"), { code: "invalid_package_name" });
+  }
+  const normalized = rawName.trim();
+  if (!normalized || normalized.length > 214 || !NPM_PACKAGE_NAME_RE.test(normalized) || normalized.includes("..")) {
+    throw Object.assign(new Error(`Invalid npm package name: ${String(rawName)}`), { code: "invalid_package_name" });
+  }
+  if (normalized.startsWith("@gaofeng21cn/") || normalized.startsWith("@one-person-lab/")) {
+    throw Object.assign(new Error(`First-party scoped package cannot be managed as an external npm plugin: ${normalized}`), { code: "invalid_package_name" });
+  }
+  if (findDshPluginDescriptor(normalized)) {
+    throw Object.assign(new Error(`Package is already managed in the built-in catalog: ${normalized}`), { code: "invalid_package_name" });
+  }
+  return normalized;
+}
+
 function readJsonSafe(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -374,6 +397,138 @@ export async function appendDshPluginActivity(profileDir, entry) {
   }, { waitMs: 10000 });
 }
 
+/**
+ * Reads user-installed community/external npm DSH plugin metadata from profile storage.
+ */
+export function readUserExternalDshPlugins(profileDir) {
+  if (!profileDir) return {};
+  const data = readJsonSafe(path.join(profileDir, USER_EXTERNAL_PLUGINS_FILE));
+  if (!data || data.schema !== "opl_user_external_dsh_plugins.v1" || !data.plugins || typeof data.plugins !== "object") {
+    return {};
+  }
+  const clean = {};
+  for (const [key, entry] of Object.entries(data.plugins)) {
+    if (!entry || typeof entry !== "object") continue;
+    try {
+      const packageName = validateExternalDshPackageName(entry.packageName ?? key);
+      clean[packageName] = { ...entry, pluginId: packageName, packageName };
+    } catch {
+      // Ignore tampered or reserved package names.
+    }
+  }
+  return clean;
+}
+
+export async function upsertUserExternalDshPlugin(profileDir, record) {
+  if (!profileDir) throw new Error("DSH profile directory is unavailable");
+  const packageName = validateExternalDshPackageName(record?.packageName ?? record?.pluginId);
+  const filePath = path.join(profileDir, USER_EXTERNAL_PLUGINS_FILE);
+  return withFileLock(filePath, async () => {
+    const plugins = readUserExternalDshPlugins(profileDir);
+    plugins[packageName] = {
+      ...plugins[packageName],
+      ...record,
+      pluginId: packageName,
+      packageName,
+      updatedAt: new Date().toISOString()
+    };
+    writeJsonAtomic(filePath, {
+      schema: "opl_user_external_dsh_plugins.v1",
+      updatedAt: new Date().toISOString(),
+      plugins
+    });
+    return plugins[packageName];
+  }, { waitMs: 10000 });
+}
+
+export async function removeUserExternalDshPlugin(profileDir, rawPackageName) {
+  if (!profileDir) return {};
+  const packageName = validateExternalDshPackageName(rawPackageName);
+  const filePath = path.join(profileDir, USER_EXTERNAL_PLUGINS_FILE);
+  return withFileLock(filePath, async () => {
+    const plugins = readUserExternalDshPlugins(profileDir);
+    delete plugins[packageName];
+    writeJsonAtomic(filePath, {
+      schema: "opl_user_external_dsh_plugins.v1",
+      updatedAt: new Date().toISOString(),
+      plugins
+    });
+    return plugins;
+  }, { waitMs: 10000 });
+}
+
+export function readInstalledExternalPackageManifest(profileDir, packageName) {
+  if (!profileDir || !packageName) return null;
+  return readJsonSafe(path.join(profileDir, "node_modules", ...packageName.split("/"), "package.json"));
+}
+
+/** Reconciles staged external plugin updates/removals during cold boot before DSH loads the profile. */
+export function reconcileUserExternalPluginsOnBoot(profileDir) {
+  if (!profileDir) return;
+  const records = readUserExternalDshPlugins(profileDir);
+  let changed = false;
+  const next = { ...records };
+  for (const [pkg, record] of Object.entries(records)) {
+    const installedManifest = readInstalledExternalPackageManifest(profileDir, pkg);
+    if (record.pendingOperation === "remove" || !installedManifest) {
+      delete next[pkg];
+      changed = true;
+      continue;
+    }
+    if (record.pendingOperation) {
+      next[pkg] = {
+        ...record,
+        installedVersion: installedManifest.version ?? record.installedVersion ?? null,
+        pendingOperation: null,
+        pendingVersion: null,
+        updateAvailable: false
+      };
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  writeJsonAtomic(path.join(profileDir, USER_EXTERNAL_PLUGINS_FILE), {
+    schema: "opl_user_external_dsh_plugins.v1",
+    updatedAt: new Date().toISOString(),
+    plugins: next
+  });
+}
+
+/**
+ * Converts a BillionContextPreference snapshot into a generic external plugin catalog entry.
+ */
+export function externalPluginEntryFromBillionContext(billionContext) {
+  const bc = billionContext ?? {
+    enabled: false,
+    installed: false,
+    version: null,
+    availableVersion: null,
+    updateAvailable: false,
+    activeVersion: null,
+    active: false,
+    startupFailed: false,
+    pendingOperation: null,
+    pendingVersion: null
+  };
+  const pendingRestart = Boolean(bc.pendingOperation) || bc.active !== bc.enabled;
+  return {
+    pluginId: "billion-context",
+    installed: Boolean(bc.installed),
+    enabled: Boolean(bc.enabled),
+    active: Boolean(bc.active),
+    version: bc.version ?? null,
+    activeVersion: bc.activeVersion ?? null,
+    availableVersion: bc.availableVersion ?? null,
+    updateAvailable: Boolean(bc.updateAvailable),
+    startupFailed: Boolean(bc.startupFailed),
+    pendingRestart,
+    pendingOperation: bc.pendingOperation ?? null,
+    pendingVersion: bc.pendingVersion ?? null,
+    requiresRestartOnMutate: Boolean(bc.installed && (bc.active || bc.pendingOperation)),
+    sourceLabel: "npm · ranxianglei/billion-context"
+  };
+}
+
 function readInstalledBundledVersion(packageName, { dshProfileDir, dshInstallAnchor }) {
   if (dshProfileDir) {
     try {
@@ -408,44 +563,44 @@ export function buildDshPluginCatalog({
   dshProfileDir,
   dshInstallAnchor,
   disabledAtBoot = [],
+  activeExternalPlugins = [],
+  externalEntries,
   billionContext,
   updateProjection
 } = {}) {
   const disabledSet = new Set(readDisabledOptionalPluginIds(dshProfileDir));
   const bootDisabledSet = new Set(Array.isArray(disabledAtBoot) ? disabledAtBoot : []);
+  const bootActiveExternalSet = new Set(Array.isArray(activeExternalPlugins) ? activeExternalPlugins : []);
   const updatesMap = updateProjection?.plugins ?? {};
   const activity = readDshPluginActivity(dshProfileDir);
 
+  const resolvedExternalEntries = Array.isArray(externalEntries)
+    ? externalEntries
+    : [externalPluginEntryFromBillionContext(billionContext)];
+  const externalMap = new Map(resolvedExternalEntries.map(entry => [entry.pluginId, entry]));
+
   let restartRequired = false;
   const entries = DSH_PLUGIN_DESCRIPTORS.map(descriptor => {
-    if (descriptor.pluginId === "billion-context") {
-      const bc = billionContext ?? {
-        enabled: false,
-        installed: false,
-        version: null,
-        availableVersion: null,
-        updateAvailable: false,
-        activeVersion: null,
-        active: false,
-        startupFailed: false,
-        pendingOperation: null,
-        pendingVersion: null
-      };
-      const pendingRestart = Boolean(bc.pendingOperation) || bc.active !== bc.enabled;
-      if (pendingRestart) restartRequired = true;
+    const adapterEntry = externalMap.get(descriptor.pluginId);
+    if (descriptor.tier === "external_plugin") {
+      const state = adapterEntry ?? externalPluginEntryFromBillionContext(undefined);
+      if (state.pendingRestart) restartRequired = true;
       return {
         ...descriptor,
-        installed: Boolean(bc.installed),
-        enabled: Boolean(bc.enabled),
-        active: Boolean(bc.active),
-        version: bc.version ?? null,
-        activeVersion: bc.activeVersion ?? null,
-        availableVersion: bc.availableVersion ?? null,
-        updateAvailable: Boolean(bc.updateAvailable),
-        startupFailed: Boolean(bc.startupFailed),
-        pendingRestart,
-        pendingOperation: bc.pendingOperation ?? null,
-        pendingVersion: bc.pendingVersion ?? null
+        installed: Boolean(state.installed),
+        enabled: Boolean(state.enabled),
+        active: Boolean(state.active),
+        version: state.version ?? null,
+        activeVersion: state.activeVersion ?? null,
+        availableVersion: state.availableVersion ?? null,
+        updateAvailable: Boolean(state.updateAvailable),
+        startupFailed: Boolean(state.startupFailed),
+        pendingRestart: Boolean(state.pendingRestart),
+        pendingOperation: state.pendingOperation ?? null,
+        pendingVersion: state.pendingVersion ?? null,
+        requiresRestartOnMutate: state.requiresRestartOnMutate ?? Boolean(state.installed && (state.active || state.pendingOperation)),
+        ...(state.sourceLabel ? { sourceLabel: state.sourceLabel } : {}),
+        ...(state.checkErrorReason ? { checkErrorReason: state.checkErrorReason } : {})
       };
     }
 
@@ -470,9 +625,59 @@ export function buildDshPluginCatalog({
       pendingRestart,
       pendingOperation: null,
       pendingVersion: null,
+      sourceLabel: "OPL",
       ...(updateInfo?.state === "unavailable" && updateInfo?.reason ? { checkErrorReason: updateInfo.reason } : {})
     };
   });
+
+  // Merge community/external DSH plugins installed into this profile dynamically.
+  const userExternal = readUserExternalDshPlugins(dshProfileDir);
+  for (const record of Object.values(userExternal)) {
+    if (DESCRIPTOR_BY_ID.has(record.pluginId) || DESCRIPTOR_BY_PKG.has(record.packageName)) continue;
+    const { version: profileVersion } = readInstalledBundledVersion(record.packageName, { dshProfileDir });
+    const installedVersion = profileVersion ?? record.installedVersion ?? null;
+    const installed = Boolean(profileVersion) || record.pendingOperation === "remove";
+    const active = bootActiveExternalSet.has(record.packageName);
+    const enabled = record.enabled !== false;
+    const pendingOperation = record.pendingOperation ?? null;
+    const pendingVersion = record.pendingVersion ?? null;
+    const pendingRestart = Boolean(pendingOperation) || enabled !== active || Boolean(installed && !active && enabled);
+    if (pendingRestart) restartRequired = true;
+    entries.push({
+      pluginId: record.pluginId,
+      packageName: record.packageName,
+      tier: "external_plugin",
+      origin: "external",
+      intentCategory: record.intentCategory ?? "efficiency",
+      canToggle: true,
+      canInstall: true,
+      canUninstall: true,
+      ...(record.upstreamUrl ? { upstreamUrl: record.upstreamUrl } : {}),
+      labelI18n: record.labelI18n ?? { zh: record.packageName, en: record.packageName },
+      descriptionI18n: record.descriptionI18n ?? {
+        zh: "由用户通过 npm 安装的第三方 DSH 插件。",
+        en: "Third-party DSH plugin installed from npm."
+      },
+      permissionsI18n: record.permissionsI18n ?? {
+        zh: ["作为 DSH 插件扩展运行，变更需重启应用生效", "从 npm 安装且全程禁用生命周期脚本"],
+        en: ["Runs as a DSH profile plugin (changes apply after restart)", "Installed from npm with lifecycle scripts disabled"]
+      },
+      installed,
+      enabled,
+      active,
+      version: installedVersion,
+      activeVersion: active ? (record.activeVersion ?? installedVersion) : null,
+      availableVersion: record.availableVersion ?? null,
+      updateAvailable: Boolean(record.updateAvailable),
+      startupFailed: false,
+      pendingRestart,
+      pendingOperation,
+      pendingVersion,
+      requiresRestartOnMutate: true,
+      sourceLabel: "npm",
+      ...(record.checkErrorReason ? { checkErrorReason: record.checkErrorReason } : {})
+    });
+  }
 
   if (updateProjection?.profileBootRecovery) {
     restartRequired = false;

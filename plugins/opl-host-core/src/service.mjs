@@ -1,11 +1,14 @@
 import path from "node:path";
-import { checkRegistryUpdates, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
+import { checkRegistryUpdates, manageExternalNpmDshPlugin, updateRegistryPlugins } from "@gaofeng21cn/opl-host-kit/profile-plugin-updates";
 import { clearProfileBootRecovery, readProfileBootRecovery } from "@gaofeng21cn/opl-host-kit/profile-boot-recovery";
 import {
   appendDshPluginActivity,
   buildDshPluginCatalog,
+  externalPluginEntryFromBillionContext,
   findDshPluginDescriptor,
-  setOptionalPluginEnabled
+  readUserExternalDshPlugins,
+  setOptionalPluginEnabled,
+  validateExternalDshPackageName
 } from "@gaofeng21cn/opl-host-kit/dsh-plugin-catalog";
 import { createSettingsSearchLog } from "./settings-search-log.mjs";
 import { EventEmitter } from "node:events";
@@ -93,7 +96,10 @@ function defaultCarrierDiagnostics(env) {
   };
 }
 
-export const CLIENT_ONLY_DSH_PACKAGES = new Set(["@gaofeng21cn/opl-studio-client"]);
+export const CLIENT_ONLY_DSH_PACKAGES = new Set([
+  "@gaofeng21cn/opl-studio-client",
+  "@gaofeng21cn/opl-runtime-status"
+]);
 
 /**
  * Reports whether an update batch can safely apply via lightweight renderer reload.
@@ -168,6 +174,29 @@ export class OplHostCore extends EventEmitter {
       : () => readLinkGatewayAccount(env));
     this.closePromise = null;
     this.manualUpdateOperations = new Set();
+    this.externalPluginAdapters = new Map([
+      ["billion-context", {
+        readEntry: async () => {
+          try {
+            return externalPluginEntryFromBillionContext(this.codex.readBillionContext());
+          } catch {
+            return externalPluginEntryFromBillionContext(undefined);
+          }
+        },
+        execute: async (operation) => {
+          const result = operation === "enable" || operation === "disable"
+            ? await this.codex.setBillionContext({ enabled: operation === "enable" })
+            : await this.codex.manageBillionContext({ operation });
+          const staged = Boolean(result.pendingOperation) || result.active !== result.enabled;
+          return {
+            staged,
+            targetVersion: result.pendingVersion ?? result.version ?? null,
+            installed: Boolean(result.installed),
+            updateAvailable: Boolean(result.updateAvailable)
+          };
+        }
+      }]
+    ]);
     this.codex.on("event", (event) => this.emit("event", event));
   }
 
@@ -399,7 +428,10 @@ export class OplHostCore extends EventEmitter {
         detail
       });
     }
-    return reloadMode ? { ...result, reloadMode } : result;
+    const baseResult = reloadMode === "renderer_reload"
+      ? { ...result, application: "renderer-reload", reloadMode }
+      : (reloadMode ? { ...result, reloadMode } : result);
+    return baseResult;
   }
 
   async readDshPluginCatalog(payload = {}) {
@@ -420,19 +452,103 @@ export class OplHostCore extends EventEmitter {
         // Keep catalog read usable offline when feed checks fail.
       }
     }
-    let billionContext;
-    try {
-      billionContext = this.codex.readBillionContext();
-    } catch {
-      billionContext = undefined;
-    }
+    const externalEntries = await Promise.all(
+      [...this.externalPluginAdapters.values()].map(adapter => adapter.readEntry().catch(() => null))
+    );
     return buildDshPluginCatalog({
       dshProfileDir: options.dshProfileDir,
       dshInstallAnchor: options.dshInstallAnchor,
       disabledAtBoot: options.dshDisabledAtBoot,
-      billionContext,
+      activeExternalPlugins: options.dshActiveExternalPlugins,
+      externalEntries: externalEntries.filter(Boolean),
       updateProjection: this.latestDshPluginUpdates
     });
+  }
+
+  async syncAllDshPluginUpdates() {
+    const options = this.hostContext?.get("oplStudioHostOptions");
+    if (!options?.dshHome || !options?.dshInstallAnchor || !options?.dshProfileDir) {
+      throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
+    }
+    const primary = await this.updateDshPlugins({ all: true });
+    const externalStaged = [];
+    const activeExternal = new Set(options.dshActiveExternalPlugins ?? []);
+    const now = new Date().toISOString();
+
+    for (const [pluginId, adapter] of this.externalPluginAdapters.entries()) {
+      try {
+        const state = await adapter.readEntry();
+        if (!state?.installed) continue;
+        await adapter.execute("check").catch(() => undefined);
+        const latest = await adapter.readEntry();
+        if (latest?.updateAvailable && !latest.pendingOperation) {
+          const outcome = await adapter.execute("update");
+          if (outcome?.staged || outcome?.targetVersion) {
+            externalStaged.push(pluginId);
+            await appendDshPluginActivity(options.dshProfileDir, {
+              pluginId,
+              action: "update",
+              status: "staged_restart",
+              startedAt: now,
+              finishedAt: new Date().toISOString(),
+              targetVersion: outcome.targetVersion,
+              restartRequired: true
+            });
+          }
+        }
+      } catch {
+        // Keep background maintenance resilient if a single third-party source is unreachable.
+      }
+    }
+
+    const userExternal = readUserExternalDshPlugins(options.dshProfileDir);
+    for (const record of Object.values(userExternal)) {
+      if (record.pendingOperation === "remove") continue;
+      try {
+        const check = await manageExternalNpmDshPlugin({
+          home: options.dshHome,
+          installAnchor: options.dshInstallAnchor,
+          dir: options.dshProfileDir,
+          packageName: record.packageName,
+          operation: "check",
+          activeAtBoot: activeExternal.has(record.packageName)
+        });
+        if (check.updateAvailable) {
+          const outcome = await manageExternalNpmDshPlugin({
+            home: options.dshHome,
+            installAnchor: options.dshInstallAnchor,
+            dir: options.dshProfileDir,
+            packageName: record.packageName,
+            operation: "update",
+            activeAtBoot: activeExternal.has(record.packageName)
+          });
+          if (outcome.staged) {
+            externalStaged.push(record.packageName);
+            await appendDshPluginActivity(options.dshProfileDir, {
+              pluginId: record.packageName,
+              packageName: record.packageName,
+              labelI18n: record.labelI18n,
+              action: "update",
+              status: "staged_restart",
+              startedAt: now,
+              finishedAt: new Date().toISOString(),
+              targetVersion: outcome.version,
+              restartRequired: true
+            });
+          }
+        }
+      } catch {
+        // Keep community npm plugin check failures isolated.
+      }
+    }
+
+    if (externalStaged.length === 0) return primary;
+    return {
+      ...primary,
+      externalStaged,
+      application: "restart-required",
+      reloadMode: "restart_required"
+    };
   }
 
   async manageDshPlugin(payload = {}) {
@@ -440,45 +556,45 @@ export class OplHostCore extends EventEmitter {
     if (!options?.dshHome || !options?.dshInstallAnchor || !options?.dshProfileDir) {
       throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
     }
-    const { pluginId, operation } = payload;
-    const descriptor = findDshPluginDescriptor(pluginId);
-    if (!descriptor) {
-      throw new ThreadAdapterError("invalid_request", `Unknown DSH plugin: ${String(pluginId)}`, { pluginId }, 400);
-    }
+    const { pluginId, packageName, operation } = payload;
     const allowedOps = ["install", "update", "remove", "enable", "disable", "check", "cancel_pending"];
     if (!allowedOps.includes(operation)) {
       throw new ThreadAdapterError("invalid_request", `Unsupported DSH plugin operation: ${String(operation)}`, { operation }, 400);
     }
     const startedAt = new Date().toISOString();
-    if (descriptor.tier === "core_runtime") {
+    const descriptor = findDshPluginDescriptor(pluginId ?? packageName);
+
+    if (descriptor?.tier === "core_runtime") {
       if (operation === "update") {
         await this.updateDshPlugins({ packages: [descriptor.packageName] });
         return this.readDshPluginCatalog({ includeUpdates: true });
       }
-      throw new ThreadAdapterError("dsh_plugin_core_required", "Core DSH runtime plugins cannot be disabled or removed", { pluginId }, 409);
+      throw new ThreadAdapterError("dsh_plugin_core_required", "Core DSH runtime plugins cannot be disabled or removed", { pluginId: descriptor.pluginId }, 409);
     }
-    if (descriptor.pluginId === "billion-context") {
+
+    const adapterId = descriptor?.pluginId ?? pluginId;
+    const adapter = adapterId ? this.externalPluginAdapters.get(adapterId) : undefined;
+    if (adapter) {
       try {
-        const result = operation === "enable" || operation === "disable"
-          ? await this.codex.setBillionContext({ enabled: operation === "enable" })
-          : await this.codex.manageBillionContext({ operation });
-        const staged = Boolean(result.pendingOperation) || result.active !== result.enabled;
+        const result = await adapter.execute(operation);
         if (operation !== "check") {
           await appendDshPluginActivity(options.dshProfileDir, {
-            pluginId: descriptor.pluginId,
-            packageName: descriptor.packageName,
+            pluginId: descriptor?.pluginId ?? adapterId,
+            packageName: descriptor?.packageName ?? adapterId,
+            labelI18n: descriptor?.labelI18n,
             action: operation,
-            status: staged ? "staged_restart" : "completed",
+            status: result?.staged ? "staged_restart" : "completed",
             startedAt,
             finishedAt: new Date().toISOString(),
-            targetVersion: result.pendingVersion ?? result.version,
-            restartRequired: staged
+            targetVersion: result?.targetVersion,
+            restartRequired: Boolean(result?.staged)
           });
         }
       } catch (error) {
         await appendDshPluginActivity(options.dshProfileDir, {
-          pluginId: descriptor.pluginId,
-          packageName: descriptor.packageName,
+          pluginId: descriptor?.pluginId ?? adapterId,
+          packageName: descriptor?.packageName ?? adapterId,
+          labelI18n: descriptor?.labelI18n,
           action: operation,
           status: "failed",
           startedAt,
@@ -489,31 +605,79 @@ export class OplHostCore extends EventEmitter {
       }
       return this.readDshPluginCatalog();
     }
-    if (operation === "enable" || operation === "disable") {
-      await setOptionalPluginEnabled(options.dshProfileDir, descriptor.pluginId, operation === "enable");
-      const disabledAtBoot = new Set(options.dshDisabledAtBoot ?? []);
-      const wasActive = !disabledAtBoot.has(descriptor.pluginId);
-      const nextEnabled = operation === "enable";
-      const restartRequired = nextEnabled !== wasActive;
+
+    if (descriptor) {
+      if (operation === "enable" || operation === "disable") {
+        await setOptionalPluginEnabled(options.dshProfileDir, descriptor.pluginId, operation === "enable");
+        const disabledAtBoot = new Set(options.dshDisabledAtBoot ?? []);
+        const wasActive = !disabledAtBoot.has(descriptor.pluginId);
+        const nextEnabled = operation === "enable";
+        const restartRequired = nextEnabled !== wasActive;
+        await appendDshPluginActivity(options.dshProfileDir, {
+          pluginId: descriptor.pluginId,
+          packageName: descriptor.packageName,
+          action: operation,
+          status: restartRequired ? "staged_restart" : "completed",
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          restartRequired
+        });
+        return this.readDshPluginCatalog();
+      }
+      if (operation === "update") {
+        await this.updateDshPlugins({ packages: [descriptor.packageName] });
+        return this.readDshPluginCatalog({ includeUpdates: true });
+      }
+      if (operation === "check") {
+        return this.readDshPluginCatalog({ includeUpdates: true });
+      }
+      throw new ThreadAdapterError("dsh_plugin_operation_unsupported", "Bundled optional plugin does not support install or uninstall", { pluginId: descriptor.pluginId, operation }, 409);
+    }
+
+    let validatedPkg;
+    try {
+      validatedPkg = validateExternalDshPackageName(packageName ?? pluginId);
+    } catch (error) {
+      throw new ThreadAdapterError("invalid_request", error instanceof Error ? error.message : `Unknown DSH plugin: ${String(pluginId)}`, { pluginId, packageName }, 400);
+    }
+    const activeExternal = new Set(options.dshActiveExternalPlugins ?? []);
+    try {
+      const result = await manageExternalNpmDshPlugin({
+        home: options.dshHome,
+        installAnchor: options.dshInstallAnchor,
+        dir: options.dshProfileDir,
+        packageName: validatedPkg,
+        operation,
+        activeAtBoot: activeExternal.has(validatedPkg)
+      });
+      if (operation !== "check") {
+        const record = readUserExternalDshPlugins(options.dshProfileDir)[validatedPkg];
+        await appendDshPluginActivity(options.dshProfileDir, {
+          pluginId: validatedPkg,
+          packageName: validatedPkg,
+          labelI18n: record?.labelI18n ?? { zh: validatedPkg, en: validatedPkg },
+          action: operation,
+          status: result.restartRequired ? "staged_restart" : "completed",
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          targetVersion: result.version,
+          restartRequired: Boolean(result.restartRequired)
+        });
+      }
+      return this.readDshPluginCatalog();
+    } catch (error) {
       await appendDshPluginActivity(options.dshProfileDir, {
-        pluginId: descriptor.pluginId,
-        packageName: descriptor.packageName,
+        pluginId: validatedPkg,
+        packageName: validatedPkg,
         action: operation,
-        status: restartRequired ? "staged_restart" : "completed",
+        status: "failed",
         startedAt,
         finishedAt: new Date().toISOString(),
-        restartRequired
+        detail: error instanceof Error ? error.message : String(error)
       });
-      return this.readDshPluginCatalog();
+      if (error instanceof ThreadAdapterError) throw error;
+      throw new ThreadAdapterError(error?.code ?? "dsh_plugin_operation_failed", error instanceof Error ? error.message : String(error), { pluginId: validatedPkg, operation }, 409);
     }
-    if (operation === "update") {
-      await this.updateDshPlugins({ packages: [descriptor.packageName] });
-      return this.readDshPluginCatalog({ includeUpdates: true });
-    }
-    if (operation === "check") {
-      return this.readDshPluginCatalog({ includeUpdates: true });
-    }
-    throw new ThreadAdapterError("dsh_plugin_operation_unsupported", "Bundled optional plugin does not support install or uninstall", { pluginId, operation }, 409);
   }
 
   capabilities() {
@@ -571,6 +735,7 @@ export class OplHostCore extends EventEmitter {
         return withRecovery;
       }
       case "updateDshPlugins": return this.updateDshPlugins(payload);
+      case "syncAllDshPluginUpdates": return this.syncAllDshPluginUpdates();
       case "readDshPluginCatalog": return this.readDshPluginCatalog(payload);
       case "manageDshPlugin": return this.manageDshPlugin(payload);
       case "readSuperagent": return this.hostContext.get("oplSuperagent").read();

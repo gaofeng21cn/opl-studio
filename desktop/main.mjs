@@ -489,7 +489,7 @@ async function createDesktopHost(appLogDirectory) {
       codex: core.codex,
       stateFile: path.join(app.getPath("userData"), "managed-update-maintenance.json"),
       checkAppUpdate: () => updater.perform("check"),
-      syncDshPlugins: () => core.invoke("updateDshPlugins", { all: true }),
+      syncDshPlugins: () => core.invoke("syncAllDshPluginUpdates"),
       onStateChange: (state) => core.emit("event", {
         method: "host/managed-update", params: { ...state, activationStatus }
       })

@@ -336,3 +336,61 @@ test("DSH plugin sync failures remain isolated without failing Framework package
   assert.equal(snapshot.dshPluginRestartRequired, false);
   await maintenance.close();
 });
+
+test("background maintenance marks reload_ready when only client DSH plugins refresh and external updates still require restart", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-maintenance-reload-ready-"));
+  try {
+    const stateFile = path.join(root, "state.json");
+    const transport = new CodexAppServerTransport();
+    const maintenance = createManagedUpdateMaintenance({
+      stateFile,
+      opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+      codex: { transport },
+      syncDshPlugins: async () => ({
+        application: "renderer-reload",
+        reloadMode: "renderer_reload",
+        installed: { "@gaofeng21cn/opl-runtime-status": "0.1.2" },
+        failures: {},
+        externalStaged: []
+      }),
+      now: () => 50_000
+    });
+    const snapshot = await maintenance.runNow();
+    assert.equal(snapshot.dshPluginReloadReady, true);
+    assert.equal(snapshot.dshPluginRestartRequired, false);
+    assert.equal(snapshot.dshPluginUpdateStatus, "reload_ready");
+    await maintenance.close();
+
+    const relaunched = createManagedUpdateMaintenance({
+      stateFile,
+      opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+      codex: { transport },
+      schedule: (cb, delay) => ({ cb, delay }),
+      unschedule: () => {},
+      now: () => 60_000
+    });
+    await relaunched.start();
+    assert.equal(relaunched.snapshot().dshPluginReloadReady, false);
+    assert.equal(relaunched.snapshot().dshPluginRestartRequired, false);
+    await relaunched.close();
+
+    const mixedMaintenance = createManagedUpdateMaintenance({
+      opl: { runManagedUpdate: async () => ({ managed_update: { components: [] } }) },
+      codex: { transport },
+      syncDshPlugins: async () => ({
+        application: "restart-required",
+        reloadMode: "restart_required",
+        installed: { "@gaofeng21cn/opl-studio-client": "0.1.10" },
+        failures: {},
+        externalStaged: ["billion-context"]
+      }),
+      now: () => 70_000
+    });
+    const mixedSnapshot = await mixedMaintenance.runNow();
+    assert.equal(mixedSnapshot.dshPluginRestartRequired, true);
+    assert.equal(mixedSnapshot.dshPluginReloadReady, false);
+    await mixedMaintenance.close();
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
