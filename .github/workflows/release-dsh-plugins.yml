@@ -5,25 +5,14 @@ on:
     branches:
       - main
     paths:
-      - "plugins/**"
-      - "packages/**"
-      - "vendor/**"
-      - "src/**"
-      - "scripts/build-dsh-plugins.mjs"
-      - "scripts/build-plugin-ui-kit.mjs"
-      - "scripts/vite-build-renderer-entry.mjs"
-      - "scripts/client-runtime-policy.mjs"
-      - "scripts/build-dsh-client.mjs"
-      - "scripts/check-plugin-publication.mjs"
-      - "package.json"
-      - "package-lock.json"
-      - "!src/**/*.test.mjs"
+      - "plugins/*/package.json"
+      - "packages/*/package.json"
   workflow_dispatch:
     inputs:
       packages:
         description: >
           Comma-separated plugin directory names to publish (e.g. opl-superagent,opl-host-core).
-          Leave empty to publish all changed packages detected from the last commit.
+          Leave empty to publish packages whose version changed in the last commit.
         required: false
         default: ""
       force_all:
@@ -56,15 +45,6 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-
-      - name: Resolve App product source
-        id: app-source
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          app_sha="$(gh api repos/gaofeng21cn/one-person-lab-app/commits/main --jq .sha)"
-          [[ "$app_sha" =~ ^[0-9a-f]{40}$ ]]
-          echo "sha=$app_sha" >> "$GITHUB_OUTPUT"
 
       - name: Detect changed plugins
         id: detect
@@ -110,24 +90,21 @@ jobs:
             if (/^(?!0{40}$)[0-9a-f]{40}$/.test(base) && !hasBase()) {
               spawnSync("git", ["fetch", "--depth=1", "--no-tags", "origin", base], { stdio: "inherit" });
             }
-            const changed = hasBase()
-              ? execFileSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean)
-              : null;
-            // Test and publication-only changes do not change a package's bytes.
-            const packageInputs = changed?.filter(file =>
-              file !== ".github/workflows/release-dsh-plugins.yml" &&
-              file !== "scripts/publish-dsh-plugin-feed.mjs" &&
-              !(file.startsWith("src/") && file.endsWith(".test.mjs"))
-            );
-            const sharedChanged = packageInputs?.some(file => !file.startsWith("plugins/") && !file.startsWith("packages/opl-plugin-ui-kit/"));
-            selected = !packageInputs || sharedChanged
-              ? PUBLISHABLE
-              : PUBLISHABLE.filter(name => packageInputs.some(file => file.startsWith(`plugins/${name}/`)));
-            selectedSdks = !packageInputs || packageInputs.some(file =>
-              file === "scripts/build-plugin-ui-kit.mjs" || file.startsWith("packages/opl-plugin-ui-kit/")
-            )
-              ? PUBLISHABLE_SDKS
-              : [];
+            if (!hasBase() && base !== "0".repeat(40)) {
+              throw new Error("Cannot resolve the prior revision for package version detection");
+            }
+            function hasNewVersion(directory) {
+              const manifestPath = directory + "/package.json";
+              const current = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+              const priorRef = base + ":" + manifestPath;
+              const prior = spawnSync("git", ["cat-file", "-e", priorRef], { stdio: "ignore" });
+              if (prior.status !== 0) return true;
+              const previous = JSON.parse(execFileSync("git", ["show", priorRef], { encoding: "utf8" }));
+              return current.name !== previous.name || current.version !== previous.version;
+            }
+            // Source changes flow through source validation. Package publication follows version changes.
+            selected = PUBLISHABLE.filter(name => hasNewVersion("plugins/" + name));
+            selectedSdks = PUBLISHABLE_SDKS.filter(name => hasNewVersion("packages/" + name));
           }
 
           const output = process.env.GITHUB_OUTPUT;
@@ -142,6 +119,16 @@ jobs:
           FORCE_ALL: ${{ inputs.force_all || 'false' }}
           PACKAGES_INPUT: ${{ inputs.packages || '' }}
           PUSH_BASE: ${{ github.event.before }}
+
+      - name: Resolve App product source
+        id: app-source
+        if: steps.detect.outputs.has_plugins == 'true' || steps.detect.outputs.has_sdk == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          app_sha="$(gh api repos/gaofeng21cn/one-person-lab-app/commits/main --jq .sha)"
+          [[ "$app_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$app_sha" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Build, test and publish selected DSH plugins
