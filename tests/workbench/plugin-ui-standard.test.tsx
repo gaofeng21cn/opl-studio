@@ -2,7 +2,9 @@ import React, { act } from "react";
 let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import {
@@ -415,4 +417,116 @@ test("Tier 3 McpAppWorkspace surfaces authorization banner and jumps to resource
   const retryBtn = [...authBanner.querySelectorAll("button")].find(btn => btn.textContent === "重试")!;
   await act(async () => { retryBtn.click(); });
   expect(openAttempts).toBe(2);
+});
+
+test("E2E Tier 1 settings_form template spawns real contribution-cli.mjs, validates, persists, and indexes search", async () => {
+  const studioRoot = path.resolve(import.meta.dirname, "../..");
+  const cliPath = path.join(studioRoot, "templates/plugin-devkit/tier1-settings-form/contribution-cli.mjs");
+  const contributions = JSON.parse(readFileSync(path.join(studioRoot, "templates/plugin-devkit/tier1-settings-form/app-contributions.example.json"), "utf8"));
+  const stateDir = mkdtempSync(path.join(os.tmpdir(), "opl-devkit-tier1-e2e-"));
+  const stateFile = path.join(stateDir, "settings.json");
+
+  const runCliBridge = (request: Record<string, unknown>) => {
+    const res = spawnSync(process.execPath, [cliPath], {
+      input: JSON.stringify({ schema_version: "opl-package-app-contribution-request.v1", ...request }),
+      encoding: "utf8",
+      env: { ...process.env, OPL_TIER1_SETTINGS_FILE: stateFile }
+    });
+    expect(res.status).toBe(0);
+    return JSON.parse(res.stdout.trim());
+  };
+
+  try {
+    const view = contributions.views[0];
+    const placement = contributions.ui[0];
+    const entries = readUiContributionsProjection({
+      ui_contributions: {
+        surface_kind: "opl_app_ui_contributions_projection.v1",
+        entries: [{
+          contribution_key: `example-tier1:${placement.contribution_id}`,
+          contribution_id: placement.contribution_id,
+          package_id: "example-tier1",
+          slot: placement.slot,
+          contribution_kind: placement.contribution_kind,
+          trust_tier: placement.trust_tier,
+          scope: placement.scope,
+          sort_order: placement.sort_order,
+          view,
+          commands: contributions.commands,
+          badges: []
+        }]
+      }
+    }).entries;
+
+    expect(settingsEntriesForNativeAppSurface(entries, "capabilities")).toHaveLength(1);
+    expect(settingsSearchTargets("zh", entries).some(t => t.destination === "capabilities" && t.label === "示例扩展配置")).toBe(true);
+
+    const owner: OplContributionSlotOwner = {
+      locale: "zh",
+      actionAvailable: true,
+      refreshRevision: 0,
+      readData: async (entry) => {
+        const resp = runCliBridge({ package_id: entry.packageId, ref: entry.view!.dataRef, operation: "read", input: {} });
+        expect(resp.ok).toBe(true);
+        return resp.result;
+      },
+      onAction: async (entry, command, input) => {
+        const resp = runCliBridge({ package_id: entry.packageId, ref: command.actionRef, operation: "execute", input });
+        return resp.ok ? { status: "succeeded" } : { status: "failed", message: resp.error?.message };
+      }
+    };
+
+    await act(async () => {
+      root.render(<ProjectedContribution entry={entries[0]!} owner={owner} />);
+    });
+    // Wait for async readData Promise resolution inside DeclarativeSettingsForm
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+
+    const form = document.querySelector<HTMLFormElement>('[data-testid="opl-settings-form-example-tier1:example-tier1-settings"]')!;
+    expect(form).toBeTruthy();
+    const endpointInput = form.querySelector<HTMLInputElement>('[data-field-id="endpoint"] input')!;
+    const concurrencyInput = form.querySelector<HTMLInputElement>('[data-field-id="concurrency"] input')!;
+    expect(endpointInput.value).toBe("https://api.example.invalid");
+    expect(concurrencyInput.value).toBe("2");
+
+    // 1. Invalid endpoint rejected by real contribution-cli.mjs without persisting
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(endpointInput, "http://insecure.invalid");
+      endpointInput.dispatchEvent(new Event("input", { bubbles: true }));
+      endpointInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    expect(form.querySelector('[role="status"]')?.textContent).toContain("https://");
+
+    // 2. Valid edit persists to disk via real contribution-cli.mjs and reloads cleanly
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(endpointInput, "https://pilot.saved.example");
+      endpointInput.dispatchEvent(new Event("input", { bubbles: true }));
+      endpointInput.dispatchEvent(new Event("change", { bubbles: true }));
+      setter.call(concurrencyInput, "6");
+      concurrencyInput.dispatchEvent(new Event("input", { bubbles: true }));
+      concurrencyInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+
+    const persisted = JSON.parse(readFileSync(stateFile, "utf8"));
+    expect(persisted.endpoint).toBe("https://pilot.saved.example");
+    expect(persisted.concurrency).toBe(6);
+
+    // Fresh mount reloads saved values directly from disk via CLI
+    await act(async () => { root.render(null); });
+    await act(async () => {
+      root.render(<ProjectedContribution entry={entries[0]!} owner={{ ...owner, refreshRevision: 1 }} />);
+    });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    const reloadedForm = document.querySelector<HTMLFormElement>('[data-testid="opl-settings-form-example-tier1:example-tier1-settings"]')!;
+    expect(reloadedForm.querySelector<HTMLInputElement>('[data-field-id="endpoint"] input')!.value).toBe("https://pilot.saved.example");
+    expect(reloadedForm.querySelector<HTMLInputElement>('[data-field-id="concurrency"] input')!.value).toBe("6");
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
 });

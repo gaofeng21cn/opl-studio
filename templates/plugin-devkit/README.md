@@ -7,7 +7,7 @@ OPL App organizes extension UI & settings into three standardized tiers so plugi
 1. **Tier 1 — Declarative Contribution (`tier1-settings-form/`)**
    - Best for plugins that need structured configuration fields (`boolean`, `enum`, `string`, `number`, `directory`, `secret_ref`) or read/command projections.
    - Zero frontend code required: OPL App renders `settings_form` inside the matching `settings_destination` (`models`, `resources`, `workspace`, `capabilities`, `services`, `preferences`) using native validation, effect timing badges (`immediate` / `next_task` / `restart_required`), secret masking, and settings search indexing.
-   - See `tier1-settings-form/app-contributions.example.json` (manifest matching `opl-app-contributions.schema.json`) and `tier1-settings-form/settings-form-data.example.json` (domain read payload matching `#/$defs/settings_form_result`).
+   - See `tier1-settings-form/app-contributions.example.json` (manifest matching `opl-app-contributions.schema.json`), `tier1-settings-form/settings-form-data.example.json` (domain read payload matching `#/$defs/settings_form_result`), and `tier1-settings-form/contribution-cli.mjs` (executable `opl-package-app-contribution-cli.v1` stdin/stdout JSON pilot backing real reads, HTTPS validation, and persisted saves).
 
 2. **Tier 2 — DSH Client Plugin (`tier2-dsh-client-plugin/`)**
    - Best for rich interactive panels or custom controls inside DSH slots.
