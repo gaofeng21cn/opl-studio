@@ -29,7 +29,7 @@ public service deployment are separate acceptance surfaces.
 
 1. Open **Settings → Connections & Deployment → Remote & web access → OPL Link**.
 2. Sign in from **OPL Account**. Phone access starts automatically unless you turned it off on this computer.
-3. In OPL Link on your iPhone or iPad, sign in to the same OPL Gateway account. Link connects automatically when one computer is online. If several are online, choose the one you want.
+3. In OPL Link on your iPhone or iPad, sign in to the same OPL Gateway account. The multi-computer version of Link connects to eligible online computers automatically. Open **All Computers** to see conversations grouped by computer and project, or filter to one computer.
 4. To pause remote access on this computer, choose **Turn off phone access**. Existing remote sessions close and the setting persists across restarts. Choose **Enable phone access** to resume.
 
 The default connection uses `https://link.medopl.com`. Keep the computer online
