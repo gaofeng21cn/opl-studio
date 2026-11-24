@@ -1,222 +1,67 @@
 # DSH 通用客户端插件
 
-Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 对话、文件访问授权及 Framework/App 状态桥；第三方插件负责界面与格式呈现，不另建会话、模型、凭据或 Package 管理器。
+Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 对话、文件访问授权及 Framework/App 状态桥；第三方插件负责界面与格式呈现，不另建会话、模型、凭据或 Package 管理器。自有 DSH 插件的目录规范、构建与装载边界见 [plugins/](../plugins/README.md)。
 
-自有插件的统一开发入口是 [plugins/](../plugins/README.md)，采用 DSH npm 包形态与包名解析。Host 实现、客户端入口和第三方适配包都归入该目录；官方 npm 插件继续使用原包依赖。
-
-当前载体包含：
+当前载体包含的通用 UI 能力：
 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
-| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.3`，MIT，与固定 cohort 同步 | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备和状态内容，不装载其模型或凭据 controller |
-| DSH Client Modules | 与 Studio DSH cohort 同步，MIT | Host 扫描当前启用包的 `dsh.client` 声明生成 graph，官方 `AppWebEntry` 装载与挂载；React 等平台模块由官方 boot 单实例提供 |
+| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.3`，MIT | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备与状态内容，不装载其模型或凭据 controller |
+| DSH Client Modules | 与 Studio DSH cohort 同步，MIT | Host 扫描启用包的 `dsh.client` 声明生成 graph，由官方 `AppWebEntry` 装载与挂载（Electron 经受限桥接转发） |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
-| DSH `ui-sidebar-documentpreview` | 固定 DSH cohort 的 MIT 官方源码 | 当前预览 UI 源码编入产品 Client Plugin，文件面板仍使用窄工作区适配器；完整 `apply()` 等待官方 Remote、Resource、Sidebar 与 Session 运行时 |
-| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | SHA-bound 本地搜索兼容补丁作为普通 Vite 构建依赖编入产品 Client Plugin，保留搜索、索引、快捷键与日志，经 Studio 既有桥接访问日志 |
+| DSH `ui-sidebar-documentpreview` | 固定 DSH cohort 的 MIT 官方源码 | 预览 UI 源码与 OPL workspace 适配器（`EcosystemFilePreview`）编入 `opl-studio-client`；完整 `apply()` 待官方 Remote/Resource/Sidebar/Session 运行时齐备后切换；Office/Excel/PDF 当前返回不可用 |
+| [dsh-settings-search](https://github.com/objectivex666/dsh-settings-search) | npm 1.14.0，GPL-3.0 | 经 SHA-256 校验的 `settings-search-studio.patch` 编入 `opl-studio-client`，保留搜索/快捷键/日志（`createLogStore`），关闭第二套模型与凭据读写 |
+| [AKS1st/dock-git](https://github.com/AKS1st/dock-git) | MIT（仅评估候选） | 依赖 `dock-base` 与另一组 Cordis/React peer，尚未集成或验收 |
 
-设置搜索使用 1.14.0，功能范围仍是本地设置检索。该版本没有公开的本地搜索 feature-policy hook，却默认提供独立模型、API Key 和直连推理界面。Studio 在 Vite 构建时应用明确记录的 `settings-search-studio.patch`，作为普通构建依赖编入 `opl-studio-client`，不再单独发现或加载一个客户端 graph row。补丁保留官方搜索、索引、快捷键与日志，关闭第二套模型与凭据读写，并将固定日志请求交给既有 WebUI/桌面桥。补丁清单同时核对包版本、原始载荷、补丁及结果的 SHA-256；不修改安装的 npm 包，输入漂移会阻止构建。日志沿用官方 `createLogStore` 和 `createLogRoute`，存储在当前 DSH home 的独立日志目录，WebUI 保留认证与请求上限，打开目录仅允许本机桌面。App/Codex 继续持有模型和凭据。原许可证、上游源码来源与兼容补丁随源码和产品 Client Plugin 保留。
-
-`EcosystemFilePreview` 将当前 canonical thread 的相对路径交给 OPL workspace 适配器。Markdown、HTML、图片和普通文本由窄适配器呈现，实际使用的 UI 源码与适配器一起编入产品 Client Plugin。官方 `ui-sidebar-documentpreview` 的 npm 客户端不再静态复制为独立载荷；只有完整的 `remote.workspaceFiles`、`resources`、`sidebarRightTabs`、Session 生命周期和 `apply()` 注入链到位后才切换完整官方调用者。当前 Office/Excel/PDF 等格式明确返回不可用；每次 DSH 升级必须重新评估并优先接入官方完整路径。
-
-客户端发现与装载直接复用官方 Host graph 和 `AppWebEntry`。Host 从当前启用的 Cordis Loader entries 扫描 `dsh.client`，不扫描磁盘上的所有 npm 包；原生 profile 继续持有启用和依赖解析。Electron 只转发官方 index injections 和 `/plugins` 资源，没有 `dist/ecosystem/` 静态第二加载器。settings-search 与当前预览源码属于产品 Client Plugin 的构建依赖，不各自制造独立发现清单，也不替代 Framework 管理的 OPL Package 图。后续插件仍须核对许可证、真实注入依赖和 owner 边界，并验证实际界面。
-
-社区检索也确认 [AKS1st/dock-git](https://github.com/AKS1st/dock-git) 提供 Git 历史、差异、暂存、提交、推送和分支功能，采用 MIT。它依赖 `dock-base` 的工作台布局和另一组 Cordis/React peer，目前保留为可选适配候选，尚未集成或完成 Studio 运行验收。Git 不需要由 OPL 从头开发，但包存在与可直接安装是两个不同结论。
-
-验证覆盖 workspace bridge 的二进制窗口、跨任务/越界拒绝、取消、响应一致性与符号链接；文件预览复用官方 Markdown primitive。Office/Excel/PDF 的完整官方 Remote 接入仍是待完成的载体能力，不以源码存在替代运行时验收。
+文件预览验证覆盖 workspace bridge 的二进制窗口、跨任务/越界拒绝、取消、一致性与符号链接；Office/Excel/PDF 的官方 Remote 接入仍是待完成的载体能力。
 
 ## 客户端扩展与设置生命周期
 
-`opl-studio-client` 在现有 Cordis context 中安装官方 `SlotRegistry` 和 renderer。
-产品界面与 Framework contribution 共用原生注册入口；store、factory occurrence、
-声明依赖和卸载由 DSH 负责。每个客户端实例独立，不再使用模块级 slot host、空 store
-实现。官方 renderer 所需的 session scope 由当前 canonical Codex 线程的薄投影提供，
-未选择线程时为空，切换时销毁旧视图 fiber；不维护第二套 session 数据。
-
-`sidebar.settings` 注册官方 `createSettingsShellStore`，`SettingsRoot` 和 App 导航共用
-其 actions。设置导航直接使用上游实现；GUI 的 React 19 兼容补丁由 source manifest 明确记录。社区搜索通过
-真实 Cordis 插件依赖注入和卸载接入；仅搜索目录和语言绑定映射到 App 当前投影，
-不建立第二份设置持久状态。升级入口及验收见 [验证指南](verification.md#dsh-upstream-upgrade-gate)。
+`opl-studio-client` 在 Cordis context 中安装官方 `SlotRegistry` 与 renderer，session scope 仅由当前 canonical Codex 线程薄投影提供（切换时销毁旧视图 fiber）。`sidebar.settings` 注册官方 `createSettingsShellStore`，`SettingsRoot` 与 App 导航共用其 actions；React 19 兼容补丁及升级入口见 [验证指南](verification.md#dsh-upstream-upgrade-gate)。
 
 ## DSH sandbox reuse boundary
 
-At the pinned `0.1.7-rc.2` source, `dsh-sandbox` defines subprocess
-confinement and per-call escalation; `dsh-sandbox-local` supplies platform
-backends (macOS Seatbelt, Linux bubblewrap/Landlock, Windows restricted tokens).
-These share the host kernel/filesystem and do not replace a container or VM.
-Backend availability and full/partial enforcement must be reported as facts.
+At the pinned `0.2.2-rc.3` cohort (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`),
+`dsh-sandbox` defines subprocess confinement and per-call escalation, and
+`dsh-sandbox-local` supplies platform backends (macOS Seatbelt, Linux
+bubblewrap/Landlock, Windows restricted tokens). Studio packages those peer
+modules as cohort dependencies, but its Host profile does not mount a sandbox
+provider or session policy writer.
 
-Studio explicitly packages the sandbox and sandbox-policy peer modules needed
-by the DSH cohort. Its Host profile does not mount a sandbox provider or a
-second session policy store. Installing the modules does not confine plugins.
+Codex execution stays under App Server sandbox/approval ownership, and Framework
+Package work stays under Framework ownership. Before enabling any DSH plugin
+sandbox provider, each `DshToolMcp` call must bind to its canonical thread,
+workspace, and allowed mode (never inferring from last UI selection) and pass
+read-only denial, workspace write, path/symlink containment, cancellation, and
+fail-closed unavailable-backend tests against the packaged carrier.
 
-The useful next integration is bounded DSH plugin subprocess/file work. Codex
-execution remains under App Server sandbox/approval ownership, and Framework
-Package/runtime work remains under Framework ownership. An in-process plugin
-can access Node APIs directly; only operations routed through a confined
-executor receive this protection.
-
-Before enabling a provider, bind each MCP tool call to its canonical thread,
-workspace and allowed mode. The current DshToolMcp passes call ID, tool arguments
-and cancellation only; an MCP session ID is not a Codex thread identity. Never
-infer the workspace from the last selected UI thread or use a global writable
-fallback. Resolve escalation through the existing approval owner, scoped to the
-single call; do not load the DSH session-backed policy writer as a second store.
-
-Acceptance should prove read-only denial, workspace write success, outside-path
-and symlink denial, child-process confinement, cancellation, denied escalation,
-and fail-closed unavailable backend behavior. Do not advertise this as active
-sandbox enforcement until those tests run against the actual packaged carrier.
-
-Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/sandbox/sandbox),
-[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/sandbox/sandbox-local),
-[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/sandbox/sandbox-policy).
+Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox),
+[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox-local),
+[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox-policy).
 
 ## 计划任务、记忆与数据管理
 
-通用基础组件优先采用固定 DSH cohort 的官方实现。新增面板复用官方
-`Button` 和 Settings slot 的 `close` 回调；任务、记忆和清理经现有
-`opl-framework-bridge` 读取 `workbench_services` 并派发
-`package_contribution_execute`，不新增 renderer RPC、数据库或调度循环。
+新增面板复用官方 `Button` 与 Settings slot 的 `close` 回调，经 `opl-framework-bridge` 读取 `workbench_services` 并派发 `package_contribution_execute`，不新增 renderer RPC、业务数据库或调度循环：
 
-| 能力 | Studio 入口 |
+| 能力 | Studio 入口与边界 |
 | --- | --- |
-| 用户计划任务 | 主导航 → 计划任务：创建、编辑、暂停、恢复、删除、立即运行 |
-| 计划执行 | 每次运行新建 canonical thread，显式只读或工作区写权限；结果打开成功后进入对应会话，失败保留任务页面 |
-| Codex 执行器记忆 | Settings → 智能体与能力 → 记忆：查看当前 Codex home 中的 Markdown，新增、修改、删除交给该 owner 的纠错建议 |
-| 任务知识引用 | 同页按需读取领域 owner 提供的 refs；不读取业务正文，没有 refs 不等于没有记忆能力 |
-| 数据管理 | Settings → 工作区 → 数据与存储：只读用量与可预览清理 |
+| 用户计划任务 | 主导航 → 计划任务（设置页仅作运行条件与跳转）；每次运行新建 canonical thread，显式只读或工作区写权限 |
+| Codex 执行器记忆 | Settings → 智能体与能力 → 记忆：只读 `CODEX_HOME/memories`，纠错建议写入 `extensions/ad_hoc/notes` |
+| 任务知识引用 | 同页按需读取领域 owner 提供的 refs，不读取或缓存业务正文 |
+| 数据管理 | Settings → 工作区 → 数据与存储：只读用量与带过期校验的可预览清理 |
 
-官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/schedule/schedule)
-及 [`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/477b4f420553e8a52c2fbccc464d7561b239c443/packages/client/ui-schedule)
-的执行端依赖 DSH root Agent/session；`cofy-x/dsh-cron`、`squirrel20/dsh-cron` 和
-`Whale-Zhang/dsh-cron-tasks` 的后端同样依赖 DSH Agent/session，因此整套后端都不
-采用。任务定义、调度、队列窗口、清理范围、revision 与确认语义归 Framework 公开
-插件：见
-[工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)
-与 [Architecture](architecture.md#workbench-services)。Studio 侧只渲染投影并派发
-owner action，不维护业务状态表；执行器使用用户声明的权限与超时。补跑和重叠策略归
-Temporal，已获准的持久运行不因等待 App worker 超过五分钟而再次过期。
+官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/schedule/schedule)、[`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/client/ui-schedule) 及 `cofy-x/dsh-cron` 等均依赖 DSH root Agent/session，故不采用其后端；调度定义、Temporal 补跑/重叠策略与清理归 Framework 公开插件（见 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)、[Architecture](architecture.md#workbench-services) 与[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)）。
 
-这些能力需要 Framework 的公开 `./cordis-profiles` 导出
-`startCordisWorkbenchServicesHost`；缺少该导出时旧 Framework 会得到明确的升级
-提示，普通聊天不被阻塞。源码接入不代表已发布载体自动具备新导出：测试入口和
-证据层级见 [Verification](verification.md)，安装包仍须绑定相应 Framework 版本
-再验收。
-
-知识归属遵循 Framework 的[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)
-和[知识来源接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/knowledge-sources.md)。
-用户已有 Obsidian 等资料库时，原库继续持有唯一可编辑的业务正文；没有资料库时，
-业务工作目录可以承担同样职责。产品、用户或团队、主题、项目是归属范围，机制、
-约束、时点状态、决策是内容性质，两者都不由文件夹名称推断。
-
-Framework 管理来源登记、绑定、接受版本、权限核验、任务快照与机械写回证据；
-用户或领域 owner 接受正文含义。业务现状仍以领域 owner 的观察日期和版本为准，
-运行证据只记录实际消费，Codex 纠错建议只交给执行器记忆 owner。这些内容各有
-负责人，Studio 缓存不成为新的事实源，也不另建个人知识库或 Vault 副本。
-
-后续知识来源、审核与写回视图复用下述动态能力工作台，由 owner 声明真实可用能力；
-本说明不表示新增了内置知识编辑器。选中工作目录不授予资料库访问权，通用文件预览
-也不承担来源绑定或知识写回。业务工作区中的原始成果按其 owner 的保留规则管理，
-不能作为临时运行缓存清理。
-
-## 实现位置与设置组织
+## 能力工作台与标准 MCP Apps
 
 ### 能力工作台
 
-`opl-studio-client` 在 Cordis 生命周期内安装 `opl-workspace-client` 子模块，
-通过官方 `sidebar.footer.action` 和 `shell.overlay` 插槽提供工作台入口。
-类型化模块视图消费 Framework 已投影到 `settings.section` 的根级 `list_detail`、
-`timeline`、`approval_diff` 与 `activity_log` 视图，不扫描插件、不另建能力目录，
-也不根据 Persona、Relay 等 Package 名称决定是否显示。停用或卸载后视图随投影移除。
-
-工作台在宽屏右侧停留，聊天区域为它让出空间；窄屏使用可关闭的全宽面板。
-导航按视图 `dataRef` 的稳定能力命名空间分组，不重复显示 Package ID。
-模块数据仍由 Package 的 stdin/stdout JSON ABI 读取。`input_schema` 提供读取条件，
-`input_required` 会显示选择表单；`query/status/offset/limit` 由模块执行完整集合检索与分页，
-`pagination` 提供总数与下一页状态。客户端不会把当前一页搜索误称为完整邮箱检索。
-`command_inputs` 提供字段合同与默认值；`collection_actions` 明确声明新增等集合操作，
-条目 `actions` 提供绑定到当前内容的编辑或审核参数。同一个 action ref 可同时用于新增和编辑，
-不会因为已有条目而隐藏新增入口。读取选项和动作都只接受模块与描述文件允许的范围。
-表单等待确认和异步执行结果，只有成功才关闭；取消、拒绝或失败保留输入，就地给出结果。
-传输超时或未知执行结果不自动重发，先刷新并从实际 owner 核实。
-确认页显示具体动作、正文、目标和来源证据；内容指纹与内部编号自动绑定并默认收起。
-审核差异只使用模块提供的真实 `preview.before/after`；旧内容未知时仅显示拟写内容，
-不伪造“修改前”。时间线和活动视图显示模块提供的时间序列，正文保持可读排版。
-客户端只允许描述文件已声明的动作，并继续经过 App 的统一确认与 Framework 动作桥。
-审核内容指纹由领域模块检查，语音、场景切换和打开工作台都不构成邮件发送或网站发布授权。
-界面不持久化个人数据，人物、记忆、收件箱及提案状态归当前 Profile Workspace 内的领域模块。
-
-成功且通过当前 Package/ref/operation 校验的动作可以返回 `presentation.mode=browser` 和
-`presentation.url`。工作区显示“打开工作台”链接，复用模块自己的 WebUI。客户端只接受无
-URL 凭据的 HTTPS 或本机回环 HTTP；链接只保留在当前视图内存，不进入全局执行摘要或偏好。
-浏览器入口与内嵌 MCP App 共用模块界面，供需要顶层浏览器能力的场景使用。
+`opl-studio-client` 通过 `sidebar.footer.action` 与 `shell.overlay` 安装工作台入口，消费 Framework 投影到 `settings.section` 的 `list_detail`、`timeline`、`approval_diff` 与 `activity_log` 视图（按 `dataRef` 命名空间分组，不按 Package 名称硬编码）。所有读写均通过 stdin/stdout JSON ABI 与 App 统一确认/动作桥执行，失败或超时先回读确认而非自动重发，审核差异仅展示真实 `preview.before/after`，界面不持久化业务状态。`presentation.mode=browser` 仅在视图内存中保留无凭据 HTTPS/回环 URL 链接。
 
 ### 标准 MCP Apps
 
-能力工作台的 MCP Apps 页从当前 Codex 对话连接的 MCP 目录发现 UI 工具。
-模型调用完成后，聊天中的“打开应用”入口读取同一对话的 canonical tool result，
-不重放原工具；手动打开仅执行声明为只读的工具。目录不维护 Package 名称白名单，
-共享 OPL Apps 与 Relay 独立工作台使用同一宿主。
+`opl-mcp-apps` 消费当前 Codex 对话连接的 MCP 目录并运行 `@modelcontextprotocol/ext-apps` `2.0.4` 的 `AppBridge` 与 `PostMessageTransport`（弥补固定 `0.2.2-rc.3` DSH 缺少标准 MCP App UI 宿主的缺口）。界面保留单一应用切换工具栏，在无 `allow-same-origin` 的 opaque CSP iframe 中注入 App 主题、语言与尺寸；`ui/update-model-context` 与 `ui/message` 仅准备上下文或草稿，工具权限、Connect 授权与 `opl-workspace://artifact` 媒体预览均由 Codex/Framework/Thread workspace 实时校验，关闭或切换对话立即释放绑定且不自动重试工具调用。详情规范见 [Framework Mini App 规范](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/mcp-apps/SPEC.md)。
 
-打开界面时只保留一条应用切换工具栏，iframe 填满剩余主内容区。软件中心、目录刷新、
-模块视图和关闭行为说明放在“更多”菜单，不常驻目录侧栏或重复工作台标题。
-工作台的 iframe 尺寸由可用画布决定；任务详情的行内嵌入继续响应 App 的尺寸请求。
+### 语音、Profile 与 设置入口边界
 
-固定 DSH `0.2.2-rc.3`（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）
-提供 MCP client/tools/resources，尚无标准
-MCP App UI 宿主。因此使用官方 `@modelcontextprotocol/ext-apps` `2.0.4`
-的 `AppBridge` 和 `PostMessageTransport`，放入现有 DSH 工作台 slot；后续
-DSH 升级需重新评估这个缺口。`opl-codex-native` 继续持有 MCP 连接、凭据、
-审批和线程，宿主只保存临时 view binding。
-
-支持 `ui.resourceUri` 与旧 `ui/resourceUri`、`openai/outputTemplate`
-元数据、标准 MIME 的文本或 base64 HTML、同 server 的 App-visible 工具、
-声明资源读取、主题/语言/尺寸与展开模式。资源 list/read 中声明的 CSP 被应用到
-不含 `allow-same-origin` 的 opaque iframe；仅允许声明的 HTTPS 外部 origin，
-不授予宿主同源访问。工具权限仍由 Codex 与领域 owner 检查，UI 不构成审批。
-
-主题来自 App 已解析的当前配色，优先于操作系统偏好；主题和语言变化通过官方
-Host context 更新，保留现有 iframe 与未提交编辑。共享声明式视图与领域专用界面
-消费同一上下文，进度、产物、审阅的业务含义仍由 Framework 和领域 owner 提供。
-专业应用可保留自己的布局和编辑工具，通过 owner 声明的链接进入；Studio 不为
-它们复制任务、数据或执行队列。统一呈现模型见
-[Framework Mini App 规范](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/mcp-apps/SPEC.md)。
-
-Connect 连接使用能力必须由 Framework 在已验证的 installed Package 身份下绑定。
-当前 Codex MCP 目录只给宿主 server/tool 身份，不能把 server 名称、页面参数或
-`consumer_id` 当作 Package 身份。因此现有宿主仍通过绑定 server 的已声明工具调用
-领域 owner；不向 iframe 伪造 `connect.forPackage`，也不在 Studio 建立授权 broker。
-具备可信 Package 绑定的 owner host 可接入 Connect 的公开能力，页面仅收到连接引用、
-授权状态和业务结果，凭据生命周期继续由 provider/carrier 管理。
-
-共享工作台的 `opl-workspace://artifact?ref=...&start=...&end=...` 链接通过当前
-对话的 `readThread().workspace` 绑定工作区，然后复用现有分块读取、symlink
-containment 和系统打开/浏览器下载接口。`ref` 必须是当前 thread workspace 内的
-绝对产物路径，越界或相对路径一律拒绝；Framework 注册 workspace 与 thread cwd
-没有已证明的一致合同前，宿主不猜测映射。Studio 当前提供媒体预览及起止时码，关闭
-Mini App 时释放预览，文件不跨对话共享或落入持久状态。独立设备应用的启动 deep link
-不属于此工作区文件合同，继续由 owner 的产品/平台入口定义。
-
-`ui/update-model-context` 将有大小限制的非可信资料带到同一对话后续用户消息；
-`ui/message` 仅准备输入草稿，由用户发送。外链需用户点击。关闭、切换对话或视图
-释放绑定，晚到结果不能写入新对话。暂不声明 sampling 或 subscription 支持。
-桌面 IPC 与认证 WebUI 路由复用同一 Host 实现；浏览器实测与安装包验收分别记录。
-
-此工作台是现有 Studio 客户端插件的一部分，随 Studio 分发，不需要恢复已退役的
-`opl-aion-shell`，也不引入独立 Persona App。安装新版领域 Package 后仍需用其真实
-描述文件投影验收；仅有仓库中的视图声明不代表已安装载体自动更新。
-
-语音入口复用当前运行环境的识别服务，只把最终转写追加到当前草稿，不提交对话或执行动作。
-取消、切换任务、工作区或语言会撤销旧识别，晚到结果不能写入新任务；没有识别服务时明确显示不可用。
-Host 的个人 Profile 由启动时的 `OPL_PROFILE_WORKSPACE` 固定，当前没有动态 Profile 切换投影；
-不能把 fast/full 状态读取模式当作个人身份。真人麦克风与打包载体的识别服务仍须在目标环境单独验收。
-
-DSH 插件位于 `plugins/<plugin-id>/`。Host Core 通过 Cordis 消费其他插件服务，共享协议与原生 profile 更新分别归 `packages/host-contracts` 和 `packages/host-kit`。桌面、WebUI、Docker 通过同一个 Host profile 按 npm 包名装载。客户端组合和设置壳归 `opl-studio-client`，设置页在 `plugins/opl-studio-client/src/client/workbench/settings/pages/`。
-
-计划任务使用主导航入口，设置中的后台任务页仅提供运行条件和跳转，两个入口共用同一 Framework 服务及操作确认组件。模型与执行页包含权限、Codex Auto Review 和逐次发送的时间上下文。偏好页包含自定义快捷键和语音输入；语音由运行环境的识别服务提供，未提供时明确说明系统听写替代入口。能力目录提供用途入口、类型筛选与动态 Package 管理，配置表单仍由其唯一功能页持有。
-
-App 的 `app-shell-adapter.json` 是当前壳采用状态的唯一权威；Studio 候选证据不声明发布就绪。OPL Link 暂不内置、不进入自动注册或未安装推荐目录，保留已安装实例及其数据。
-
-## Plugin composition boundary
-
-The Studio repository contains the DSH Host and Client plugin composition. Framework capability Packages are discovered from owner descriptors and projected through the existing contribution ABI; they are not admitted into the DSH profile merely because their native carrier is a Codex plugin manager. Keep these surfaces separate while sharing the same user-facing Settings, Workspace, Task Detail, and MCP App entry patterns.
+语音识别仅将最终转写追加到当前草稿（取消或切换任务即撤销，无识别服务时提示系统听写替代）；个人 Profile 由启动时 `OPL_PROFILE_WORKSPACE` 固定。功能按语义归入主导航/设置（消息与远程通道归连接设置，服务诊断归服务状态，配置归能力设置，软件详情链接直达，OPL Link 不内置自动注册）；Framework Package 依 descriptor 与 `app-shell-adapter.json` 投影接入，与 DSH Host/Client 插件各自保持独立边界。

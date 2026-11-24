@@ -49,7 +49,7 @@ OPL Cloud       optional online workspaces and hosted services
 
 The ordinary product is **One Person Lab App**, distributed through the
 [App Latest Release](https://github.com/gaofeng21cn/one-person-lab-app/releases/latest).
-macOS Stable has used Studio since 26.9.25, retaining `cn.onepersonlab.opl`,
+macOS Stable uses Studio, retaining `cn.onepersonlab.opl`,
 the `One Person Lab.app` installation and the App update feed. The
 [App installation guide](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/install/README.md)
 owns platform selection and trusted installation.

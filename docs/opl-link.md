@@ -197,16 +197,8 @@ followed by a fresh Relay/Noise connection. `--relay-only` covers a retained
 Relay-only client. The forced-fallback lane also proves a repeated mutation ID
 does not dispatch another turn.
 Its Gateway account response is a local fixture. It does not prove public WSS
-reachability or native iOS behavior.
-
-The 2026-11-15 local native qualification additionally completed LAN and forced
-Relay-fallback lanes on iOS Simulator, plus the full TURN lane against native
-coturn 4.19. TURN reported an actual relay/prflx succeeded pair and completed
-claim, canonical conversation reads, chunk upload, versioned download, SSE,
-fresh reconnect and both revocations. The Host used the same bundled official
-werift provider. The Docker loopback test path failed before these requests;
-the native coturn fixture passed without an upstream protocol or RTC body patch.
-Public network qualification belongs to the Instance protected workflow.
+reachability or native iOS behavior. Public network qualification belongs to the
+Instance protected workflow.
 
 Add `--hold-qr-file /private/test-directory/pairing.txt` to leave that local
 fixture running for the native test. The file contains only the pairing URL,

@@ -45,7 +45,7 @@ OPL Cloud       可选的在线工作区和托管服务
 
 日常使用的产品是 **One Person Lab App**，从
 [App 最新发布页](https://github.com/gaofeng21cn/one-person-lab-app/releases/latest)
-下载安装。macOS Stable 从 26.9.25 起已采用 Studio，保留 `cn.onepersonlab.opl`、
+下载安装。macOS Stable 已采用 Studio，保留 `cn.onepersonlab.opl`、
 `One Person Lab.app` 安装位置与 App 更新源。
 [App 安装指南](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/install/README.zh-CN.md)
 负责平台选择和可信安装。

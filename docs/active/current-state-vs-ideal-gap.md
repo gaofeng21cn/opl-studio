@@ -26,25 +26,25 @@ their release assets and handoff receipts rather than a copied status table.
 ## Scope Of Product Work
 
 Studio develops the App-owned minimum product on the independent DSH/Cordis
-Application Host. It preserves required OPL user outcomes. AionUI-specific
-providers, Team orchestration, AionCore integration, and custom assistant
-catalogs are not automatic Studio parity requirements. Codex-native subagent
-display consumes App Server lineage and events without owning scheduling.
+Application Host while preserving required OPL user outcomes. Codex-native
+subagent display consumes App Server lineage and events without owning
+scheduling, and retired shell catalogs, providers, or custom assistant lists are
+not parity targets unless App explicitly admits them.
 
 With the same `CODEX_HOME`, canonical Codex threads remain available through App
 Server list/resume, including paginated history. Studio reads thread history and
-identity only from Codex App Server. It does not scan or import retired AionUI
-databases, cache files, history, or settings. Existing source files and data are
-left untouched. Studio Preview to Stable continuity remains a separate signed,
+identity solely from Codex App Server without importing external or retired
+shell databases, cache files, history, or settings. Existing user files stay
+untouched. Studio Preview to Stable continuity remains a separate signed,
 allowlisted handoff for Studio-owned settings, drafts, and canonical channel
-bindings. Browser-origin-only expansion state is not a conversation-loss condition.
+bindings; browser-origin-only expansion state is not a conversation-loss condition.
 
 Workspace browsing, search, and external opening or Web download are the
 minimum file outcome. Rich preview is optional. Generic features first reuse
-official or community DSH plugins; a dedicated Git workbench, storage deletion
-UI, and AionUI-specific providers remain nonblocking unless App explicitly
-admits them. Studio's maintained feature plugins focus on OPL research
-progress, maps, and canonical owner adapters.
+official or community DSH plugins; a dedicated Git workbench and storage
+deletion UI remain nonblocking unless App explicitly admits them. Studio's
+maintained feature plugins focus on OPL research progress, maps, and canonical
+owner adapters.
 
 Public Preview distribution and a selected local Studio carrier do not transfer
 Stable adoption, runtime or Package authority, professional quality, or artifact
