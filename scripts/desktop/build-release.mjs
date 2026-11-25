@@ -53,6 +53,9 @@ export function resolveStableBuildPlan(argv, env = process.env, host = { platfor
   const display = env.OPL_RELEASE_VERSION, machine = env.OPL_UPDATER_VERSION;
   if (!semver.valid(display) || !semver.valid(machine)) throw new Error('App release controller must provide display and updater versions');
   const commandEnvironment = { ...env, OPL_DESKTOP_RELEASE_IDENTITY: 'stable' };
+  if (platform === 'darwin' && typeof commandEnvironment.CSC_NAME === 'string') {
+    commandEnvironment.CSC_NAME = commandEnvironment.CSC_NAME.trim().replace(/^Developer ID Application:\s*/i, '');
+  }
   const appleId = env.APPLE_ID || env.appleId;
   const applePassword = env.APPLE_APP_SPECIFIC_PASSWORD || env.appleIdPassword;
   const appleTeam = env.APPLE_TEAM_ID || env.teamId;

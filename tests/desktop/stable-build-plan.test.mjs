@@ -253,3 +253,17 @@ test('payload environment preserves the Stable display and machine identities us
     assert.equal(local.OPL_UPDATER_VERSION, env.OPL_UPDATER_VERSION);
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('macOS Stable build plan strips Developer ID Application prefix from CSC_NAME while keeping identity', () => {
+  const prefixed = resolveStableBuildPlan(
+    ['--platform', 'darwin', '--arch', 'arm64'],
+    { ...env, CSC_NAME: 'Developer ID Application: Example Team (TEAM123)', identity: 'Developer ID Application: Example Team (TEAM123)' }
+  );
+  assert.equal(prefixed.env.CSC_NAME, 'Example Team (TEAM123)');
+  assert.equal(prefixed.env.identity, 'Developer ID Application: Example Team (TEAM123)');
+  const unprefixed = resolveStableBuildPlan(
+    ['--platform', 'darwin', '--arch', 'arm64'],
+    { ...env, CSC_NAME: 'Example Team (TEAM123)' }
+  );
+  assert.equal(unprefixed.env.CSC_NAME, 'Example Team (TEAM123)');
+});

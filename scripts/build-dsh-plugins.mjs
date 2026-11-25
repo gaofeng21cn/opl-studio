@@ -29,6 +29,15 @@ export function buildDshPlugins(selected, { skipBuild = false } = {}) {
   if (selected) for (const name of selected) {
     if (!entries.some(entry => entry.name === name)) throw new Error(`Unknown DSH source package: ${name}`);
   }
+  if (!skipBuild && (!selected || selected.some((name) => name !== "opl-superagent-engine"))) {
+    const uiKit = spawnSync(process.execPath, [path.join(root, "scripts/build-plugin-ui-kit.mjs")], {
+      cwd: root,
+      encoding: "utf8"
+    });
+    if (uiKit.status !== 0) {
+      throw new Error(uiKit.stderr || uiKit.stdout || "Failed to build @gaofeng21cn/opl-plugin-ui-kit");
+    }
+  }
   const rootManifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   for (const entry of entries) {
     if (selected && !selected.includes(entry.name)) continue;
