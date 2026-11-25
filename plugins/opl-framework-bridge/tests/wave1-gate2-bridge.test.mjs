@@ -287,6 +287,7 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
 
   const contrib = await opl.readContribution({ ref: "status.overview" });
   assert.equal(contrib.stdoutJson.opl_app_contribution.surface_kind, "opl_app_package_contribution.v1");
+  assert.equal(contrib.stdoutJson.opl_app_contribution.package_id, undefined);
   assert.equal(contrib.stdoutJson.opl_app_contribution.response.ok, true);
 
   const plan = await opl.runManagedUpdate("plan");
@@ -296,20 +297,111 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
   assert.equal(act.status, "preview_ready");
   assert.equal(act.authorityBoundary, "app_bridge_no_domain_authority");
 
+  const previewModeRo = createOplPassthrough({ env: { ...env, OPL_STUDIO_READ_ONLY: "1" }, client: opl.client });
+  const actPreviewMode = await previewModeRo.executeAction({ actionId: "codex_install", dryRun: false, mode: "preview" });
+  assert.equal(actPreviewMode.dryRun, true);
+  assert.equal(actPreviewMode.receiptKind, "preview");
+  assert.equal(actPreviewMode.status, "preview_ready");
+
   const missingBinBridge = new OplFrameworkBridge({ env: { ...env, OPL_DAEMON_BIN: path.join(root, "no-such-opld"), OPL_STATE_DIR: path.join(root, "empty-state") } });
   t.after(() => missingBinBridge.close());
   await assert.rejects(() => missingBinBridge.start(), (err) => err.code === "daemon_not_found");
 });
 
-test("Wave 1 Gate 2F: OpldClient reconnects and re-handshakes after daemon restart", async (t) => {
+test("Wave 1 Gate 2F: zero-sleep daemon.shutdown & SIGKILL recovery + close() mid-connect race", async (t) => {
   const { root, stateDir, env } = createIsolatedEnv();
   const bridge = new OplFrameworkBridge({ env });
   t.after(() => shutdownSandbox(root, stateDir, bridge));
   await bridge.start();
-  const firstSessionId = bridge.client.sessionInfo.session_id;
-  await bridge.client.call("daemon.shutdown", {});
-  await new Promise((r) => setTimeout(r, 250));
-  const st = await bridge.opl.readState("fast");
-  assert.equal(st.profile, "fast");
-  assert.notEqual(bridge.client.sessionInfo.session_id, firstSessionId);
+  const sessionFile = path.join(stateDir, "run", "opld.session.json");
+
+  for (let i = 0; i < 5; i += 1) {
+    const prevSid = bridge.client.sessionInfo.session_id;
+    await bridge.client.call("daemon.shutdown", {});
+    const st = await bridge.opl.readState("fast");
+    assert.equal(st.profile, "fast");
+    assert.notEqual(bridge.client.sessionInfo.session_id, prevSid);
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const prevSid = bridge.client.sessionInfo.session_id;
+    const prevPid = JSON.parse(fs.readFileSync(sessionFile, "utf8")).pid;
+    process.kill(prevPid, "SIGKILL");
+    const st = await bridge.opl.readState("fast");
+    assert.equal(st.profile, "fast");
+    assert.notEqual(bridge.client.sessionInfo.session_id, prevSid);
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const b1 = new OplFrameworkBridge({ env });
+    await b1.start();
+    const prevPid = JSON.parse(fs.readFileSync(sessionFile, "utf8")).pid;
+    process.kill(prevPid, "SIGKILL");
+    await b1.close();
+    const b2 = new OplFrameworkBridge({ env });
+    await b2.start();
+    const st = await b2.opl.readState("fast");
+    assert.equal(st.profile, "fast");
+    assert.notEqual(JSON.parse(fs.readFileSync(sessionFile, "utf8")).pid, prevPid);
+    await b2.close();
+  }
+
+  const raceClient = new OpldClient({ env });
+  const connectP = raceClient.connect();
+  await raceClient.close();
+  await assert.rejects(() => connectP, (err) => err instanceof OpldRpcError && err.code === "client_closed");
+  assert.equal(raceClient.connected, false);
+});
+
+test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", async (t) => {
+  const { root, stateDir, env } = createIsolatedEnv();
+  const bridge = new OplFrameworkBridge({ env });
+  t.after(() => shutdownSandbox(root, stateDir, bridge));
+  await bridge.start();
+
+  const detailPkgDir = writeV2Pkg(path.join(root, "detail-pkg"), {
+    id: "detail-pkg", intent: "app",
+    extra: {
+      provides: { contribution_handler: { kind: "cli", argv: ["./handler.mjs"], transport: "stdin_json_stdout_json" } },
+      ui: { declarative: { views: [{ id: "roadmap", view_type: "list_detail", slot: "workbench.panel", title: { "zh-CN": "路线图", "en-US": "Roadmap" }, data_ref: "roadmap.list" }] } },
+    },
+  });
+  fs.writeFileSync(path.join(detailPkgDir, "handler.mjs"), "#!/usr/bin/env node\nconsole.log(JSON.stringify({ ok: true }))\n", { mode: 0o755 });
+  await bridge.client.call("pack.link", { dir: detailPkgDir, sync_codex: false });
+
+  const avail = await bridge.opl.readDomainDetailView({ itemId: "detail-pkg", viewId: "roadmap" });
+  assert.equal(avail.exitCode, 0);
+  assert.equal(avail.stdoutJson.schema_version, "opl_domain_detail_view.v1");
+  assert.equal(avail.stdoutJson.surface_kind, "opl_domain_detail_view");
+  assert.equal(avail.stdoutJson.item_id, "detail-pkg");
+  assert.equal(avail.stdoutJson.view_id, "roadmap");
+  assert.equal(avail.stdoutJson.view_kind, "list_detail");
+  assert.equal(avail.stdoutJson.availability, "available");
+  assert.equal(avail.stdoutJson.not_modified, false);
+  assert.equal(Number.isInteger(avail.stdoutJson.revision) && avail.stdoutJson.revision >= 0, true);
+  assert.notEqual(avail.stdoutJson.payload, null);
+
+  const notMod = await bridge.opl.readDomainDetailView({ itemId: "detail-pkg", viewId: "roadmap", ifRevision: avail.stdoutJson.revision });
+  assert.equal(notMod.stdoutJson.not_modified, true);
+  assert.equal(notMod.stdoutJson.payload, null);
+
+  const missing = await bridge.opl.readDomainDetailView({ itemId: "unknown-pkg", viewId: "roadmap" });
+  assert.equal(missing.stdoutJson.schema_version, "opl_domain_detail_view.v1");
+  assert.equal(missing.stdoutJson.surface_kind, "opl_domain_detail_view");
+  assert.equal(missing.stdoutJson.view_kind, "unknown");
+  assert.equal(missing.stdoutJson.availability, "missing");
+  assert.equal(missing.stdoutJson.not_modified, false);
+  assert.equal(missing.stdoutJson.payload, null);
+
+  for (const bad of [null, undefined, 123, "str", [], {}, { email: "   ", password: "pw" }, { email: "alice@opl.dev", password: "   " }, { email: "alice@opl.dev", password: 123 }]) {
+    assert.deepEqual(await bridge.gatewayAccountLogin(bad), { ok: false, errorCode: "invalid_request", stateRefreshRequired: false });
+  }
+  for (const bad of [null, undefined, 123, "str", [], {}, { apiKey: "" }, { apiKey: "   \t\n  " }, { apiKey: 999 }]) {
+    assert.deepEqual(await bridge.codexApiKeyConfiguration(bad), { ok: false, errorCode: "invalid_request", stateRefreshRequired: false });
+  }
+  const listedEmpty = await bridge.client.call("connect.list", {});
+  assert.equal(listedEmpty.connections.length, 0);
+
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "alice@opl.dev", password: "pw-secret-1" }), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey: "sk-valid-key" }), { ok: true, stateRefreshRequired: true });
 });
