@@ -112,6 +112,7 @@ export class CodexAppServerTransport extends EventEmitter {
   // A turn that starts again between the wakeup and the lease re-arms the wait,
   // so the operation is not silently dropped as a deferred no-op.
   async scheduleWhenIdle(operation) {
+    let idleDeferred = 0;
     for (;;) {
       await this.whenIdle();
       if (this.disposed) {
@@ -119,6 +120,16 @@ export class CodexAppServerTransport extends EventEmitter {
       }
       const result = await this.runWhenIdle(operation);
       if (result.status !== "deferred") return result;
+      if (!this.maintenance && !this.isBusy()) {
+        idleDeferred += 1;
+        // One immediate retry handles a maintenance lease that released while
+        // awaiting runWhenIdle; repeated idle defers indicate a stubbed hook.
+        if (idleDeferred >= 2) {
+          await new Promise((resolve) => { this.idleWaiters.add(resolve); });
+        }
+      } else {
+        idleDeferred = 0;
+      }
     }
   }
 

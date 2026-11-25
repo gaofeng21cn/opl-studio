@@ -15,12 +15,16 @@ import {
   validateExternalDshPackageName
 } from "../../packages/host-kit/dsh-plugin-catalog.mjs";
 import {
+  applyPendingExternalPluginRemovalsOnBoot,
   manageExternalNpmDshPlugin
 } from "../../packages/host-kit/src/profile-plugin-updates.mjs";
 import {
+  cancelPendingContextOperation,
   clearPendingContextOperation,
-  readPendingContextOperation
+  readPendingContextOperation,
+  stageContextPluginOperation
 } from "../../plugins/opl-codex-native/src/billion-context.mjs";
+import { readProfileManifest } from "@deepseek-ai/dsh-app-boot";
 import { classifyAndRefreshDshPluginUpdate } from "../../plugins/opl-host-core/src/service.mjs";
 
 test("optional plugin preferences persist native DSH patches and reject core plugins", async () => {
@@ -300,8 +304,152 @@ test("validateExternalDshPackageName and open external npm DSH plugin lifecycle 
       home, dir: profileDir, packageName: "@community/dsh-notes", operation: "remove", activeAtBoot: true, view, run, runRemove
     });
     assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-notes"]?.pendingOperation, "remove");
+    await applyPendingExternalPluginRemovalsOnBoot({ dir: profileDir, home, runRemove });
     reconcileUserExternalPluginsOnBoot(profileDir);
     assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-notes"], undefined);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("external npm plugin updates preserve disabled choice and staged removals are genuinely reversible", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-open-dsh-reversible-"));
+  const home = path.join(root, "home");
+  const profileDir = path.join(root, "profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  try {
+    let remoteVersion = "1.0.0";
+    let removedByPnpm = 0;
+    const view = async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        name: "@community/dsh-toggle",
+        version: remoteVersion,
+        engines: { node: ">=20" },
+        dsh: { manifestVersion: 1, title: "Toggle Plugin", client: "./lib/client.js" }
+      })
+    });
+    const run = async (profileCtx) => {
+      const pkgDir = path.join(profileCtx.dir, "node_modules", "@community", "dsh-toggle");
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
+        name: "@community/dsh-toggle",
+        version: remoteVersion,
+        dsh: { manifestVersion: 1, client: "./lib/client.js" }
+      }));
+      const manifestPath = path.join(profileCtx.dir, "package.json");
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      manifest.dependencies = { ...(manifest.dependencies ?? {}), "@community/dsh-toggle": remoteVersion };
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      return { exitCode: 0, timedOut: false };
+    };
+    const runRemove = async (profileCtx) => {
+      removedByPnpm += 1;
+      fs.rmSync(path.join(profileCtx.dir, "node_modules", "@community", "dsh-toggle"), { recursive: true, force: true });
+      const manifestPath = path.join(profileCtx.dir, "package.json");
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      if (manifest.dependencies) delete manifest.dependencies["@community/dsh-toggle"];
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      return { exitCode: 0, timedOut: false };
+    };
+
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "install", view, run, runRemove
+    });
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "disable", activeAtBoot: false, view, run, runRemove
+    });
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-toggle"]?.enabled, false);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-toggle"), false);
+
+    // Background update on disabled plugin must preserve enabled: false and bundles exclusion.
+    remoteVersion = "1.1.0";
+    const updatedDisabled = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "update", activeAtBoot: false, view, run, runRemove
+    });
+    assert.equal(updatedDisabled.updated, true);
+    assert.equal(updatedDisabled.staged, false);
+    assert.equal(updatedDisabled.restartRequired, false);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-toggle"]?.enabled, false);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-toggle"), false);
+
+    // Re-enable and simulate loaded at boot; staged update cannot be canceled.
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "enable", activeAtBoot: false, view, run, runRemove
+    });
+    remoteVersion = "1.2.0";
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "update", activeAtBoot: true, view, run, runRemove
+    });
+    const updateCatalog = buildDshPluginCatalog({
+      dshProfileDir: profileDir,
+      activeExternalPlugins: ["@community/dsh-toggle"]
+    });
+    const stagedUpdateEntry = updateCatalog.entries.find(e => e.packageName === "@community/dsh-toggle");
+    assert.equal(stagedUpdateEntry?.pendingOperation, "update");
+    assert.equal(stagedUpdateEntry?.canCancelPending, false);
+    await assert.rejects(
+      manageExternalNpmDshPlugin({
+        home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "cancel_pending", activeAtBoot: true, view, run, runRemove
+      }),
+      (err) => err?.code === "dsh_plugin_cancel_unsupported"
+    );
+    reconcileUserExternalPluginsOnBoot(profileDir);
+
+    // Staged removal keeps files intact on disk until boot, and cancel_pending restores prior enabled state.
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "remove", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(removedByPnpm, 0);
+    assert.equal(fs.existsSync(path.join(profileDir, "node_modules", "@community", "dsh-toggle", "package.json")), true);
+    const removeCatalog = buildDshPluginCatalog({
+      dshProfileDir: profileDir,
+      activeExternalPlugins: ["@community/dsh-toggle"]
+    });
+    const stagedRemoveEntry = removeCatalog.entries.find(e => e.packageName === "@community/dsh-toggle");
+    assert.equal(stagedRemoveEntry?.pendingOperation, "remove");
+    assert.equal(stagedRemoveEntry?.canCancelPending, true);
+
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "cancel_pending", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-toggle"]?.pendingOperation, null);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-toggle"]?.enabled, true);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-toggle"), true);
+    reconcileUserExternalPluginsOnBoot(profileDir);
+    assert.equal(fs.existsSync(path.join(profileDir, "node_modules", "@community", "dsh-toggle", "package.json")), true);
+
+    // Uncancelled staged removal is executed on cold boot.
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-toggle", operation: "remove", activeAtBoot: true, view, run, runRemove
+    });
+    const bootRemoval = await applyPendingExternalPluginRemovalsOnBoot({ dir: profileDir, home, runRemove });
+    assert.deepEqual(bootRemoval, { removed: ["@community/dsh-toggle"], failed: [] });
+    assert.equal(removedByPnpm, 1);
+    assert.equal(fs.existsSync(path.join(profileDir, "node_modules", "@community", "dsh-toggle")), false);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-toggle"], undefined);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cancelPendingContextOperation restores billion-context bundle selection after staged removal", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-bc-cancel-remove-"));
+  const profileDir = path.join(root, "profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  try {
+    fs.writeFileSync(path.join(profileDir, "package.json"), JSON.stringify({
+      name: "opl-studio-profile",
+      private: true,
+      dependencies: { "billion-context": "1.0.0" },
+      dsh: { profile: { bundles: ["billion-context"] } }
+    }, null, 2));
+    await stageContextPluginOperation({ dshProfileDir: profileDir }, "remove", "1.0.0");
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("billion-context"), false);
+    assert.equal(readPendingContextOperation(profileDir)?.operation, "remove");
+    await cancelPendingContextOperation({ dshProfileDir: profileDir });
+    assert.equal(readPendingContextOperation(profileDir), null);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("billion-context"), true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

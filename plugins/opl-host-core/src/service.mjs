@@ -535,6 +535,18 @@ export class OplHostCore extends EventEmitter {
               targetVersion: outcome.version,
               restartRequired: true
             });
+          } else if (outcome.updated) {
+            await appendDshPluginActivity(options.dshProfileDir, {
+              pluginId: record.packageName,
+              packageName: record.packageName,
+              labelI18n: record.labelI18n,
+              action: "update",
+              status: "completed",
+              startedAt: now,
+              finishedAt: new Date().toISOString(),
+              targetVersion: outcome.version,
+              restartRequired: false
+            });
           }
         }
       } catch {

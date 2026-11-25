@@ -469,8 +469,35 @@ export function reconcileUserExternalPluginsOnBoot(profileDir) {
   let changed = false;
   const next = { ...records };
   for (const [pkg, record] of Object.entries(records)) {
+    if (record.pendingOperation === "remove") {
+      // Best-effort synchronous cleanup if async pnpm remove did not run or failed.
+      const manifestPath = path.join(profileDir, "package.json");
+      const manifest = readJsonSafe(manifestPath);
+      if (manifest && typeof manifest === "object") {
+        let manifestChanged = false;
+        if (manifest.dependencies && Object.hasOwn(manifest.dependencies, pkg)) {
+          delete manifest.dependencies[pkg];
+          manifestChanged = true;
+        }
+        const bundles = manifest.dsh?.profile?.bundles;
+        if (Array.isArray(bundles) && bundles.includes(pkg)) {
+          manifest.dsh.profile.bundles = bundles.filter(name => name !== pkg);
+          manifestChanged = true;
+        }
+        if (manifestChanged) {
+          writeJsonAtomic(manifestPath, manifest);
+        }
+      }
+      const pkgDir = path.join(profileDir, "node_modules", ...pkg.split("/"));
+      if (fs.existsSync(pkgDir)) {
+        fs.rmSync(pkgDir, { recursive: true, force: true });
+      }
+      delete next[pkg];
+      changed = true;
+      continue;
+    }
     const installedManifest = readInstalledExternalPackageManifest(profileDir, pkg);
-    if (record.pendingOperation === "remove" || !installedManifest) {
+    if (!installedManifest) {
       delete next[pkg];
       changed = true;
       continue;
@@ -599,6 +626,7 @@ export function buildDshPluginCatalog({
         pendingOperation: state.pendingOperation ?? null,
         pendingVersion: state.pendingVersion ?? null,
         requiresRestartOnMutate: state.requiresRestartOnMutate ?? Boolean(state.installed && (state.active || state.pendingOperation)),
+        canCancelPending: Boolean(state.pendingOperation),
         ...(state.sourceLabel ? { sourceLabel: state.sourceLabel } : {}),
         ...(state.checkErrorReason ? { checkErrorReason: state.checkErrorReason } : {})
       };
@@ -642,6 +670,7 @@ export function buildDshPluginCatalog({
     const pendingOperation = record.pendingOperation ?? null;
     const pendingVersion = record.pendingVersion ?? null;
     const pendingRestart = Boolean(pendingOperation) || enabled !== active || Boolean(installed && !active && enabled);
+    const canCancelPending = pendingOperation === "remove" && Boolean(profileVersion);
     if (pendingRestart) restartRequired = true;
     entries.push({
       pluginId: record.pluginId,
@@ -674,6 +703,7 @@ export function buildDshPluginCatalog({
       pendingOperation,
       pendingVersion,
       requiresRestartOnMutate: true,
+      canCancelPending,
       sourceLabel: "npm",
       ...(record.checkErrorReason ? { checkErrorReason: record.checkErrorReason } : {})
     });

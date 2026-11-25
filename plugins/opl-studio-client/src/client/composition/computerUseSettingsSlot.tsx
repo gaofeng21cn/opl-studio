@@ -92,6 +92,8 @@ export function ComputerUseSettingsSection({
   const available = state?.available ?? false;
   const enabled = state?.enabled ?? false;
   const consentMode = state?.consentMode ?? "elicit";
+  const runtimeInitFailed = Boolean(state?.supported && state.available && enabled && !state.active && !state.restartPending && state.unavailableReason);
+  const enabledNotActive = Boolean(state?.supported && state.available && enabled && !state.active && !state.restartPending && !state.unavailableReason);
 
   return (
     <div data-testid="opl-dsh-computer-use-settings">
@@ -101,12 +103,17 @@ export function ComputerUseSettingsSection({
         ) : state && !available ? (
           <StatusPill state="warning" label={zh ? "未检测到辅助程序" : "Helper missing"} />
         ) : (
-          <Switch
-            label={label}
-            checked={enabled}
-            disabled={!state || busy}
-            onChange={(next) => void updateSettings({ enabled: next })}
-          />
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {runtimeInitFailed ? (
+              <StatusPill state="warning" label={zh ? "初始化异常 · 不可用" : "Init failed · Unavailable"} />
+            ) : null}
+            <Switch
+              label={label}
+              checked={enabled}
+              disabled={!state || busy}
+              onChange={(next) => void updateSettings({ enabled: next })}
+            />
+          </div>
         )}
       </SettingRow>
 
@@ -116,11 +123,33 @@ export function ComputerUseSettingsSection({
         </p>
       ) : null}
 
+      {runtimeInitFailed ? (
+        <p className="settings-inline-note" role="alert" data-testid="opl-cua-runtime-error">
+          {zh
+            ? `Computer Use 初始化异常（${state!.unavailableReason}），当前未生效且功能不可用；普通 Codex 对话不受影响。`
+            : `Computer Use failed to initialize (${state!.unavailableReason}) and is currently unavailable; plain Codex chats are unaffected.`}
+        </p>
+      ) : enabledNotActive ? (
+        <p className="settings-inline-note" role="status" data-testid="opl-cua-inactive-notice">
+          {zh
+            ? "Computer Use 开关已打开，但当前未在 Codex 运行进程中生效。"
+            : "Computer Use is enabled, but not currently active in the running Codex process."}
+        </p>
+      ) : null}
+
       {state?.restartPending ? (
         <p className="settings-inline-note" role="status" data-testid="opl-cua-restart-pending">
-          {zh
-            ? "当前有对话轮次正在运行，设置已保存并在空闲重启 Codex 后生效。"
-            : "A turn is currently running. Changes are saved and apply after Codex restarts when idle."}
+          {state.active && !enabled
+            ? (zh
+              ? `当前有对话轮次正在运行，旧授权模式（${state.activeConsentMode ?? "elicit"}）仅在本轮内保留；轮次结束后将自动重载 Codex 并关闭 Computer Use。`
+              : `A turn is currently running, so the previous mode (${state.activeConsentMode ?? "elicit"}) stays active only for this turn; Codex will reload automatically when idle to turn Computer Use off.`)
+            : state.active && enabled && state.activeConsentMode && state.activeConsentMode !== consentMode
+              ? (zh
+                ? `当前有对话轮次正在运行，当前生效模式仍为 ${state.activeConsentMode}，目标模式 ${consentMode} 将在轮次结束后自动重载生效。`
+                : `A turn is currently running, so ${state.activeConsentMode} remains active until the turn finishes and Codex reloads automatically to ${consentMode}.`)
+              : (zh
+                ? "当前有对话轮次正在运行，设置已保存并在空闲重启 Codex 后生效。"
+                : "A turn is currently running. Changes are saved and apply after Codex restarts when idle.")}
         </p>
       ) : null}
 

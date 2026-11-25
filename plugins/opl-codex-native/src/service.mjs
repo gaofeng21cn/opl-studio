@@ -6,6 +6,7 @@ import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings"
 import { CodexThreadAdapter } from "./thread-adapter.mjs";
 import {
   applyPendingContextOperation,
+  cancelPendingContextOperation,
   clearPendingContextOperation,
   hasContextUpdate,
   manageContextPlugin,
@@ -94,6 +95,9 @@ export class OplCodexNative extends EventEmitter {
       nativeControl: nativeCuaControl
     };
     this.computerUseRestartPending = false;
+    this.computerUseConfigRevision = 0;
+    this.appliedComputerUseRevision = 0;
+    this.pendingComputerUseReloadPromise = null;
     this.computerUseActive = false;
     this.computerUseActiveConsentMode = null;
     this.computerUseError = null;
@@ -194,6 +198,7 @@ export class OplCodexNative extends EventEmitter {
   }
 
   #buildCodexArgs() {
+    this.configuredComputerUseRevision = this.computerUseConfigRevision;
     const withToolMcp = codexArgsWithDshToolMcp(this.baseCodexArgs, this.dshToolMcpConnection);
     if (this.hasExplicitTransport) {
       this.configuredComputerUseEnabled = false;
@@ -258,8 +263,17 @@ export class OplCodexNative extends EventEmitter {
     }
     this.computerUseActive = Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled);
     this.computerUseActiveConsentMode = this.computerUseActive ? this.configuredComputerUseConsentMode : null;
-    this.computerUseRestartPending = false;
+    this.appliedComputerUseRevision = this.configuredComputerUseRevision ?? this.computerUseConfigRevision;
+    this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
     this.appServerError = null;
+    this.emit("event", {
+      method: "host/computer-use-changed",
+      params: {
+        active: this.computerUseActive,
+        activeConsentMode: this.computerUseActiveConsentMode,
+        restartPending: this.computerUseRestartPending
+      }
+    });
   }
 
   async start() {
@@ -308,7 +322,7 @@ export class OplCodexNative extends EventEmitter {
     if (!["check", "install", "update", "remove", "cancel_pending"].includes(operation))
       throw new ThreadAdapterError("invalid_request", "Unknown Billion Context package operation", {}, 400);
     if (operation === "cancel_pending") {
-      clearPendingContextOperation(this.contextProfile.dshProfileDir);
+      await cancelPendingContextOperation(this.contextProfile);
       return this.readBillionContext();
     }
     const { version } = this.readBillionContext();
@@ -363,6 +377,33 @@ export class OplCodexNative extends EventEmitter {
     };
   }
 
+  #scheduleComputerUseReload() {
+    if (this.pendingComputerUseReloadPromise || this.closePromise) return;
+    if (typeof this.transport?.scheduleWhenIdle !== "function") return;
+    this.pendingComputerUseReloadPromise = this.transport.scheduleWhenIdle(async () => {
+      if (!this.computerUseRestartPending || this.closePromise) return;
+      this.#applyCodexArgs();
+      await this.reloadConfiguration({ maintenanceHeld: true });
+    }).catch((error) => {
+      if (!this.closePromise) {
+        this.appServerError = {
+          code: error?.code ?? "app_server_unavailable",
+          message: error?.message ?? String(error)
+        };
+      }
+    }).finally(() => {
+      this.pendingComputerUseReloadPromise = null;
+      if (
+        this.computerUseRestartPending
+        && !this.closePromise
+        && !this.transport?.disposed
+        && this.appliedComputerUseRevision !== this.computerUseConfigRevision
+      ) {
+        this.#scheduleComputerUseReload();
+      }
+    });
+  }
+
   async setComputerUse({ enabled, consentMode } = {}) {
     if (enabled !== undefined && typeof enabled !== "boolean") {
       throw new ThreadAdapterError("invalid_request", "Expected a boolean Computer Use enabled value", {}, 400);
@@ -377,14 +418,20 @@ export class OplCodexNative extends EventEmitter {
       this.computerUseOptions.platform
     );
     const changed = prev.enabled !== next.enabled || prev.consentMode !== next.consentMode;
+    if (changed) {
+      this.computerUseConfigRevision += 1;
+    }
     this.#applyCodexArgs();
     if (changed && this.transport.initialized) {
       try {
         await this.reloadConfiguration();
-        this.computerUseRestartPending = false;
+        if (this.computerUseRestartPending) {
+          this.#scheduleComputerUseReload();
+        }
       } catch (error) {
         if (error?.code === "app_server_busy") {
           this.computerUseRestartPending = true;
+          this.#scheduleComputerUseReload();
         } else {
           throw error;
         }

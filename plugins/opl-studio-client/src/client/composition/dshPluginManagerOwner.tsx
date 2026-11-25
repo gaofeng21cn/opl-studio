@@ -210,7 +210,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
       } else if (pluginId === "billion-context") {
         const bc = operation === "enable" || operation === "disable"
           ? await dshBridge?.setBillionContext?.({ enabled: operation === "enable" })
-          : dshBridge?.manageBillionContext && operation !== "cancel_pending"
+          : dshBridge?.manageBillionContext
             ? await dshBridge.manageBillionContext({ operation })
             : undefined;
         if (bc) nextCatalog = synthesizeBillionContextCatalog(bc);
@@ -500,7 +500,7 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
                 ? (isZh ? "已暂存卸载请求，重启应用后自动完成清理。" : "Removal is staged and completes automatically after restart.")
                 : (isZh ? "状态变更已保存，重启应用后生效。" : "Changes are saved and apply after restarting the app.")}</p>
             {typeof dshBridge?.restartNativeApp === "function" ? <Button size="sm" variant="primary" disabled={entryBusy || restarting} onClick={() => void restartForDshPlugin(entry.pluginId)}>{restarting ? (isZh ? "正在重启…" : "Restarting…") : (isZh ? "立即重启应用" : "Restart app now")}</Button> : null}
-            {entry.pendingOperation && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "cancel_pending", entry.packageName)}>{isZh ? "取消待生效变更" : "Cancel staged change"}</Button> : null}
+            {entry.pendingOperation && entry.canCancelPending !== false && canManage ? <Button size="sm" variant="outline" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, "cancel_pending", entry.packageName)}>{isZh ? "取消待生效变更" : "Cancel staged change"}</Button> : null}
           </div> : null}
           {entry.installed && entry.tier !== "core_runtime" ? <div className="opl-dsh-plugin-actions">
             {canToggle ? <Button size="sm" disabled={entryBusy} onClick={() => void runDshPluginAction(entry.pluginId, entry.enabled ? "disable" : "enable", entry.packageName)}>{entry.enabled ? (isZh ? "停用" : "Disable") : (isZh ? "启用" : "Enable")}</Button> : null}

@@ -578,6 +578,50 @@ async function lookupExternalNpmDshRelease({
 }
 
 /**
+ * Executes pending external npm plugin removals during cold boot before DSH loads the profile.
+ */
+export async function applyPendingExternalPluginRemovalsOnBoot({
+  dir,
+  installAnchor,
+  home,
+  cwd = process.cwd(),
+  runRemove = runProfilePnpm
+}) {
+  if (!dir) return { removed: [], failed: [] };
+  const pendingRemovals = Object.entries(readUserExternalDshPlugins(dir))
+    .filter(([, record]) => record.pendingOperation === "remove");
+  if (pendingRemovals.length === 0) return { removed: [], failed: [] };
+  const pnpmExec = resolveBundledPnpm(installAnchor);
+  const profileCtx = { profile, dir, installAnchor, home, cwd };
+  const removed = [];
+  const failed = [];
+  for (const [packageName] of pendingRemovals) {
+    try {
+      await withFileLock(path.join(dir, "package.json"), async () => {
+        await setExternalBundleActiveInProfile(dir, packageName, false);
+        const manifest = readProfileManifest(profile, dir);
+        if (Object.hasOwn(manifest.dependencies ?? {}, packageName)) {
+          const result = await runRemove(profileCtx, ["remove", packageName], {
+            command: pnpmExec.command ?? process.execPath,
+            args: pnpmExec.args ?? [],
+            execution: "service",
+            idleTimeoutMs: 60000
+          });
+          if (result.exitCode !== 0 || result.timedOut) {
+            throw Object.assign(new Error(`Could not remove ${packageName}`), { code: "dsh_plugin_remove_failed" });
+          }
+        }
+        await removeUserExternalDshPlugin(dir, packageName);
+      }, { waitMs: 120000 });
+      removed.push(packageName);
+    } catch {
+      failed.push(packageName);
+    }
+  }
+  return { removed, failed };
+}
+
+/**
  * Manages open community/external npm DSH plugins inside the DSH profile with strict
  * package name validation, compatibility admission, --ignore-scripts execution, and activity history.
  */
@@ -626,26 +670,65 @@ export async function manageExternalNpmDshPlugin({
   }
 
   if (operation === "cancel_pending") {
-    await withFileLock(path.join(dir, "package.json"), async () => {
-      if (existing?.pendingOperation === "remove" && installedManifest) {
-        await setExternalBundleActiveInProfile(dir, packageName, true);
+    if (!existing?.pendingOperation) {
+      return { operation, packageName, version: installedVersion, restartRequired: false };
+    }
+    if (existing.pendingOperation === "remove") {
+      if (!installedManifest) {
+        throw Object.assign(
+          new Error(`Cannot cancel removal of ${packageName}: package files are no longer installed`),
+          { code: "dsh_plugin_cancel_unavailable" }
+        );
       }
-      if (existing) {
+      const restoredEnabled = existing.previousEnabled !== false;
+      await withFileLock(path.join(dir, "package.json"), async () => {
+        await setExternalBundleActiveInProfile(dir, packageName, restoredEnabled);
         await upsertUserExternalDshPlugin(dir, {
           ...existing,
           packageName,
-          enabled: existing.pendingOperation === "remove" && installedManifest ? true : existing.enabled !== false,
+          enabled: restoredEnabled,
+          previousEnabled: undefined,
           pendingOperation: null,
           pendingVersion: null
         });
-      }
-    }, { waitMs: 10000 });
-    return { operation, packageName, version: installedVersion, restartRequired: false };
+      }, { waitMs: 10000 });
+      return {
+        operation,
+        packageName,
+        version: installedVersion,
+        restartRequired: restoredEnabled !== activeAtBoot
+      };
+    }
+    throw Object.assign(
+      new Error(`Cannot cancel staged update for ${packageName}: updated package files are already installed`),
+      { code: "dsh_plugin_cancel_unsupported" }
+    );
   }
 
   if (operation === "remove") {
     if (!existing && !installedManifest) {
       return { operation, packageName, version: null, restartRequired: false };
+    }
+    if (activeAtBoot) {
+      await withFileLock(path.join(dir, "package.json"), async () => {
+        await setExternalBundleActiveInProfile(dir, packageName, false);
+        await upsertUserExternalDshPlugin(dir, {
+          ...existing,
+          packageName,
+          installedVersion,
+          previousEnabled: existing?.enabled !== false,
+          enabled: false,
+          pendingOperation: "remove",
+          pendingVersion: null,
+          updateAvailable: false
+        });
+      }, { waitMs: 10000 });
+      return {
+        operation,
+        packageName,
+        version: installedVersion,
+        restartRequired: true
+      };
     }
     const pnpmExec = resolveBundledPnpm(installAnchor);
     await withFileLock(path.join(dir, "package.json"), async () => {
@@ -662,25 +745,13 @@ export async function manageExternalNpmDshPlugin({
           throw Object.assign(new Error(`Could not remove ${packageName}`), { code: "dsh_plugin_remove_failed" });
         }
       }
-      if (activeAtBoot) {
-        await upsertUserExternalDshPlugin(dir, {
-          ...existing,
-          packageName,
-          installedVersion,
-          enabled: false,
-          pendingOperation: "remove",
-          pendingVersion: null,
-          updateAvailable: false
-        });
-      } else {
-        await removeUserExternalDshPlugin(dir, packageName);
-      }
+      await removeUserExternalDshPlugin(dir, packageName);
     }, { waitMs: 120000 });
     return {
       operation,
       packageName,
       version: installedVersion,
-      restartRequired: Boolean(activeAtBoot)
+      restartRequired: false
     };
   }
 
@@ -761,8 +832,10 @@ export async function manageExternalNpmDshPlugin({
     throw Object.assign(new Error(`Could not install ${packageName}@${latestVersion}`), { code: "dsh_plugin_install_failed" });
   }
   const installedPkgManifest = readInstalledExternalPackageManifest(dir, packageName) ?? metadata;
+  const shouldEnable = operation === "install" ? true : existing?.enabled !== false;
+  const restartRequired = Boolean(activeAtBoot || shouldEnable);
   await withFileLock(path.join(dir, "package.json"), async () => {
-    await setExternalBundleActiveInProfile(dir, packageName, true);
+    await setExternalBundleActiveInProfile(dir, packageName, shouldEnable);
     await upsertUserExternalDshPlugin(dir, {
       ...existing,
       ...baseRecord,
@@ -770,7 +843,7 @@ export async function manageExternalNpmDshPlugin({
       installedVersion: latestVersion,
       availableVersion: latestVersion,
       updateAvailable: false,
-      enabled: true,
+      enabled: shouldEnable,
       pendingOperation: activeAtBoot ? "update" : null,
       pendingVersion: activeAtBoot ? latestVersion : null
     });
@@ -780,7 +853,8 @@ export async function manageExternalNpmDshPlugin({
     packageName,
     version: latestVersion,
     availableVersion: latestVersion,
-    staged: true,
-    restartRequired: true
+    updated: true,
+    staged: restartRequired,
+    restartRequired
   };
 }

@@ -34,6 +34,17 @@ export function clearPendingContextOperation(dshProfileDir) {
   }
 }
 
+export async function cancelPendingContextOperation({ dshProfileDir: dir }) {
+  if (!dir) return;
+  const pending = readPendingContextOperation(dir);
+  await withFileLock(path.join(dir, "package.json"), async () => {
+    if (pending?.operation === "remove" && pending.previousEnabled !== false) {
+      await saveBundleSelection(dir, true);
+    }
+    clearPendingContextOperation(dir);
+  }, { waitMs: 10000 });
+}
+
 async function writePendingContextOperation(dshProfileDir, payload) {
   const filePath = path.join(dshProfileDir, PENDING_FILE);
   await writeFileAtomic(filePath, JSON.stringify(payload, null, 2) + "\n", { mode: 0o600 });
@@ -91,10 +102,12 @@ export async function stageContextPluginOperation({ dshProfileDir: dir, dshInsta
   if (!dir) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
   if (operation === "remove") {
     await withFileLock(path.join(dir, "package.json"), async () => {
+      const previousEnabled = readProfileManifest("opl-studio", dir).dsh?.profile?.bundles?.includes(name) === true;
       await writePendingContextOperation(dir, {
         schema: "opl_billion_context_pending.v1",
         operation: "remove",
         targetVersion: null,
+        previousEnabled,
         requestedAt: new Date().toISOString()
       });
       await saveBundleSelection(dir, false);

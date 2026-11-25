@@ -256,3 +256,59 @@ test("OplCodexNative isolates CUA profile initialization failures without blocki
   assert.equal(state.active, false);
   assert.equal(state.unavailableReason, service.computerUseError.code);
 });
+
+test("OplCodexNative automatically reloads Computer Use once an active turn finishes", { skip: process.platform !== "darwin" }, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-auto-reload-"));
+  t.after(() => rm(tempRoot, { recursive: true, force: true }));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  await writeComputerUseSettings(dshHome, { enabled: true, consentMode: "allow" }, "darwin");
+
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin"
+  });
+  let starts = 0;
+  let stops = 0;
+  service.transport.start = async () => {
+    starts += 1;
+    service.transport.initialized = true;
+  };
+  service.transport.stop = async () => {
+    stops += 1;
+    service.transport.initialized = false;
+  };
+
+  await service.start();
+  assert.equal(starts, 1);
+  assert.equal((await service.readComputerUse()).active, true);
+  assert.equal((await service.readComputerUse()).activeConsentMode, "allow");
+
+  // Simulate an active Codex turn holding the transport busy.
+  let releaseTurn;
+  const turnPromise = service.transport.withActivity(() => new Promise((resolve) => {
+    releaseTurn = resolve;
+  }));
+
+  const whileBusy = await service.setComputerUse({ enabled: false });
+  assert.equal(whileBusy.enabled, false);
+  assert.equal(whileBusy.active, true);
+  assert.equal(whileBusy.activeConsentMode, "allow");
+  assert.equal(whileBusy.restartPending, true);
+  assert.equal(starts, 1);
+
+  // Finishing the turn triggers automatic idle reload without any explicit reload call.
+  releaseTurn();
+  await turnPromise;
+  await service.pendingComputerUseReloadPromise;
+
+  assert.equal(stops, 1);
+  assert.equal(starts, 2);
+  const afterIdle = await service.readComputerUse();
+  assert.equal(afterIdle.enabled, false);
+  assert.equal(afterIdle.active, false);
+  assert.equal(afterIdle.activeConsentMode, null);
+  assert.equal(afterIdle.restartPending, false);
+  assert.ok(!service.transport.args.some((arg) => arg.includes("mcp_servers.dsh_cua")));
+});

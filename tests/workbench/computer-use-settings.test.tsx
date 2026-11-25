@@ -134,3 +134,68 @@ test("ComputerUseSettingsSection defaults to elicit, warns on unattended allow, 
   expect(actions[1]?.appId).toBe("a".repeat(64));
   expect(document.body.textContent).not.toContain("Notes");
 });
+
+test("ComputerUseSettingsSection surfaces runtime init errors and active-turn disable details", async () => {
+  const initFailedState: ComputerUseState = {
+    supported: true,
+    available: true,
+    enabled: true,
+    active: false,
+    consentMode: "elicit",
+    activeConsentMode: null,
+    restartPending: false,
+    platform: "darwin",
+    permissions: {
+      status: "ready",
+      accessibility: true,
+      screenRecording: true,
+      helperAppPath: "/Applications/One Person Lab.app/Contents/Resources/DSH Computer Use.app",
+      helperBundle: "test-bundle",
+      error: null
+    },
+    allowedApps: [],
+    blockedApps: [],
+    unavailableReason: "EEXIST"
+  };
+
+  let state = initFailedState;
+  const bridge = {
+    async readComputerUse() {
+      return structuredClone(state);
+    },
+    async setComputerUse() {
+      return structuredClone(state);
+    },
+    async performComputerUseAction() {
+      return structuredClone(state);
+    }
+  };
+
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={bridge} />);
+  });
+  await act(async () => {});
+
+  const runtimeError = document.querySelector('[data-testid="opl-cua-runtime-error"]');
+  expect(runtimeError).not.toBeNull();
+  expect(runtimeError?.textContent).toContain("EEXIST");
+  expect(document.body.textContent).toContain("初始化异常 · 不可用");
+
+  state = {
+    ...initFailedState,
+    enabled: false,
+    active: true,
+    activeConsentMode: "allow",
+    restartPending: true,
+    unavailableReason: null
+  };
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={{ ...bridge }} />);
+  });
+  await act(async () => {});
+
+  const pendingBanner = document.querySelector('[data-testid="opl-cua-restart-pending"]');
+  expect(pendingBanner).not.toBeNull();
+  expect(pendingBanner?.textContent).toContain("allow");
+  expect(pendingBanner?.textContent).toContain("自动重载");
+});

@@ -199,6 +199,7 @@ export type DshPluginCatalogEntry = {
   pendingOperation: "update" | "remove" | null;
   pendingVersion: string | null;
   requiresRestartOnMutate?: boolean;
+  canCancelPending?: boolean;
   sourceLabel?: string;
   checkErrorReason?: string;
 };
