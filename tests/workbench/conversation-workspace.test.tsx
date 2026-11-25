@@ -19,7 +19,7 @@ const sourceSection = (source: string, start: string, end: string) => source.sli
 test("native directory picking is a direct pinned cohort dependency", () => {
   // Given the Workspace picker composition and its DSH package binding.
   const dependency = "@deepseek-ai/dsh-client-ui-directory-picker-native";
-  const version = "0.2.2-rc.3";
+  const version = "0.2.3-alpha.2";
   const spec = `${dependency}@${version}`;
   const pkg = JSON.parse(readSource("package.json"));
   const lock = JSON.parse(readSource("package-lock.json"));

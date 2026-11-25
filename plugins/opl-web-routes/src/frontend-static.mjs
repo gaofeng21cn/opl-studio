@@ -35,6 +35,7 @@ export async function registerOplFrontend(ctx, { webAuth, webRoot, webHost = "12
     renderIndex: (html, peer) => webServer.renderIndex(html, peer),
     registerFallback({ resource }) {
       return webServer.registerFallback({
+        auth: "anonymous",
         async resource(request, peer) {
           // HTTP assets and index share Studio's auth fence. A local resource
           // reader must explicitly use the page scope owned by this adapter.

@@ -14,18 +14,18 @@
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20",
-    "dsh": "0.2.2-rc.3"
+    "dsh": "0.2.3-alpha.2"
   },
   "dsh": {
     "manifestVersion": 1
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.1.0"
+    "@deepseek-ai/cordis": "4.2.0-alpha.1"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-client-connection": "0.2.2-rc.3",
-    "@deepseek-ai/dsh-host-frontend-static": "0.2.2-rc.3",
-    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.3"
+    "@deepseek-ai/dsh-client-connection": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-host-frontend-static": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-host-webserver": "0.2.3-alpha.2"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",

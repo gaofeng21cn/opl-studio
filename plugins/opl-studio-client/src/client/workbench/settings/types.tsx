@@ -102,6 +102,7 @@ export type SettingsPanelProps = {
   onChooseWorkspaceRoot: () => Promise<unknown>;
   onInstallCodex: () => Promise<unknown>;
   billionContext?: Pick<OplBridge, "readBillionContext" | "setBillionContext">;
+  computerUse?: Pick<OplBridge, "readComputerUse" | "setComputerUse" | "performComputerUseAction">;
   onConfigureCodexApiKey: (apiKey: string) => Promise<boolean>;
   onChangeLogDirectory: () => void;
   onOpenLogDirectory?: () => Promise<unknown>;

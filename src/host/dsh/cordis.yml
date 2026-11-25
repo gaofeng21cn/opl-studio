@@ -1,3 +1,6 @@
+- id: session-projection
+  name: '@deepseek-ai/dsh-session-projection'
+
 - id: system-prompt
   name: '@deepseek-ai/dsh-system-prompt'
   config:

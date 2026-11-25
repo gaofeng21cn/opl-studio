@@ -38,6 +38,11 @@ export {
   type OplSettingsGroupSlotName,
   type OplSettingsGroupMeta,
   type OplBillionContextPreferenceSnapshot,
+  type OplComputerUseConsentMode,
+  type OplComputerUsePermissionSnapshot,
+  type OplComputerUseAppGrantSnapshot,
+  type OplComputerUseStateSnapshot,
+  type OplComputerUseActionRequestSnapshot,
   type OplSettingsGroupOwner,
   type OplSettingsGroupSlotRegistry
 } from "./settingsSlots";

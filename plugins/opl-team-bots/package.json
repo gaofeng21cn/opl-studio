@@ -15,7 +15,7 @@
   "description": "Unmodified official DSH collaboration workbench with the existing persistent Codex executor.",
   "engines": {
     "node": ">=22.19.0",
-    "dsh": "0.2.2-rc.3"
+    "dsh": "0.2.3-alpha.2"
   },
   "dsh": {
     "manifestVersion": 1,

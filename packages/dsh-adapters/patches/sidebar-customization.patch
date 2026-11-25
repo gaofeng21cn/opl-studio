@@ -1,8 +1,6 @@
-diff --git a/packages/client/ui-sidebar/src/client/SidebarRoot.tsx b/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
-index c8193d2..fabe389 100644
 --- a/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
 +++ b/packages/client/ui-sidebar/src/client/SidebarRoot.tsx
-@@ -100,11 +100,13 @@ function PanelRow({
+@@ -96,11 +96,13 @@ function PanelRow({
        </Tooltip>
        {wide && canUnpin && <Tooltip label={unpinTooltip} side="bottom" align="end" delayMs={500} portal>
          <button type="button" className={css.panelUnpin} aria-label={unpinLabel} onClick={(event) => {
@@ -19,7 +17,7 @@ index c8193d2..fabe389 100644
          }}>
            <IconPinFillRegular size={14} />
          </button>
-@@ -125,10 +127,10 @@ function PanelMoreMenu({ wide, label, entries, onOpen, onPinnedChange, trackEntr
+@@ -121,10 +123,10 @@ function PanelMoreMenu({ wide, label, entries, onOpen, onPinnedChange, trackEntr
    const [open, setOpen] = useState(false)
    const onDismiss = (): void => { setOpen(false) }
    return (
@@ -32,7 +30,7 @@ index c8193d2..fabe389 100644
              onClick={() => {
                trackEntryClick({ menu_name: 'more', position: 'sidebar' })
                setOpen(value => !value)
-@@ -431,7 +433,7 @@ export function SidebarRoot({
+@@ -400,7 +402,7 @@ export function SidebarRoot({
                    renderFactorySlot={renderFactorySlot}
                  />
                ))}

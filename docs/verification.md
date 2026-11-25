@@ -87,7 +87,7 @@ ref, package cohort, GUI roots, and file inventory consumed by
    without regenerating vendor sources). Verification checks exact installed
    cohort alignment, reverses and verifies the React 19 compatibility patch
    digests, validates Desktop/Web schemas via official DSH APIs, and runs Host,
-   Client Cordis, headless, and candidate gates. For `0.2.2-rc.3`, the keyed
+   Client Cordis, headless, and candidate gates. For `0.2.3-alpha.2`, the keyed
    `main` slot uses `conversation` fallback (`activePanelId: null`).
 
 ## Three-Carrier And Rendered Acceptance

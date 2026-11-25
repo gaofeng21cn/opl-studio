@@ -1027,7 +1027,7 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
   assert.match(settingsPanel, /shortcut_id:/);
   assert.match(settingsPanel, /visible,/);
   assert.match(settingsPanel, /sort_order: sortOrder/);
-  assert.match(settingsRoot, /renderSlot\('settings\.section'/);
+  assert.match(settingsRoot, /renderFactorySlot\('settings\.section\.view'/);
   assert.match(slotHost, /settingsDestinations\("en"\)\.entries\(\)/);
   assert.match(slotHost, /id: settingsSectionId\(destination\.id\)/);
   assert.match(slotHost, /renderSettings\(selected, renderContribution \?\? undefined, setSelected, close\)/);

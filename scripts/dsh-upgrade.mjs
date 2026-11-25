@@ -37,7 +37,7 @@ export function readUpgradeTarget(binding, sourceRoot, { version, branch } = {})
   const wanted = new Set(binding.packageSpecs.map(({ name }) => name));
   const packages = new Map();
   const files = runGit(source, ["ls-files", "-z"]).split("\0")
-    .filter(file => /^(packages|vendor)\/.*\/package\.json$/.test(file));
+    .filter(file => /^(?:apps\/cli|(?:packages|vendor)\/.*)\/package\.json$/.test(file));
   for (const file of files) {
     const manifest = JSON.parse(fs.readFileSync(path.join(source, file), "utf8"));
     if (!wanted.has(manifest.name)) continue;
@@ -86,8 +86,7 @@ export async function verifyInstalledCohort(binding) {
 
 export async function verifyProfileSchemas(binding) {
   const { generateConfigSchema, initProfile, loadProfile, resolveProfileDir, loadOverlayPatches } = await import("@deepseek-ai/dsh-app-boot");
-  const { entryListSchema, applyEntryPatches } = await import("@deepseek-ai/cordis-plugin-include");
-  const { default: yaml } = await import("js-yaml");
+  const { applyEntryPatches, parseEntryYaml } = await import("@deepseek-ai/cordis-plugin-include");
   const { Ajv2020 } = await import("ajv/dist/2020.js");
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "opl-dsh-upgrade-schema-"));
   try {
@@ -95,14 +94,14 @@ export async function verifyProfileSchemas(binding) {
     const host = binding.manifest.application_host;
     initProfile(resolveProfileDir(host.profile, home), []);
     const profile = loadProfile(host.profile, host.profile, anchor, home);
-    const entries = yaml.load(fs.readFileSync(path.join(binding.root, host.profile_source), "utf8"), { schema: entryListSchema });
+    const entries = parseEntryYaml(fs.readFileSync(path.join(binding.root, host.profile_source), "utf8"));
     const webPatches = loadOverlayPatches(host.profile, path.join(binding.root, host.web_overlay));
     const results = [];
     for (const [carrier, layers] of [["desktop", [[{ insert: entries }]]], ["web", [[{ insert: entries }], webPatches]]]) {
       const schema = await generateConfigSchema(profile, layers, anchor);
       const diagnostics = schema["x-cordis"].diagnostics;
       if (diagnostics.some(item => item.level === "error")) fail(`DSH ${carrier} profile schema failed: ${JSON.stringify(diagnostics)}`);
-      const composed = layers.reduce((current, patches) => applyEntryPatches(current, patches, message => fail(`DSH ${carrier} profile patch failed: ${message}`)), []);
+      const composed = layers.reduce((current, patches) => applyEntryPatches(current, patches, message => fail(`DSH ${carrier} profile patch failed: ${message}`)).data, []);
       const validator = new Ajv2020({ strict: false, validateFormats: false });
       if (!validator.validate(schema, composed)) fail(`DSH ${carrier} profile config failed: ${JSON.stringify(validator.errors)}`);
       // Native transforms cannot be expressed fully in JSON Schema. Preserve

@@ -16,7 +16,7 @@ on DSH/Cordis. Source completion does not change the selected Stable carrier,
 GUI ABI freeze, release composition, or installed product.
 
 ```text
-DeepSeek Harness v0.2.2-rc.3 boot/profile/patch loader
+DeepSeek Harness v0.2.3-alpha.2 boot/profile/patch loader
   -> Studio Cordis Application Host
        -> DSH native tool registry -> authenticated MCP -> opl-codex-native
        -> opl-framework-bridge -> public OPL App contracts
@@ -46,7 +46,7 @@ stay replayable.
 `src/host/dsh/host.mjs` boots the `opl-studio` profile from
 `src/host/dsh/cordis.yml` into `$DSH_HOME/profiles/opl-studio`, heals standard
 profile module fallbacks, and applies `src/host/dsh/web.patch.yml` plus bundle
-patches. The profile uses `dsh-system-prompt` (without DSH identity or runtime
+patches. The profile uses `dsh-session-projection`, `dsh-system-prompt` (without DSH identity or runtime
 context), `dsh-tools` (native registry), `dsh-host-webserver`,
 `dsh-host-plugin-inventory`, `dsh-client-modules`, and auth-gated Web static
 hosting, excluding `dsh-base`.

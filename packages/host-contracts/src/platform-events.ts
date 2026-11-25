@@ -239,6 +239,9 @@ export type OplStudioSurface = Pick<
   readBillionContext?: () => Promise<BillionContextPreference>;
   setBillionContext?: (request: { enabled: boolean }) => Promise<BillionContextPreference>;
   manageBillionContext?: (request: { operation: "check" | "install" | "update" | "remove" | "cancel_pending" }) => Promise<BillionContextPreference>;
+  readComputerUse?: () => Promise<ComputerUseState>;
+  setComputerUse?: (request: { enabled?: boolean; consentMode?: ComputerUseConsentMode }) => Promise<ComputerUseState>;
+  performComputerUseAction?: (request: ComputerUseActionRequest) => Promise<ComputerUseState>;
   readDshPluginCatalog?: (request?: { includeUpdates?: boolean }) => Promise<DshPluginCatalogProjection>;
   manageDshPlugin?: (request: DshPluginManageRequest) => Promise<DshPluginCatalogProjection>;
   linkCompanion?: LinkCompanionManagement;
@@ -271,10 +274,52 @@ export type BillionContextPreference = {
   pendingVersion?: string | null;
 };
 
+export type ComputerUseConsentMode = "elicit" | "allow";
+
+export type ComputerUsePermissionStatus = {
+  status: "ready" | "permission_required" | "unavailable" | "unsupported";
+  accessibility: boolean;
+  screenRecording: boolean;
+  helperAppPath: string | null;
+  helperBundle: string | null;
+  error: string | null;
+};
+
+export type ComputerUseAppGrant = {
+  id: string;
+  name: string;
+  executablePath?: string;
+};
+
+export type ComputerUseState = {
+  supported: boolean;
+  available: boolean;
+  enabled: boolean;
+  active: boolean;
+  consentMode: ComputerUseConsentMode;
+  activeConsentMode: ComputerUseConsentMode | null;
+  restartPending: boolean;
+  platform: string;
+  permissions: ComputerUsePermissionStatus;
+  allowedApps: ComputerUseAppGrant[];
+  blockedApps: ComputerUseAppGrant[];
+  unavailableReason: string | null;
+};
+
+export type ComputerUseActionRequest = {
+  action: "recheck" | "request_permission" | "open_settings" | "revoke_app" | "retry_app";
+  permission?: "accessibility" | "screenRecording";
+  appId?: string;
+  locale?: "zh" | "en";
+};
+
 export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   readBillionContext?: OplStudioSurface["readBillionContext"];
   setBillionContext?: OplStudioSurface["setBillionContext"];
   manageBillionContext?: OplStudioSurface["manageBillionContext"];
+  readComputerUse?: OplStudioSurface["readComputerUse"];
+  setComputerUse?: OplStudioSurface["setComputerUse"];
+  performComputerUseAction?: OplStudioSurface["performComputerUseAction"];
   readDshPluginCatalog?: OplStudioSurface["readDshPluginCatalog"];
   manageDshPlugin?: OplStudioSurface["manageDshPlugin"];
   reloadRenderer?: OplStudioSurface["reloadRenderer"];

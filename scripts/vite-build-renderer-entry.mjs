@@ -11,17 +11,64 @@ import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Use the existing source aliases without maintaining a second package map. */
-function sourceAliases() {
+function tsconfigAliasMap() {
   const tsconfig = JSON.parse(fs.readFileSync(path.join(root, "tsconfig.json"), "utf8"));
   return Object.entries(tsconfig.compilerOptions.paths).map(([specifier, paths]) => {
     if (specifier.includes("*") || paths.length !== 1) {
       throw new Error(`Renderer source alias must have one exact target: ${specifier}`);
     }
     return {
-      find: new RegExp(`^${specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
-      replacement: path.resolve(root, paths[0])
+      specifier,
+      target: path.resolve(root, paths[0])
     };
   });
+}
+
+function sourceAliases(excludedSpecifiers = new Set()) {
+  return tsconfigAliasMap()
+    .filter(({ specifier }) => !excludedSpecifiers.has(specifier))
+    .map(({ specifier, target }) => ({
+      find: new RegExp(`^${specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+      replacement: target
+    }));
+}
+
+const STATIC_LINKED_VENDOR_SPECIFIERS = new Set([
+  "@deepseek-ai/dsh-client-ui-primitives",
+  "@deepseek-ai/dsh-client-ui-slots"
+]);
+
+function vendoredStaticModuleManifest(external = []) {
+  const externalSet = new Set(external);
+  const activeTargets = new Map(
+    tsconfigAliasMap()
+      .filter(({ specifier }) => STATIC_LINKED_VENDOR_SPECIFIERS.has(specifier) && !externalSet.has(specifier))
+      .map(({ specifier, target }) => [specifier, target])
+  );
+  const prefix = "\0opl-static-manifest:";
+  return {
+    name: "opl-vendored-static-module-manifest",
+    enforce: "pre",
+    resolveId(specifier) {
+      if (activeTargets.has(specifier)) return `${prefix}${specifier}`;
+      return undefined;
+    },
+    load(id) {
+      if (!id.startsWith(prefix)) return undefined;
+      const specifier = id.slice(prefix.length);
+      const target = activeTargets.get(specifier);
+      if (!target) return undefined;
+      const literalTarget = JSON.stringify(target);
+      return [
+        `import * as raw from ${literalTarget};`,
+        `export * from ${literalTarget};`,
+        `export const __$dsh_client_module_manifest = {`,
+        `  id: ${JSON.stringify(specifier)},`,
+        `  factory: () => Object.defineProperties({}, Object.fromEntries(Object.keys(raw).map((key) => [key, { enumerable: true, get: () => raw[key] }])))`,
+        `};`
+      ].join("\n");
+    }
+  };
 }
 
 function nodeModuleStub() {
@@ -65,18 +112,21 @@ export async function buildRendererEntry(entrypoint, outdir, format = "esm", { e
   const outputFormat = formats[format];
   if (!outputFormat) throw new Error(`Unsupported renderer output format: ${format}`);
   const name = path.basename(entrypoint).replace(/\.[^.]+$/, "");
+  const excludedAliases = new Set(
+    [...STATIC_LINKED_VENDOR_SPECIFIERS].filter((specifier) => !external.includes(specifier))
+  );
   return build({
     root,
     configFile: false,
     publicDir: false,
     base: "./",
     logLevel: "warn",
-    plugins: [clientRuntimePolicy(), settingsSearchModule(), react()],
+    plugins: [vendoredStaticModuleManifest(external), clientRuntimePolicy(), settingsSearchModule(), react()],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: [
         { find: /^node:module$/, replacement: nodeModuleStub() },
-        ...sourceAliases()
+        ...sourceAliases(excludedAliases)
       ],
       mainFields: ["main", "module"],
     },

@@ -15,7 +15,7 @@
   "description": "OPL App first-party Materials Space for browsing and previewing user-facing deliverables across registered standard agent project workspaces.",
   "engines": {
     "node": ">=22.19.0",
-    "dsh": "0.2.2-rc.3"
+    "dsh": "0.2.3-alpha.2"
   },
   "dsh": {
     "manifestVersion": 1,

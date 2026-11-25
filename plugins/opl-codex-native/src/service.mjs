@@ -14,11 +14,29 @@ import {
   setContextPluginEnabled,
   stageContextPluginOperation
 } from "./billion-context.mjs";
+import {
+  codexArgsWithComputerUse,
+  ensureCuaMcpProfile,
+  inspectNativePermissions,
+  openNativePermissionSettings,
+  readComputerUseSettings,
+  readSavedAppPermissions,
+  requestNativePermission,
+  resolveBundledCuaHelper,
+  resolveCuaHome,
+  resolveCuaWorkspace,
+  resolveDshCliEntry,
+  retrySavedAppPermission,
+  revokeSavedAppPermission,
+  writeComputerUseSettings
+} from "./computer-use.mjs";
 import { ThreadAdapterError } from "@gaofeng21cn/opl-host-contracts/thread-error";
 
 const defaultWorkspaceRoot = process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD
   ?? process.env.OPL_STUDIO_CODEX_CWD
   ?? process.cwd();
+
+export { codexArgsWithComputerUse };
 
 export function codexArgsWithDshToolMcp(baseArgs, connection) {
   if (!connection) return [...baseArgs];
@@ -48,7 +66,11 @@ export class OplCodexNative extends EventEmitter {
     dshProfileDir,
     dshInstallAnchor,
     dshHome,
-    env = process.env
+    env = process.env,
+    platform = process.platform,
+    arch = process.arch,
+    nodeExecutable = process.execPath,
+    nativeCuaControl
   } = {}) {
     super();
     const channelBindingStore = new ChannelBindingStore({
@@ -60,17 +82,28 @@ export class OplCodexNative extends EventEmitter {
       : env;
     const baseArgs = env.CODEX_APP_SERVER_ARGS?.split(" ").filter(Boolean)
       ?? ["app-server"];
+    this.baseCodexArgs = [...baseArgs];
+    this.dshToolMcpConnection = connection ?? null;
+    this.contextProfile = { dshProfileDir, dshInstallAnchor, dshHome };
+    this.billionContextAdmitted = billionContextAdmitted;
+    this.hasExplicitTransport = Boolean(transport);
+    this.computerUseOptions = {
+      platform,
+      arch,
+      nodeExecutable,
+      nativeControl: nativeCuaControl
+    };
+    this.computerUseRestartPending = false;
+    this.computerUseActive = false;
+    this.computerUseActiveConsentMode = null;
     this.transport = transport ?? new CodexAppServerTransport({
       cwd: workspaceRoot,
       env: childEnv,
-      args: codexArgsWithDshToolMcp(baseArgs, connection),
+      args: this.#buildCodexArgs(),
       channelBindingStore,
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
     this.transport.channelBindingStore ??= channelBindingStore;
-    this.contextProfile = { dshProfileDir, dshInstallAnchor, dshHome };
-    this.billionContextAdmitted = billionContextAdmitted;
-    this.hasExplicitTransport = Boolean(transport);
     this.contextLaunch = null;
     this.contextError = false;
     this.contextVersion = null;
@@ -127,25 +160,102 @@ export class OplCodexNative extends EventEmitter {
     }
   }
 
+  #computerUseRuntimeConfig() {
+    const { dshHome, dshInstallAnchor } = this.contextProfile;
+    const { platform, arch, nodeExecutable } = this.computerUseOptions;
+    const supported = platform === "darwin";
+    const settings = readComputerUseSettings(dshHome, platform);
+    const dshCliEntry = dshHome ? resolveDshCliEntry({ installAnchor: dshInstallAnchor }) : null;
+    const helper = dshHome ? resolveBundledCuaHelper({ installAnchor: dshInstallAnchor, platform, arch }) : null;
+    const available = supported && Boolean(dshHome && dshCliEntry && helper);
+    const cuaHome = resolveCuaHome(dshHome);
+    const workspace = resolveCuaWorkspace(dshHome);
+    return {
+      supported,
+      available,
+      enabled: settings.enabled,
+      consentMode: settings.consentMode,
+      command: nodeExecutable,
+      cuaHome,
+      workspace,
+      dshCliEntry,
+      helper,
+      unavailableReason: !supported
+        ? "unsupported_platform"
+        : !dshHome
+          ? "dsh_home_unavailable"
+          : !dshCliEntry
+            ? "dsh_cli_unavailable"
+            : !helper
+              ? "cua_helper_unavailable"
+              : null
+    };
+  }
+
+  #buildCodexArgs() {
+    const withToolMcp = codexArgsWithDshToolMcp(this.baseCodexArgs, this.dshToolMcpConnection);
+    if (this.hasExplicitTransport) {
+      this.configuredComputerUseEnabled = false;
+      this.configuredComputerUseConsentMode = null;
+      return withToolMcp;
+    }
+    const config = this.#computerUseRuntimeConfig();
+    if (!config.available || !config.enabled) {
+      this.configuredComputerUseEnabled = false;
+      this.configuredComputerUseConsentMode = null;
+      return withToolMcp;
+    }
+    ensureCuaMcpProfile(this.contextProfile.dshHome);
+    this.configuredComputerUseEnabled = true;
+    this.configuredComputerUseConsentMode = config.consentMode;
+    return codexArgsWithComputerUse(withToolMcp, {
+      enabled: true,
+      consentMode: config.consentMode,
+      command: config.command,
+      cuaHome: config.cuaHome,
+      workspace: config.workspace,
+      dshCliEntry: config.dshCliEntry
+    });
+  }
+
+  #applyCodexArgs() {
+    if (this.hasExplicitTransport) return;
+    if (this.contextLaunch) {
+      Object.assign(this.transport, {
+        command: this.contextLaunch.command,
+        env: this.contextLaunch.env
+      });
+      this.contextLaunch = null;
+    }
+    this.transport.args = this.#buildCodexArgs();
+  }
+
+  async #startTransport() {
+    this.#prepareContextLauncher();
+    try {
+      await this.transport.start();
+    } catch (error) {
+      if (!this.contextLaunch) throw error;
+      await this.transport.stop();
+      Object.assign(this.transport, this.contextLaunch);
+      this.contextLaunch = null;
+      this.contextError = true;
+      await this.transport.start();
+    }
+    this.computerUseActive = Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled);
+    this.computerUseActiveConsentMode = this.computerUseActive ? this.configuredComputerUseConsentMode : null;
+    this.computerUseRestartPending = false;
+    this.appServerError = null;
+  }
+
   async start() {
     if (this.pendingContextOperationOnBoot) {
       const stagedOutcome = await applyPendingContextOperation(this.contextProfile);
       this.pendingContextOperationOnBoot = null;
       if (stagedOutcome.error) this.contextError = true;
-      this.#prepareContextLauncher();
     }
     try {
-      try {
-        await this.transport.start();
-      } catch (error) {
-        if (!this.contextLaunch) throw error;
-        await this.transport.stop();
-        Object.assign(this.transport, this.contextLaunch);
-        this.contextLaunch = null;
-        this.contextError = true;
-        await this.transport.start();
-      }
-      this.appServerError = null;
+      await this.#startTransport();
     } catch (error) {
       this.appServerError = {
         code: error.code ?? "app_server_unavailable",
@@ -213,6 +323,85 @@ export class OplCodexNative extends EventEmitter {
     return this.readBillionContext();
   }
 
+  async readComputerUse() {
+    const config = this.#computerUseRuntimeConfig();
+    const { dshHome } = this.contextProfile;
+    const { platform, nativeControl } = this.computerUseOptions;
+    const [permissions, saved] = await Promise.all([
+      inspectNativePermissions({ helper: config.helper, platform, nativeControl }),
+      dshHome ? readSavedAppPermissions(dshHome) : Promise.resolve({ allowedApps: [], blockedApps: [] })
+    ]);
+    return {
+      supported: config.supported,
+      available: config.available,
+      enabled: config.enabled,
+      active: this.computerUseActive && this.transport.initialized === true,
+      consentMode: config.consentMode,
+      activeConsentMode: this.computerUseActive && this.transport.initialized === true ? this.computerUseActiveConsentMode : null,
+      restartPending: this.computerUseRestartPending,
+      platform,
+      permissions,
+      allowedApps: saved.allowedApps,
+      blockedApps: saved.blockedApps,
+      unavailableReason: config.unavailableReason
+    };
+  }
+
+  async setComputerUse({ enabled, consentMode } = {}) {
+    if (enabled !== undefined && typeof enabled !== "boolean") {
+      throw new ThreadAdapterError("invalid_request", "Expected a boolean Computer Use enabled value", {}, 400);
+    }
+    if (consentMode !== undefined && consentMode !== "elicit" && consentMode !== "allow") {
+      throw new ThreadAdapterError("invalid_request", `Unsupported Computer Use consent mode: ${String(consentMode)}`, {}, 400);
+    }
+    const prev = readComputerUseSettings(this.contextProfile.dshHome, this.computerUseOptions.platform);
+    const next = await writeComputerUseSettings(
+      this.contextProfile.dshHome,
+      { enabled, consentMode },
+      this.computerUseOptions.platform
+    );
+    const changed = prev.enabled !== next.enabled || prev.consentMode !== next.consentMode;
+    this.#applyCodexArgs();
+    if (changed && this.transport.initialized) {
+      try {
+        await this.reloadConfiguration();
+        this.computerUseRestartPending = false;
+      } catch (error) {
+        if (error?.code === "app_server_busy") {
+          this.computerUseRestartPending = true;
+        } else {
+          throw error;
+        }
+      }
+    }
+    return this.readComputerUse();
+  }
+
+  async performComputerUseAction({ action, permission, appId, locale = "en" } = {}) {
+    const config = this.#computerUseRuntimeConfig();
+    const { nativeControl } = this.computerUseOptions;
+    const { dshHome } = this.contextProfile;
+    switch (action) {
+      case "recheck":
+        break;
+      case "request_permission":
+        await requestNativePermission({ helper: config.helper, permission, locale, nativeControl });
+        break;
+      case "open_settings":
+        await openNativePermissionSettings({ helper: config.helper, permission, locale, nativeControl });
+        break;
+      case "revoke_app":
+        await revokeSavedAppPermission(dshHome, appId);
+        break;
+      case "retry_app":
+        await retrySavedAppPermission(dshHome, appId);
+        break;
+      default:
+        throw new ThreadAdapterError("invalid_request", `Unknown Computer Use action: ${String(action)}`, {}, 400);
+    }
+    return this.readComputerUse();
+  }
+
   async reloadConfiguration({ maintenanceHeld = false } = {}) {
     if (!maintenanceHeld && typeof this.transport.runWhenIdle === "function") {
       const result = await this.transport.runWhenIdle(() => this.reloadConfiguration({ maintenanceHeld: true }));
@@ -229,8 +418,7 @@ export class OplCodexNative extends EventEmitter {
     this.reloadPromise ??= (async () => {
       await this.transport.stop();
       try {
-        await this.transport.start();
-        this.appServerError = null;
+        await this.#startTransport();
       } catch (error) {
         this.appServerError = {
           code: error.code ?? "app_server_unavailable",

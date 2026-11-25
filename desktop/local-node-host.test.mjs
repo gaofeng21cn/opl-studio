@@ -8,8 +8,8 @@ import { createLocalNodeHost } from "./local-node-host.mjs";
 import { assertPatchedHostNode, resolveHostNode, resolveCurrentNodeEntrypoint } from "./node-host-runtime.mjs";
 
 test("Node Host admission rejects the compromised TLS cohorts and prereleases", () => {
-  for (const version of ["22.23.4", "22.24.0", "24.22.1", "26.12.1", "28.0.0"]) assert.doesNotThrow(() => assertPatchedHostNode(version));
-  for (const version of ["20.20.0", "22.23.3", "23.0.0", "24.22.0", "25.0.0", "26.12.0", "26.12.1-rc.1"]) {
+  for (const version of ["22.23.4", "22.24.0", "24.22.3", "26.13.1", "28.0.0"]) assert.doesNotThrow(() => assertPatchedHostNode(version));
+  for (const version of ["20.20.0", "22.23.3", "23.0.0", "24.22.2", "25.0.0", "26.13.0", "26.13.1-rc.1"]) {
     assert.throws(() => assertPatchedHostNode(version), { code: "node_host_security_update_required" });
   }
 });
@@ -20,7 +20,7 @@ test("Node Host refuses Electron and unsafe selected Node before starting a Host
   const command = path.join(root, "node");
   fs.writeFileSync(command, "fixture", { mode: 0o755 });
   const probe = value => () => ({ status: 0, stdout: JSON.stringify(value) });
-  assert.throws(() => resolveHostNode({ nodeExecutable: command, probe: probe({ node: "26.12.1", electron: "44.9.1" }) }), { code: "node_host_runtime_unavailable" });
+  assert.throws(() => resolveHostNode({ nodeExecutable: command, probe: probe({ node: "26.13.1", electron: "44.9.1" }) }), { code: "node_host_runtime_unavailable" });
   assert.throws(() => resolveHostNode({ nodeExecutable: command, probe: probe({ node: "26.10.0", electron: null }) }), { code: "node_host_security_update_required" });
 });
 
@@ -38,7 +38,7 @@ test("Node entrypoints follow carrier upgrades while preserving identity and run
   const env = { PATH: [path.join(root, "other"), path.join(root, "bin")].join(path.delimiter) };
   assert.equal(resolveCurrentNodeEntrypoint({ env, executable: oldNode }), command);
   assert.equal(resolveCurrentNodeEntrypoint({ env: { PATH: path.join(root, "other") }, executable: oldNode }), oldNode);
-  const probe = () => ({ status: 0, stdout: JSON.stringify({ node: "26.12.1", electron: null }) });
+  const probe = () => ({ status: 0, stdout: JSON.stringify({ node: "26.13.1", electron: null }) });
   const before = resolveHostNode({ nodeExecutable: command, probe });
   assert.equal(before.command, command);
   fs.unlinkSync(command);

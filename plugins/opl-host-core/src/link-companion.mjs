@@ -409,9 +409,9 @@ export async function createLinkCompanion({ hostCore, env = process.env, webAuth
     }
   }
   function register(webServer) {
-    const dispose = ["/pair", "/claim", "/account/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect", "/uploads"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, handler: handle }));
-    dispose.push(webServer.register({ kind: "prefix", path: "/api/link/devices/", handler: handle }));
-    dispose.push(webServer.register({ kind: "prefix", path: "/api/link/uploads/", handler: handle }));
+    const dispose = ["/pair", "/claim", "/account/claim", "/devices", "/bootstrap", "/invoke", "/events", "/download", "/disconnect", "/uploads"].map(suffix => webServer.register({ kind: "exact", path: `/api/link${suffix}`, auth: "anonymous", handler: handle }));
+    dispose.push(webServer.register({ kind: "prefix", path: "/api/link/devices/", auth: "anonymous", handler: handle }));
+    dispose.push(webServer.register({ kind: "prefix", path: "/api/link/uploads/", auth: "anonymous", handler: handle }));
     return () => { for (const close of dispose.reverse()) close(); };
   }
   async function handleAuthenticatedPeer(req, res, context) {

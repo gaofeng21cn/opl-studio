@@ -25,7 +25,7 @@
   "description": "OPL renderer integration for the DSH client module system.",
   "engines": {
     "node": ">=20",
-    "dsh": "0.2.2-rc.3"
+    "dsh": "0.2.3-alpha.2"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",

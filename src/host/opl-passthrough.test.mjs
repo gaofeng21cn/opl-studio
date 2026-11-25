@@ -19,9 +19,9 @@ test("App state timeout keeps the interactive default and admits a bounded cold-
 test("fast state rechecks owner-requested source access before publishing one fresh catalog", async context => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-source-refresh-test-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
+  const worker = path.join(directory, "fake-opl.mjs");
   const command = path.join(directory, "fake-opl");
-  await writeFile(command, `#!${process.execPath}
-import fs from 'node:fs';
+  await writeFile(worker, `import fs from 'node:fs';
 const args = process.argv.slice(2);
 fs.appendFileSync('calls.jsonl', JSON.stringify(args) + '\\n');
 const fixture = JSON.parse(fs.readFileSync('fixture.json', 'utf8'));
@@ -34,6 +34,9 @@ console.log(JSON.stringify({app_state:{agent_packages:{
   sources:{entries:fixture.sources},
   directory:{entries:checked && !fixture.checkFails ? [{package_id:'private-agent',installed:false}] : []}
 }}}));
+`);
+  await writeFile(command, `#!/bin/sh
+exec ${JSON.stringify(process.execPath)} ${JSON.stringify(worker)} "$@"
 `);
   await chmod(command, 0o755);
   const source = { source_id: "github-packages:owner", access_refresh_required: true,

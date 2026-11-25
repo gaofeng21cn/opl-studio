@@ -35,8 +35,8 @@
   "application_host": {
     "role": "deepseek_harness_cordis_application_host",
     "implementation_status": "source_implemented_release_admission_separate",
-    "upstream_version": "0.2.2-rc.3",
-    "upstream_ref": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
+    "upstream_version": "0.2.3-alpha.2",
+    "upstream_ref": "4b399c39a6d1479cd84ca591b4d7c88e24d38a96",
     "profile": "opl-studio",
     "profile_source": "src/host/dsh/cordis.yml",
     "web_overlay": "src/host/dsh/web.patch.yml",
@@ -102,6 +102,17 @@
       "installed_location": "node_modules",
       "third_party_policy": "pinned_native_package_or_provenance_preserving_adapter",
       "codex_capability_packages_are_dsh_plugins": false
+    },
+    "computer_use": {
+      "provider": "deepseek_harness_native_cua_mcp",
+      "mcp_server_name": "dsh_cua",
+      "consent_modes": [
+        "elicit",
+        "allow"
+      ],
+      "default_consent_mode": "elicit",
+      "codex_injection": "dynamic_cli_override_required_false",
+      "native_helper_sign_ignore": true
     },
     "collaboration": {
       "coordination_owner": "official_DSH_Agent_Subagent_Session_and_AgentTeam",

@@ -15,7 +15,7 @@
   "description": "OPL App first-party runtime status monitor for registered standard agents, active projects, stage progress, and task workbenches.",
   "engines": {
     "node": ">=22.19.0",
-    "dsh": "0.2.2-rc.3"
+    "dsh": "0.2.3-alpha.2"
   },
   "dsh": {
     "manifestVersion": 1,

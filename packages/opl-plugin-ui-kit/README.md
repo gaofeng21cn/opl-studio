@@ -11,7 +11,7 @@ npm install @gaofeng21cn/opl-plugin-ui-kit --registry https://npm.pkg.github.com
 Peer dependencies:
 
 - `react` (`>=19.0.0`)
-- `@deepseek-ai/dsh-client-ui-primitives` (`0.2.2-rc.3 || >=0.2.2`)
+- `@deepseek-ai/dsh-client-ui-primitives` (`0.2.3-alpha.2 || >=0.2.2`)
 
 ## Usage
 

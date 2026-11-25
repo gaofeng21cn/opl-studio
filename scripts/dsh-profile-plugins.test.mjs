@@ -62,7 +62,10 @@ test("native DSH profile update boots Superagent and removal restores the bundle
     assert.ok(!graph.entries.some(entry => entry.id.startsWith("@one-person-lab/")));
     assert.equal(host.context.oplSuperagent.read().executor, "codex");
     await host.context.oplSuperagent.start();
-    const response = await fetch(new URL("/orchestrator/api/state", host.context.oplSuperagent.read().url), { headers: { "x-orchestrator-request": "1" } });
+    const superagentUrl = host.context.oplSuperagent.read().url;
+    const superagentEntry = await fetch(superagentUrl, { redirect: "manual" });
+    const cookie = superagentEntry.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const response = await fetch(new URL("/orchestrator/api/state", superagentUrl), { headers: { "x-orchestrator-request": "1", cookie } });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).setup.problem.code, "repositoryUnset");
   } finally { await host.core.close(); }
@@ -105,7 +108,7 @@ test("registry resolution uses the selected carrier cohort and skips newer incom
     queries.push(spec);
     const answer = spec === name ? ["0.1.0", incompatibleVersion, currentVersion, "0.2.0"] : {
       name, version: spec.split("@").at(-1),
-      engines: { dsh: spec.endsWith(incompatibleVersion) ? ">=9.0.0" : "0.2.2-rc.3" }
+      engines: { dsh: spec.endsWith(incompatibleVersion) ? ">=9.0.0" : "0.2.3-alpha.2" }
     };
     return { exitCode: 0, timedOut: false, stdout: JSON.stringify(answer), stderr: "" };
   };
@@ -130,7 +133,7 @@ test("current and unavailable registry checks never create an unnecessary profil
   const installAnchor = path.join(root, "package.json");
   const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
   const view = async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
-    ? [currentVersion] : { name, version: currentVersion, engines: { dsh: "0.2.2-rc.3" } }) });
+    ? [currentVersion] : { name, version: currentVersion, engines: { dsh: "0.2.3-alpha.2" } }) });
   let installs = 0;
   const run = async () => { installs += 1; throw new Error("No install expected"); };
   const current = await updateRegistryPlugins({ installAnchor, home, names: [name], view, run });
@@ -151,7 +154,7 @@ test("registry update projection preserves each failed check while reporting com
   const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
     view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
       : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? [availableVersion]
-        : { name: good, version: availableVersion, engines: { dsh: "0.2.2-rc.3" } }) } });
+        : { name: good, version: availableVersion, engines: { dsh: "0.2.3-alpha.2" } }) } });
   assert.equal(projection.plugins[good].state, "update_available");
   assert.equal(projection.plugins[bad].state, "unavailable");
   assert.equal(projection.plugins[bad].reason, "timeout");
@@ -168,7 +171,7 @@ test("registry updates use the profile scope route without overriding npm's defa
   let managerContext;
   await assert.rejects(updateRegistryPlugins({ installAnchor, home, names: [name],
     view: async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
-      ? [currentVersion, nextVersion] : { name, version: nextVersion, engines: { dsh: "0.2.2-rc.3" } }) }),
+      ? [currentVersion, nextVersion] : { name, version: nextVersion, engines: { dsh: "0.2.3-alpha.2" } }) }),
     run: async (context, args) => { managerContext = context; managerArgs = args; return { exitCode: 1, timedOut: false, logPath: "fixture" }; }
   }), /Native DSH package operation failed/);
   assert.deepEqual(managerArgs, ["add", "--save-exact", `${name}@${nextVersion}`]);
@@ -213,7 +216,7 @@ test("public DSH plugin feed works without GitHub tokens, rejects tampered tarba
     dirName: "opl-superagent",
     name,
     version: nextVersion,
-    engines: { dsh: "0.2.2-rc.3" },
+    engines: { dsh: "0.2.3-alpha.2" },
     peerDependencies: {},
     assetName: `opl-superagent-${nextVersion}.tgz`,
     integrity

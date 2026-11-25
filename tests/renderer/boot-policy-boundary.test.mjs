@@ -15,7 +15,7 @@ test("built renderer reaches the native plugin boot before any product policy ex
   try {
     const build = spawnSync(process.execPath, [
       path.join(root, "scripts/vite-build-renderer-entry.mjs"),
-      path.join(root, "src/main.tsx"), output, "esm"
+      path.join(root, "src/main.tsx"), output, "iife"
     ], { cwd: root, encoding: "utf8", timeout: 120_000 });
     assert.equal(build.status, 0, build.stderr);
     browser.document.write('<!doctype html><html><head></head><body><div id="root"></div></body></html>');

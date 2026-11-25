@@ -3,8 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadOptionalPatches, loadProfile, readProfileManifest, resolveProfileDir, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
-import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
-import * as yaml from "js-yaml";
+import { stringifyEntryYaml } from "@deepseek-ai/cordis-plugin-include";
 import { runPluginCommand, runProfilePnpm, viewProfilePackage } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { classifyInstallFailure } from "@deepseek-ai/dsh-plugin-manager";
 import { withFileLock, writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
@@ -215,7 +214,7 @@ export async function retireLegacyOverrides({ installAnchor, home, names, cwd = 
   } };
   visit(patches);
   if (changed) {
-    await writeFileAtomic(patchFile, yaml.dump(patches, { schema: entryListSchema, noRefs: true }), { mode: 0o600 });
+    await writeFileAtomic(patchFile, stringifyEntryYaml(patches, { lineWidth: -1 }), { mode: 0o600 });
   }
   return { removedLegacyOverrides: retired, profileChanged: retired.length > 0 || changed || bundlesChanged };
 }

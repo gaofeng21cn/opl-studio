@@ -124,6 +124,9 @@ export function createBrowserBridge(): OplBridge {
     readBillionContext: candidate?.readBillionContext,
     setBillionContext: candidate?.setBillionContext,
     manageBillionContext: candidate?.manageBillionContext,
+    readComputerUse: candidate?.readComputerUse,
+    setComputerUse: candidate?.setComputerUse,
+    performComputerUseAction: candidate?.performComputerUseAction,
     readDshPluginCatalog: candidate?.readDshPluginCatalog,
     manageDshPlugin: candidate?.manageDshPlugin,
     readCodexModels() {

@@ -24,9 +24,11 @@ const screenshotRoot = path.join(root, "out/acceptance/native-electron-ui");
 const cdpPort = Number(process.env.OPL_NATIVE_UI_CDP_PORT || "9337");
 const electronPath = createRequire(import.meta.url)("electron");
 const execFileAsync = promisify(execFile);
-const fakeOpl = path.join(tempRoot, "fake-opl.mjs");
+const fakeOplWorker = path.join(tempRoot, "fake-opl.mjs");
+const fakeOpl = path.join(tempRoot, "fake-opl");
 const lifecyclePath = path.join(tempRoot, "app-server-lifecycle.jsonl");
-await writeFile(fakeOpl, "#!" + process.execPath + "\nimport fs from 'node:fs';\nconst args=process.argv.slice(2).join(' ');\nif (args.includes('system initialize')) process.stdout.write(JSON.stringify({system_initialize:{setup_flow:{is_first_run:false,phase:'ready',ready_to_launch:true},readiness:{launch_ready:true}}}));\nelse process.stdout.write(args.includes('app state') ? fs.readFileSync(" + JSON.stringify(path.join(fixtureRoot, "state.json")) + ", 'utf8') : '{}');\n", { mode: 0o700 });
+await writeFile(fakeOplWorker, "import fs from 'node:fs';\nconst args=process.argv.slice(2).join(' ');\nif (args.includes('system initialize')) process.stdout.write(JSON.stringify({system_initialize:{setup_flow:{is_first_run:false,phase:'ready',ready_to_launch:true},readiness:{launch_ready:true}}}));\nelse process.stdout.write(args.includes('app state') ? fs.readFileSync(" + JSON.stringify(path.join(fixtureRoot, "state.json")) + ", 'utf8') : '{}');\n", { mode: 0o600 });
+await writeFile(fakeOpl, "#!/bin/sh\nexec " + JSON.stringify(process.execPath) + " " + JSON.stringify(fakeOplWorker) + " \"$@\"\n", { mode: 0o700 });
 const child = spawn(electronPath, ["desktop/main.mjs", "--disable-gpu", "--remote-debugging-port=" + cdpPort, "--remote-debugging-address=127.0.0.1"], {
   cwd: root,
   env: {

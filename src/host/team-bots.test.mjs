@@ -76,35 +76,42 @@ class CodexFixture extends EventEmitter {
 async function boot(home, transport) {
   const host = await bootOplStudioHost({ dshHome: home, workspaceRoot: home, transport, webPort: 0,
     opl: Object.fromEntries(["readState", "readInitialize", "readFullDrilldown", "readDomainDetailView", "readContribution", "executeAction"].map(name => [name, async () => ({})])) });
-  assert.equal(host.context.get("agents"), undefined, "ordinary Host must not own DSH sessions");
-  // Exercise the official controller/adapter graph directly. The packed-package
-  // integration test covers the shipped CLI process and parent transport.
-  const profileHome = path.join(home, "opl-collaboration");
-  const dir = path.join(profileHome, "profiles/web");
-  initProfile(dir, ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@gaofeng21cn/opl-codex-agents"]);
-  const installAnchor = path.resolve("package.json");
-  const profile = loadProfile("executor test", "web", installAnchor, profileHome);
-  const root = path.join(dir, "cordis.yml");
-  await writeFile(root, "[]\n");
-  const overlays = [{ id: "hmr", disabled: true }, { id: "session-telemetry-otel", disabled: true },
-    { id: "credentials", config: { dshHome: profileHome } },
-    { id: "session-persistence-jsonl", config: { root: path.join(home, "opl/sessions") } },
-    { id: "web-runtime", config: { openBrowser: false, printUrl: false } }];
-  const profileContext = { name: "web", dir, patchPath: profile.patchPath, installAnchor, home: profileHome,
-    cwd: home, startedBundles: profile.layers.map(layer => layer.packageName), overlays, telemetryDisabledEnv: "1" };
-  const resolution = await createRuntimeResolution({ installAnchor, profile, home: profileHome });
-  const collaboration = await bootOfficial("executor test", root, readProfilePatches("executor test", profileContext, profile), async ctx => {
-    ctx.set("dshHomePath", (...parts) => path.join(profileHome, ...parts));
-    ctx.provide("profileContext", profileContext);
-    ctx.provide("oplStudioHostOptions", { dshHome: home, workspaceRoot: home });
-    ctx.provide("oplCodexNative", { transport });
-    ctx.provide("oplCodexDefaultModel", "fixture");
-    await ctx.plugin(PluginPackages, { resolution });
-    provideCmdline(ctx, { args: ["--host", "127.0.0.1", "--port", "0", "--no-open"], exit: () => {} });
-  }, pathToFileURL(path.join(dir, "package.json")).href);
-  let closing;
-  const core = { close: () => closing ??= (async () => { await collaboration.fiber.dispose(); await host.core.close(); })() };
-  return { ...host, core, collaboration };
+  try {
+    assert.equal(host.context.get("agents"), undefined, "ordinary Host must not own DSH sessions");
+    // Exercise the official controller/adapter graph directly. The packed-package
+    // integration test covers the shipped CLI process and parent transport.
+    const profileHome = path.join(home, "opl-collaboration");
+    const dir = path.join(profileHome, "profiles/web");
+    initProfile(dir, ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@gaofeng21cn/opl-codex-agents"]);
+    const installAnchor = path.resolve("package.json");
+    const profile = loadProfile("executor test", "web", installAnchor, profileHome);
+    const root = path.join(dir, "cordis.yml");
+    await writeFile(root, "[]\n");
+    const overlayPath = path.join(profileHome, "test.overlay.yml");
+    const overlays = [{ id: "hmr", disabled: true }, { id: "session-telemetry-otel", disabled: true },
+      { id: "credentials", config: { dshHome: profileHome } },
+      { id: "session-persistence-jsonl", config: { root: path.join(home, "opl/sessions") } },
+      { id: "web-runtime", config: { openBrowser: false, printUrl: false } }];
+    await writeFile(overlayPath, `${JSON.stringify(overlays, null, 2)}\n`);
+    const profileContext = { name: "web", dir, patchPath: profile.patchPath, installAnchor, home: profileHome,
+      cwd: home, startedBundles: profile.layers.map(layer => layer.packageName), overlayPaths: [overlayPath], telemetryDisabledEnv: "1" };
+    const resolution = await createRuntimeResolution({ installAnchor, profile, home: profileHome });
+    const collaboration = await bootOfficial("executor test", root, readProfilePatches("executor test", profileContext, profile), async ctx => {
+      ctx.set("dshHomePath", (...parts) => path.join(profileHome, ...parts));
+      ctx.provide("profileContext", profileContext);
+      ctx.provide("oplStudioHostOptions", { dshHome: home, workspaceRoot: home });
+      ctx.provide("oplCodexNative", { transport });
+      ctx.provide("oplCodexDefaultModel", "fixture");
+      await ctx.plugin(PluginPackages, { resolution });
+      provideCmdline(ctx, { args: ["--host", "127.0.0.1", "--port", "0", "--no-open"], exit: () => {} });
+    }, pathToFileURL(path.join(dir, "package.json")).href);
+    let closing;
+    const core = { close: () => closing ??= (async () => { await collaboration.fiber.dispose(); await host.core.close(); })() };
+    return { ...host, core, collaboration };
+  } catch (error) {
+    await host.core.close();
+    throw error;
+  }
 }
 
 async function create(ctx, home) {
@@ -166,7 +173,8 @@ test("the official workbench toggles teamwork on the same Codex thread and resto
     const restored = ctx.agents.get(root.id);
     assert.equal(ctx.agentTeams.listTasks(restored).length, 1);
     assert.ok((await ctx.subagents.listDescendants(root.id)).some(member => member.id === memberId));
-    await ctx.sessionQuery.inspectSession(memberId, session => assert.ok(session.seq > 0));
+    const memberTranscript = await ctx.sessionQuery.readSession(memberId);
+    assert.ok(memberTranscript.events.length > 0);
     assert.equal(ctx.agents.get(memberId), undefined, "cold transcript reads do not activate members");
     await ctx.subagents.sendMessage(restored, memberId, [{ type: "text", text: "Continue after restart" }], { signal: new AbortController().signal });
     await ctx.agents.get(memberId).whenIdle(); await restored.whenIdle();

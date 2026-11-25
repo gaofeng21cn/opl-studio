@@ -131,7 +131,9 @@ test("Superagent child profile boots with the packed Codex Agents dependency clo
     await service.start();
     assert.equal(service.read().state, "running");
     assert.equal(service.read().executor, "codex");
-    const response = await fetch(new URL("/orchestrator/api/state", service.read().url), { headers: { "x-orchestrator-request": "1" } });
+    const entry = await fetch(service.read().url, { redirect: "manual" });
+    const cookie = entry.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const response = await fetch(new URL("/orchestrator/api/state", service.read().url), { headers: { "x-orchestrator-request": "1", cookie } });
     assert.equal(response.status, 200, `${await response.clone().text()}\n${service.diagnostic ?? ""}`);
     assert.equal((await response.json()).setup.problem.code, "repositoryUnset");
     assert.equal((await service.stop()).state, "stopped");

@@ -146,6 +146,13 @@ async function dispatchApi(req, res, hostCore) {
   if (req.method === "POST" && url.pathname === "/api/host/billion-context") {
     return json(res, 200, await hostCore.invoke("manageBillionContext", await body(req)));
   }
+  if (url.pathname === "/api/codex/computer-use") {
+    if (req.method === "GET") return json(res, 200, await hostCore.invoke("readComputerUse"));
+    if (req.method === "POST") return json(res, 200, await hostCore.invoke("setComputerUse", await body(req)));
+  }
+  if (req.method === "POST" && url.pathname === "/api/codex/computer-use/action") {
+    return json(res, 200, await hostCore.invoke("performComputerUseAction", await body(req)));
+  }
   if (req.method === "GET" && url.pathname === "/api/codex/models") {
     json(res, 200, await hostCore.invoke("readCodexModels"));
     return;
@@ -284,6 +291,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/healthz",
+      auth: "anonymous",
       handler(_req, res) {
         json(res, closing ? 503 : 200, {
           status: closing ? "stopping" : "ok",
@@ -294,6 +302,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/readyz",
+      auth: "anonymous",
       handler(_req, res) {
         const capabilities = hostCore.capabilities();
         const ready = !closing && capabilities.appServerAvailable === true;
@@ -307,6 +316,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/login",
+      auth: "anonymous",
       handler(_req, res) {
         res.writeHead(200, {
           "content-type": "text/html; charset=utf-8",
@@ -319,6 +329,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/api/auth/login",
+      auth: "anonymous",
       async handler(req, res) {
         if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
         try {
@@ -339,6 +350,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/api/auth/user",
+      auth: "anonymous",
       handler(req, res) {
         if (req.method !== "GET") return json(res, 405, { error: { code: "method_not_allowed", message: "GET required", details: {} } });
         const result = webAuth.requireSession(req);
@@ -349,6 +361,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/api/auth/logout",
+      auth: "anonymous",
       handler(req, res) {
         if (req.method !== "POST") return json(res, 405, { error: { code: "method_not_allowed", message: "POST required", details: {} } });
         const result = webAuth.requireSession(req, { csrf: true });
@@ -360,6 +373,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "exact",
       path: "/api/opl-events",
+      auth: "anonymous",
       handler(req, res) {
         const auth = webAuth.requireSession(req);
         if (!auth.ok) return authError(res, auth);
@@ -381,6 +395,7 @@ export function registerOplHttpRoutes(webServer, hostCore, {
     webServer.register({
       kind: "prefix",
       path: "/api",
+      auth: "anonymous",
       async handler(req, res) {
         try {
           const linkPath = new URL(req.url ?? "/", "http://127.0.0.1").pathname;

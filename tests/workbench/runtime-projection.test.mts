@@ -756,24 +756,24 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
           }
         },
         managed_companions: [{
-          surface_kind: "opl_managed_computer_use_projection",
-          provider_id: "kimi-cu",
-          product_name: "KimiCU",
-          available_actions: ["settings_reinstall_computer_use"]
+          surface_kind: "opl_managed_browser_automation_projection",
+          provider_id: "playwright-mcp",
+          product_name: "Browser Automation",
+          available_actions: ["settings_reinstall_browser_automation"]
         }],
         actions: [{
-          action_id: "settings_reinstall_computer_use",
-          label: "Reinstall Computer Use",
-          route: "opl app action execute --action settings_reinstall_computer_use",
+          action_id: "settings_reinstall_browser_automation",
+          label: "Reinstall Browser Automation",
+          route: "opl app action execute --action settings_reinstall_browser_automation",
           surface: "opl app action execute",
           submit_via: "opl app action execute",
           payload_fields: [],
-          mutates: "opl_managed_kimi_cu_bundle_service_and_codex_mcp_registration",
+          mutates: "opl_managed_playwright_mcp_bundle_service_and_codex_mcp_registration",
           dry_run_supported: true,
           confirmation_required: true,
           danger_level: "medium",
           owner: "one-person-lab",
-          delegated_surface: "OPL managed KimiCU reinstall",
+          delegated_surface: "OPL managed Browser Automation reinstall",
           can_submit_to_safe_action_shell: true,
           route_requires_domain_or_app_payload: false
         }]
@@ -793,22 +793,22 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
   assert.equal(model.runtimeOverview?.temporal.serviceStatus, "loaded_running");
   assert.equal(model.runtimeOverview?.temporal.workerStatus, "ready");
   assert.equal(model.runtimeOverview?.temporal.schedulerStatus, "attention_needed");
-  assert.equal(model.managedCompanions[0]?.providerId, "kimi-cu");
+  assert.equal(model.managedCompanions[0]?.providerId, "playwright-mcp");
   assert.equal(model.workItemRuntime?.items[0]?.title, "Study one");
-  assert.deepEqual(readback.app_state.managed_companions.map((item) => item.provider_id), ["kimi-cu"]);
+  assert.deepEqual(readback.app_state.managed_companions.map((item) => item.provider_id), ["playwright-mcp"]);
   assert.deepEqual(readback.app_state.actions[0], {
-    action_id: "settings_reinstall_computer_use",
-    label: "Reinstall Computer Use",
-    route: "opl app action execute --action settings_reinstall_computer_use",
+    action_id: "settings_reinstall_browser_automation",
+    label: "Reinstall Browser Automation",
+    route: "opl app action execute --action settings_reinstall_browser_automation",
     surface: "opl app action execute",
     submit_via: "opl app action execute",
     payload_fields: [],
-    mutates: "opl_managed_kimi_cu_bundle_service_and_codex_mcp_registration",
+    mutates: "opl_managed_playwright_mcp_bundle_service_and_codex_mcp_registration",
     dry_run_supported: true,
     confirmation_required: true,
     danger_level: "medium",
     owner: "one-person-lab",
-    delegated_surface: "OPL managed KimiCU reinstall",
+    delegated_surface: "OPL managed Browser Automation reinstall",
     can_submit_to_safe_action_shell: true,
     route_requires_domain_or_app_payload: false
   });

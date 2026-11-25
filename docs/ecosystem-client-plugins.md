@@ -6,7 +6,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 | 插件 | 固定版本与来源 | 使用方式 |
 | --- | --- | --- |
-| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.2-rc.3`，MIT | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备与状态内容，不装载其模型或凭据 controller |
+| DSH OnboardingModal | npm `@deepseek-ai/dsh-client-ui-settings-models@0.2.3-alpha.2`，MIT | 直接导入官方首启容器、样式和焦点生命周期；仅注入 OPL 本机准备与状态内容，不装载其模型或凭据 controller |
 | DSH Client Modules | 与 Studio DSH cohort 同步，MIT | Host 扫描启用包的 `dsh.client` 声明生成 graph，由官方 `AppWebEntry` 装载与挂载（Electron 经受限桥接转发） |
 | DSH FilesBody | 与 Studio DSH source ref 同步，MIT | 直接复用官方文件树、store 与 face；通过 canonical thread 文件桥浏览与刷新目录 |
 | DSH `ui-sidebar-documentpreview` | 固定 DSH cohort 的 MIT 官方源码 | 预览 UI 源码与 OPL workspace 适配器（`EcosystemFilePreview`）编入 `opl-studio-client`；完整 `apply()` 待官方 Remote/Resource/Sidebar/Session 运行时齐备后切换；Office/Excel/PDF 当前返回不可用 |
@@ -21,7 +21,7 @@ Studio 的通用能力优先复用 DSH 官方及社区插件。OPL 保留 Codex 
 
 ## DSH sandbox reuse boundary
 
-At the pinned `0.2.2-rc.3` cohort (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`),
+At the pinned `0.2.3-alpha.2` cohort (`4b399c39a6d1479cd84ca591b4d7c88e24d38a96`),
 `dsh-sandbox` defines subprocess confinement and per-call escalation, and
 `dsh-sandbox-local` supplies platform backends (macOS Seatbelt, Linux
 bubblewrap/Landlock, Windows restricted tokens). Studio packages those peer
@@ -35,9 +35,9 @@ workspace, and allowed mode (never inferring from last UI selection) and pass
 read-only denial, workspace write, path/symlink containment, cancellation, and
 fail-closed unavailable-backend tests against the packaged carrier.
 
-Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox),
-[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox-local),
-[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/sandbox/sandbox-policy).
+Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/sandbox/sandbox),
+[local provider](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/sandbox/sandbox-local),
+[policy owner](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/sandbox/sandbox-policy).
 
 ## 计划任务、记忆与数据管理
 
@@ -50,7 +50,7 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 | 任务知识引用 | 同页按需读取领域 owner 提供的 refs，不读取或缓存业务正文 |
 | 数据管理 | Settings → 工作区 → 数据与存储：只读用量与带过期校验的可预览清理 |
 
-官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/schedule/schedule)、[`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/38a6a5c965aa99ab525161efb7cc5cf1fe62fced/packages/client/ui-schedule) 及 `cofy-x/dsh-cron` 等均依赖 DSH root Agent/session，故不采用其后端；调度定义、Temporal 补跑/重叠策略与清理归 Framework 公开插件（见 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)、[Architecture](architecture.md#workbench-services) 与[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)）。
+官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/schedule/schedule)、[`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/client/ui-schedule) 及 `cofy-x/dsh-cron` 等均依赖 DSH root Agent/session，故不采用其后端；调度定义、Temporal 补跑/重叠策略与清理归 Framework 公开插件（见 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)、[Architecture](architecture.md#workbench-services) 与[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)）。
 
 ## 能力工作台与标准 MCP Apps
 
@@ -60,7 +60,7 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 
 ### 标准 MCP Apps
 
-`opl-mcp-apps` 消费当前 Codex 对话连接的 MCP 目录并运行 `@modelcontextprotocol/ext-apps` `2.0.4` 的 `AppBridge` 与 `PostMessageTransport`（弥补固定 `0.2.2-rc.3` DSH 缺少标准 MCP App UI 宿主的缺口）。界面保留单一应用切换工具栏，在无 `allow-same-origin` 的 opaque CSP iframe 中注入 App 主题、语言与尺寸；`ui/update-model-context` 与 `ui/message` 仅准备上下文或草稿，工具权限、Connect 授权与 `opl-workspace://artifact` 媒体预览均由 Codex/Framework/Thread workspace 实时校验，关闭或切换对话立即释放绑定且不自动重试工具调用。详情规范见 [Framework Mini App 规范](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/mcp-apps/SPEC.md)。
+`opl-mcp-apps` 消费当前 Codex 对话连接的 MCP 目录并运行 `@modelcontextprotocol/ext-apps` `2.0.4` 的 `AppBridge` 与 `PostMessageTransport`（弥补固定 `0.2.3-alpha.2` DSH 缺少标准 MCP App UI 宿主的缺口）。界面保留单一应用切换工具栏，在无 `allow-same-origin` 的 opaque CSP iframe 中注入 App 主题、语言与尺寸；`ui/update-model-context` 与 `ui/message` 仅准备上下文或草稿，工具权限、Connect 授权与 `opl-workspace://artifact` 媒体预览均由 Codex/Framework/Thread workspace 实时校验，关闭或切换对话立即释放绑定且不自动重试工具调用。详情规范见 [Framework Mini App 规范](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/mcp-apps/SPEC.md)。
 
 ### 语音、Profile 与 设置入口边界
 

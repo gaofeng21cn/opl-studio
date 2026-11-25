@@ -17,75 +17,58 @@ function validAction(actionId: string, overrides: Record<string, unknown> = {}) 
   };
 }
 
-test("managed companions consume every Framework companion through the canonical action catalog", () => {
+test("managed companions consume Framework browser automation through the canonical action catalog", () => {
   const projection = readManagedCompanions({
     app_state: {
       managed_companions: [{
-        surface_kind: "opl_managed_computer_use_projection",
-        provider_id: "kimi-cu",
-        product_name: "KimiCU",
-        version: "0.5.4",
-        status: "permission_required",
-        ready: false,
-        installed: true,
-        registered: true,
-        enabled: true,
-        permission: "required",
-        health_ref: "opl://managed-computer-use/kimi-cu",
-        available_actions: [
-          "settings_request_computer_use_permissions",
-          "settings_recheck_computer_use",
-          "settings_repair_computer_use",
-          "settings_reinstall_computer_use",
-          "settings_unknown_computer_use"
-        ]
-      }, {
         surface_kind: "opl_managed_browser_automation_projection",
         provider_id: "playwright-mcp",
         product_name: "Browser Automation",
-        status: "not_registered",
-        ready: false,
+        version: "0.0.70",
+        status: "ready",
+        ready: true,
         installed: true,
-        registered: false,
-        enabled: false,
+        registered: true,
+        enabled: true,
         permission: "not_required",
-        available_actions: ["settings_recheck_browser_automation"]
+        health_ref: "opl://managed-browser-automation/playwright-mcp",
+        available_actions: [
+          "settings_recheck_browser_automation",
+          "settings_repair_browser_automation",
+          "settings_reinstall_browser_automation",
+          "settings_unknown_browser_automation"
+        ]
       }],
       actions: [
-        validAction("settings_request_computer_use_permissions", { label: "Allow permissions" }),
-        validAction("settings_recheck_computer_use", { label: "Recheck" }),
-        validAction("settings_repair_computer_use", { label: "Repair", danger_level: "low" }),
-        validAction("settings_reinstall_computer_use", {
+        validAction("settings_recheck_browser_automation", { label: "Recheck browser" }),
+        validAction("settings_repair_browser_automation", { label: "Repair", danger_level: "low" }),
+        validAction("settings_reinstall_browser_automation", {
           label: "Reinstall",
           confirmation_required: true,
           danger_level: "medium"
-        }),
-        validAction("settings_recheck_browser_automation", { label: "Recheck browser" })
+        })
       ]
     }
   });
 
   assert.deepEqual(projection[0], {
-    surfaceKind: "opl_managed_computer_use_projection",
-    providerId: "kimi-cu",
-    productName: "KimiCU",
-    version: "0.5.4",
-    status: "permission_required",
-    ready: false,
+    surfaceKind: "opl_managed_browser_automation_projection",
+    providerId: "playwright-mcp",
+    productName: "Browser Automation",
+    version: "0.0.70",
+    status: "ready",
+    ready: true,
     installed: true,
     registered: true,
     enabled: true,
-    permission: "required",
-    healthRef: "opl://managed-computer-use/kimi-cu",
+    permission: "not_required",
+    healthRef: "opl://managed-browser-automation/playwright-mcp",
     actions: [
-      { actionId: "settings_request_computer_use_permissions", label: "Allow permissions", confirmationRequired: false },
-      { actionId: "settings_recheck_computer_use", label: "Recheck", confirmationRequired: false },
-      { actionId: "settings_repair_computer_use", label: "Repair", confirmationRequired: false, dangerLevel: "low" },
-      { actionId: "settings_reinstall_computer_use", label: "Reinstall", confirmationRequired: true, dangerLevel: "medium" }
+      { actionId: "settings_recheck_browser_automation", label: "Recheck browser", confirmationRequired: false },
+      { actionId: "settings_repair_browser_automation", label: "Repair", confirmationRequired: false, dangerLevel: "low" },
+      { actionId: "settings_reinstall_browser_automation", label: "Reinstall", confirmationRequired: true, dangerLevel: "medium" }
     ]
   });
-  assert.equal(projection[1]?.providerId, "playwright-mcp");
-  assert.deepEqual(projection[1]?.actions.map((action) => action.actionId), ["settings_recheck_browser_automation"]);
 });
 
 test("managed companions stay absent when the producer is absent or outside the Framework namespace", () => {
@@ -93,32 +76,32 @@ test("managed companions stay absent when the producer is absent or outside the 
   assert.deepEqual(readManagedCompanions({
     app_state: {
       managed_companions: [{
-        surface_kind: "forged_computer_use_projection",
-        provider_id: "kimi-cu",
-        product_name: "KimiCU"
+        surface_kind: "forged_browser_automation_projection",
+        provider_id: "playwright-mcp",
+        product_name: "Browser Automation"
       }],
       actions: []
     }
   }), []);
 });
 
-test("managed Computer Use drops actions that bypass the canonical App action boundary", () => {
+test("managed companions drop actions that bypass the canonical App action boundary", () => {
   const projection = readManagedCompanions({
     app_state: {
       managed_companions: [{
-        surface_kind: "opl_managed_computer_use_projection",
-        provider_id: "kimi-cu",
-        product_name: "KimiCU",
+        surface_kind: "opl_managed_browser_automation_projection",
+        provider_id: "playwright-mcp",
+        product_name: "Browser Automation",
         available_actions: [
-          "settings_recheck_computer_use",
-          "settings_repair_computer_use",
-          "settings_reinstall_computer_use"
+          "settings_recheck_browser_automation",
+          "settings_repair_browser_automation",
+          "settings_reinstall_browser_automation"
         ]
       }],
       actions: [
-        validAction("settings_recheck_computer_use", { surface: "direct provider call" }),
-        validAction("settings_repair_computer_use", { payload_fields: ["provider_id"] }),
-        validAction("settings_reinstall_computer_use", { can_submit_to_safe_action_shell: false })
+        validAction("settings_recheck_browser_automation", { surface: "direct provider call" }),
+        validAction("settings_repair_browser_automation", { payload_fields: ["provider_id"] }),
+        validAction("settings_reinstall_browser_automation", { can_submit_to_safe_action_shell: false })
       ]
     }
   });

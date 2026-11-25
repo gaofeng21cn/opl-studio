@@ -10,20 +10,24 @@ includes its license. <https://github.com/ranxianglei/billion-context>
 
 OPL Studio directly reuses the pinned DeepSeek Harness Application Host cohort:
 
-- `@deepseek-ai/cordis` `4.1.0`;
-- `@deepseek-ai/cordis-plugin-group` `1.1.0`;
-- `@deepseek-ai/cordis-plugin-include` `1.1.0`;
-- `@deepseek-ai/cordis-plugin-loader` `1.1.0`;
+- `@deepseek-ai/cordis` `4.2.0-alpha.1`;
+- `@deepseek-ai/cordis-plugin-group` `1.2.0-alpha.1`;
+- `@deepseek-ai/cordis-plugin-include` `1.2.0-alpha.1`;
+- `@deepseek-ai/cordis-plugin-loader` `1.2.0-alpha.1`;
+- `@deepseek-ai/cordis-plugin-timer` `1.3.0-alpha.1`;
+- `@deepseek-ai/schemastery` `3.20.0-alpha.1`;
 - `@deepseek-ai/dsh-app-boot`, `dsh-brand`, `dsh-client-modules`,
   `dsh-client-ui-primitives`, `dsh-client-ui-slots`, `dsh-client-ui-dockkit`,
   `dsh-client-web`, `dsh-agent-preset-registry`,
   `dsh-home-paths`, `dsh-host-frontend-static`,
   `dsh-host-plugin-inventory`, `dsh-host-webserver`,
-  `dsh-launch-environment`, `dsh-system-prompt`, `dsh-tools`, `dsh-sandbox`, `dsh-sandbox-policy`, and
-  `dsh-typert-protocol`, `dsh-client-store`, and
+  `dsh-launch-environment`, `dsh-session-projection`, `dsh-system-prompt`,
+  `dsh-tools`, `dsh-sandbox`, `dsh-sandbox-policy`, `dsh-computer-use`,
+  `dsh-cua`, `dsh-cua-mcp`, `dsh-cua-macos`, `dsh-cua-windows`,
+  `dsh-util-text-search`, `dsh-typert-protocol`, `dsh-client-store`,
   `dsh-util-workspace-path`, `dsh-util-file-drag`, `dsh-util-values`,
   `dsh-client-connection` (public Peer type/primitive only), and
-  `dsh-tool-executor-native`, all at `0.2.2-rc.3`;
+  `dsh-tool-executor-native`, all at `0.2.3-alpha.2`;
 - `use-sync-external-store` `1.7.0` for the vendored renderer closure;
 - `zustand` `5.1.0` and `immer` `11.2.9` for the DSH client store runtime
   closure (MIT, pmndrs and Michel Weststrate);
@@ -38,7 +42,7 @@ Application Host package cohort is repeated in
 
 Source repository: <https://github.com/deepseek-ai/deepseek-harness>
 
-Inspected source ref: `38a6a5c965aa99ab525161efb7cc5cf1fe62fced`
+Inspected source ref: `4b399c39a6d1479cd84ca591b4d7c88e24d38a96`
 
 The complete `src/` trees of twenty-one client packages are vendored from that ref under `vendor/deepseek-harness/packages/client/`:
 
@@ -67,8 +71,8 @@ The complete `src/` trees of twenty-one client packages are vendored from that r
 The upstream `packages/util/workspace-path/src` helpers are also vendored from
 the same ref so renderer imports resolve to the pinned source helpers.
 
-The snapshot contains 701 files, including the upstream `LICENSE`. Its package
-roots, per-file SHA-256 inventory, source package version (`0.2.2-rc.3`), and
+The snapshot contains 768 files, including the upstream `LICENSE`. Its package
+roots, per-file SHA-256 inventory, source package version (`0.2.3-alpha.2`), and
 update boundary are recorded in
 `packages/dsh-adapters/deepseekHarnessSourceManifest.json`; `npm run verify:dsh-gui`
 checks every local digest and reverts the declared compatibility patches
@@ -89,9 +93,9 @@ The live One Person Lab composition directly renders upstream `AppFrame`,
 registration, disposal, and entry error isolation. OPL components import `Button`, `Pill`, `Input`, `Tooltip`,
 `StateDot`, `projectUserText`, and icons directly from the vendored upstream
 `@deepseek-ai/dsh-client-ui-primitives` index. User-visible identity uses the
-DSH 0.2.2-rc.3 brand slots with the text `One Person Lab`; OPL adds no logo artwork or replacement shell palette. OPL-owned content pages
+DSH 0.2.3-alpha.2 brand slots with the text `One Person Lab`; OPL adds no logo artwork or replacement shell palette. OPL-owned content pages
 retain bounded layout and typography adapters outside the upstream source. The
-DSH 0.2.2-rc.3 attachment slot is occupied by a null adapter and does not enable a
+DSH 0.2.3-alpha.2 attachment slot is occupied by a null adapter and does not enable a
 multimodal runtime. Workspace host description remains unavailable until the
 App ABI supplies it; the POSIX home-path compatibility shim therefore does not
 claim a visible `~` abbreviation.

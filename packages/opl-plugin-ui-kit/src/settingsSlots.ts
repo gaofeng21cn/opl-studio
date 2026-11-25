@@ -41,6 +41,45 @@ export type OplBillionContextPreferenceSnapshot = {
   pendingVersion?: string | null;
 };
 
+export type OplComputerUseConsentMode = "elicit" | "allow";
+
+export type OplComputerUsePermissionSnapshot = {
+  status: "ready" | "permission_required" | "unavailable" | "unsupported";
+  accessibility: boolean;
+  screenRecording: boolean;
+  helperAppPath: string | null;
+  helperBundle: string | null;
+  error: string | null;
+};
+
+export type OplComputerUseAppGrantSnapshot = {
+  id: string;
+  name: string;
+  executablePath?: string;
+};
+
+export type OplComputerUseStateSnapshot = {
+  supported: boolean;
+  available: boolean;
+  enabled: boolean;
+  active: boolean;
+  consentMode: OplComputerUseConsentMode;
+  activeConsentMode: OplComputerUseConsentMode | null;
+  restartPending: boolean;
+  platform: string;
+  permissions: OplComputerUsePermissionSnapshot;
+  allowedApps: OplComputerUseAppGrantSnapshot[];
+  blockedApps: OplComputerUseAppGrantSnapshot[];
+  unavailableReason: string | null;
+};
+
+export type OplComputerUseActionRequestSnapshot = {
+  action: "recheck" | "request_permission" | "open_settings" | "revoke_app" | "retry_app";
+  permission?: "accessibility" | "screenRecording";
+  appId?: string;
+  locale?: "zh" | "en";
+};
+
 export type OplSettingsGroupOwner = {
   locale: "zh" | "en";
   developerDetails?: boolean;
@@ -53,6 +92,11 @@ export type OplSettingsGroupOwner = {
   billionContext?: {
     readBillionContext?: () => Promise<OplBillionContextPreferenceSnapshot>;
     setBillionContext?: (request: { enabled: boolean }) => Promise<OplBillionContextPreferenceSnapshot>;
+  };
+  computerUse?: {
+    readComputerUse?: () => Promise<OplComputerUseStateSnapshot>;
+    setComputerUse?: (request: { enabled?: boolean; consentMode?: OplComputerUseConsentMode }) => Promise<OplComputerUseStateSnapshot>;
+    performComputerUseAction?: (request: OplComputerUseActionRequestSnapshot) => Promise<OplComputerUseStateSnapshot>;
   };
 };
 

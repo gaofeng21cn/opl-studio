@@ -63,15 +63,16 @@ test("startup action retention remains bounded to retained views and closes foll
 test("native source receipts preserve partial readback and give Homebrew its lifecycle execution budget", async context => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-native-source-receipt-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
+  const worker = path.join(directory, "fake-opl.mjs");
   const command = path.join(directory, "fake-opl");
-  await writeFile(command, `#!${process.execPath}
-const actionId = process.argv[process.argv.indexOf('--action') + 1];
+  await writeFile(worker, `const actionId = process.argv[process.argv.indexOf('--action') + 1];
 console.log(JSON.stringify({ app_action_execution: { status: 'completed', result: {
   native_action: { action_id: actionId, status: process.env.TEST_NATIVE_STATUS,
     reason_code: process.env.TEST_NATIVE_STATUS === 'needs_attention' ? 'homebrew_native_readback_unverified' : null },
   native_inventory: { inventory_status: 'available', native_items: [{ item_id: 'cask:publisher/tap/native-app', installed: true }] }
 } } }));
 `);
+  await writeFile(command, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(worker)} "$@"\n`);
   await chmod(command, 0o755);
   const timers = [];
   const nativeSetTimeout = globalThis.setTimeout;

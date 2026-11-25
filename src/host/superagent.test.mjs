@@ -14,9 +14,16 @@ test('independent Superagent profile preserves settings and setup across restart
   transport.listModels = async () => ({ data: [{ id: "codex-test", isDefault: true }] });
   const service = new SuperagentProfile({ dshHome: home, workspaceRoot: home }, { transport });
   initProfile(path.join(service.home, "profiles/web"), ["@one-person-lab/opl-codex-agents"]);
+  let cookieUrl = null;
+  let cachedCookie = '';
   const api = async (route, method = 'GET', value) => {
+    if (cookieUrl !== service.url) {
+      const entry = await fetch(service.url, { redirect: 'manual' });
+      cachedCookie = entry.headers.getSetCookie().map(item => item.split(';')[0]).join('; ');
+      cookieUrl = service.url;
+    }
     const response = await fetch(new URL(`/orchestrator/api/${route}`, service.url), {
-      method, headers: { 'x-orchestrator-request': '1', 'content-type': 'application/json' },
+      method, headers: { 'x-orchestrator-request': '1', 'content-type': 'application/json', ...(cachedCookie ? { cookie: cachedCookie } : {}) },
       ...(value ? { body: JSON.stringify(value) } : {})
     });
     assert.equal(response.status, 200, await response.clone().text());

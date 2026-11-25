@@ -71,7 +71,8 @@ export function SettingsSurface({
         openSoftwareCenter: onOpenSoftwareCenterRoute,
         openSettingsDestination: (targetDestination: string, focus?: ResourceSettingsFocus) =>
           onOpenSettingsDestination(targetDestination as SettingsDestinationId, focus),
-        billionContext: panelProps.billionContext
+        billionContext: panelProps.billionContext,
+        computerUse: panelProps.computerUse
       })}
     />
   );

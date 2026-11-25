@@ -134,7 +134,16 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       assert.equal(typeof frameworkBridge.createOplPassthrough, "function", "the carrier consumes the Framework bridge package export");
       const seedModule = { exports: {} };
       runInNewContext(await fs.readFile(path.join(staging, "platform/platform-seed.js"), "utf8"), { ...sandbox, module: seedModule, exports: seedModule.exports, require });
-      const modules = seedModule.exports.getStaticModules();
+      const staticModules = new Map(seedModule.exports.getStaticModules().map(entry => [entry.id, entry]));
+      const resolvedModules = new Map();
+      const resolveStatic = specifier => {
+        if (resolvedModules.has(specifier)) return resolvedModules.get(specifier);
+        const entry = staticModules.get(specifier);
+        assert.ok(entry, `missing static platform module ${specifier}`);
+        const exportsObject = entry.factory(resolveStatic);
+        resolvedModules.set(specifier, exportsObject);
+        return exportsObject;
+      };
       const registrations = new Map();
       browser.__ModuleLoader__ = { load: registration => registrations.set(registration.id, registration) };
       for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-runtime-status", "opl-materials-space", "opl-superagent", "opl-team-bots"]) {
@@ -144,8 +153,8 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         const registration = registrations.get(name);
         assert.ok(registration, name);
         const client = registration.factory(specifier => {
-          assert.ok(Object.hasOwn(modules, specifier), `${name} requested non-platform module ${specifier}`);
-          return modules[specifier];
+          assert.ok(staticModules.has(specifier), `${name} requested non-platform module ${specifier}`);
+          return resolveStatic(specifier);
         });
         assert.equal(typeof (client.default ?? client).apply, "function", name);
         if (id === "opl-studio-client") {
@@ -184,11 +193,11 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     const superagent = host.context.oplSuperagent.read();
     assert.equal(superagent.state, "running");
     assert.equal(superagent.executor, "codex");
-    const setupResponse = await fetch(new URL("/orchestrator/api/state", superagent.url), { headers: { "x-orchestrator-request": "1" } });
-    assert.equal(setupResponse.status, 200);
-    assert.equal((await setupResponse.json()).setup.problem.code, "repositoryUnset");
     const superagentEntry = await fetch(superagent.url, { redirect: "manual" });
     const superagentCookie = superagentEntry.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const setupResponse = await fetch(new URL("/orchestrator/api/state", superagent.url), { headers: { "x-orchestrator-request": "1", cookie: superagentCookie } });
+    assert.equal(setupResponse.status, 200);
+    assert.equal((await setupResponse.json()).setup.problem.code, "repositoryUnset");
     const superagentPage = await fetch(new URL("/", superagent.url), { headers: { cookie: superagentCookie } });
     const superagentHtml = await superagentPage.text();
     assert.ok(superagentHtml.includes("__OPL_CODEX_WORKBENCH_INITIAL_PANEL__"));

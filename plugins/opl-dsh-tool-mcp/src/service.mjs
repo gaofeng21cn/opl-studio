@@ -143,6 +143,7 @@ export class DshToolMcp {
     const disposeRoute = this.webServer.register({
       kind: "exact",
       path: DSH_TOOL_MCP_PATH,
+      auth: "anonymous",
       handler: (req, res) => this.#handle(req, res)
     });
     const disposeChange = this.context.on("tools/change", () => {

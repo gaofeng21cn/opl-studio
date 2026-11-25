@@ -1,19 +1,18 @@
 --- a/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx
 +++ b/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx
-@@ -20,7 +20,7 @@
-   SegmentedTabs, StateDot, Switch, Tag, TerminalBlock, Toast, Tooltip, useDismissOnOutsidePointer,
-   type IconProps, type StateDotState, type TerminalBlockLabels,
+@@ -22,7 +22,7 @@ import {
  } from '@deepseek-ai/dsh-client-ui-primitives'
--import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-+import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+ import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
+ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
+-import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
++import type { InjectFace, PropsLocale, PropsRenderFactories, PropsRenderSlots, PropsRuntime, PropsStore, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
  import { EXTENSION_BUNDLES, HIDDEN_BUNDLES, MORE_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
+ import { localizedValues, TextSearchIndex } from '@deepseek-ai/dsh-util-text-search'
  import type { createNavigationStore } from './navigation-store.ts'
- import type { PluginHeaderLayoutFace } from './header-scroll.ts'
-@@ -49,6 +49,40 @@
-   >
-   & InjectFace<PluginManagerFace & PluginHeaderLayoutFace>
+@@ -56,6 +56,40 @@ export type PluginManagerPageProps =
+   & InjectFace<ClientSyncFace>
    & PropsStore<ReturnType<typeof createNavigationStore>>
-+
+ 
 +/** Render-only owner page contract. It reuses the official card/detail shells without DSH Host authority. */
 +export type PluginManagerOwnerItem = {
 +  readonly id: string
@@ -47,15 +46,14 @@
 +  readonly useStore: PluginManagerPageProps['useStore']
 +  readonly actions: PluginManagerPageProps['actions']
 +}
- 
- /** The page's slot renderer, narrowed to the configuration slots. */
- type RenderConfig = PluginManagerPageProps['renderSlot']
-@@ -587,6 +621,62 @@
-       <CardHead title={item.label} t={t} onOpen={onOpen} icon={itemArtwork(item.id)} description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })} />
-     </li>
-   )
-+}
 +
+ /** This page's client plugin synchronization, read from the page's module system. */
+ export interface ClientSyncFace {
+   readonly hooks: { readonly clientSync: ObservableSnapshot<ClientEntryState> }
+@@ -629,6 +663,62 @@ function ItemCard({ item, t, onOpen, renderSlot }: {
+   )
+ }
+ 
 +function OwnerCard({ item, t, onOpen }: { item: PluginManagerOwnerItem; t: Translate; onOpen(): void }): ReactNode {
 +  return <li className={`${css.card} ${css.cardLink}`} data-plugin-owner-package={item.id}>
 +    <CardHead title={item.title} t={t} onOpen={onOpen} icon={item.icon ?? <PluginArtworkDefault size={CARD_ARTWORK_SIZE} />}
@@ -110,6 +108,8 @@
 +        </div>}
 +    </div>
 +  </section>
- }
- 
++}
++
  /** One row as the detail slots see it. */
+ function rowRef(row: PackageRow): PluginRowRef {
+   return { rowId: row.rowId, moduleName: row.moduleName, enabled: row.enabled }

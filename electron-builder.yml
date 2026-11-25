@@ -50,6 +50,7 @@ mac:
   signIgnore:
     - '/Contents/Frameworks/Electron Framework[.]framework(?:/Versions/[^/]+)?/Resources/(?:[^/]+[.]lproj/locale[.]pak|(?:chrome_[0-9]+_percent|resources)[.]pak|icudtl[.]dat|v8_context_snapshot[.][^/]+[.]bin)$'
     - '/Contents/Resources/app[.]asar[.]unpacked/node_modules/(?:katex/dist/fonts/[^/]+[.](?:ttf|woff2?)|pdfjs-dist/cmaps/[^/]+[.]bcmap)$'
+    - '/Contents/Resources/app[.]asar[.]unpacked/node_modules/@deepseek-ai/dsh-cua-macos/native/bin(?:/|$)'
   target:
     - dmg
     - zip

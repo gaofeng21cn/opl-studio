@@ -100,15 +100,17 @@
    lang: string | undefined,
 --- a/packages/client/ui-primitives/src/useMenuSubmenu.ts
 +++ b/packages/client/ui-primitives/src/useMenuSubmenu.ts
-@@ -17,3 +17,3 @@
+@@ -18,3 +18,3 @@ interface MenuSubmenu {
    entry: (MenuItem & { submenu: readonly MenuEntry[] }) | undefined
 -  panelRef: RefObject<HTMLDivElement>
 +  panelRef: RefObject<HTMLDivElement | null>
    /** CSS anchor name of the root card's anchor box; the child card is placed against it. */
-@@ -43,3 +43,3 @@
+@@ -44,4 +44,4 @@ export function useMenuSubmenu(options: {
    footer: readonly MenuEntry[] | undefined
 -  listRef: RefObject<HTMLDivElement>
+-  searchRowsRef: RefObject<HTMLDivElement>
 +  listRef: RefObject<HTMLDivElement | null>
++  searchRowsRef: RefObject<HTMLDivElement | null>
    refocusAnchor: () => void
 --- a/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx
 +++ b/packages/client/ui-sidebar-documentpreview/src/client/image/ImageBody.tsx

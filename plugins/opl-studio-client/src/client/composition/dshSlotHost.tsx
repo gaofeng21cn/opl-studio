@@ -27,6 +27,7 @@ import {
   type OplSettingsGroupOwner
 } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { registerBillionContextSettingsSlot } from "./billionContextSettingsSlot";
+import { registerComputerUseSettingsSlot } from "./computerUseSettingsSlot";
 import { installWorkspaceClientPlugin } from "./workspaceClientPlugin";
 import { settingsDestinations } from "../workbench/SettingsPanel";
 import {
@@ -171,6 +172,7 @@ export class OplStudioDshSlotHost {
     const registerFactory = (spec: Record<string, unknown>, component: unknown) => this.core.registerFactory(spec as any, component as any);
     register({ name: "root", registrant: "opl-studio", inject: () => ({ slotHost: this, contributions: this.contributions }), children: { sidebar: { kind: "single", scope: "root" }, main: { kind: "keyed", scope: "root" }, rightbar: { kind: "single", scope: "root" }, "shell.bottom": { kind: "single", scope: "root" }, "shell.overlay": { kind: "list", scope: "root" }, "shell.leading": { kind: "single", scope: "root" }, "composer.palette": { kind: "list", scope: "root" }, "runtime.detail": { kind: "list", scope: "root" }, "settings.section": { kind: "list", scope: "root" }, "settings.group.models": { kind: "list", scope: "root" }, "settings.group.resources": { kind: "list", scope: "root" }, "settings.group.workspace": { kind: "list", scope: "root" }, "settings.group.capabilities": { kind: "list", scope: "root" }, "settings.group.services": { kind: "list", scope: "root" }, "settings.group.preferences": { kind: "list", scope: "root" } } }, OplStudioRoot);
     registerBillionContextSettingsSlot(this.core);
+    registerComputerUseSettingsSlot(this.core);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root", inject: { hooks: { sectionScroller: (_standard: unknown, hookContext: any) => hookContext.useSectionScroller } } }, "sidebar.session.action": { kind: "hoc", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist.actions": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     registerFactory({ name: "sidebar.panel.icon", scope: "root", children: { "sidebar.panellist": { kind: "list", scope: "root" } } }, PanelIcon);
     register({ name: "sidebar.panellist.actions", id: "opl-sidebar-panel-actions", registrant: "opl-studio" }, SidebarPanelActionsSlot);
