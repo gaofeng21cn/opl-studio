@@ -96,6 +96,7 @@ export class OplCodexNative extends EventEmitter {
     this.computerUseRestartPending = false;
     this.computerUseActive = false;
     this.computerUseActiveConsentMode = null;
+    this.computerUseError = null;
     this.transport = transport ?? new CodexAppServerTransport({
       cwd: workspaceRoot,
       env: childEnv,
@@ -203,9 +204,22 @@ export class OplCodexNative extends EventEmitter {
     if (!config.available || !config.enabled) {
       this.configuredComputerUseEnabled = false;
       this.configuredComputerUseConsentMode = null;
+      this.computerUseError = null;
       return withToolMcp;
     }
-    ensureCuaMcpProfile(this.contextProfile.dshHome);
+    try {
+      ensureCuaMcpProfile(this.contextProfile.dshHome);
+    } catch (error) {
+      // Keep plain Codex App Server startup unblocked if CUA profile materialization fails.
+      this.computerUseError = {
+        code: error?.code ?? "cua_profile_init_failed",
+        message: error?.message ?? String(error)
+      };
+      this.configuredComputerUseEnabled = false;
+      this.configuredComputerUseConsentMode = null;
+      return withToolMcp;
+    }
+    this.computerUseError = null;
     this.configuredComputerUseEnabled = true;
     this.configuredComputerUseConsentMode = config.consentMode;
     return codexArgsWithComputerUse(withToolMcp, {
@@ -329,7 +343,9 @@ export class OplCodexNative extends EventEmitter {
     const { platform, nativeControl } = this.computerUseOptions;
     const [permissions, saved] = await Promise.all([
       inspectNativePermissions({ helper: config.helper, platform, nativeControl }),
-      dshHome ? readSavedAppPermissions(dshHome) : Promise.resolve({ allowedApps: [], blockedApps: [] })
+      dshHome
+        ? readSavedAppPermissions(dshHome).catch(() => ({ allowedApps: [], blockedApps: [] }))
+        : Promise.resolve({ allowedApps: [], blockedApps: [] })
     ]);
     return {
       supported: config.supported,
@@ -343,7 +359,7 @@ export class OplCodexNative extends EventEmitter {
       permissions,
       allowedApps: saved.allowedApps,
       blockedApps: saved.blockedApps,
-      unavailableReason: config.unavailableReason
+      unavailableReason: config.unavailableReason ?? this.computerUseError?.code ?? null
     };
   }
 

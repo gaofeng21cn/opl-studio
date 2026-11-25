@@ -57,6 +57,11 @@ test('macOS signing skips binary resource data while retaining native signing ca
   const nativeBytes = Buffer.alloc(512);
   fs.readSync(executable, nativeBytes);
   fs.closeSync(executable);
+  const bundledCuaHelper = write(
+    path.join(resources, '@deepseek-ai/dsh-cua-macos/native/bin/darwin-arm64/1.0.0/DSH Computer Use.app/Contents/MacOS/dsh-cua-native'),
+    nativeBytes,
+  );
+  data.push(bundledCuaHelper);
   const native = [
     write(path.join(contents, 'MacOS/One Person Lab'), nativeBytes),
     write(path.join(framework, 'Electron Framework'), nativeBytes),
