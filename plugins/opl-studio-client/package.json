@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-studio-client",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "module",
   "main": "./lib/index.mjs",
   "exports": {

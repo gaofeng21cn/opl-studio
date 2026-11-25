@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-plugin-ui-kit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Public UI Kit and Settings Slot SDK for Tier 2 OPL App DSH client plugins.",

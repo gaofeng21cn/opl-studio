@@ -233,3 +233,26 @@ test("OplCodexNative wires native CUA controls, preserves Billion Context across
   assert.equal(service.transport.args[0], bcBin);
   assert.ok(!service.transport.args.some((arg) => arg.includes("mcp_servers.dsh_cua")));
 });
+
+test("OplCodexNative isolates CUA profile initialization failures without blocking plain Codex startup", { skip: process.platform !== "darwin" }, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-fault-isolation-"));
+  t.after(() => rm(tempRoot, { recursive: true, force: true }));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  await mkdir(dshHome, { recursive: true });
+  // Place an obstructing regular file at opl-cua-mcp so ensureCuaMcpProfile throws on mkdirSync.
+  await writeFile(path.join(dshHome, "opl-cua-mcp"), "not-a-directory\n");
+
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin"
+  });
+
+  assert.equal(service.configuredComputerUseEnabled, false);
+  assert.ok(service.computerUseError);
+  assert.ok(!service.transport.args.some((arg) => arg.includes("mcp_servers.dsh_cua")));
+  const state = await service.readComputerUse();
+  assert.equal(state.active, false);
+  assert.equal(state.unavailableReason, service.computerUseError.code);
+});

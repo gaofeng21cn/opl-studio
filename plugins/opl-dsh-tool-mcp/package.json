@@ -1,6 +1,6 @@
 {
   "name": "@gaofeng21cn/opl-dsh-tool-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Authenticated DSH tool registry bridge for Codex.",
   "type": "module",
   "main": "./lib/index.mjs",
