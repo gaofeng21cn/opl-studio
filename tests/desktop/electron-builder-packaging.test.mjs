@@ -26,6 +26,8 @@ test('desktop carriers prune non-runtime dependency material without dropping Ho
       files.some(entry => String(entry).includes('{test,tests,__tests__')),
       `${name} prunes package test material`,
     );
+    assert.ok(unpack.includes('packages/host-kit/**/*.mjs'), `${name} unpacks nested host-kit modules`);
+    assert.ok(files.includes('packages/host-kit/**/*.mjs'), `${name} bundles nested host-kit modules`);
     assert.ok(files.includes('package.json'), `${name} keeps the carrier root manifest`);
   }
 });

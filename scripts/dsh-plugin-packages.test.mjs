@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -166,15 +167,13 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
         }
       }
     } finally { await browser.happyDOM.close(); }
-    await fs.mkdir(path.join(staging, "packages/host-kit"), { recursive: true });
-    for (const entry of await fs.readdir(path.join(root, "packages/host-kit"), { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(".mjs")) {
-        await fs.copyFile(
-          path.join(root, "packages/host-kit", entry.name),
-          path.join(staging, "packages/host-kit", entry.name)
-        );
+    await fs.cp(path.join(root, "packages/host-kit"), path.join(staging, "packages/host-kit"), {
+      recursive: true,
+      filter: (source) => {
+        if (statSync(source).isDirectory()) return path.basename(source) !== "node_modules";
+        return source.endsWith(".mjs");
       }
-    }
+    });
     await fs.cp(path.join(root, "src/host/dsh"), path.join(staging, "src/host/dsh"), { recursive: true });
     const { bootOplStudioHost } = await import(pathToFileURL(path.join(staging, "src/host/dsh/host.mjs")));
     const transport = {
