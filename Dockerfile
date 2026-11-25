@@ -19,9 +19,8 @@ RUN git init \
   && test "$(git rev-parse HEAD)" = "${OPL_FRAMEWORK_REF}"
 RUN npm ci --ignore-scripts \
   && npm run build \
-  && npm pack --workspaces --ignore-scripts --silent --pack-destination /tmp \
   && npm pack --ignore-scripts --silent --pack-destination /tmp \
-  && npm install --global --prefix /opt/opl-framework --omit=dev /tmp/one-person-lab-*.tgz /tmp/opl-framework-*.tgz \
+  && npm install --global --prefix /opt/opl-framework --omit=dev /tmp/opl-framework-*.tgz \
   && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS codex-builder

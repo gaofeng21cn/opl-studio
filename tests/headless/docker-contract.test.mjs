@@ -19,8 +19,9 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.ok(rendererBuilder.indexOf("COPY vendor ./vendor") < rendererBuilder.indexOf("RUN npm run build:webui"), "the plugin build must receive the unmodified Superagent source");
   assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec/);
   assert.match(dockerfile, /ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507/);
-  assert.match(dockerfile, /npm pack --workspaces --ignore-scripts/);
-  assert.match(dockerfile, /npm install --global --prefix \/opt\/opl-framework --omit=dev \/tmp\/one-person-lab-\*\.tgz \/tmp\/opl-framework-\*\.tgz/);
+  assert.match(dockerfile, /npm pack --ignore-scripts/);
+  assert.doesNotMatch(dockerfile, /npm pack --workspaces/);
+  assert.match(dockerfile, /npm install --global --prefix \/opt\/opl-framework --omit=dev \/tmp\/opl-framework-\*\.tgz/);
   const productionDependencies = dockerfile.slice(
     dockerfile.indexOf("FROM ${NODE_IMAGE} AS production-dependencies"),
     dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime")
