@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ComputerUseActionRequest,
   ComputerUseConsentMode,
@@ -17,7 +17,9 @@ import {
 type ComputerUseBridge = Pick<
   OplBridge,
   "readComputerUse" | "setComputerUse" | "performComputerUseAction"
->;
+> & {
+  subscribeEvents?: (onEvent: (event: { method?: string; type?: string; params?: Record<string, unknown> }) => void) => () => void;
+};
 
 export function ComputerUseSettingsSection({
   zh,
@@ -31,21 +33,44 @@ export function ComputerUseSettingsSection({
   const [state, setState] = useState<ComputerUseState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const requestSeqRef = useRef(0);
+  const activeRef = useRef(true);
 
   useEffect(() => {
     let active = true;
+    activeRef.current = true;
     setState(null);
     setError(false);
-    bridge?.readComputerUse?.().then(
-      (next) => {
-        if (active) setState(next);
-      },
-      () => {
-        if (active) setError(true);
+
+    const refresh = (surfaceError: boolean) => {
+      if (!bridge?.readComputerUse) return;
+      const seq = ++requestSeqRef.current;
+      void bridge.readComputerUse().then(
+        (next) => {
+          if (active && seq === requestSeqRef.current) {
+            setState(next);
+            setError(false);
+          }
+        },
+        () => {
+          if (active && surfaceError && seq === requestSeqRef.current) {
+            setError(true);
+          }
+        }
+      );
+    };
+
+    refresh(true);
+    const unsubscribe = bridge?.subscribeEvents?.((event) => {
+      if (event?.method === "host/computer-use-changed" || event?.method === "host/availability") {
+        refresh(false);
       }
-    );
+    });
+
     return () => {
       active = false;
+      activeRef.current = false;
+      unsubscribe?.();
     };
   }, [bridge]);
 
@@ -53,12 +78,20 @@ export function ComputerUseSettingsSection({
     if (!bridge?.setComputerUse || busy) return;
     setBusy(true);
     setError(false);
+    const seq = ++requestSeqRef.current;
     try {
-      setState(await bridge.setComputerUse(patch));
+      const next = await bridge.setComputerUse(patch);
+      if (activeRef.current && seq === requestSeqRef.current) {
+        setState(next);
+      }
     } catch {
-      setError(true);
+      if (activeRef.current && seq === requestSeqRef.current) {
+        setError(true);
+      }
     } finally {
-      setBusy(false);
+      if (activeRef.current) {
+        setBusy(false);
+      }
     }
   }
 
@@ -66,12 +99,20 @@ export function ComputerUseSettingsSection({
     if (!bridge?.performComputerUseAction || busy) return;
     setBusy(true);
     setError(false);
+    const seq = ++requestSeqRef.current;
     try {
-      setState(await bridge.performComputerUseAction({ ...request, locale }));
+      const next = await bridge.performComputerUseAction({ ...request, locale });
+      if (activeRef.current && seq === requestSeqRef.current) {
+        setState(next);
+      }
     } catch {
-      setError(true);
+      if (activeRef.current && seq === requestSeqRef.current) {
+        setError(true);
+      }
     } finally {
-      setBusy(false);
+      if (activeRef.current) {
+        setBusy(false);
+      }
     }
   }
 

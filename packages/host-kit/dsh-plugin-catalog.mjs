@@ -490,7 +490,16 @@ export function reconcileUserExternalPluginsOnBoot(profileDir) {
       }
       const pkgDir = path.join(profileDir, "node_modules", ...pkg.split("/"));
       if (fs.existsSync(pkgDir)) {
-        fs.rmSync(pkgDir, { recursive: true, force: true });
+        try {
+          fs.rmSync(pkgDir, { recursive: true, force: true });
+        } catch (error) {
+          console.warn("[OPL:dsh-plugin-reconcile]", JSON.stringify({
+            packageName: pkg,
+            operation: "remove_cleanup",
+            code: error?.code ?? null,
+            message: error instanceof Error ? error.message : String(error)
+          }));
+        }
       }
       delete next[pkg];
       changed = true;

@@ -102,7 +102,10 @@ export async function stageContextPluginOperation({ dshProfileDir: dir, dshInsta
   if (!dir) throw new ThreadAdapterError("dsh_profile_unavailable", "The active DSH profile is unavailable", {}, 503);
   if (operation === "remove") {
     await withFileLock(path.join(dir, "package.json"), async () => {
-      const previousEnabled = readProfileManifest("opl-studio", dir).dsh?.profile?.bundles?.includes(name) === true;
+      const existingPending = readPendingContextOperation(dir);
+      const previousEnabled = existingPending?.operation === "remove" && typeof existingPending.previousEnabled === "boolean"
+        ? existingPending.previousEnabled
+        : readProfileManifest("opl-studio", dir).dsh?.profile?.bundles?.includes(name) === true;
       await writePendingContextOperation(dir, {
         schema: "opl_billion_context_pending.v1",
         operation: "remove",

@@ -24,8 +24,9 @@ import {
   readPendingContextOperation,
   stageContextPluginOperation
 } from "../../plugins/opl-codex-native/src/billion-context.mjs";
-import { readProfileManifest } from "@deepseek-ai/dsh-app-boot";
+import { readProfileManifest, initProfile } from "@deepseek-ai/dsh-app-boot";
 import { classifyAndRefreshDshPluginUpdate } from "../../plugins/opl-host-core/src/service.mjs";
+import { bootOplStudioHost } from "./dsh/host.mjs";
 
 test("optional plugin preferences persist native DSH patches and reject core plugins", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-dsh-catalog-test-"));
@@ -452,5 +453,211 @@ test("cancelPendingContextOperation restores billion-context bundle selection af
     assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("billion-context"), true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("external npm plugin update respects disable or staged removal made while download is in flight", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-open-dsh-toctou-"));
+  const home = path.join(root, "home");
+  const profileDir = path.join(root, "profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  try {
+    let remoteVersion = "1.0.0";
+    let onDownloadStart = null;
+    const view = async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        name: "@community/dsh-race",
+        version: remoteVersion,
+        engines: { node: ">=20" },
+        dsh: { manifestVersion: 1, title: "Race Plugin", client: "./lib/client.js" }
+      })
+    });
+    const run = async (profileCtx) => {
+      if (onDownloadStart) await onDownloadStart();
+      const pkgDir = path.join(profileCtx.dir, "node_modules", "@community", "dsh-race");
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
+        name: "@community/dsh-race",
+        version: remoteVersion,
+        dsh: { manifestVersion: 1, client: "./lib/client.js" }
+      }));
+      return { exitCode: 0, timedOut: false };
+    };
+    const runRemove = async () => ({ exitCode: 0, timedOut: false });
+
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-race", operation: "install", view, run, runRemove
+    });
+
+    // Case 1: user disables the plugin while 1.1.0 is downloading.
+    remoteVersion = "1.1.0";
+    onDownloadStart = async () => {
+      await manageExternalNpmDshPlugin({
+        home, dir: profileDir, packageName: "@community/dsh-race", operation: "disable", activeAtBoot: false, view, run, runRemove
+      });
+    };
+    const updateAfterDisable = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-race", operation: "update", activeAtBoot: false, view, run, runRemove
+    });
+    assert.equal(updateAfterDisable.updated, true);
+    assert.equal(updateAfterDisable.staged, false);
+    assert.equal(updateAfterDisable.restartRequired, false);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-race"]?.enabled, false);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-race"), false);
+
+    // Case 2: user stages removal while 1.2.0 is downloading.
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-race", operation: "enable", activeAtBoot: false, view, run, runRemove
+    });
+    remoteVersion = "1.2.0";
+    onDownloadStart = async () => {
+      await manageExternalNpmDshPlugin({
+        home, dir: profileDir, packageName: "@community/dsh-race", operation: "remove", activeAtBoot: true, view, run, runRemove
+      });
+    };
+    const updateAfterRemove = await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-race", operation: "update", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(updateAfterRemove.updated, false);
+    assert.equal(updateAfterRemove.restartRequired, true);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-race"]?.pendingOperation, "remove");
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-race"]?.previousEnabled, true);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-race"), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repeated staged removal preserves original enabled state on cancel for external plugins and billion-context", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-repeat-stage-remove-"));
+  const home = path.join(root, "home");
+  const profileDir = path.join(root, "profile");
+  fs.mkdirSync(profileDir, { recursive: true });
+  try {
+    const view = async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        name: "@community/dsh-repeat",
+        version: "1.0.0",
+        engines: { node: ">=20" },
+        dsh: { manifestVersion: 1, title: "Repeat Plugin", client: "./lib/client.js" }
+      })
+    });
+    const run = async (profileCtx) => {
+      const pkgDir = path.join(profileCtx.dir, "node_modules", "@community", "dsh-repeat");
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
+        name: "@community/dsh-repeat",
+        version: "1.0.0",
+        dsh: { manifestVersion: 1, client: "./lib/client.js" }
+      }));
+      return { exitCode: 0, timedOut: false };
+    };
+    const runRemove = async () => ({ exitCode: 0, timedOut: false });
+
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-repeat", operation: "install", view, run, runRemove
+    });
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-repeat", operation: "remove", activeAtBoot: true, view, run, runRemove
+    });
+    // Repeat remove before reboot must not clobber previousEnabled: true with false.
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-repeat", operation: "remove", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-repeat"]?.previousEnabled, true);
+    await manageExternalNpmDshPlugin({
+      home, dir: profileDir, packageName: "@community/dsh-repeat", operation: "cancel_pending", activeAtBoot: true, view, run, runRemove
+    });
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-repeat"]?.enabled, true);
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("@community/dsh-repeat"), true);
+
+    // Same invariant for billion-context repeated staged remove.
+    const manifestPath = path.join(profileDir, "package.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    manifest.dependencies = { ...(manifest.dependencies ?? {}), "billion-context": "1.0.0" };
+    manifest.dsh.profile.bundles.push("billion-context");
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+    await stageContextPluginOperation({ dshProfileDir: profileDir }, "remove", "1.0.0");
+    await stageContextPluginOperation({ dshProfileDir: profileDir }, "remove", "1.0.0");
+    assert.equal(readPendingContextOperation(profileDir)?.previousEnabled, true);
+    await cancelPendingContextOperation({ dshProfileDir: profileDir });
+    assert.equal(readProfileManifest("opl-studio", profileDir).dsh?.profile?.bundles?.includes("billion-context"), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("bootOplStudioHost continues cleanly when staged external plugin directory cleanup hits EACCES/EPERM", { skip: process.getuid?.() === 0 }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-boot-eacces-cleanup-"));
+  const dshHome = path.join(root, "dsh-home");
+  const profileDir = path.join(dshHome, "profiles", "opl-studio");
+  const nodeModulesDir = path.join(profileDir, "node_modules");
+  const scopeDir = path.join(nodeModulesDir, "@community");
+  const pkgDir = path.join(scopeDir, "dsh-locked");
+  t.after(() => {
+    try { fs.chmodSync(scopeDir, 0o755); } catch {}
+    try { fs.chmodSync(pkgDir, 0o755); } catch {}
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  initProfile(profileDir, []);
+  fs.mkdirSync(pkgDir, { recursive: true });
+  fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
+    name: "@community/dsh-locked",
+    version: "1.0.0",
+    dsh: { manifestVersion: 1, client: "./index.js" }
+  }));
+  fs.writeFileSync(path.join(pkgDir, "index.js"), "export function apply() {}\n");
+
+  const manifestPath = path.join(profileDir, "package.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.dependencies = { ...(manifest.dependencies ?? {}), "@community/dsh-locked": "1.0.0" };
+  manifest.dsh = { profile: { bundles: ["@community/dsh-locked"] } };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+  await manageExternalNpmDshPlugin({
+    home: dshHome,
+    dir: profileDir,
+    packageName: "@community/dsh-locked",
+    operation: "remove",
+    activeAtBoot: true
+  });
+
+  // Make @community read-only so both pnpm remove and fs.rmSync(pkgDir) hit EACCES.
+  fs.chmodSync(scopeDir, 0o555);
+  const fakeTransport = {
+    initialized: true,
+    on() {},
+    once() {},
+    removeListener() {},
+    off() {},
+    capabilities() { return { available: true }; },
+    createChannelCallbackAdapter() { return null; },
+    async start() {},
+    async stop() {},
+    async close() {},
+    async listThreads() { return { data: [], nextCursor: null }; },
+    async listModels() { return { data: [], nextCursor: null }; },
+    async listCapabilities() { return { skills: [], plugins: [], apps: [], errors: [] }; }
+  };
+  const emptyOpl = () => ({
+    readState: async () => ({}),
+    readInitialize: async () => ({}),
+    readFullDrilldown: async () => ({}),
+    executeAction: async () => ({}),
+    capabilities: () => ({ available: true })
+  });
+
+  const { core } = await bootOplStudioHost({ dshHome, transport: fakeTransport, opl: emptyOpl(), webPort: 0 });
+  try {
+    const updatedManifest = readProfileManifest("opl-studio", profileDir);
+    assert.equal(Object.hasOwn(updatedManifest.dependencies ?? {}, "@community/dsh-locked"), false);
+    assert.equal(updatedManifest.dsh?.profile?.bundles?.includes("@community/dsh-locked"), false);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-locked"], undefined);
+  } finally {
+    await core.close();
   }
 });

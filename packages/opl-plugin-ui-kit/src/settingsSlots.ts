@@ -97,6 +97,7 @@ export type OplSettingsGroupOwner = {
     readComputerUse?: () => Promise<OplComputerUseStateSnapshot>;
     setComputerUse?: (request: { enabled?: boolean; consentMode?: OplComputerUseConsentMode }) => Promise<OplComputerUseStateSnapshot>;
     performComputerUseAction?: (request: OplComputerUseActionRequestSnapshot) => Promise<OplComputerUseStateSnapshot>;
+    subscribeEvents?: (onEvent: (event: { method?: string; type?: string; params?: Record<string, unknown> }) => void) => () => void;
   };
 };
 

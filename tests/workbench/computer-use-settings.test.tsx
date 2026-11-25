@@ -199,3 +199,69 @@ test("ComputerUseSettingsSection surfaces runtime init errors and active-turn di
   expect(pendingBanner?.textContent).toContain("allow");
   expect(pendingBanner?.textContent).toContain("自动重载");
 });
+
+test("ComputerUseSettingsSection refreshes live state when host/computer-use-changed arrives", async () => {
+  let state: ComputerUseState = {
+    supported: true,
+    available: true,
+    enabled: false,
+    active: true,
+    consentMode: "elicit",
+    activeConsentMode: "allow",
+    restartPending: true,
+    platform: "darwin",
+    permissions: {
+      status: "ready",
+      accessibility: true,
+      screenRecording: true,
+      helperAppPath: "/Applications/One Person Lab.app/Contents/Resources/DSH Computer Use.app",
+      helperBundle: "test-bundle",
+      error: null
+    },
+    allowedApps: [],
+    blockedApps: [],
+    unavailableReason: null
+  };
+  let listener: ((event: { method?: string; params?: Record<string, unknown> }) => void) | null = null;
+  let unsubscribed = false;
+
+  const bridge = {
+    async readComputerUse() {
+      return structuredClone(state);
+    },
+    async setComputerUse() {
+      return structuredClone(state);
+    },
+    async performComputerUseAction() {
+      return structuredClone(state);
+    },
+    subscribeEvents(onEvent: (event: { method?: string; params?: Record<string, unknown> }) => void) {
+      listener = onEvent;
+      return () => {
+        unsubscribed = true;
+      };
+    }
+  };
+
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={bridge} />);
+  });
+  await act(async () => {});
+
+  expect(document.querySelector('[data-testid="opl-cua-restart-pending"]')).not.toBeNull();
+
+  state = {
+    ...state,
+    active: false,
+    activeConsentMode: null,
+    restartPending: false
+  };
+  await act(async () => {
+    listener?.({ method: "host/computer-use-changed", params: { active: false, restartPending: false } });
+  });
+  await act(async () => {});
+
+  expect(document.querySelector('[data-testid="opl-cua-restart-pending"]')).toBeNull();
+  await act(async () => root.unmount());
+  expect(unsubscribed).toBe(true);
+});

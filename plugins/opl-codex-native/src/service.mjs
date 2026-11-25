@@ -101,6 +101,8 @@ export class OplCodexNative extends EventEmitter {
     this.computerUseActive = false;
     this.computerUseActiveConsentMode = null;
     this.computerUseError = null;
+    this.transportStarting = false;
+    this.computerUseWriteChain = Promise.resolve();
     this.transport = transport ?? new CodexAppServerTransport({
       cwd: workspaceRoot,
       env: childEnv,
@@ -133,6 +135,31 @@ export class OplCodexNative extends EventEmitter {
             code: "app_server_unavailable",
             message: `Codex App Server became unavailable (${availability.signal ?? availability.code ?? "unknown"})`
           };
+      if (availability.available === false) {
+        this.computerUseActive = false;
+        this.computerUseActiveConsentMode = null;
+        this.emit("event", {
+          method: "host/computer-use-changed",
+          params: {
+            active: false,
+            activeConsentMode: null,
+            restartPending: this.computerUseRestartPending
+          }
+        });
+      } else if (availability.available === true && !this.transportStarting) {
+        this.computerUseActive = Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled);
+        this.computerUseActiveConsentMode = this.computerUseActive ? this.configuredComputerUseConsentMode : null;
+        this.appliedComputerUseRevision = this.configuredComputerUseRevision ?? this.computerUseConfigRevision;
+        this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
+        this.emit("event", {
+          method: "host/computer-use-changed",
+          params: {
+            active: this.computerUseActive,
+            activeConsentMode: this.computerUseActiveConsentMode,
+            restartPending: this.computerUseRestartPending
+          }
+        });
+      }
       this.emit("event", { method: "host/availability", params: availability });
     });
     this.transport.on("serverRequest", (request) => {
@@ -250,30 +277,49 @@ export class OplCodexNative extends EventEmitter {
   }
 
   async #startTransport() {
-    this.#prepareContextLauncher();
-    try {
-      await this.transport.start();
-    } catch (error) {
-      if (!this.contextLaunch) throw error;
-      await this.transport.stop();
-      Object.assign(this.transport, this.contextLaunch);
-      this.contextLaunch = null;
-      this.contextError = true;
-      await this.transport.start();
+    if (this.configuredComputerUseRevision !== this.computerUseConfigRevision) {
+      this.#applyCodexArgs();
     }
-    this.computerUseActive = Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled);
-    this.computerUseActiveConsentMode = this.computerUseActive ? this.configuredComputerUseConsentMode : null;
-    this.appliedComputerUseRevision = this.configuredComputerUseRevision ?? this.computerUseConfigRevision;
-    this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
-    this.appServerError = null;
-    this.emit("event", {
-      method: "host/computer-use-changed",
-      params: {
-        active: this.computerUseActive,
-        activeConsentMode: this.computerUseActiveConsentMode,
-        restartPending: this.computerUseRestartPending
+    this.#prepareContextLauncher();
+    const launch = {
+      revision: this.configuredComputerUseRevision ?? this.computerUseConfigRevision,
+      enabled: Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled),
+      consentMode: !this.hasExplicitTransport && this.configuredComputerUseEnabled
+        ? this.configuredComputerUseConsentMode
+        : null
+    };
+    this.transportStarting = true;
+    try {
+      try {
+        await this.transport.start();
+      } catch (error) {
+        if (!this.contextLaunch) throw error;
+        await this.transport.stop();
+        Object.assign(this.transport, this.contextLaunch);
+        this.contextLaunch = null;
+        this.contextError = true;
+        await this.transport.start();
       }
-    });
+      this.computerUseActive = launch.enabled;
+      this.computerUseActiveConsentMode = launch.enabled ? launch.consentMode : null;
+      this.appliedComputerUseRevision = launch.revision;
+      this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
+      this.appServerError = null;
+      this.emit("event", {
+        method: "host/computer-use-changed",
+        params: {
+          active: this.computerUseActive,
+          activeConsentMode: this.computerUseActiveConsentMode,
+          restartPending: this.computerUseRestartPending
+        }
+      });
+    } catch (error) {
+      this.computerUseActive = false;
+      this.computerUseActiveConsentMode = null;
+      throw error;
+    } finally {
+      this.transportStarting = false;
+    }
   }
 
   async start() {
@@ -284,6 +330,14 @@ export class OplCodexNative extends EventEmitter {
     }
     try {
       await this.#startTransport();
+      if (
+        this.computerUseRestartPending
+        && !this.closePromise
+        && !this.transport?.disposed
+        && this.appliedComputerUseRevision !== this.computerUseConfigRevision
+      ) {
+        this.#scheduleComputerUseReload();
+      }
     } catch (error) {
       this.appServerError = {
         code: error.code ?? "app_server_unavailable",
@@ -380,24 +434,45 @@ export class OplCodexNative extends EventEmitter {
   #scheduleComputerUseReload() {
     if (this.pendingComputerUseReloadPromise || this.closePromise) return;
     if (typeof this.transport?.scheduleWhenIdle !== "function") return;
+    let attemptedRevision = null;
+    let reloadFailed = false;
     this.pendingComputerUseReloadPromise = this.transport.scheduleWhenIdle(async () => {
       if (!this.computerUseRestartPending || this.closePromise) return;
+      attemptedRevision = this.computerUseConfigRevision;
       this.#applyCodexArgs();
       await this.reloadConfiguration({ maintenanceHeld: true });
     }).catch((error) => {
+      reloadFailed = true;
       if (!this.closePromise) {
         this.appServerError = {
           code: error?.code ?? "app_server_unavailable",
           message: error?.message ?? String(error)
         };
+        if (!this.transport?.initialized) {
+          this.computerUseActive = false;
+          this.computerUseActiveConsentMode = null;
+        }
+        if (attemptedRevision === null || this.computerUseConfigRevision === attemptedRevision) {
+          this.computerUseRestartPending = false;
+        }
+        this.emit("event", {
+          method: "host/computer-use-changed",
+          params: {
+            active: this.computerUseActive && this.transport?.initialized === true,
+            activeConsentMode: this.computerUseActive && this.transport?.initialized === true ? this.computerUseActiveConsentMode : null,
+            restartPending: this.computerUseRestartPending
+          }
+        });
       }
     }).finally(() => {
       this.pendingComputerUseReloadPromise = null;
+      const hasNewerRevision = attemptedRevision !== null && this.computerUseConfigRevision !== attemptedRevision;
       if (
         this.computerUseRestartPending
         && !this.closePromise
         && !this.transport?.disposed
         && this.appliedComputerUseRevision !== this.computerUseConfigRevision
+        && (!reloadFailed || hasNewerRevision)
       ) {
         this.#scheduleComputerUseReload();
       }
@@ -411,30 +486,55 @@ export class OplCodexNative extends EventEmitter {
     if (consentMode !== undefined && consentMode !== "elicit" && consentMode !== "allow") {
       throw new ThreadAdapterError("invalid_request", `Unsupported Computer Use consent mode: ${String(consentMode)}`, {}, 400);
     }
-    const prev = readComputerUseSettings(this.contextProfile.dshHome, this.computerUseOptions.platform);
-    const next = await writeComputerUseSettings(
-      this.contextProfile.dshHome,
-      { enabled, consentMode },
-      this.computerUseOptions.platform
-    );
-    const changed = prev.enabled !== next.enabled || prev.consentMode !== next.consentMode;
+    const writeStep = this.computerUseWriteChain.then(async () => {
+      const prev = readComputerUseSettings(this.contextProfile.dshHome, this.computerUseOptions.platform);
+      const next = await writeComputerUseSettings(
+        this.contextProfile.dshHome,
+        { enabled, consentMode },
+        this.computerUseOptions.platform
+      );
+      const changed = prev.enabled !== next.enabled || prev.consentMode !== next.consentMode;
+      if (changed) {
+        this.computerUseConfigRevision += 1;
+      }
+      return { changed, targetRevision: this.computerUseConfigRevision };
+    });
+    this.computerUseWriteChain = writeStep.catch(() => undefined);
+    const { changed, targetRevision } = await writeStep;
+
     if (changed) {
-      this.computerUseConfigRevision += 1;
-    }
-    this.#applyCodexArgs();
-    if (changed && this.transport.initialized) {
-      try {
-        await this.reloadConfiguration();
-        if (this.computerUseRestartPending) {
-          this.#scheduleComputerUseReload();
+      if (this.transportStarting || this.reloadPromise) {
+        this.computerUseRestartPending = true;
+        this.emit("event", {
+          method: "host/computer-use-changed",
+          params: {
+            active: this.computerUseActive && this.transport?.initialized === true,
+            activeConsentMode: this.computerUseActive && this.transport?.initialized === true ? this.computerUseActiveConsentMode : null,
+            restartPending: true
+          }
+        });
+        return this.readComputerUse();
+      }
+      this.#applyCodexArgs();
+      if (this.transport.initialized) {
+        try {
+          await this.reloadConfiguration();
+          if (this.computerUseRestartPending) {
+            this.#scheduleComputerUseReload();
+          }
+        } catch (error) {
+          if (error?.code === "app_server_busy") {
+            this.computerUseRestartPending = true;
+            this.#scheduleComputerUseReload();
+          } else {
+            if (this.computerUseConfigRevision !== targetRevision && !this.transportStarting && !this.reloadPromise) {
+              this.#applyCodexArgs();
+            }
+            throw error;
+          }
         }
-      } catch (error) {
-        if (error?.code === "app_server_busy") {
-          this.computerUseRestartPending = true;
-          this.#scheduleComputerUseReload();
-        } else {
-          throw error;
-        }
+      } else {
+        this.computerUseRestartPending = false;
       }
     }
     return this.readComputerUse();
@@ -471,6 +571,15 @@ export class OplCodexNative extends EventEmitter {
       if (result.status === "deferred") {
         throw Object.assign(new Error("Codex configuration reload is waiting for active tasks"), { code: "app_server_busy" });
       }
+      if (
+        this.computerUseRestartPending
+        && !this.closePromise
+        && !this.transport?.disposed
+        && this.appliedComputerUseRevision !== this.computerUseConfigRevision
+        && !this.pendingComputerUseReloadPromise
+      ) {
+        this.#scheduleComputerUseReload();
+      }
       return result.result;
     }
     if (this.closePromise) {
@@ -487,13 +596,28 @@ export class OplCodexNative extends EventEmitter {
           code: error.code ?? "app_server_unavailable",
           message: error.message ?? String(error)
         };
+        if (this.computerUseRestartPending && !this.transport?.initialized) {
+          this.computerUseActive = false;
+          this.computerUseActiveConsentMode = null;
+        }
         throw error;
       }
       return this.capabilities();
     })().finally(() => {
       this.reloadPromise = null;
     });
-    return this.reloadPromise;
+    const outcome = await this.reloadPromise;
+    if (
+      maintenanceHeld
+      && this.computerUseRestartPending
+      && !this.closePromise
+      && !this.transport?.disposed
+      && this.appliedComputerUseRevision !== this.computerUseConfigRevision
+      && !this.pendingComputerUseReloadPromise
+    ) {
+      this.#scheduleComputerUseReload();
+    }
+    return outcome;
   }
 
   capabilities() {
