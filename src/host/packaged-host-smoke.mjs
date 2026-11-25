@@ -21,9 +21,16 @@ try {
     async stop() { this.initialized = false; }
   };
   const result = await bootOplStudioHost({
-    // The Host also loads Link identity and grants from OPL_DATA_DIR. A
-    // temporary DSH profile alone still opens the user's live Link carrier.
-    env: { ...process.env, OPL_DATA_DIR: directory },
+    // Isolate both Studio and Framework state from the builder machine so a
+    // signed-in builder account cannot trigger a live Link connection in smoke.
+    env: {
+      ...process.env,
+      HOME: directory,
+      OPL_DATA_DIR: directory,
+      OPL_STATE_DIR: path.join(directory, "framework-state"),
+      OPL_APP_OPL_BIN: path.join(directory, "missing-opl"),
+      NODE_TEST_CONTEXT: "packaged-host-smoke"
+    },
     dshHome: directory,
     workspaceRoot: directory,
     transport,
