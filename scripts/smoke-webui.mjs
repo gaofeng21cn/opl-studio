@@ -53,11 +53,17 @@ const webuiRendererTestIds = [
 assertRendererTestIds(rendererSource, webuiRendererTestIds, "WebUI renderer");
 const html = read("dist/webui/index.html");
 const bundle = read("dist/webui/renderer.js");
+const studioClientRoot = "plugins/core/opl-studio-client";
+const studioClient = JSON.parse(read(studioClientRoot + "/package.json"));
+const studioClientBundle = process.env.OPL_DSH_REGISTRY_PLUGINS === "1"
+  ? "node_modules/" + studioClient.name + "/" + studioClient.exports["./client"]
+  : studioClientRoot + "/" + studioClient.exports["./client"];
+assert(read(studioClientBundle).includes("opl-studio-root"), "DSH Studio client bundle must own the Workspace mount");
 for (const marker of ['<div id="root"></div>', './renderer.js']) {
   assert(html.includes(marker), `missing WebUI HTML marker ${marker}`);
 }
 assert(!html.includes("branding/opl-app-logo.png"), "WebUI HTML must keep product identity text-only");
-for (const marker of ["opl-studio-root", "window.oplStudio", "/api/opl-events"]) {
+for (const marker of ["window.oplStudio", "/api/opl-events"]) {
   assert(bundle.includes(marker), `missing WebUI renderer marker ${marker}`);
 }
 
