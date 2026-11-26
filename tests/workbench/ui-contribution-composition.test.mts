@@ -778,3 +778,125 @@ test("phone PIN projections carry a current challenge but never submitted digits
   value.connection.state = "connected";
   expect(readChannelAccessResult(value)).toBeNull();
 });
+
+test("conversation.composer.bar provides renderSlotChain for placeholder and renders composerRunState when a model is available", async () => {
+  const host = createHost();
+  const barEntry = host.core.entries("conversation.composer.bar")[0]!;
+  expect(barEntry.children?.["conversation.input.placeholder"]).toEqual({ kind: "chain", scope: "root", inline: true });
+
+  const extraGlobals = {
+    HTMLInputElement: (browser as any).HTMLInputElement,
+    HTMLSelectElement: (browser as any).HTMLSelectElement,
+    HTMLTextAreaElement: (browser as any).HTMLTextAreaElement,
+    Event: (browser as any).Event,
+    MutationObserver: (browser as any).MutationObserver,
+    getComputedStyle: (browser as any).getComputedStyle,
+    ResizeObserver: class { observe() {} disconnect() {} },
+    IS_REACT_ACT_ENVIRONMENT: true
+  };
+  const saved = new Map(Object.keys(extraGlobals).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const previousFonts = Object.getOwnPropertyDescriptor(document, "fonts");
+  for (const [key, value] of Object.entries(extraGlobals)) {
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+  }
+  Object.defineProperty(document, "fonts", {
+    configurable: true,
+    value: { addEventListener() {}, removeEventListener() {} }
+  });
+
+  const React = await import("react");
+  const { act } = React;
+  const { createRoot } = await import("react-dom/client");
+  const { SlotRegistry } = await import("../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts");
+  const { createSlotRenderer } = await import("../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx");
+  const { CodexThreadScope } = await import("../../plugins/core/opl-studio-client/src/client/composition/codexThreadScope.ts");
+  const { StudioContext } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
+  const { ComposerAccessory } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ComposerAccessory.tsx");
+
+  const ctx = new Context();
+  contexts.push(ctx);
+  new SlotRegistry(ctx);
+  const slots = ctx.get("slots") as InstanceType<typeof SlotRegistry>;
+  slots.installScope("session", new CodexThreadScope(ctx));
+  slots.install(createSlotRenderer());
+  const errors: unknown[] = [];
+  const stopErrors = slots.onEntryError((slot, _entry, error) => errors.push({ slot, error }));
+  slots.register(
+    { name: "root", registrant: "test", children: { "conversation.composer.bar": { kind: "single", scope: "root" } } } as never,
+    (({ renderSlot }: { renderSlot: (key: string, owner: object) => React.ReactNode }) =>
+      renderSlot("conversation.composer.bar", { variant: "hero", occurrence: "main" })) as never
+  );
+  slots.register(
+    {
+      name: "conversation.composer.bar",
+      registrant: barEntry.registrant,
+      inject: barEntry.inject,
+      children: barEntry.children
+    } as never,
+    barEntry.component as never
+  );
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const reactRoot = createRoot(container);
+  const surface = {
+    locale: "zh" as const,
+    prompt: "",
+    promptRevision: 0,
+    queue: [],
+    composerImages: [],
+    composerOverlay: null,
+    composerAccessory: React.createElement(ComposerAccessory, {
+      locale: "zh",
+      prompt: "",
+      selections: [],
+      selectedAgent: null,
+      sendState: "idle",
+      submissionError: "",
+      unavailableFixedModel: false,
+      onUpdatePrompt: () => {},
+      onRemoveSelection: () => {},
+      onClearAgent: () => {}
+    }),
+    resolvedModelId: "codex-fixture",
+    modelOptions: [],
+    modelSelection: "__auto" as const,
+    reasoningSelection: "high",
+    reasoningOptions: ["high"],
+    sending: false,
+    agentPermissions: ":workspace" as const,
+    currentThreadId: undefined,
+    updatePrompt: () => {},
+    submitPrompt: () => {},
+    steerQueue: () => {},
+    addComposerImages: () => null,
+    removeComposerImage: () => {},
+    openComposerPalette: () => {},
+    stopTurn: () => {},
+    setAgentPermissions: () => {},
+    selectModel: async () => true,
+    narrow: false,
+    detailsOpen: false,
+    toggleSidebar: () => {},
+    closeDetails: () => {}
+  };
+
+  try {
+    await act(async () => {
+      reactRoot.render(React.createElement(StudioContext.Provider, { value: surface as never }, slots.renderSlot("root", {})));
+    });
+    expect(errors).toEqual([]);
+    expect(container.querySelector('[data-testid="opl-composer-run-state"]')).toBeTruthy();
+    expect(container.querySelector("[data-composer-placeholder]")?.textContent).toBe("向 OPL 描述你的目标");
+  } finally {
+    stopErrors();
+    await act(async () => reactRoot.unmount());
+    container.remove();
+    if (previousFonts) Object.defineProperty(document, "fonts", previousFonts);
+    else Reflect.deleteProperty(document, "fonts");
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
