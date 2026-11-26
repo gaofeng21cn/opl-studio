@@ -21,7 +21,7 @@ const {
   readAdditionalConversationInstructions,
   readSettings,
   writeAdditionalConversationInstructions
-} = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+} = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
 
 function memoryStorage(initial: Record<string, string>) {
   const values = new Map(Object.entries(initial));

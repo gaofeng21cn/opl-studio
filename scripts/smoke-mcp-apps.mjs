@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promis
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { McpAppHost } from '../plugins/opl-mcp-apps/src/service.mjs';
+import { McpAppHost } from '../plugins/core/opl-mcp-apps/src/service.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { MCP_APP_MIME } from '../packages/host-contracts/mcp-app-protocol.mjs';
@@ -115,9 +115,9 @@ const uiBundle = relayRoot || frameworkRoot ? '' : await bundle('app', uiSource)
 resourceHtml = `<!doctype html><html><head><meta charset="utf-8"></head><body><h1>Review item-7</h1><pre id="owner-result">loading</pre><button id="apply">Apply decision</button><button id="stale">Apply stale revision</button><button id="inspect">Read owner</button><script type="module">${uiBundle.replaceAll('</script', '<\\/script')}</script></body></html>`;
 const rendererBundle = await bundle('renderer', `import React from ${JSON.stringify(path.join(root, 'node_modules/react/index.js'))};
 import {createRoot} from ${JSON.stringify(path.join(root, 'node_modules/react-dom/client.js'))};
-import {McpAppWorkspace} from ${JSON.stringify(path.join(root, 'plugins/opl-mcp-apps/src/client/McpAppWorkspace.tsx'))};
-import {McpAppsClientContext} from ${JSON.stringify(path.join(root, 'plugins/opl-mcp-apps/src/client/plugin.tsx'))};
-import {installWorkspaceClientPlugin} from ${JSON.stringify(path.join(root, 'plugins/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx'))};
+import {McpAppWorkspace} from ${JSON.stringify(path.join(root, 'plugins/core/opl-mcp-apps/src/client/McpAppWorkspace.tsx'))};
+import {McpAppsClientContext} from ${JSON.stringify(path.join(root, 'plugins/core/opl-mcp-apps/src/client/plugin.tsx'))};
+import {installWorkspaceClientPlugin} from ${JSON.stringify(path.join(root, 'plugins/core/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx'))};
 const rpc=async(method,payload)=>{const response=await fetch('/api/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});const value=await response.json();if(!response.ok)throw new Error(value.error);return value};
 const launch=await fetch('/launch').then(response=>response.json());
 const config=await fetch('/config').then(response=>response.json());
@@ -126,7 +126,7 @@ const surface={locale:'en',workspacePath:'/synthetic',currentThreadId:config.thr
 let Page; installWorkspaceClientPlugin({register:(slot,component)=>{if(slot.name==='main')Page=component;return ()=>{}}},()=>surface);
 createRoot(document.querySelector('#root')).render(<McpAppsClientContext.Provider value={{Workspace:McpAppWorkspace}}><Page/></McpAppsClientContext.Provider>);`);
 const officialTheme = await Promise.all(['base.css', 'design-platform.css', 'gradient-shadow-text.css', 'focus.css'].map(name => readFile(path.join(root, 'vendor/deepseek-harness/packages/client/ui-theme/src/styles', name), 'utf8')));
-const workspaceCss = officialTheme.join('\n') + '\n' + await readFile(path.join(temporaryRoot, 'renderer-bundle/renderer.css'), 'utf8') + '\n' + await readFile(path.join(root, 'plugins/opl-studio-client/src/client/composition/workspace.css'), 'utf8');
+const workspaceCss = officialTheme.join('\n') + '\n' + await readFile(path.join(temporaryRoot, 'renderer-bundle/renderer.css'), 'utf8') + '\n' + await readFile(path.join(root, 'plugins/core/opl-studio-client/src/client/composition/workspace.css'), 'utf8');
 const pageHtml = '<!doctype html><html data-opl-host="desktop"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Studio MCP App acceptance</title><link rel="stylesheet" href="/workspace.css"><style>body{margin:0;font:var(--dsw-font-s-14)}#root{height:100dvh}</style></head><body><div id="root"></div><script type="module" src="/renderer.js"></script></body></html>';
 const server = http.createServer(async (request, response) => {
   const send = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };

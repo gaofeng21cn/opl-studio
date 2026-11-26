@@ -17,8 +17,8 @@ import {
   retrySavedAppPermission,
   revokeSavedAppPermission,
   writeComputerUseSettings
-} from "../../plugins/opl-codex-native/src/computer-use.mjs";
-import { OplCodexNative } from "../../plugins/opl-codex-native/src/service.mjs";
+} from "../../plugins/core/opl-codex-native/src/computer-use.mjs";
+import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const installAnchor = path.join(root, "package.json");

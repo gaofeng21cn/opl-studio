@@ -6,11 +6,11 @@ import path from "node:path";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile, symlink, copyFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { createLinkCompanion } from "../../plugins/opl-host-core/src/link-companion.mjs";
-import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../plugins/opl-host-core/src/link-loopback.mjs";
-import { createThreadWorkspaceService } from "../../plugins/opl-host-core/src/thread-workspace-service.mjs";
-import { createLinkInternet, authorizeLinkHost } from "../../plugins/opl-host-core/src/link-internet.mjs";
-import { createLinkTransportEvidence } from "../../plugins/opl-host-core/src/link-transport-evidence.mjs";
+import { createLinkCompanion } from "../../plugins/core/opl-host-core/src/link-companion.mjs";
+import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../plugins/core/opl-host-core/src/link-loopback.mjs";
+import { createThreadWorkspaceService } from "../../plugins/core/opl-host-core/src/thread-workspace-service.mjs";
+import { createLinkInternet, authorizeLinkHost } from "../../plugins/core/opl-host-core/src/link-internet.mjs";
+import { createLinkTransportEvidence } from "../../plugins/core/opl-host-core/src/link-transport-evidence.mjs";
 
 async function fixture(t, { now } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-remote-test-"));

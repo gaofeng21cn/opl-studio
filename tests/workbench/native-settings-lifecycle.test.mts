@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import * as React from "react";
 import { Context } from "@deepseek-ai/cordis";
 import { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
-import { createEcosystemLocale, installSettingsSearch } from "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/ecosystemClients.ts";
+import { createEcosystemLocale, installSettingsSearch } from "../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/ecosystemClients.ts";
 
 function settingsSearchPlugin() {
   let plugin: any;

@@ -101,7 +101,7 @@ test("registry authentication survives a later update without a new token", asyn
 
 test("registry resolution uses the selected carrier cohort and skips newer incompatible versions", async () => {
   const name = "@gaofeng21cn/opl-superagent";
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const incompatibleVersion = inc(currentVersion, "patch");
   const queries = [];
   const view = async (_dir, spec) => {
@@ -131,7 +131,7 @@ test("current and unavailable registry checks never create an unnecessary profil
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const view = async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
     ? [currentVersion] : { name, version: currentVersion, engines: { dsh: "0.2.3-alpha.2" } }) });
   let installs = 0;
@@ -150,7 +150,7 @@ test("registry update projection preserves each failed check while reporting com
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-partial-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const good = "@gaofeng21cn/opl-superagent", bad = "@gaofeng21cn/opl-team-bots";
-  const availableVersion = inc(JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version, "patch");
+  const availableVersion = inc(JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version, "patch");
   const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
     view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
       : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? [availableVersion]
@@ -165,7 +165,7 @@ test("registry updates use the profile scope route without overriding npm's defa
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const nextVersion = inc(currentVersion, "patch");
   let managerArgs;
   let managerContext;
@@ -189,7 +189,7 @@ test("public DSH plugin feed works without GitHub tokens, rejects tampered tarba
   const bundledPnpmBin = path.join(carrierDir, "node_modules", "pnpm", "bin", "pnpm.mjs");
   await fs.mkdir(path.dirname(bundledPnpmBin), { recursive: true });
   await fs.writeFile(bundledPnpmBin, "// fixture bundled pnpm\n");
-  const superagentManifest = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"), "utf8"));
+  const superagentManifest = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"), "utf8"));
   const bootManifest = JSON.parse(await fs.readFile(path.join(root, "node_modules/@deepseek-ai/dsh-app-boot/package.json"), "utf8"));
   await fs.mkdir(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent"), { recursive: true });
   await fs.writeFile(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent", "package.json"), JSON.stringify(superagentManifest));

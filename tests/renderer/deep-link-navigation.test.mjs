@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { applySettingsShellNavigation, resolveDeepLinkDestination } from "../../plugins/opl-studio-client/src/client/workbench/deepLinkNavigation.ts";
+import { applySettingsShellNavigation, resolveDeepLinkDestination } from "../../plugins/core/opl-studio-client/src/client/workbench/deepLinkNavigation.ts";
 import { createDeepLinkPolicy } from "../../desktop/deep-links.mjs";
 import { resolveAppRepoRoot } from "../../scripts/resolve-app-repo-root.mjs";
 import { createSettingsShellStore } from "../../vendor/deepseek-harness/packages/client/ui-settings-general/src/client/shell-store.ts";

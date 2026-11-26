@@ -1,4 +1,4 @@
-import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
+import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
 
 export function runtimeOverviewFixture(locale: "zh" | "en" = "zh") {
   const zh = locale === "zh";

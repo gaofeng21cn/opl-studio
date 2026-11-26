@@ -70,7 +70,7 @@ test("rejects lock version drift, local resolution, foreign origin and invalid i
     ["root version", f => { f.lock.packages[""].dependencies[name] = "^0.1.2"; }, /root lock dependency/],
     ["installed version", f => { f.entry.version = "0.1.1"; }, /installed lock entry/],
     ["linked lock", f => { f.entry.link = true; }, /installed lock entry/],
-    ["local path", f => { f.entry.resolved = "file:plugins/opl-studio-client"; }, /receipt registry/],
+    ["local path", f => { f.entry.resolved = "file:plugins/core/opl-studio-client"; }, /receipt registry/],
     ["foreign origin", f => { f.entry.resolved = "https://registry.npmjs.org/client.tgz"; }, /receipt registry/],
     ["missing integrity", f => { delete f.entry.integrity; }, /integrity/],
     ["truncated integrity", f => { f.entry.integrity = "sha512-YWJj"; }, /integrity/]

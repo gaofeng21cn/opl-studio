@@ -452,7 +452,7 @@ the full license text.
 https://github.com/deepseek-ai/dsh-superagent-prototype at
 `8c32a9dc5d72c033816c6a8110b37f40cf94fba4`. Per-file SHA-256 values are in
 `vendor/dsh-superagent/provenance.json`; the original license is preserved.
-`plugins/opl-superagent-engine` is a private delivery wrapper, not a separately
+`plugins/extensions/opl-superagent-engine` is a private delivery wrapper, not a separately
 published upstream package.
 
 ## ds-harness-remote

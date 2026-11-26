@@ -5,17 +5,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Window } from "happy-dom";
-import { readKnowledgeSourcesProjection, knowledgeConsumerGroups, knowledgeLibraryLabel, knowledgeSourceNeedsAttention, knowledgeSourceStatus, type KnowledgeSourcesProjection } from "../../plugins/opl-studio-client/src/client/workbench/knowledgeSources";
-import { KnowledgeSourcesSection } from "../../plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
-import { ApplicationManagementPage } from "../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage";
-import { deriveWorkbenchModelFromState, initialWorkbenchModel, type WorkbenchModel } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
-import type { SettingsActionRequest } from "../../plugins/opl-studio-client/src/client/workbench/settingsActions";
+import { readKnowledgeSourcesProjection, knowledgeConsumerGroups, knowledgeLibraryLabel, knowledgeSourceNeedsAttention, knowledgeSourceStatus, type KnowledgeSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/knowledgeSources";
+import { KnowledgeSourcesSection } from "../../plugins/core/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
+import { ApplicationManagementPage } from "../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage";
+import { deriveWorkbenchModelFromState, initialWorkbenchModel, type WorkbenchModel } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
+import type { SettingsActionRequest } from "../../plugins/core/opl-studio-client/src/client/workbench/settingsActions";
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: "test-fixture", defaultModel: "codex-fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "codex-fixture" }], reasoningEfforts: ["high"],
   autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel");
+const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel");
 
 function ownerProjection() {
   return {

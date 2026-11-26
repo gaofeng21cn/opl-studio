@@ -23,6 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import { listDshSourcePackages } from "../packages/host-kit/src/dsh-source-packages.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -66,13 +67,12 @@ if (receipt.dsh_cohort !== pkg.dependencies?.["@deepseek-ai/dsh-app-boot"]) {
 const dirForPackage = new Map(
   Object.entries(pkg.dependencies || {})
     .filter(([, v]) => typeof v === "string" && v.startsWith("file:plugins/"))
-    .map(([name, v]) => [name, v]) // e.g. "@gaofeng21cn/opl-superagent" → "file:plugins/opl-superagent"
+    .map(([name, v]) => [name, v]) // e.g. "@gaofeng21cn/opl-superagent" → "file:plugins/extensions/opl-superagent"
 );
 
 const changes = [];
-const publishable = fs.readdirSync(path.join(root, "plugins"), { withFileTypes: true })
-  .filter(entry => entry.isDirectory())
-  .map(entry => JSON.parse(fs.readFileSync(path.join(root, "plugins", entry.name, "package.json"), "utf8")))
+const publishable = listDshSourcePackages(root)
+  .map(entry => entry.manifest)
   .filter(manifest => manifest.publishConfig?.registry === receipt.registry && !manifest.private)
   .map(manifest => manifest.name);
 if (publishable.length !== Object.keys(receipt.plugins).length || publishable.some(name => !Object.hasOwn(receipt.plugins, name))) {

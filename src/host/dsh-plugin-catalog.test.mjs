@@ -23,9 +23,9 @@ import {
   clearPendingContextOperation,
   readPendingContextOperation,
   stageContextPluginOperation
-} from "../../plugins/opl-codex-native/src/billion-context.mjs";
+} from "../../plugins/core/opl-codex-native/src/billion-context.mjs";
 import { readProfileManifest, initProfile } from "@deepseek-ai/dsh-app-boot";
-import { classifyAndRefreshDshPluginUpdate } from "../../plugins/opl-host-core/src/service.mjs";
+import { classifyAndRefreshDshPluginUpdate } from "../../plugins/core/opl-host-core/src/service.mjs";
 import { bootOplStudioHost } from "./dsh/host.mjs";
 
 test("optional plugin preferences persist native DSH patches and reject core plugins", async () => {

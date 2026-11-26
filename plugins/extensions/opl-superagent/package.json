@@ -1,0 +1,47 @@
+{
+  "name": "@gaofeng21cn/opl-superagent",
+  "version": "0.1.6",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "Independent official Superagent profile lifecycle and OPL entry point.",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.3-alpha.2"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@gaofeng21cn/opl-studio-client"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@gaofeng21cn/opl-codex-agents": "^0.1.2",
+    "dsh-superagent": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-superagent": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/extensions/opl-superagent"
+  }
+}

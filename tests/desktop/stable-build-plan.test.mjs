@@ -28,7 +28,7 @@ function writePackagedWslHostPayload(payloadRoot, { includeNodeModules = true } 
     'desktop/windows-guest-inspect.mjs': 'inspect',
     'packages/host-kit/official-profile.mjs': 'profile',
     'src/host/create-host.mjs': 'create-host',
-    'plugins/opl-host-core/lib/index.mjs': 'host-core',
+    'plugins/core/opl-host-core/lib/index.mjs': 'host-core',
     'runtime/node/bin/node': 'node',
     'runtime/node/bin/npm': 'npm',
     'runtime/node/lib/node_modules/npm/bin/npm-cli.js': 'npm-cli',

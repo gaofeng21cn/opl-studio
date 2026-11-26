@@ -12,13 +12,16 @@ import { verifyCompositionInstallation } from "./verify-composition-installation
 const execute = promisify(execFile);
 const script = new URL("./apply-composition-receipt.mjs", import.meta.url);
 const pluginName = "@fixture/opl-plugin";
-const pluginSource = "plugins/opl-plugin";
+const pluginSource = "plugins/extensions/opl-plugin";
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-composition-install-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, "scripts"));
   await fs.copyFile(script, path.join(root, "scripts/apply-composition-receipt.mjs"));
+  const helper = "packages/host-kit/src/dsh-source-packages.mjs";
+  await fs.mkdir(path.join(root, path.dirname(helper)), { recursive: true });
+  await fs.copyFile(new URL(`../${helper}`, import.meta.url), path.join(root, helper));
   await fs.mkdir(path.join(root, pluginSource), { recursive: true });
   const manifest = {
     name: "composition-fixture", version: "1.0.0", private: true,

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme';
-import { codexWorkbenchStyles } from '../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles';
-import { ApplicationManagementPage } from '../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage';
-import { ShellOverlaySlot } from '../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots';
-import { StudioContext, type StudioContextValue } from '../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext';
-import { SettingsActionDialog } from '../../plugins/opl-studio-client/src/client/workbench/settings/SettingsActionDialog';
-import { deriveWorkbenchModelFromState } from '../../plugins/opl-studio-client/src/client/workbench/workbenchModel';
-import { settingsDefaults } from '../../plugins/opl-studio-client/src/client/workbench/settingsModel';
-import { buildSettingsActionViewModel } from '../../plugins/opl-studio-client/src/client/workbench/settingsActions';
-import { packageActivity, type PackageOperation } from '../../plugins/opl-studio-client/src/client/workbench/packageOperations';
+import '../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/theme';
+import { codexWorkbenchStyles } from '../../plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles';
+import { ApplicationManagementPage } from '../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage';
+import { ShellOverlaySlot } from '../../plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots';
+import { StudioContext, type StudioContextValue } from '../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext';
+import { SettingsActionDialog } from '../../plugins/core/opl-studio-client/src/client/workbench/settings/SettingsActionDialog';
+import { deriveWorkbenchModelFromState } from '../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel';
+import { settingsDefaults } from '../../plugins/core/opl-studio-client/src/client/workbench/settingsModel';
+import { buildSettingsActionViewModel } from '../../plugins/core/opl-studio-client/src/client/workbench/settingsActions';
+import { packageActivity, type PackageOperation } from '../../plugins/core/opl-studio-client/src/client/workbench/packageOperations';
 
 // Shipped Software Center and Shell controls with deterministic owner projections.
 // All software, transfer values and actions in this fixture are illustrative.

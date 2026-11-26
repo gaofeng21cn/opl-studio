@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const vendor = path.join(root, "vendor/dsh-superagent");
-const target = path.join(root, "plugins/opl-superagent-engine");
+const target = path.join(root, "plugins/extensions/opl-superagent-engine");
 const provenance = JSON.parse(fs.readFileSync(path.join(vendor, "provenance.json"), "utf8"));
 for (const [file, expected] of Object.entries(provenance.source_files)) {
   const actual = createHash("sha256").update(fs.readFileSync(path.join(vendor, file))).digest("hex");

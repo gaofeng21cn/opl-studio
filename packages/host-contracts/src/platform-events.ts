@@ -171,7 +171,9 @@ export type LinkCompanionManagement = {
 };
 
 export type DshPluginTier = "optional_product" | "external_plugin" | "core_runtime";
-export type DshPluginIntentCategory = "agent" | "application" | "efficiency" | "runtime";
+export type SoftwareProductType = "agent" | "application" | "extension" | "channel" | "dependency";
+// Profiles can update their client and Host independently.
+export type DshPluginIntentCategory = SoftwareProductType | "efficiency" | "runtime";
 
 export type DshPluginCatalogEntry = {
   pluginId: string;

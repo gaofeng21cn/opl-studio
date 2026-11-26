@@ -8,7 +8,7 @@ import {
   compactInitialize,
   createOplPassthrough,
   mergeChannelProviderState
-} from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
+} from "../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs";
 
 test("App state timeout keeps the interactive default and admits a bounded cold-start override", () => {
   assert.doesNotThrow(() => createOplPassthrough({ readStateTimeoutMs: undefined }));
@@ -262,6 +262,53 @@ test("channel callbacks stay dormant unless an optional provider registrar is co
     /Host is missing appStatePatch/
   );
   assert.equal(invalidDisposeCount, 1);
+});
+
+test("native Weixin hides the superseded Package and publishes its action without a Framework action", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-native-channel-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const command = path.join(directory, "opl");
+  const packageId = "opl-channel-weixin";
+  await writeFile(command, `#!/bin/sh
+printf '%s' '${JSON.stringify({ app_state: { actions: [], agent_packages: {
+    directory: { entry_count: 2, installed_package_count: 1, entries: [
+      { package_id: packageId, installed: true }, { package_id: "other" }
+    ] },
+    status_index: { installed_package_count: 1, packages: [{ package_id: packageId, installed: true }] }
+  } } })}'
+`, { mode: 0o700 });
+  let executionCount = 0;
+  const passthrough = createOplPassthrough({
+    command,
+    env: { OPL_STUDIO_READ_ONLY: "1" },
+    channelCallbackRegistrar: async () => ({
+      replacedPackageIds: [packageId],
+      appStatePatch: () => ({ ui_contributions: { entries: [{
+        package_id: packageId,
+        action_boundary: "opl.connect.channel-provider-host",
+        view: { view_type: "channel_access", data_ref: "weixin.channel-access#state" },
+        commands: [{ action_ref: "weixin.channel-access#connect" }]
+      }] } }),
+      readChannelAccess: async () => ({ state: "disconnected" }),
+      executeChannelAccessAction: async () => { executionCount += 1; },
+      dispose: () => {}
+    })
+  });
+  const registration = await passthrough.registerChannelCallbackAdapter({
+    startThread() {}, resumeThread() {}, startTurn() {}, subscribeTurn() {}
+  });
+  context.after(registration.dispose);
+  const state = (await passthrough.readState()).app_state.app_state;
+  assert.deepEqual(state.agent_packages.directory.entries.map(entry => entry.package_id), ["other"]);
+  assert.equal(state.agent_packages.directory.entry_count, 1);
+  assert.equal(state.agent_packages.directory.installed_package_count, 0);
+  assert.equal(state.agent_packages.status_index.installed_package_count, 0);
+  assert.deepEqual(state.ui_contributions.entries.map(entry => entry.package_id), [packageId]);
+  assert.ok(state.actions.some(entry => entry.action_id === "package_contribution_execute"));
+  assert.equal((await passthrough.readContribution({ packageId, ref: "weixin.channel-access#state" })).stdoutJson.state, "disconnected");
+  const payload = { package_id: packageId, ref: "weixin.channel-access#connect" };
+  assert.equal((await passthrough.executeAction({ actionId: "package_contribution_execute", dryRun: false, payload })).status, "blocked_read_only");
+  assert.equal(executionCount, 0);
 });
 
 test("remote companion reads expose development status when its optional host is unavailable", async () => {

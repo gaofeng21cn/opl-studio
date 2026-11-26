@@ -4,12 +4,12 @@ import test from "node:test";
 import {
   agentPackageSelectionIntent,
   deriveWorkbenchModelFromState
-} from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
 test("software scope and immutable artwork survive the Host projection", async () => {
-  const { compactPackageRows, compactManagedUpdateProjection } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { softwareCatalogPackages } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareCatalog.ts");
-  const { publicSoftwareIconUrl } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareArtwork.tsx");
+  const { compactPackageRows, compactManagedUpdateProjection } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { softwareCatalogPackages } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
+  const { publicSoftwareIconUrl } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareArtwork.tsx");
   const icon = `https://raw.githubusercontent.com/owner/app/${"a".repeat(40)}/plugins/app/assets/icon.png`;
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([
     { package_id: "local", catalog_origin: "opl", management_scope: "local_product", icon_url: icon, icon_ref: "assets/icon.svg", installed: true },
@@ -27,7 +27,7 @@ test("software scope and immutable artwork survive the Host projection", async (
 });
 
 test("App visibility preserves native installation and callable package metadata", async () => {
-  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
     directory: { entries: compactPackageRows([{ package_id: "private-phone", app_enabled: false, installed: true, activated: true,
       package_role: "capability_package", display_name: "Private phone", presence: { callable: true } },
@@ -92,8 +92,8 @@ test("software sources project public and authorized entries without exposing cr
 });
 
 test("owner-requested access refresh checks a source once without granting software access", async () => {
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { readSoftwareSourcesProjection, pendingSoftwareSourceAccessCheck } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, pendingSoftwareSourceAccessCheck } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const projection = readSoftwareSourcesProjection(compactSoftwareSources({
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
       source_id: "private-source", display_name: "Authorized software", source_kind: "registry", visibility: "authorized_only",
@@ -114,8 +114,8 @@ test("owner-requested access refresh checks a source once without granting softw
 });
 
 test("native source inventory preserves unknown state and version-bound owner actions", async () => {
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareMatches, softwareSourceStatusLabel } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareMatches, softwareSourceStatusLabel } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const projection = readSoftwareSourcesProjection(compactSoftwareSources({
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
       source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", version_authority: "homebrew_local_metadata", entry_count: 1,
@@ -495,7 +495,7 @@ test("package projection derives OPL membership from owner provenance", () => {
 });
 
 test("maintenance provenance separates OPL software, external extensions and unknown origin without trusting names", async () => {
-  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const entries = compactPackageRows([
     { package_id: "travel-passport", publisher: "gaofeng21cn", catalog_origin: "opl", origin_basis: "owner_manifest", catalog_scope: "software",
       catalog_source: { manager: "codex_plugin_manager", marketplace_id: "journey-atlas", delivery: "local", token: "must-not-cross" } },
@@ -524,8 +524,8 @@ test("maintenance provenance separates OPL software, external extensions and unk
 });
 
 test("native products preserve maintenance provenance separately from installation and distribution managers", async () => {
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const raw = {
     surface_kind: "opl_software_sources_projection.v1",
     installed_products: [{ item_id: "managed:framework", product_id: "framework", name: "framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12",
@@ -626,8 +626,8 @@ test("package version prefers installed identity over the available release", ()
 
 
 test("native product counts collapse distribution channels and retain actual installation authority", async () => {
-  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts, nativeCarrierInstalled } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
-  const { compactSoftwareSources, compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts, nativeCarrierInstalled } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { compactSoftwareSources, compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const projection = readSoftwareSourcesProjection(compactSoftwareSources({ surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [
     ...["app", "app-full", "app-nightly"].map(name => ({ item_id: `cask:${name}`, name, display_name: "OPL App", kind: "cask", product_id: "github:owner/app", installed: true, installed_version: "26.11.1091", homebrew_installed: false, homebrew_installed_version: null, installation_kind: "app_bundle", installation_owner: "application", available_version: "26.11.890", update_status: "unknown" })),
     { item_id: "formula:opl", name: "opl", display_name: "OPL Framework", kind: "formula", product_id: "github:owner/framework", installed: true, installed_version: "0.3.12", homebrew_installed: false, installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", available_version: "0.3.10", update_status: "unknown" }
@@ -648,8 +648,8 @@ test("native product counts collapse distribution channels and retain actual ins
 
 
 test("owner-managed Framework remains visible without Homebrew and merges with its optional distribution channel", async () => {
-  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareInventory, nativeSoftwareProducts } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const product = { product_id: "github:owner/framework", product_display_name: "OPL Framework", item_id: "managed:framework", name: "opl-framework", display_name: "OPL Framework", kind: "managed_runtime", installed: true, installed_version: "0.3.12", installation_kind: "managed_runtime", installation_owner: "opl_framework", owner_settings_route: "updates", installation_id: "runtime:/home/user/.opl/one-person-lab", location: "/home/user/.opl/one-person-lab", active: true, mode: "installed", token: "must-not-cross" };
   const raw = { surface_kind: "opl_software_sources_projection.v1", installed_products: [product], entries: [] };
   const projection = readSoftwareSourcesProjection(compactSoftwareSources(raw))!;
@@ -674,9 +674,9 @@ test("owner-managed Framework remains visible without Homebrew and merges with i
 });
 
 test("native display identities survive the host bridge without changing machine versions or channel selection", async () => {
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { readSoftwareSourcesProjection, nativeSoftwareProducts, nativeInstalledDisplayVersion } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
-  const { nativeCatalogAvailableVersion, nativeCatalogState } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareCatalog.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts, nativeInstalledDisplayVersion } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { nativeCatalogAvailableVersion, nativeCatalogState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
   const installed = {
     product_id: "github:owner/app", item_id: "installed:app", name: "app", kind: "cask", installed: true,
     installed_version: "26.11.1091", installed_display_version: "26.11.10", installed_build_kind: "local-development",
@@ -712,8 +712,8 @@ test("native display identities survive the host bridge without changing machine
 });
 
 test("software installations preserve exact paths and active selection across the compact bridge", async () => {
-  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { catalogInstalledVersion } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareCatalog.ts");
+  const { compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { catalogInstalledVersion } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
   const release = { installation_id: "release", kind: "macos_bundle", mode: "installed", manager: "package_owner", version: "1.0", location: "/Applications/Example.app", active: true, entrypoint_verified: true, revision: "r1", private_token: "must-not-cross" };
   const development = { ...release, installation_id: "development", kind: "developer_checkout", mode: "development", version: "9.0", location: "/work/example", active: false };
   const installPayload = { package_id: "example", operation: "install", version: "1.1", expected_revision: "catalog-r2" };
@@ -733,9 +733,9 @@ test("software installations preserve exact paths and active selection across th
 });
 
 test("recommended native release is owner-selected and never chosen from a newer development or Nightly version", async () => {
-  const { compactSoftwareSources } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
-  const { nativeCatalogAvailableVersion } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareCatalog.ts");
+  const { compactSoftwareSources } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { readSoftwareSourcesProjection, nativeSoftwareProducts } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { nativeCatalogAvailableVersion } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
   const base = { product_id: "app", kind: "cask", installed: false, available_actions: [] };
   const raw = { surface_kind: "opl_software_sources_projection.v1", entries: [{ source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [
     { ...base, item_id: "nightly", name: "app-nightly", available_version: "3.0-nightly", selected_for_product: false, release_channel: "nightly" },

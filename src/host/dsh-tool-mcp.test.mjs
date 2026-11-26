@@ -8,7 +8,7 @@ import { initProfile } from "@deepseek-ai/dsh-app-boot";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { codexArgsWithDshToolMcp } from "../../plugins/opl-codex-native/src/service.mjs";
+import { codexArgsWithDshToolMcp } from "../../plugins/core/opl-codex-native/src/service.mjs";
 import { bootOplStudioHost, resolveWebBindAddress } from "./dsh/host.mjs";
 
 const fakeTransport = {

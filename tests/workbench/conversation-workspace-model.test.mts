@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { WorkbenchProjectGroup, WorkbenchThreadItem } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
+import type { WorkbenchProjectGroup, WorkbenchThreadItem } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
 import {
   buildConversationWorkspaceItems,
   createConversationWorkspaceView,
@@ -7,7 +7,7 @@ import {
   pickConversationDirectory,
   resetConversationWorkspace,
   selectConversationWorkspace
-} from "../../plugins/opl-studio-client/src/client/composition/conversationWorkspace";
+} from "../../plugins/core/opl-studio-client/src/client/composition/conversationWorkspace";
 
 function thread(id: string, workspace: string): WorkbenchThreadItem {
   return {

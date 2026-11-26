@@ -11,9 +11,9 @@ import type {
 } from "@gaofeng21cn/opl-host-contracts";
 import { OPL_STUDIO_SHELL_SERVICE } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
-import { createStudioShellStore } from "../../plugins/opl-studio-client/src/client/composition/studioShellStore";
-import { runtimeStatusClientPlugin } from "../../plugins/opl-runtime-status/src/client/plugin";
-import { RuntimeStatusPanel, RuntimeStatusSlotPanel } from "../../plugins/opl-runtime-status/src/client/RuntimeStatusPanel";
+import { createStudioShellStore } from "../../plugins/core/opl-studio-client/src/client/composition/studioShellStore";
+import { runtimeStatusClientPlugin } from "../../plugins/extensions/opl-runtime-status/src/client/plugin";
+import { RuntimeStatusPanel, RuntimeStatusSlotPanel } from "../../plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel";
 
 let createRoot: typeof import("react-dom/client").createRoot;
 let browser: Window;

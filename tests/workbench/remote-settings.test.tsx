@@ -2,14 +2,15 @@ import React, { act } from "react";
 let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { McpAppsClientContext } from "../../plugins/opl-studio-client/src/client/composition/mcpAppsClient";
-import { installWorkspaceClientPlugin } from "../../plugins/opl-studio-client/src/client/composition/workspaceClientPlugin";
-import { SettingsPluginSections } from "../../plugins/opl-studio-client/src/client/composition/SettingsPluginSections";
-import { CapabilitiesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage";
-import { ServicesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ServicesSettingsPage";
-import { ResourcesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
-import { ProjectedContribution } from "../../plugins/opl-studio-client/src/client/composition/contributionComponents";
-import { readUiContributionsProjection, settingsEntriesForDestination, settingsEntriesForNativeAppSurface, type OplContributionSlotOwner } from "../../plugins/opl-studio-client/src/client/composition/contributionProjection";
+import { createWeixinChannelService } from "../../plugins/channels/opl-channel-weixin/src/service.mjs";
+import { McpAppsClientContext } from "../../plugins/core/opl-studio-client/src/client/composition/mcpAppsClient";
+import { installWorkspaceClientPlugin } from "../../plugins/core/opl-studio-client/src/client/composition/workspaceClientPlugin";
+import { SettingsPluginSections } from "../../plugins/core/opl-studio-client/src/client/composition/SettingsPluginSections";
+import { CapabilitiesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage";
+import { ServicesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ServicesSettingsPage";
+import { ResourcesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
+import { ProjectedContribution } from "../../plugins/core/opl-studio-client/src/client/composition/contributionComponents";
+import { readUiContributionsProjection, settingsEntriesForDestination, settingsEntriesForNativeAppSurface, type OplContributionSlotOwner } from "../../plugins/core/opl-studio-client/src/client/composition/contributionProjection";
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
@@ -93,6 +94,69 @@ test('PIN form preserves leading zeroes and never sends PIN values in subsequent
   expect(input.value).toBe('');
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 280)); });
   expect(JSON.stringify(reads)).not.toContain('012345');
+});
+
+test('native Weixin keeps each PIN scoped to its current challenge', async () => {
+  const channel = createWeixinChannelService();
+  const native = await channel.connect({
+    readTransportBindings: async () => [],
+    startThread: async () => { throw new Error('PIN verification does not start a thread'); },
+    resumeThread: async () => {},
+    startTurn: async () => { throw new Error('PIN verification does not start a turn'); },
+    subscribeTurn: () => ({ dispose: () => {} })
+  });
+  const projected = readUiContributionsProjection(native.appStatePatch());
+  const [entry] = settingsEntriesForNativeAppSurface(projected.entries, 'resources');
+  expect(entry?.packageId).toBe('opl-channel-weixin');
+  expect(entry?.view?.dataRef).toBe('weixin.channel-access#state');
+  await channel.dispose();
+  let challengeId = 'original';
+  const actions: Record<string, unknown>[] = [];
+  const owner: OplContributionSlotOwner = {
+    locale: 'en', actionAvailable: true, refreshRevision: 0,
+    readData: async () => ({
+      schema_version: 'opl-app-channel-access.v1', status: 'available', channel_id: 'weixin',
+      connection: { state: 'pin_required', verification_challenge: { challenge_id: challengeId, expires_at_ms: Date.now() + 60000, retry: challengeId === 'retry' } },
+      actions: [{ command_id: 'weixin-submit-pin', input: { channel_id: 'weixin', challenge_id: challengeId } }],
+      pending_pairings: [], authorized_users: []
+    }),
+    onAction: async (_entry, command, input) => {
+      expect(command.actionRef).toBe('weixin.channel-access#submit-pin');
+      actions.push(input ?? {});
+      return { status: 'failed', retryable: actions.length === 1 };
+    }
+  };
+  const render = (revision: number) => root.render(<ProjectedContribution entry={entry!} owner={{ ...owner, refreshRevision: revision }} />);
+  const enter = (pin: string) => {
+    const input = document.querySelector('input')!;
+    Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, pin);
+    input.dispatchEvent(new browser.Event('input', { bubbles: true }) as any);
+    input.dispatchEvent(new browser.Event('change', { bubbles: true }) as any);
+  };
+  const submit = () => document.querySelector('form')!.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as any);
+  const submitButton = () => document.querySelector<HTMLButtonElement>('form button[type="submit"]')!;
+
+  await act(async () => render(0));
+  expect(document.querySelector('input')?.getAttribute('aria-invalid')).toBe('false');
+  await act(async () => { submit(); });
+  expect(document.querySelector('input')?.getAttribute('aria-invalid')).toBe('true');
+  expect(actions).toHaveLength(0);
+  await act(async () => enter('012345'));
+  expect(document.querySelector('input')?.getAttribute('aria-invalid')).toBe('false');
+  await act(async () => { submit(); });
+  expect(actions[0]).toEqual({ channel_id: 'weixin', challenge_id: 'original', verify_code: '012345' });
+  expect(submitButton().disabled).toBe(false);
+
+  await act(async () => enter('654321'));
+  challengeId = 'retry';
+  await act(async () => render(1));
+  expect(document.querySelector('input')?.value).toBe('');
+  expect(document.body.textContent).toContain('The PIN did not match.');
+  await act(async () => enter('654321'));
+  await act(async () => { submit(); submit(); });
+  expect(actions).toHaveLength(2);
+  expect(actions[1]).toEqual({ channel_id: 'weixin', challenge_id: 'retry', verify_code: '654321' });
+  expect(submitButton().disabled).toBe(true);
 });
 
 test('software and component details retain ordinary configuration and opt-in technical activity', () => {

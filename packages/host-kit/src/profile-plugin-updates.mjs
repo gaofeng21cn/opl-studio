@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { listDshSourcePackages } from "./dsh-source-packages.mjs";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createRuntimeResolution, evaluatePluginCompatibility, initProfile, loadOptionalPatches, loadProfile, readProfileManifest, resolveProfileDir, writeProfileBundles } from "@deepseek-ai/dsh-app-boot";
@@ -113,13 +114,8 @@ export function hasProfileRegistryToken(dir, env = process.env) {
 /** Discover publishable DSH packages from the package metadata that owns them. */
 export function discoverPublishablePackages({ installAnchor, sourceRoot = process.cwd(), profilePackages = [] } = {}) {
   const candidates = new Map();
-  const pluginRoot = path.join(sourceRoot, "plugins");
-  if (!installAnchor && fs.existsSync(pluginRoot)) {
-    for (const entry of fs.readdirSync(pluginRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const manifestPath = path.join(pluginRoot, entry.name, "package.json");
-      if (!fs.existsSync(manifestPath)) continue;
-      const manifest = readJson(manifestPath);
+  if (!installAnchor) {
+    for (const { manifest } of listDshSourcePackages(sourceRoot)) {
       if (isPublishableManifest(manifest)) candidates.set(manifest.name, manifest);
     }
   }

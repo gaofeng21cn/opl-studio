@@ -6,7 +6,7 @@ import { cloneModelPolicyProfile, syntheticProfile } from "./model-policy-fixtur
 
 const missingInjection = spawnSync(
   "bun",
-  ["--eval", 'await import("./plugins/opl-studio-client/src/client/workbench/modelPolicy.ts")'],
+  ["--eval", 'await import("./plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts")'],
   { cwd: fileURLToPath(new URL("..", import.meta.url)), encoding: "utf8" }
 );
 assert.notEqual(missingInjection.status, 0);
@@ -23,8 +23,8 @@ const {
   reasoningLabel,
   resolveCodexModelOptions,
   resolveCodexSelection
-} = await import("../plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
-const { normalizeCodexModelCatalog } = await import("../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
+} = await import("../plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts");
+const { normalizeCodexModelCatalog } = await import("../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
 
 assert.deepEqual(
   codexModelPolicy.modelOptions.map((option) => option.id),

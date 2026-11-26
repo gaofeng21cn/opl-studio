@@ -2,7 +2,7 @@ import React, { act } from "react";
 let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { LinkCompanionSection } from "../../plugins/opl-studio-client/src/client/workbench/settings/LinkCompanionSection";
+import { LinkCompanionSection } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/LinkCompanionSection";
 import type { LinkDeviceReadback, LinkInternetStatus } from "../../packages/host-contracts/src/platform-events";
 
 let browser: Window;

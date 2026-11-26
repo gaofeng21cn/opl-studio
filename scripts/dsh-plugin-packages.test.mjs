@@ -12,9 +12,10 @@ import { Window } from "happy-dom";
 import { createRequire } from "node:module";
 import { parse } from "@babel/parser";
 import { readPluginInventory } from "@deepseek-ai/dsh-host-plugin-inventory";
-import { ThreadAdapterError } from "../plugins/opl-codex-native/src/thread-adapter.mjs";
+import { ThreadAdapterError } from "../plugins/core/opl-codex-native/src/thread-adapter.mjs";
 import { createClientRuntimePolicy } from "./client-runtime-policy.mjs";
 import { resolveAppRepoRoot } from "./resolve-app-repo-root.mjs";
+import { listDshSourcePackages } from "../packages/host-kit/src/dsh-source-packages.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -30,11 +31,9 @@ function* importSpecifiers(node) {
 }
 
 test("plugin sources use public workspace package boundaries", async () => {
-  const pluginsRoot = path.join(root, "plugins");
   const violations = [];
-  const plugins = await fs.readdir(pluginsRoot, { withFileTypes: true });
-  for (const plugin of plugins.filter((entry) => entry.isDirectory())) {
-    const sourceRoot = path.join(pluginsRoot, plugin.name, "src");
+  for (const { id, group, directory } of listDshSourcePackages(root)) {
+    const sourceRoot = path.join(directory, "src");
     const files = await fs.readdir(sourceRoot, { withFileTypes: true, recursive: true });
     for (const file of files) {
       if (!file.isFile() || !/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file.name)) continue;
@@ -49,7 +48,7 @@ test("plugin sources use public workspace package boundaries", async () => {
         if (target[0] === "src" || target[0] === "scripts" || target[0] === "packages"
             || (target.length === 1 && target[0] === "package.json")
             || (target[0] === "vendor" && (target[1] === "deepseek-harness" || path.relative(sourceRoot, filename).split(path.sep)[0] === "client"))
-            || (target[0] === "plugins" && target[1] !== plugin.name)) {
+            || (target[0] === "plugins" && (target[1] !== group || target[2] !== id))) {
           violations.push(`${path.relative(root, filename)} -> ${specifier}`);
         }
       }
@@ -204,7 +203,8 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@gaofeng21cn/"));
-    assert.equal(own.length, 10);
+    assert.equal(own.length, 11);
+    assert.equal(typeof host.context.get("oplWeixinChannel")?.connect, "function");
     assert.ok(host.context.oplRuntimeStatus);
     assert.equal(typeof host.context.oplMaterialsSpace?.listSpaces, "function");
     assert.equal(host.context.get("agents"), undefined);

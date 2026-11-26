@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { listDshSourcePackages } from "../packages/host-kit/src/dsh-source-packages.mjs";
 
 const DEFAULT_REPO = "gaofeng21cn/opl-studio";
 const DEFAULT_TAG = "dsh-plugins-latest";
@@ -17,12 +18,10 @@ export function publicFeedDownloadUrl(repo, tag, assetName) {
 }
 
 function downloadRegistryPlugins(sourceRoot, destinationDir, selectedPlugins, run) {
-  const pluginRoot = path.join(sourceRoot, "plugins");
   const selected = selectedPlugins && new Set(selectedPlugins);
   const packed = [];
-  for (const entry of fs.readdirSync(pluginRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || (selected && !selected.has(entry.name))) continue;
-    const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, entry.name, "package.json"), "utf8"));
+  for (const { id, manifest } of listDshSourcePackages(sourceRoot)) {
+    if (selected && !selected.has(id)) continue;
     if (!manifest?.name?.startsWith("@gaofeng21cn/") || manifest.private === true || manifest.publishConfig?.registry !== REGISTRY_URL) {
       continue;
     }
@@ -34,7 +33,7 @@ function downloadRegistryPlugins(sourceRoot, destinationDir, selectedPlugins, ru
     if (archive?.name !== manifest.name || archive.version !== manifest.version) {
       throw new Error(`Registry returned a different package for ${spec}`);
     }
-    const assetName = `${entry.name}-${manifest.version}.tgz`;
+    const assetName = `${id}-${manifest.version}.tgz`;
     const archivePath = path.join(destinationDir, path.basename(archive.filename));
     const assetPath = path.join(destinationDir, assetName);
     if (archivePath !== assetPath) fs.renameSync(archivePath, assetPath);
@@ -55,7 +54,7 @@ function downloadRegistryPlugins(sourceRoot, destinationDir, selectedPlugins, ru
       integrity,
       digest: "sha256:" + createHash("sha256").update(bytes).digest("hex")
     });
-    selected?.delete(entry.name);
+    selected?.delete(id);
   }
   if (selected?.size) throw new Error(`Not publishable source packages: ${[...selected].join(", ")}`);
   return packed;

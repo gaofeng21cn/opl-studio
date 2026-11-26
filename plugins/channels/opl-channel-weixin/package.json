@@ -1,0 +1,32 @@
+{
+  "name": "@gaofeng21cn/opl-channel-weixin",
+  "version": "0.3.0",
+  "description": "Weixin iLink remote channel for One Person Lab Studio.",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "NOTICE"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.3-alpha.2"
+  },
+  "dsh": {
+    "manifestVersion": 1
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/channels/opl-channel-weixin"
+  }
+}

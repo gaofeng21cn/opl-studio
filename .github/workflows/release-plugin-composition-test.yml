@@ -89,10 +89,10 @@ jobs:
           import { execFileSync } from "node:child_process";
           import semver from "semver";
           import { evaluatePluginCompatibility } from "@deepseek-ai/dsh-app-boot";
+          import { listDshSourcePackages } from "./packages/host-kit/src/dsh-source-packages.mjs";
 
-          const localManifests = fs.readdirSync("plugins", { withFileTypes: true })
-            .filter(entry => entry.isDirectory())
-            .map(entry => JSON.parse(fs.readFileSync(`plugins/${entry.name}/package.json`, "utf8")))
+          const localManifests = listDshSourcePackages(process.cwd())
+            .map(({ manifest }) => manifest)
             .filter(pkg => !pkg.private && pkg.name?.startsWith("@gaofeng21cn/")
               && pkg.publishConfig?.registry === "https://npm.pkg.github.com");
 
