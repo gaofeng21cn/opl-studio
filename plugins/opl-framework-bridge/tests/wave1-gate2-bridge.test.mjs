@@ -404,4 +404,34 @@ test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", as
 
   assert.deepEqual(await bridge.gatewayAccountLogin({ email: "alice@opl.dev", password: "pw-secret-1" }), { ok: true, stateRefreshRequired: true });
   assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey: "sk-valid-key" }), { ok: true, stateRefreshRequired: true });
+  const listedAfter = await bridge.client.call("connect.list", {});
+  assert.deepEqual(listedAfter.connections.map((c) => c.provider_type).sort(), ["openai_codex", "opl_gateway"]);
+
+  const noRpcClient = { on() {}, off() {}, close: async () => {}, async call(method) { throw new Error(`unexpected RPC call: ${method}`); } };
+  const preRpcBridge = new OplFrameworkBridge({ env, client: noRpcClient });
+  for (const invokeBad of [
+    () => preRpcBridge.opl.readContribution({ packageId: "", ref: "x" }),
+    () => preRpcBridge.opl.readContribution({ packageId: "   ", ref: "x" }),
+    () => preRpcBridge.opl.readContribution({ packageId: null, ref: "x" }),
+    () => preRpcBridge.opl.readContribution({ packageId: 123, ref: "x" }),
+    () => preRpcBridge.opl.readContribution({ ref: "   " }),
+    () => preRpcBridge.opl.readDomainDetailView({ itemId: "   ", viewId: "v1" }),
+    () => preRpcBridge.opl.readDomainDetailView({ itemId: "detail-pkg", viewId: "   " }),
+    () => preRpcBridge.opl.executeAction({ actionId: "   " }),
+    () => preRpcBridge.connectionAccessApproval({ requestId: "bad;id" }),
+    () => preRpcBridge.connectionAccessApproval.approve("bad;id"),
+    () => preRpcBridge.connectionAccessApproval({ requestId: "bad\nid" }),
+    () => preRpcBridge.connectionAccessApproval({ requestId: " req" }),
+    () => preRpcBridge.connectionAccessApproval({ requestId: "" }),
+    () => preRpcBridge.connectionAccessApproval({ requestId: null }),
+    () => bridge.opl.readContribution({ packageId: "", ref: "x" }),
+    () => bridge.opl.readContribution({ packageId: "   ", ref: "x" }),
+    () => bridge.opl.readContribution({ packageId: null, ref: "x" }),
+    () => bridge.connectionAccessApproval({ requestId: "bad;id" }),
+    () => bridge.connectionAccessApproval.approve("bad;id"),
+    () => bridge.connectionAccessApproval({ requestId: "bad\nid" }),
+  ]) {
+    await assert.rejects(invokeBad, (err) => err?.code === "invalid_request");
+  }
+  assert.doesNotMatch(fs.readFileSync(path.join(SRC_DIR, "service.mjs"), "utf8"), /connect\.register/);
 });

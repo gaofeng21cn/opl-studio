@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { OpldClient } from "./opld-client.mjs";
 
 const errReq = (msg, code = "invalid_request") => Object.assign(new Error(msg), { code });
+const nonEmptyStr = (v) => typeof v === "string" && v.trim().length > 0;
 const readback = (cmd, args = []) => ({ command: cmd, commandArgs: args, exitCode: 0, stdout: "", stderr: "", timedOut: false });
 
 export function createOplPassthrough(options = {}) {
@@ -28,7 +29,7 @@ export function createOplPassthrough(options = {}) {
       return { detail: "full", drilldown: { ...tasks, ...timeline, state }, readback: readback("opld runway.task.list") };
     },
     async readDomainDetailView({ itemId, viewId, ifRevision } = {}) {
-      if (!itemId || !viewId) throw errReq("itemId and viewId are required");
+      if (!nonEmptyStr(itemId) || !nonEmptyStr(viewId)) throw errReq("itemId and viewId are required");
       if (ifRevision !== undefined && (!Number.isInteger(ifRevision) || ifRevision < 0)) throw errReq("ifRevision must be a non-negative integer");
       const res = await client.call("app.domainDetail.get", { item_id: itemId, view_id: viewId, ...(ifRevision !== undefined ? { if_revision: ifRevision } : {}) });
       const notMod = ifRevision !== undefined && res?.revision === ifRevision;
@@ -43,7 +44,8 @@ export function createOplPassthrough(options = {}) {
       return { ...readback("opld app.domainDetail.get", [itemId, viewId]), stdoutJson };
     },
     async readContribution({ packageId, ref, input, ifRevision, consumerBindToken, sessionId } = {}) {
-      if (!ref || typeof ref !== "string") throw errReq("ref is required");
+      if (!nonEmptyStr(ref)) throw errReq("ref is required");
+      if (packageId !== undefined && !nonEmptyStr(packageId)) throw errReq("packageId must be a non-empty string");
       const res = await client.call("app.contribution.read", {
         ...(packageId ? { package_id: packageId } : {}), ref,
         ...(input !== undefined ? { input } : {}), ...(ifRevision !== undefined ? { if_revision: ifRevision } : {}),
@@ -58,7 +60,7 @@ export function createOplPassthrough(options = {}) {
       return { ...readback("opld app.contribution.read", [ref]), stdoutJson };
     },
     async executeAction({ actionId, payload = {}, dryRun = true, mode, packageId } = {}) {
-      if (!actionId || typeof actionId !== "string") throw errReq("actionId is required");
+      if (!nonEmptyStr(actionId)) throw errReq("actionId is required");
       const isDry = mode === "preview" || (dryRun !== false && mode !== "execute");
       if (!isDry && readOnly()) return {
         actionId, dryRun: false, confirmationRequired: false, canExecute: false, receiptKind: "blocked_read_only",
@@ -106,8 +108,8 @@ export class OplFrameworkBridge extends EventEmitter {
 
     const defaultApproval = async (req = {}) => {
       const requestId = typeof req === "string" ? req : req?.requestId ?? req?.request_id;
-      if (!requestId || typeof requestId !== "string" || !requestId.trim()) throw errReq("requestId is required");
-      return this.client.call("connect.approveRequest", { request_id: requestId.trim() });
+      if (typeof requestId !== "string" || !/^[A-Za-z0-9._:-]+$/.test(requestId)) throw errReq("requestId is invalid");
+      return this.client.call("connect.approveRequest", { request_id: requestId });
     };
     defaultApproval.approve = (requestId) => defaultApproval({ requestId });
     if (typeof connectionAccessApproval === "function") {
@@ -115,9 +117,8 @@ export class OplFrameworkBridge extends EventEmitter {
       this.connectionAccessApproval = connectionAccessApproval;
     } else this.connectionAccessApproval = defaultApproval;
 
-    const nonEmptyStr = (v) => typeof v === "string" && v.trim().length > 0;
     const registerConnect = async (payload, fallback) => {
-      try { await this.client.call("connect.register", payload); return { ok: true, stateRefreshRequired: true }; }
+      try { await this.client.call("connect.add", payload); return { ok: true, stateRefreshRequired: true }; }
       catch (err) { return { ok: false, errorCode: err.code ?? fallback, stateRefreshRequired: false }; }
     };
     this.gatewayAccountLogin = gatewayAccountLogin ?? (async (req) => {
