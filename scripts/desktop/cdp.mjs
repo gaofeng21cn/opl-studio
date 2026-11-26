@@ -1,7 +1,30 @@
 import { randomUUID } from "node:crypto";
-import CDP from "chrome-remote-interface";
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+let cachedCdpModulePromise = null;
+
+function isMissingModuleError(error, packageName) {
+  if (!error || (error.code !== "ERR_MODULE_NOT_FOUND" && error.code !== "MODULE_NOT_FOUND")) {
+    return false;
+  }
+  const message = String(error.message ?? "");
+  return message.includes(`'${packageName}'`) || message.includes(`"${packageName}"`) || message.includes(packageName);
+}
+
+/** Lazily loads `chrome-remote-interface` when installed, falling back to Node native WebSocket in zero-dep harnesses. */
+async function loadChromeRemoteInterface() {
+  if (process.env.OPL_CDP_FORCE_NATIVE_FALLBACK === "1") return null;
+  if (!cachedCdpModulePromise) {
+    cachedCdpModulePromise = import("chrome-remote-interface")
+      .then((mod) => mod?.default ?? mod)
+      .catch((error) => {
+        if (isMissingModuleError(error, "chrome-remote-interface")) return null;
+        cachedCdpModulePromise = null;
+        throw error;
+      });
+  }
+  return cachedCdpModulePromise;
+}
 
 function withTimeout(promise, timeoutMs, message) {
   let timer;
@@ -11,13 +34,159 @@ function withTimeout(promise, timeoutMs, message) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+async function openNativeCdpClient(webSocketDebuggerUrl, timeoutMs = 30_000) {
+  if (typeof globalThis.WebSocket !== "function") {
+    throw new Error("Native CDP fallback requires Node.js global WebSocket support");
+  }
+  const socket = new WebSocket(webSocketDebuggerUrl);
+  const pending = new Map();
+  const eventListeners = new Map();
+  const disconnectListeners = [];
+  let nextId = 0;
+  let disconnected = false;
+  let settledConnect = false;
+
+  const emitDisconnect = () => {
+    if (disconnected) return;
+    disconnected = true;
+    for (const entry of pending.values()) {
+      entry.reject(new Error("CDP socket closed"));
+    }
+    pending.clear();
+    try { socket.close(); } catch {}
+    while (disconnectListeners.length > 0) {
+      const listener = disconnectListeners.shift();
+      try { listener(); } catch {}
+    }
+  };
+
+  let rejectConnect = null;
+  let connectTimer = null;
+  const connectPromise = new Promise((resolve, reject) => {
+    rejectConnect = (error) => {
+      if (settledConnect) return;
+      settledConnect = true;
+      if (connectTimer) clearTimeout(connectTimer);
+      reject(error);
+    };
+    connectTimer = setTimeout(() => {
+      try { socket.close(); } catch {}
+      rejectConnect(new Error("timed out opening CDP socket"));
+    }, Math.max(1, timeoutMs));
+
+    socket.onopen = () => {
+      if (settledConnect) return;
+      settledConnect = true;
+      clearTimeout(connectTimer);
+      resolve();
+    };
+    socket.onerror = () => {
+      rejectConnect(new Error("CDP socket closed"));
+      emitDisconnect();
+    };
+    socket.onclose = () => {
+      rejectConnect(new Error("CDP socket closed"));
+      emitDisconnect();
+    };
+  });
+
+  socket.onmessage = async (event) => {
+    let raw = event?.data;
+    if (raw instanceof ArrayBuffer) {
+      raw = Buffer.from(raw).toString("utf8");
+    } else if (raw && typeof raw.text === "function") {
+      raw = await raw.text();
+    }
+    let message;
+    try {
+      message = JSON.parse(String(raw ?? ""));
+    } catch {
+      return;
+    }
+    if (typeof message?.id === "number") {
+      const entry = pending.get(message.id);
+      if (!entry) return;
+      pending.delete(message.id);
+      if (message.error) {
+        entry.reject(new Error(JSON.stringify(message.error)));
+      } else {
+        entry.resolve(message.result);
+      }
+      return;
+    }
+    if (typeof message?.method === "string") {
+      const listeners = eventListeners.get(message.method);
+      if (!listeners?.length) return;
+      for (const listener of listeners) {
+        try { listener(message.params); } catch {}
+      }
+    }
+  };
+
+  await connectPromise;
+
+  const send = (method, params = {}) => {
+    if (disconnected) return Promise.reject(new Error("CDP socket closed"));
+    return new Promise((resolve, reject) => {
+      const id = ++nextId;
+      pending.set(id, { resolve, reject });
+      try {
+        socket.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        pending.delete(id);
+        reject(error);
+      }
+    });
+  };
+
+  return {
+    send,
+    Runtime: {
+      evaluate: (params) => send("Runtime.evaluate", params),
+      exceptionThrown: (listener) => {
+        if (typeof listener !== "function") return;
+        const listeners = eventListeners.get("Runtime.exceptionThrown") ?? [];
+        listeners.push(listener);
+        eventListeners.set("Runtime.exceptionThrown", listeners);
+      }
+    },
+    Page: {
+      captureScreenshot: (params) => send("Page.captureScreenshot", params)
+    },
+    once(event, listener) {
+      if (event !== "disconnect" || typeof listener !== "function") return;
+      if (disconnected) {
+        queueMicrotask(listener);
+        return;
+      }
+      disconnectListeners.push(listener);
+    },
+    close() {
+      emitDisconnect();
+      return Promise.resolve();
+    }
+  };
+}
+
 async function pageTarget(port, timeoutMs = 5_000) {
-  const targets = await withTimeout(
-    CDP.List({ host: "127.0.0.1", port }),
-    timeoutMs,
-    `timed out listing CDP targets on ${port}`
-  );
-  return targets.find((target) => target?.type === "page" && typeof target.webSocketDebuggerUrl === "string");
+  const CDP = await loadChromeRemoteInterface();
+  let targets;
+  if (CDP) {
+    targets = await withTimeout(
+      CDP.List({ host: "127.0.0.1", port }),
+      timeoutMs,
+      `timed out listing CDP targets on ${port}`
+    );
+  } else {
+    const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
+      signal: AbortSignal.timeout(Math.max(1, timeoutMs))
+    });
+    if (!response.ok) throw new Error(`CDP target lookup failed with HTTP ${response.status}`);
+    targets = await response.json();
+  }
+  return Array.isArray(targets)
+    ? targets.find((target) => target?.type === "page" && typeof target.webSocketDebuggerUrl === "string")
+    : undefined;
 }
 
 export async function waitForPageTarget({ port, timeoutMs = 30_000 } = {}) {
@@ -39,6 +208,11 @@ async function openPageClient({ port, timeoutMs = 30_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   const target = await waitForPageTarget({ port, timeoutMs });
   const remaining = Math.max(250, deadline - Date.now());
+  const CDP = await loadChromeRemoteInterface();
+  if (!CDP) {
+    const client = await openNativeCdpClient(target.webSocketDebuggerUrl, remaining);
+    return { client, deadline };
+  }
   let timedOut = false;
   const connectPromise = CDP({
     host: "127.0.0.1",
