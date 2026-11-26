@@ -6,6 +6,18 @@ import {
   deriveWorkbenchModelFromState
 } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts";
 
+test("contribution controls use the owner action catalog independently of task context", () => {
+  const action = { action_id: "package_contribution_execute", dry_run_supported: true };
+  const deliveryActions = Array.from({ length: 8 }, (_, index) => ({
+    action_id: `deliver-${index}`, dry_run_supported: true
+  }));
+  const available = deriveWorkbenchModelFromState({ app_state: { actions: [...deliveryActions, action] } });
+  assert.equal(available.canExecuteUiContributions, true);
+  assert.ok(!available.contextActions.some(({ id }) => id === action.action_id));
+  const withoutAction = deriveWorkbenchModelFromState({ app_state: { actions: [] } }, available);
+  assert.equal(withoutAction.canExecuteUiContributions, false);
+});
+
 test("software scope and immutable artwork survive the Host projection", async () => {
   const { compactPackageRows, compactManagedUpdateProjection } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const { softwareCatalogPackages } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
