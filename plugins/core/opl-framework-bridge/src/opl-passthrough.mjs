@@ -67,7 +67,7 @@ function compactFastApplicationManagementProjection(value) {
 // The startup budget applies to unrelated catalog entries, not to actions that
 // a retained view offers. Resolve those references against the owner catalog;
 // never manufacture an executable action from a projection or payload.
-function retainProjectedActions(state, actionCatalog, taskCatalog) {
+function retainProjectedActions(state, actionCatalog, taskCatalog, localChannelAction) {
   const actions = Array.isArray(actionCatalog) ? actionCatalog : [];
   const tasks = Array.isArray(taskCatalog) ? taskCatalog : [];
   const byId = new Map(actions.filter((action) => typeof action?.action_id === "string")
@@ -99,6 +99,7 @@ function retainProjectedActions(state, actionCatalog, taskCatalog) {
     }
   };
   actions.slice(0, 100).forEach((action) => add(action?.action_id));
+  if (localChannelAction) add("package_contribution_execute");
   inspect(state);
   for (let index = 0; index < pending.length; index += 1) {
     const id = pending[index];
@@ -111,7 +112,7 @@ function retainProjectedActions(state, actionCatalog, taskCatalog) {
   }
 }
 
-function compactFastState(value) {
+function compactFastState(value, { localChannelAction = false } = {}) {
   const root = value && typeof value === "object" ? value : {};
   const appState = root.app_state && typeof root.app_state === "object" ? root.app_state : root;
   const agentPackages = appState.agent_packages && typeof appState.agent_packages === "object" ? appState.agent_packages : undefined;
@@ -189,7 +190,7 @@ function compactFastState(value) {
       } : undefined
     }
   };
-  retainProjectedActions(compact.app_state, appState.actions, settings?.task_entries);
+  retainProjectedActions(compact.app_state, appState.actions, settings?.task_entries, localChannelAction);
   return compact;
 }
 
@@ -368,7 +369,11 @@ export function createOplPassthrough({
       }
       return {
         profile: normalizedProfile,
-        app_state: normalizedProfile === "fast" ? compactFastState(parsed) : parsed,
+        app_state: normalizedProfile === "fast" ? compactFastState(parsed, {
+          localChannelAction: parsed?.app_state.ui_contributions?.entries?.some(entry =>
+            channelProviderHost?.replacedPackageIds?.includes(entry.package_id)
+              && entry.view?.view_type === "channel_access" && entry.commands?.length)
+        }) : parsed,
         readback: boundedReadback(args, result)
       };
     },
