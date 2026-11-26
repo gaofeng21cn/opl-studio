@@ -480,6 +480,8 @@ test("Preview smoke skips optional hooks without claiming they ran", async () =>
   assert.equal(receipt.hooks.codexTurn, "skipped");
   assert.ok(evaluated.some((expression) => expression.includes('settings-page-about')));
   assert.ok(evaluated.some((expression) => expression.includes('opl-runtime-overview-page')));
+  const interaction = evaluated.find((expression) => expression.includes('result.runtime.returnedToConversation='));
+  assert.ok(interaction.indexOf("await waitFor('[data-testid=\"opl-composer-run-state\"]')") > interaction.indexOf('result.runtime.returnedToConversation='));
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-inspector-trigger')));
   assert.ok(evaluated.some((expression) => expression.includes('opl-context-tabs')));
   assert.ok(evaluated.some((expression) => expression.includes('[role="menu"] [role="menuitem"]')));
