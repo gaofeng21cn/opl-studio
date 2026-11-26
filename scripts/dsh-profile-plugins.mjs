@@ -17,6 +17,43 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const profile = "opl-studio";
 const installedAnchor = "/Applications/One Person Lab.app/Contents/Resources/app.asar.unpacked/package.json";
 
+export const DEFAULT_PACK_CACHE_RETAIN_COUNT = 2;
+
+export function pruneSourcePluginCache(cacheRoot, packageId, keepArchivePath, maxRetained = DEFAULT_PACK_CACHE_RETAIN_COUNT) {
+  const resolvedRoot = path.resolve(cacheRoot);
+  const resolvedKeep = keepArchivePath ? path.resolve(keepArchivePath) : null;
+  const pattern = new RegExp(`^${packageId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-[0-9a-f]{64}\\.tgz$`);
+  const candidates = [];
+  for (const entry of fs.readdirSync(resolvedRoot, { withFileTypes: true })) {
+    if (!pattern.test(entry.name)) continue;
+    const candidate = path.join(resolvedRoot, entry.name);
+    let stat;
+    try {
+      stat = fs.lstatSync(candidate);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.isSymbolicLink()) continue;
+    candidates.push({ path: candidate, mtimeMs: stat.mtimeMs, keep: candidate === resolvedKeep });
+  }
+  candidates.sort((left, right) => {
+    if (left.keep !== right.keep) return left.keep ? -1 : 1;
+    return right.mtimeMs - left.mtimeMs || right.path.localeCompare(left.path);
+  });
+  const limit = Number.isSafeInteger(maxRetained) && maxRetained >= 1 ? maxRetained : DEFAULT_PACK_CACHE_RETAIN_COUNT;
+  const removed = [];
+  let retained = 0;
+  for (const candidate of candidates) {
+    if (candidate.keep || retained < limit) {
+      retained += 1;
+      continue;
+    }
+    fs.rmSync(candidate.path, { force: true });
+    removed.push(candidate.path);
+  }
+  return removed;
+}
+
 export function packSourcePlugins(names, cacheRoot) {
   const directories = listDshSourcePackages(root);
   const selected = names.map(name => {
@@ -46,6 +83,7 @@ export function packSourcePlugins(names, cacheRoot) {
       const hash = createHash("sha256").update(bytes).digest("hex");
       const destination = path.join(cacheRoot, `${entry.id}-${hash}.tgz`);
       fs.writeFileSync(destination, bytes);
+      pruneSourcePluginCache(cacheRoot, entry.id, destination);
       return destination;
     });
   } finally { fs.rmSync(staging, { recursive: true, force: true }); }

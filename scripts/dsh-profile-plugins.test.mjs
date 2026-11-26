@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { inc } from "semver";
 import { initProfile, loadOptionalPatches } from "@deepseek-ai/dsh-app-boot";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
-import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveBundledPnpm, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
+import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, pruneSourcePluginCache, resolveBundledPnpm, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
 import { mergePublicFeedIndex } from "./publish-dsh-plugin-feed.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -82,6 +82,36 @@ test("source plugin selection discovers publishable client packages and rejects 
   assert.throws(() => packSourcePlugins(["opl-superagent", "@gaofeng21cn/opl-superagent"], temp));
   assert.throws(() => packSourcePlugins([], temp));
   assert.deepEqual(await fs.readdir(temp), []);
+});
+
+test("source plugin cache pruning retains only the active and newest tarballs per package and skips symlinks", async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-plugin-cache-prune-"));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const pkg = "opl-superagent";
+  const other = "opl-team-bots";
+  const oldest = path.join(temp, `${pkg}-${"1".repeat(64)}.tgz`);
+  const middle = path.join(temp, `${pkg}-${"2".repeat(64)}.tgz`);
+  const active = path.join(temp, `${pkg}-${"3".repeat(64)}.tgz`);
+  const otherArchive = path.join(temp, `${other}-${"4".repeat(64)}.tgz`);
+  const outside = path.join(temp, "outside.tgz");
+  const symlinkArchive = path.join(temp, `${pkg}-${"5".repeat(64)}.tgz`);
+  for (const file of [oldest, middle, active, otherArchive, outside]) {
+    await fs.writeFile(file, "tarball");
+  }
+  await fs.symlink(outside, symlinkArchive);
+  await fs.utimes(oldest, 1000, 1000);
+  await fs.utimes(middle, 2000, 2000);
+  await fs.utimes(active, 3000, 3000);
+
+  const removed = pruneSourcePluginCache(temp, pkg, active, 2);
+  assert.deepEqual(removed, [oldest]);
+  assert.deepEqual((await fs.readdir(temp)).sort(), [
+    path.basename(middle),
+    path.basename(active),
+    path.basename(symlinkArchive),
+    path.basename(otherArchive),
+    "outside.tgz",
+  ].sort());
 });
 
 test("registry authentication survives a later update without a new token", async t => {
