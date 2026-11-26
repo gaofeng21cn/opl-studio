@@ -270,7 +270,7 @@ test("native Weixin hides the superseded Package and publishes its action withou
   const command = path.join(directory, "opl");
   const packageId = "opl-channel-weixin";
   await writeFile(command, `#!/bin/sh
-printf '%s' '${JSON.stringify({ app_state: { actions: [], agent_packages: {
+printf '%s' '${JSON.stringify({ app_state: { actions: Array.from({ length: 101 }, (_, index) => ({ action_id: `action-${index}` })), agent_packages: {
     directory: { entry_count: 2, installed_package_count: 1, entries: [
       { package_id: packageId, installed: true }, { package_id: "other" }
     ] },
