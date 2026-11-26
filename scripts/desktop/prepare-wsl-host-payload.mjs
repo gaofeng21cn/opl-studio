@@ -19,7 +19,23 @@ function payloadFiles(directory, relative = '') {
   });
 }
 
-function copyMaterializedTree(source, destination, root, ancestors = new Set()) {
+const PACKAGER_EXCLUDED_NODE_MODULES_NAMES = new Set([
+  '.gitkeep',
+  '.gitignore',
+  '.gitattributes',
+  '.npmignore',
+  '.DS_Store',
+  'thumbs.db',
+]);
+
+export function isPackagerExcludedNodeModulesEntry(relativePath) {
+  const normalized = relativePath.replaceAll('\\', '/').replace(/^\/+/, '');
+  return (normalized === 'node_modules' || normalized.startsWith('node_modules/'))
+    && PACKAGER_EXCLUDED_NODE_MODULES_NAMES.has(path.posix.basename(normalized));
+}
+
+export function copyMaterializedTree(source, destination, root, ancestors = new Set(), relative = '') {
+  if (relative && isPackagerExcludedNodeModulesEntry(relative)) return;
   const real = fs.realpathSync(source);
   if (real !== root && !real.startsWith(root + path.sep)) throw new Error('Guest Host dependency link escapes its build root');
   const stat = fs.statSync(real);
@@ -27,7 +43,10 @@ function copyMaterializedTree(source, destination, root, ancestors = new Set()) 
     if (ancestors.has(real)) throw new Error('Guest Host dependency link contains a cycle');
     const next = new Set([...ancestors, real]);
     fs.mkdirSync(destination, { recursive: true });
-    for (const entry of fs.readdirSync(real)) copyMaterializedTree(path.join(real, entry), path.join(destination, entry), root, next);
+    for (const entry of fs.readdirSync(real)) {
+      const nextRelative = relative ? path.posix.join(relative, entry) : entry;
+      copyMaterializedTree(path.join(real, entry), path.join(destination, entry), root, next, nextRelative);
+    }
   } else if (stat.isFile()) {
     fs.copyFileSync(real, destination);
     fs.chmodSync(destination, stat.mode);
