@@ -183,11 +183,17 @@ export class OplStudioDshSlotHost {
     register({ name: "sidebar.brand.name", registrant: "opl-studio" }, OplBrandNameSlot);
     register({ name: "sidebar.workspaces", registrant: "opl-studio", children: { "sidebar.workspaces.directoryFlow": { kind: "single", scope: "root" }, "sidebar.workspaces.session.row.action": { kind: "list", scope: "root" }, "sidebar.session.row.leading": { kind: "list", scope: "root", inline: true }, "sidebar.session.row.trailing": { kind: "list", scope: "root", inline: true }, "sidebar.session.row.hover": { kind: "list", scope: "root" } } }, SidebarWorkspacesSlot);
     register({ name: "sidebar.settings", registrant: "dsh-ui-settings", store: createSettingsShellStore, children: { "settings.launcher": { kind: "single", scope: "root" }, "settings.notice": { kind: "single", scope: "root" }, "settings.trigger": { kind: "single", scope: "root" }, "settings.header": { kind: "single", scope: "root" }, "settings.action": { kind: "list", scope: "root" }, "settings.close": { kind: "single", scope: "root" }, "settings.section.icon": { kind: "list", scope: "root", inline: true }, "settings.onboarding": { kind: "list", scope: "root" } } }, SettingsSlot);
+    const settingsPages = settingsDestinations("en");
+    registerFactory({ name: "settings.section.view", scope: "root" },
+      ({ id, close }: { id: string; close: () => void }) => {
+        const destination = settingsPages.find(page => settingsSectionId(page.id) === id);
+        return destination ? <SettingsMainSlot destination={destination.id} close={close} /> : null;
+      });
     register({ name: "settings.trigger", registrant: "opl-studio" }, SettingsTriggerSlot);
     register({ name: "settings.header", registrant: "opl-studio" }, SettingsHeaderSlot);
     register({ name: "settings.close", registrant: "opl-studio" }, SettingsCloseSlot);
     register({ name: "settings.onboarding", id: "opl-first-run", order: 0, registrant: "opl-studio" }, FirstRunOnboardingSlot);
-    for (const [order, destination] of settingsDestinations("en").entries()) {
+    for (const [order, destination] of settingsPages.entries()) {
       register(
         { name: "settings.section", id: settingsSectionId(destination.id), order: order * 10, label: destination.label, registrant: "opl-studio" },
         (props: { close?: () => void }) => <SettingsMainSlot destination={destination.id} close={props.close} />
