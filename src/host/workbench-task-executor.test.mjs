@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createWorkbenchTaskExecutor } from '../../plugins/opl-framework-bridge/src/workbench-task-executor.mjs';
-import { createOplPassthrough, compactFastState } from '../../plugins/opl-framework-bridge/src/opl-passthrough.mjs';
+import { createWorkbenchTaskExecutor } from '../../plugins/core/opl-framework-bridge/src/workbench-task-executor.mjs';
+import { createOplPassthrough, compactFastState } from '../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs';
 
 test('scheduled turns use the current App Server, explicit permissions and canonical readback', async () => {
   const calls = [];

@@ -1,0 +1,37 @@
+{
+  "name": "@gaofeng21cn/opl-dsh-tool-mcp",
+  "version": "0.1.4",
+  "description": "Authenticated DSH tool registry bridge for Codex.",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20",
+    "dsh": "0.2.3-alpha.2"
+  },
+  "dsh": {
+    "manifestVersion": 1
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.2.0-alpha.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/core/opl-dsh-tool-mcp"
+  }
+}

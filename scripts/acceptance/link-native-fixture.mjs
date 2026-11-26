@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 
 // A disposable canonical Host for public WSS/native qualification. Account
 // authorization uses the real Framework bridge; no token is accepted as an argument.

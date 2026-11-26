@@ -5,8 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createLinkCompanion, LINK_SCHEMA } from "../../plugins/opl-host-core/src/link-companion.mjs";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { createLinkCompanion, LINK_SCHEMA } from "../../plugins/core/opl-host-core/src/link-companion.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost } from "./http-host.mjs";
 import { createWebUiAuth } from "../../packages/host-kit/webui-auth.mjs";
 

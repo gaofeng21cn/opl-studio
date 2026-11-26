@@ -3,7 +3,7 @@ import test from "node:test";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { createManagedUpdateMaintenance, eligibleBackgroundComponents } from "./managed-update-maintenance.mjs";
 
 const component = (id, safe = true) => ({

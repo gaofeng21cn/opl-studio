@@ -35,13 +35,13 @@ const {
   readSettingsFormResult,
   readUiContributionsProjection,
   settingsEntriesForNativeAppSurface
-} = await import("../../plugins/opl-studio-client/src/client/composition/contributionProjection");
-type OplContributionSlotOwner = import("../../plugins/opl-studio-client/src/client/composition/contributionProjection").OplContributionSlotOwner;
-const { ProjectedContribution } = await import("../../plugins/opl-studio-client/src/client/composition/contributionComponents");
-const { settingsSearchTargets } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots");
-const { CapabilitiesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage");
-const { CodexThreadScope } = await import("../../plugins/opl-studio-client/src/client/composition/codexThreadScope");
-const { McpAppWorkspace } = await import("../../plugins/opl-mcp-apps/src/client/McpAppWorkspace");
+} = await import("../../plugins/core/opl-studio-client/src/client/composition/contributionProjection");
+type OplContributionSlotOwner = import("../../plugins/core/opl-studio-client/src/client/composition/contributionProjection").OplContributionSlotOwner;
+const { ProjectedContribution } = await import("../../plugins/core/opl-studio-client/src/client/composition/contributionComponents");
+const { settingsSearchTargets } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots");
+const { CapabilitiesSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage");
+const { CodexThreadScope } = await import("../../plugins/core/opl-studio-client/src/client/composition/codexThreadScope");
+const { McpAppWorkspace } = await import("../../plugins/core/opl-mcp-apps/src/client/McpAppWorkspace");
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
@@ -347,14 +347,14 @@ test("Tier 2 PluginErrorBoundary isolates crashing plugins and settings.group ca
   expect(readOplSettingsGroupMeta(core.entries("settings.group.capabilities" as any))).toHaveLength(0);
 });
 
-test("plugins/opl-team-bots, plugins/opl-superagent, and plugins/opl-mcp-apps have zero relative vendor/ imports", () => {
+test("plugins/extensions/opl-team-bots, plugins/extensions/opl-superagent, and plugins/core/opl-mcp-apps have zero relative vendor/ imports", () => {
   const studioRoot = path.resolve(import.meta.dirname, "../..");
   for (const relPath of [
-    "plugins/opl-team-bots/src/client/plugin.tsx",
-    "plugins/opl-superagent/src/client/plugin.tsx",
-    "plugins/opl-mcp-apps/src/client/McpAppWorkspace.tsx",
-    "plugins/opl-mcp-apps/src/client/McpTaskWorkbench.tsx",
-    "plugins/opl-mcp-apps/src/client/mcpAppHost.ts"
+    "plugins/extensions/opl-team-bots/src/client/plugin.tsx",
+    "plugins/extensions/opl-superagent/src/client/plugin.tsx",
+    "plugins/core/opl-mcp-apps/src/client/McpAppWorkspace.tsx",
+    "plugins/core/opl-mcp-apps/src/client/McpTaskWorkbench.tsx",
+    "plugins/core/opl-mcp-apps/src/client/mcpAppHost.ts"
   ]) {
     const source = readFileSync(path.join(studioRoot, relPath), "utf8");
     expect(source).not.toMatch(/vendor\/deepseek-harness/);

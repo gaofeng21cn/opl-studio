@@ -3,64 +3,64 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { readDshBinding } from "../../scripts/dsh-upstream.mjs";
 import { readSlotHostSource } from "../../scripts/opl-studio-gates.mjs";
-import { abbreviateHomePath } from "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts";
-import { assistantDisplayMarkdown } from "../../plugins/opl-studio-client/src/client/workbench/messageDisplay.ts";
+import { abbreviateHomePath } from "../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts";
+import { assistantDisplayMarkdown } from "../../plugins/core/opl-studio-client/src/client/workbench/messageDisplay.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
-const app = [read("plugins/opl-studio-client/src/client/workbench/App.tsx"), read("plugins/opl-studio-client/src/client/workbench/composerAttachments.ts"), read("plugins/opl-studio-client/src/client/workbench/useSettingsActions.ts")].join("\n");
+const app = [read("plugins/core/opl-studio-client/src/client/workbench/App.tsx"), read("plugins/core/opl-studio-client/src/client/workbench/composerAttachments.ts"), read("plugins/core/opl-studio-client/src/client/workbench/useSettingsActions.ts")].join("\n");
 const main = read("src/main.tsx");
 const bridge = [
-  read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
+  read("plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts"),
   read("packages/host-contracts/src/app-state.ts")
 ].join("\n");
-const passthrough = read("plugins/opl-framework-bridge/src/opl-passthrough.mjs");
+const passthrough = read("plugins/core/opl-framework-bridge/src/opl-passthrough.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
-const model = read("plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
+const model = read("plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
 const runtimePage = [
-  "plugins/opl-runtime-status/src/client/plugin.tsx",
-  "plugins/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
-  "plugins/opl-runtime-status/src/client/StageProgressStepper.tsx",
-  "plugins/opl-runtime-status/src/client/ArchiveConfirmDialog.tsx",
-  "plugins/opl-runtime-status/src/client/WorkItemDetailDrawer.tsx",
-  "plugins/opl-runtime-status/src/client/runtimeStatusHelpers.ts"
+  "plugins/extensions/opl-runtime-status/src/client/plugin.tsx",
+  "plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
+  "plugins/extensions/opl-runtime-status/src/client/StageProgressStepper.tsx",
+  "plugins/extensions/opl-runtime-status/src/client/ArchiveConfirmDialog.tsx",
+  "plugins/extensions/opl-runtime-status/src/client/WorkItemDetailDrawer.tsx",
+  "plugins/extensions/opl-runtime-status/src/client/runtimeStatusHelpers.ts"
 ].map(read).join("\n");
 const materialsSpaceSource = [
-  "plugins/opl-materials-space/src/index.mjs",
-  "plugins/opl-materials-space/src/materials-service.mjs",
-  "plugins/opl-materials-space/src/client/plugin.tsx",
-  "plugins/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
-  "plugins/opl-materials-space/src/client/materialsSpaceHelpers.ts"
+  "plugins/extensions/opl-materials-space/src/index.mjs",
+  "plugins/extensions/opl-materials-space/src/materials-service.mjs",
+  "plugins/extensions/opl-materials-space/src/client/plugin.tsx",
+  "plugins/extensions/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
+  "plugins/extensions/opl-materials-space/src/client/materialsSpaceHelpers.ts"
 ].map(read).join("\n");
-const applicationManagementPage = read("plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/SharedResourcesPage.tsx") + read("plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection.tsx");
-const runtimeCache = read("plugins/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts");
-const settingsPanel = read("plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx") + read("plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx") + fs.readdirSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
-const settingsSurface = read("plugins/opl-studio-client/src/client/composition/surfaces/SettingsSurface.tsx");
-const softwareCenterSurface = read("plugins/opl-studio-client/src/client/composition/surfaces/SoftwareCenterSurface.tsx");
+const applicationManagementPage = read("plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx") + read("plugins/core/opl-studio-client/src/client/workbench/SharedResourcesPage.tsx") + read("plugins/core/opl-studio-client/src/client/workbench/KnowledgeSourcesSection.tsx");
+const runtimeCache = read("plugins/core/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts");
+const settingsPanel = read("plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx") + read("plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx") + fs.readdirSync(path.join(root, 'plugins/core/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/core/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
+const settingsSurface = read("plugins/core/opl-studio-client/src/client/composition/surfaces/SettingsSurface.tsx");
+const softwareCenterSurface = read("plugins/core/opl-studio-client/src/client/composition/surfaces/SoftwareCenterSurface.tsx");
 const dshShellAdapter = read("packages/dsh-adapters/dsh-shell.mjs");
 const dshThemeAdapter = read("packages/dsh-adapters/dsh-theme.mjs");
 const styleSources = [
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleFoundation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleStartup.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleContributions.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleNavigation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleConversation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleComposer.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCore.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCapabilities.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsActions.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleApplicationManagement.ts"
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleFoundation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleStartup.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleContributions.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleNavigation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleConversation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleComposer.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCore.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCapabilities.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsActions.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleApplicationManagement.ts"
 ];
 const styles = styleSources.map(read).join("\n");
-const adapterStyles = read("plugins/opl-studio-client/src/client/integrations/deepseek-harness/oplAdapter.css");
+const adapterStyles = read("plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/oplAdapter.css");
 const slotHost = readSlotHostSource();
 const appFrame = read("vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx");
 const appFrameStyles = read("vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.module.css");
@@ -69,34 +69,34 @@ const settingsRoot = read("vendor/deepseek-harness/packages/client/ui-settings-g
 const desktopMain = read("desktop/main.mjs");
 const desktopPreload = read("desktop/preload.cjs");
 const rendererShell = read("src/renderer-shell.html");
-const hostCore = read("plugins/opl-host-core/src/service.mjs");
+const hostCore = read("plugins/core/opl-host-core/src/service.mjs");
 const dshHost = read("src/host/dsh/host.mjs");
 const dshProfile = read("src/host/dsh/cordis.yml");
 const dshWebOverlay = read("src/host/dsh/web.patch.yml");
-const httpRoutes = read("plugins/opl-web-routes/src/service.mjs");
-const codexNative = read("plugins/opl-codex-native/src/service.mjs");
-const dshToolMcp = read("plugins/opl-dsh-tool-mcp/src/service.mjs");
-const appServerTransport = read("plugins/opl-codex-native/src/app-server-transport.mjs");
-const detail = read("plugins/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx");
-const lifecycle = read("plugins/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx");
-const composerPalette = read("plugins/opl-studio-client/src/client/workbench/ComposerCapabilityPalette.tsx");
-const projectProgress = read("plugins/opl-studio-client/src/client/workbench/projectProgress.ts");
-const projectProgressPanel = read("plugins/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx");
-const workspaceFilesPanel = read("plugins/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx");
-const clientCordis = read("plugins/opl-studio-client/src/client/composition/clientCordis.ts");
-const settings = read("plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-const gatewayCache = read("plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts");
-const gatewayLoginHost = read("plugins/opl-framework-bridge/src/gateway-account-login.mjs");
-const contributionComponents = read("plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
+const httpRoutes = read("plugins/core/opl-web-routes/src/service.mjs");
+const codexNative = read("plugins/core/opl-codex-native/src/service.mjs");
+const dshToolMcp = read("plugins/core/opl-dsh-tool-mcp/src/service.mjs");
+const appServerTransport = read("plugins/core/opl-codex-native/src/app-server-transport.mjs");
+const detail = read("plugins/core/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx");
+const lifecycle = read("plugins/core/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx");
+const composerPalette = read("plugins/core/opl-studio-client/src/client/workbench/ComposerCapabilityPalette.tsx");
+const projectProgress = read("plugins/core/opl-studio-client/src/client/workbench/projectProgress.ts");
+const projectProgressPanel = read("plugins/core/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx");
+const workspaceFilesPanel = read("plugins/core/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx");
+const clientCordis = read("plugins/core/opl-studio-client/src/client/composition/clientCordis.ts");
+const settings = read("plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+const gatewayCache = read("plugins/core/opl-studio-client/src/client/workbench/gatewayAccountCache.ts");
+const gatewayLoginHost = read("plugins/core/opl-framework-bridge/src/gateway-account-login.mjs");
+const contributionComponents = read("plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx");
 const contributionProjection = [
   "contributionProjection.ts",
   "channelAccessProjection.ts",
   "remoteCompanionAccessProjection.ts",
   "contributionWireValues.ts"
-].map(file => read(`plugins/opl-studio-client/src/client/composition/${file}`)).join("\n");
+].map(file => read(`plugins/core/opl-studio-client/src/client/composition/${file}`)).join("\n");
 const primitiveIndex = read("vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
 const scopedSlots = read("vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx");
-const runtimeShim = read("plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
+const runtimeShim = read("plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
 const rendererBuild = read("scripts/vite-build-renderer-entry.mjs");
 const sourceManifest = JSON.parse(read("packages/dsh-adapters/deepseekHarnessSourceManifest.json"));
 const candidateEvidence = JSON.parse(read("src/candidateContractEvidence.json"));
@@ -164,7 +164,7 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
   assert.match(runtimePage, /name: "sidebar\.panellist",\s*id: "runtime",\s*order: 20,/);
   assert.match(slotHost, /usePanels=\{useStudioPanels\}/);
   assert.match(slotHost, /slots\?\.entries\("sidebar\.panellist"\)/);
-  assert.match(read("plugins/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx"), /ctx\.provide\("oplStudioShell", shellStore\)/);
+  assert.match(read("plugins/core/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx"), /ctx\.provide\("oplStudioShell", shellStore\)/);
   assert.match(bridge, /workbench\?: Record<string, unknown>/);
   assert.match(model, /work_item_projection_v2/);
   assert.match(runtimePage, /data-testid="opl-runtime-overview-page"/);
@@ -210,10 +210,10 @@ test("Studio exposes one App-owned application management surface", () => {
   assert.match(app, /<SoftwareCenterSurface/);
   assert.match(softwareCenterSurface, /<ApplicationManagementPage/);
   assert.match(app, /applicationManagement:/);
-  assert.match(read("plugins/opl-studio-client/src/client/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
+  assert.match(read("plugins/core/opl-studio-client/src/client/workbench/deepLinkNavigation.ts"), /baseRoute === "\/apps"/);
   assert.match(applicationManagementPage, /data-testid="opl-app-management"/);
   assert.match(applicationManagementPage, /DshPluginManagerOwner/);
-  assert.match(read("plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx"), /PluginManagerOwnerPage/);
+  assert.match(read("plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx"), /PluginManagerOwnerPage/);
   assert.match(read("vendor/deepseek-harness/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx"), /PluginManagerOwnerPage/);
   assert.match(applicationManagementPage, /UpdatesSettingsPage/);
   assert.match(applicationManagementPage, /model\.applicationManagement\?\.sharedResources/);
@@ -239,7 +239,7 @@ test("new task and runtime entries use the pinned DSH sidebar controls", () => {
 });
 
 test("DSH More menu does not duplicate the pinned OPL application management entry", () => {
-  const navigationSlots = read("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
+  const navigationSlots = read("plugins/core/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   assert.match(navigationSlots, /entries\.filter\(entry => !entry\.pinned\)/);
   assert.doesNotMatch(navigationSlots, /管理应用与扩展|Manage apps and extensions/);
 });
@@ -302,7 +302,7 @@ test("DSH workspace browser, lifecycle, and Codex subagent projection stay expli
   assert.doesNotMatch(app, /const resumed = thread\.status === "unloaded"/);
   assert.match(app, /async function resumeThreadAndOpen/);
   assert.match(app, /thread-read-error/);
-  assert.match(fs.readFileSync(new URL("../../plugins/opl-studio-client/src/client/workbench/ConversationMessages.tsx", import.meta.url), "utf8"), /message\.subagent \? " subagent"/);
+  assert.match(fs.readFileSync(new URL("../../plugins/core/opl-studio-client/src/client/workbench/ConversationMessages.tsx", import.meta.url), "utf8"), /message\.subagent \? " subagent"/);
   assert.match(model, /"collabAgentToolCall" \| "subAgentActivity"/);
   assert.match(model, /type === "collabagenttoolcall"/);
   assert.match(model, /type === "subagentactivity"/);
@@ -591,7 +591,7 @@ test("Electron desktop hosts the live DeepSeek Harness composition root", () => 
 });
 
 test("Web host exposes the product brand while keeping Studio as an internal client id", () => {
-  const webHostTransport = read("plugins/opl-codex-native/src/app-server-transport.mjs");
+  const webHostTransport = read("plugins/core/opl-codex-native/src/app-server-transport.mjs");
   assert.match(webHostTransport, /name: "opl-studio-webui"/);
   assert.match(webHostTransport, /title: "One Person Lab"/);
   assert.doesNotMatch(webHostTransport, /title: "OPL Studio WebUI"/);
@@ -860,7 +860,7 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
   for (const id of ["client-modules", "opl-studio-client"]) assert.match(dshProfile, new RegExp(`id: ${id}`));
   assert.match(dshWebOverlay, /id: opl-web-routes/);
   assert.doesNotMatch(dshWebOverlay, /id: frontend-static/);
-  assert.match(read("plugins/opl-web-routes/src/frontend-static.mjs"), /frontend\.plugin\(frontendStatic/);
+  assert.match(read("plugins/core/opl-web-routes/src/frontend-static.mjs"), /frontend\.plugin\(frontendStatic/);
   assert.match(httpRoutes, /webAuth\.requireSession\(req\)/);
   assert.match(dshToolMcp, /StreamableHTTPServerTransport/);
   assert.match(dshToolMcp, /sendToolListChanged/);

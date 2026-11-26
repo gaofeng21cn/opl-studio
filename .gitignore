@@ -19,4 +19,4 @@ packaged-runtimes/
 output/
 
 # Generated DSH plugin payloads; rebuilt by prepare/build:plugins.
-plugins/*/lib/
+plugins/*/*/lib/

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 
 test("stdio preserves Unicode separators and split UTF-8 in large history responses", async () => {
   const preview = `${"历史🧪".repeat(12_000)}\u2028第二段\u2029第三段\n第四段`;

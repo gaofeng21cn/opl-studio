@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme";
-import { codexWorkbenchStyles } from "../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
-import { ResourcesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
-import { ApplicationManagementPage } from "../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage";
-import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
-import { readKnowledgeSourcesProjection } from "../../plugins/opl-studio-client/src/client/workbench/knowledgeSources";
-import { settingsDefaults } from "../../plugins/opl-studio-client/src/client/workbench/settingsModel";
-import { buildSettingsActionViewModel } from "../../plugins/opl-studio-client/src/client/workbench/settingsActions";
-import type { ResourceSettingsFocus } from "../../plugins/opl-studio-client/src/client/workbench/settings/types";
+import "../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/theme";
+import { codexWorkbenchStyles } from "../../plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
+import { ResourcesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
+import { ApplicationManagementPage } from "../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage";
+import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
+import { readKnowledgeSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/knowledgeSources";
+import { settingsDefaults } from "../../plugins/core/opl-studio-client/src/client/workbench/settingsModel";
+import { buildSettingsActionViewModel } from "../../plugins/core/opl-studio-client/src/client/workbench/settingsActions";
+import type { ResourceSettingsFocus } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/types";
 
 // Shipped components over deterministic owner readbacks. No private registry is written.
 function Fixture() {

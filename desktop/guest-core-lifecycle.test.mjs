@@ -5,7 +5,7 @@ import test from "node:test";
 import { createGuestRpc } from "./windows-guest-rpc.mjs";
 import { nativeHostOptions, startGuestHostCore } from "./guest-host-core.mjs";
 import { createGuestCoreProxy } from "./guest-core-proxy.mjs";
-import { OplHostCore } from "../plugins/opl-host-core/src/service.mjs";
+import { OplHostCore } from "../plugins/core/opl-host-core/src/service.mjs";
 
 function fixture(managedUpdate = async () => ({})) {
   const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });

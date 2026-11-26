@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, writeFile, rm, realpath, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { createThreadWorkspaceService } from '../../plugins/opl-host-core/src/thread-workspace-service.mjs';
+import { createThreadWorkspaceService } from '../../plugins/core/opl-host-core/src/thread-workspace-service.mjs';
 
 test('Git reads canonical workspace, distinguishes staged/unstaged, ignores caller paths and does not mutate', async t => {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'studio-git-')));

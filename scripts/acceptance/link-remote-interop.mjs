@@ -8,11 +8,11 @@ import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
 import WebSocket from "ws";
 import { loadWeriftFactory } from "../../vendor/dsh-remote/rtc.mjs";
-import { createLinkInternet, LINK_REMOTE_REVISION } from "../../plugins/opl-host-core/src/link-internet.mjs";
-import { LINK_VIRTUAL_PORT } from "../../plugins/opl-host-core/src/link-loopback.mjs";
+import { createLinkInternet, LINK_REMOTE_REVISION } from "../../plugins/core/opl-host-core/src/link-internet.mjs";
+import { LINK_VIRTUAL_PORT } from "../../plugins/core/opl-host-core/src/link-loopback.mjs";
 import { IdentityStore, ClientSecureTransport } from "../../vendor/dsh-remote/host.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const argument = name => { const i = process.argv.indexOf(name); if (i < 0 || !process.argv[i + 1]) throw new Error(`Provide ${name}`); return path.resolve(process.argv[i + 1]); };

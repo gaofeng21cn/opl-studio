@@ -12,7 +12,7 @@ import {
   sandboxDocument,
   workspaceArtifactLink,
   workspaceArtifactPath
-} from "../../plugins/opl-mcp-apps/src/client/mcpAppHost";
+} from "../../plugins/core/opl-mcp-apps/src/client/mcpAppHost";
 
 test("host-selected theme takes precedence over the operating system preference", () => {
   expect(resolvedMcpTheme("light", true)).toBe("light");

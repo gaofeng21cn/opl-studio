@@ -4,8 +4,8 @@ import {
   isAppServerUnavailableCleanup,
   isTurnScopedServerRequestsCleanup,
   removeServerRequests
-} from "../../plugins/opl-studio-client/src/client/workbench/codexServerRequestState";
-import type { CodexPendingServerRequest } from "../../plugins/opl-studio-client/src/client/bridge/oplBridge";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/codexServerRequestState";
+import type { CodexPendingServerRequest } from "../../plugins/core/opl-studio-client/src/client/bridge/oplBridge";
 
 const approval = (id: string): CodexPendingServerRequest => ({
   id,

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSidebarPanelPins } from "../../plugins/opl-studio-client/src/client/composition/slotHost/sidebarPreferences";
+import { createSidebarPanelPins } from "../../plugins/core/opl-studio-client/src/client/composition/slotHost/sidebarPreferences";
 
 test("explicit pin choices survive remounts, new panels, removal and return", () => {
   const data = new Map<string, string>();

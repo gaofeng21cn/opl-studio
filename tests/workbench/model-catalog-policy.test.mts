@@ -22,13 +22,13 @@ Object.assign(globalThis, {
   }
 });
 
-const { normalizeCodexModelCatalog } = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-codex.ts");
+const { normalizeCodexModelCatalog } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge-normalizers-codex.ts");
 const {
   codexModelPolicy,
   modelLabel,
   resolveCodexModelOptions: resolveOptions,
   resolveCodexSelection
-} = await import("../../plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
+} = await import("../../plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts");
 
 // These catalog and alias cases exercise the explicit opt-in path.
 const resolveCodexModelOptions = (catalog: Parameters<typeof resolveOptions>[0]) => resolveOptions(catalog, true);

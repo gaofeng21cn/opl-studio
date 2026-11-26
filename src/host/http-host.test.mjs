@@ -4,7 +4,7 @@ import path from "node:path";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { once } from "node:events";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost as createHost } from "./http-host.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
@@ -195,6 +195,7 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
     [
       ["@gaofeng21cn/opl-dsh-tool-mcp", true, "active"],
       ["@gaofeng21cn/opl-codex-native", true, "active"],
+      ["@gaofeng21cn/opl-channel-weixin", true, "active"],
       ["@gaofeng21cn/opl-framework-bridge", true, "active"],
       ["@gaofeng21cn/opl-materials-space", true, "active"],
       ["@gaofeng21cn/opl-mcp-apps", true, "active"],

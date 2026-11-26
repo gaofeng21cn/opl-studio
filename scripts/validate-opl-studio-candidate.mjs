@@ -30,22 +30,22 @@ const requiredFiles = [
   "contracts/opl-studio-profile.json",
   "THIRD_PARTY_NOTICES.md",
   "package.json",
-  "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
-  "plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts",
+  "plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts",
+  "plugins/core/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts",
   "src/bridge/webTransport.ts",
   "src/main.tsx",
-  "plugins/opl-studio-client/src/client/composition/clientCordis.ts",
-  "plugins/opl-studio-client/src/client/composition/contributionProjection.ts",
-  "plugins/opl-studio-client/src/client/composition/contributionComponents.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/clientCordis.ts",
+  "plugins/core/opl-studio-client/src/client/composition/contributionProjection.ts",
+  "plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx",
   "packages/dsh-adapters/deepseekHarnessSourceManifest.json",
-  "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx",
-  "plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx",
-  "plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/slotHost/composerSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx",
-  "plugins/opl-studio-client/src/client/composition/slotHost/firstRunOnboarding.tsx",
-  "plugins/opl-studio-client/src/client/integrations/deepseek-harness/oplAdapter.css",
-  "plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts",
+  "plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/slotHost/composerSlots.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx",
+  "plugins/core/opl-studio-client/src/client/composition/slotHost/firstRunOnboarding.tsx",
+  "plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/oplAdapter.css",
+  "plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts",
   "vendor/deepseek-harness/LICENSE",
   "vendor/deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx",
   "vendor/deepseek-harness/packages/client/ui-sidebar/src/client/SidebarRoot.tsx",
@@ -58,20 +58,20 @@ const requiredFiles = [
   "vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css",
   "vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts",
   "vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx",
-  "plugins/opl-studio-client/src/client/types/use-sync-external-store.d.ts",
+  "plugins/core/opl-studio-client/src/client/types/use-sync-external-store.d.ts",
   "src/renderer-shell.html",
-  "plugins/opl-studio-client/src/client/workbench/App.tsx",
-  "plugins/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx",
-  "plugins/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts",
-  "plugins/opl-studio-client/src/client/workbench/modelPolicy.ts",
-  "plugins/opl-studio-client/src/client/workbench/projectProgress.ts",
-  "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
-  "plugins/opl-studio-client/src/client/workbench/settingsModel.ts",
-  "plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts",
-  "plugins/opl-studio-client/src/client/threads/types.ts",
-  "plugins/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx",
-  "plugins/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/App.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/projectProgress.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/gatewayAccountCache.ts",
+  "plugins/core/opl-studio-client/src/client/threads/types.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/threads/ThreadDetailPopover.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/threads/ThreadLifecycleConfirmationDialog.tsx",
   "src/candidateContractEvidence.json",
   "scripts/build-renderer.mjs",
   "scripts/validate-client-conformance.mjs",
@@ -94,24 +94,24 @@ const requiredFiles = [
   "desktop/preload.cjs",
   "desktop/updater.mjs",
   "packages/host-kit/app-server-protocol.mjs",
-  "plugins/opl-codex-native/src/app-server-transport.mjs",
-  "plugins/opl-codex-native/src/app-server-turn-lifecycle.mjs",
+  "plugins/core/opl-codex-native/src/app-server-transport.mjs",
+  "plugins/core/opl-codex-native/src/app-server-turn-lifecycle.mjs",
   "src/host/dsh/cordis.yml",
   "src/host/dsh/host.mjs",
   "src/host/dsh/web.patch.yml",
-  "plugins/opl-codex-native/src/index.mjs",
-  "plugins/opl-dsh-tool-mcp/src/index.mjs",
-  "plugins/opl-framework-bridge/src/index.mjs",
-  "plugins/opl-host-core/src/index.mjs",
-  "plugins/opl-web-routes/src/index.mjs",
-  "plugins/opl-dsh-tool-mcp/src/service.mjs",
+  "plugins/core/opl-codex-native/src/index.mjs",
+  "plugins/core/opl-dsh-tool-mcp/src/index.mjs",
+  "plugins/core/opl-framework-bridge/src/index.mjs",
+  "plugins/core/opl-host-core/src/index.mjs",
+  "plugins/core/opl-web-routes/src/index.mjs",
+  "plugins/core/opl-dsh-tool-mcp/src/service.mjs",
   "src/host/dsh-tool-mcp.test.mjs",
-  "plugins/opl-host-core/src/service.mjs",
+  "plugins/core/opl-host-core/src/service.mjs",
   "src/host/host-core.test.mjs",
   "src/host/http-host.mjs",
-  "plugins/opl-codex-native/src/thread-adapter.mjs",
+  "plugins/core/opl-codex-native/src/thread-adapter.mjs",
   "src/host/thread-adapter.test.mjs",
-  "plugins/opl-host-core/src/thread-workspace-service.mjs",
+  "plugins/core/opl-host-core/src/thread-workspace-service.mjs",
   "src/host/thread-workspace-service.test.mjs",
   "tests/workbench/project-progress.test.mts",
   "tests/renderer/thread-renderer-source.test.mjs"
@@ -164,8 +164,8 @@ const retiredPrivateThreadFiles = [
   "src/coordination/foundation.ts",
   "src/coordination/index.ts",
   "src/coordination/types.ts",
-  "plugins/opl-studio-client/src/client/workbench/coordination/CoordinationDialog.tsx",
-  "plugins/opl-studio-client/src/client/workbench/coordination/CoordinationEvents.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/coordination/CoordinationDialog.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/coordination/CoordinationEvents.tsx",
   "src/host/coordination-host.mjs",
   "src/host/coordination-ledger.mjs",
   "scripts/smoke-coordination-dynamic-tools-live.mjs",
@@ -228,7 +228,7 @@ const expectedDeliveryEvaluation = {
   desktop_platforms: ["macos", "windows", "linux"],
   headless_host: "node_http_sse",
   docker_host: "node_http_sse",
-  shared_host_core: "plugins/opl-host-core/src/service.mjs",
+  shared_host_core: "plugins/core/opl-host-core/src/service.mjs",
   workspace_product_name: "One Person Lab",
   shared_renderer_and_bridge_shape_required: true,
   runtime_backend_scope: "codex_cli_only",
@@ -296,7 +296,7 @@ assert(
   "candidate package must use the selected Electron carrier without AionUI, AionCore, or Tauri dependencies"
 );
 
-const app = [read("plugins/opl-studio-client/src/client/workbench/App.tsx"), read("plugins/opl-studio-client/src/client/workbench/composerAttachments.ts")].join("\n");
+const app = [read("plugins/core/opl-studio-client/src/client/workbench/App.tsx"), read("plugins/core/opl-studio-client/src/client/workbench/composerAttachments.ts")].join("\n");
 const rendererSource = readRendererSource();
 const evidence = readJson("src/candidateContractEvidence.json");
 assert(
@@ -320,11 +320,11 @@ function assertApplicationHost(evidence) {
   const profile = read("src/host/dsh/cordis.yml");
   const webOverlay = read("src/host/dsh/web.patch.yml");
   const hostBoot = read("src/host/dsh/host.mjs");
-  const codexPlugin = read("plugins/opl-codex-native/src/index.mjs");
-  const toolPlugin = read("plugins/opl-dsh-tool-mcp/src/index.mjs");
-  const frameworkPlugin = read("plugins/opl-framework-bridge/src/index.mjs");
-  const toolMcp = read("plugins/opl-dsh-tool-mcp/src/service.mjs");
-  const codexNative = read("plugins/opl-codex-native/src/service.mjs");
+  const codexPlugin = read("plugins/core/opl-codex-native/src/index.mjs");
+  const toolPlugin = read("plugins/core/opl-dsh-tool-mcp/src/index.mjs");
+  const frameworkPlugin = read("plugins/core/opl-framework-bridge/src/index.mjs");
+  const toolMcp = read("plugins/core/opl-dsh-tool-mcp/src/service.mjs");
+  const codexNative = read("plugins/core/opl-codex-native/src/service.mjs");
   assert(host?.upstream_ref === expectedDshRef && host.upstream_version === expectedDshVersion, "Application Host must bind the pinned DSH cohort");
   assert(host.dsh_base_loaded === false, "Application Host must not load dsh-base");
   assert(host.active_shell_adopted === "app_owned" && host.release_ready === false, "Application Host implementation must not claim active-shell adoption or release readiness");
@@ -336,8 +336,8 @@ function assertApplicationHost(evidence) {
     assert(webOverlay.includes(`id: ${id}`), `Studio web overlay is missing ${id}`);
   }
   assert(!webOverlay.includes("id: frontend-static"), "Studio web overlay must not register an unauthenticated static fallback");
-  const httpRoutes = read("plugins/opl-web-routes/src/service.mjs");
-  const frontendAdapter = read("plugins/opl-web-routes/src/frontend-static.mjs");
+  const httpRoutes = read("plugins/core/opl-web-routes/src/service.mjs");
+  const frontendAdapter = read("plugins/core/opl-web-routes/src/frontend-static.mjs");
   assert(frontendAdapter.includes('import * as frontendStatic from "@deepseek-ai/dsh-host-frontend-static"') && frontendAdapter.includes("frontend.plugin(frontendStatic"), "Studio auth routes must use the public pinned DSH static plugin");
   assert(frontendAdapter.includes("webAuth.requireSession(authRequest(request))"), "Studio static fallback must require the canonical WebUI session");
   for (const marker of ["initProfile(profileDir, [])", "createRuntimeResolution", "PluginPackages", "loadProfile", "loadOverlayPatches", "boot("]) {
@@ -372,7 +372,7 @@ function assertSourceMarkerRequirements(evidence) {
   for (const group of Object.keys(requirements)) {
     assert(Array.isArray(requirements[group]) && requirements[group].length > 0, `missing marker group ${group}`);
     for (const requirement of requirements[group]) {
-      const source = requirement.file === "plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx"
+      const source = requirement.file === "plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx"
         ? readSlotHostSource()
         : read(requirement.file);
       for (const marker of requirement.contains) {
@@ -386,16 +386,16 @@ function assertPrivateThreadLayerRemoved(evidence) {
   const runtimeSources = [
     "desktop/main.mjs",
     "desktop/preload.cjs",
-    "plugins/opl-host-core/src/service.mjs",
-    "plugins/opl-codex-native/src/app-server-transport.mjs",
+    "plugins/core/opl-host-core/src/service.mjs",
+    "plugins/core/opl-codex-native/src/app-server-transport.mjs",
     "src/host/http-host.mjs",
-    "plugins/opl-codex-native/src/thread-adapter.mjs",
-    "plugins/opl-studio-client/src/client/bridge/oplBridge.ts",
+    "plugins/core/opl-codex-native/src/thread-adapter.mjs",
+    "plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts",
     "src/bridge/webTransport.ts",
     "src/main.tsx",
-    "plugins/opl-studio-client/src/client/workbench/App.tsx",
-    "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts",
-    "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts"
+    "plugins/core/opl-studio-client/src/client/workbench/App.tsx",
+    "plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts",
+    "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles.ts"
   ].map(read).join("\n");
   for (const marker of [
     "prepareCoordination",
@@ -414,7 +414,7 @@ function assertPrivateThreadLayerRemoved(evidence) {
   assert(evidence.functional_mvp?.private_coordination_layer === false, "functional MVP must reject a private coordination layer");
   assert(evidence.webui_transport?.private_coordination_layer === false, "WebUI must reject a private coordination layer");
   assert(
-    evidence.webui_transport?.host_core === "plugins/opl-host-core/src/service.mjs"
+    evidence.webui_transport?.host_core === "plugins/core/opl-host-core/src/service.mjs"
       && evidence.webui_transport.native_host === "desktop/main.mjs"
       && evidence.webui_transport.native_transport === "desktop/preload.cjs#window.oplStudio",
     "desktop and WebUI evidence must share the Node host core through thin transport adapters"
@@ -441,7 +441,7 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const slotHost = readSlotHostSource();
   const dshShellAdapter = read("packages/dsh-adapters/dsh-shell.mjs");
   const rendererShell = read("src/renderer-shell.html");
-  const appSource = read("plugins/opl-studio-client/src/client/workbench/App.tsx");
+  const appSource = read("plugins/core/opl-studio-client/src/client/workbench/App.tsx");
   const mainSource = read("src/main.tsx");
   const themeSource = read("vendor/deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css");
   const sourceManifest = readJson("packages/dsh-adapters/deepseekHarnessSourceManifest.json");
@@ -449,9 +449,9 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
   const tsconfig = readJson("tsconfig.json");
   const typecheckConfig = readJson("tsconfig.typecheck.json");
   const primitiveIndex = read("vendor/deepseek-harness/packages/client/ui-primitives/src/index.ts");
-  const composerPalette = read("plugins/opl-studio-client/src/client/workbench/ComposerCapabilityPalette.tsx");
-  const contributionComponents = read("plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
-  const runtimeShim = read("plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
+  const composerPalette = read("plugins/core/opl-studio-client/src/client/workbench/ComposerCapabilityPalette.tsx");
+  const contributionComponents = read("plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx");
+  const runtimeShim = read("plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts");
   const rendererBuild = read("scripts/vite-build-renderer-entry.mjs");
   const notices = read("THIRD_PARTY_NOTICES.md");
   assert(alignment, "missing DeepSeek Harness GUI source-reuse evidence");
@@ -579,21 +579,21 @@ function assertDeepSeekHarnessReuse(evidence, rendererSource) {
 }
 
 function assertCodexModelControls(evidence, app, rendererSource) {
-  const settings = read("plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const settings = read("plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const settingsPanel = readSettingsSource();
   const slotHost = readSlotHostSource();
-  const policySource = read("plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
+  const policySource = read("plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts");
   const rendererBuilder = read("scripts/build-renderer.mjs");
   const appRepoResolver = read("scripts/resolve-app-repo-root.mjs");
   const bridge = [
-    read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
-    read("plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts"),
+    read("plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts"),
+    read("plugins/core/opl-studio-client/src/client/bridge/oplBridge-commands.ts"),
     read("packages/host-contracts/src/codex-workspace.ts"),
     read("packages/host-contracts/src/platform-events.ts")
   ].join("\n");
-  const hostTransport = read("plugins/opl-codex-native/src/app-server-transport.mjs");
-  const codexNative = read("plugins/opl-codex-native/src/service.mjs");
-  const oplPassthrough = read("plugins/opl-framework-bridge/src/opl-passthrough.mjs");
+  const hostTransport = read("plugins/core/opl-codex-native/src/app-server-transport.mjs");
+  const codexNative = read("plugins/core/opl-codex-native/src/service.mjs");
+  const oplPassthrough = read("plugins/core/opl-framework-bridge/src/opl-passthrough.mjs");
   const appRepoRoot = resolveAppRepoRoot(root);
   const appProductProfilePath = path.join(appRepoRoot, "contracts", "app-product-profile.json");
   const appProductProfile = JSON.parse(fs.readFileSync(appProductProfilePath, "utf8"));
@@ -680,7 +680,7 @@ function assertCodexModelControls(evidence, app, rendererSource) {
     assert(oplPassthrough.includes(marker), `shared host core must preserve launcher/runtime safety marker ${marker}`);
   }
   assert(!rendererBuilder.includes("policyScript"), "static carrier HTML must not inject product policy");
-  assert(read("plugins/opl-studio-client/src/client/plugin.tsx").startsWith('import "virtual:opl-client-runtime-policy";'), "product client must initialize its App-owned policy before UI imports");
+  assert(read("plugins/core/opl-studio-client/src/client/plugin.tsx").startsWith('import "virtual:opl-client-runtime-policy";'), "product client must initialize its App-owned policy before UI imports");
   assert(read("scripts/client-runtime-policy.mjs").includes("__OPL_CODEX_MODEL_POLICY__"), "product client build must compile the App-owned model policy");
   assert(rendererBuilder.includes("resolveAppRepoRoot"), "renderer build must resolve the App repo through the shared helper");
   assert(appRepoResolver.includes('"contracts", "app-product-profile.json"'), "App repo resolver must require the App product profile");
@@ -712,11 +712,11 @@ function assertCodexModelControls(evidence, app, rendererSource) {
 
 validateNonLiveDeliveryEvidence(evidence);
 assertFallbackBoundaryDowngrades({
-  "plugins/opl-studio-client/src/client/workbench/App.tsx": app,
-  "plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx": readSettingsSource(),
-  "plugins/opl-studio-client/src/client/bridge/oplBridge.ts": read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
-  "plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts": read("plugins/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts"),
-  "plugins/opl-studio-client/src/client/workbench/workbenchModel.ts": read("plugins/opl-studio-client/src/client/workbench/workbenchModel.ts")
+  "plugins/core/opl-studio-client/src/client/workbench/App.tsx": app,
+  "plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx": readSettingsSource(),
+  "plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts": read("plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts"),
+  "plugins/core/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts": read("plugins/core/opl-studio-client/src/client/bridge/oplBridge-normalizers-action.ts"),
+  "plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts": read("plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts")
 });
 assertFunctionalMvpCloseout(evidence);
 assertSourceMarkerRequirements(evidence);
@@ -728,8 +728,8 @@ assertRendererTestIds(rendererSource, requiredTestIds);
 assertRendererTestIds(rendererSource, deliverySurfaceTestIds(evidence));
 
 const bridge = [
-  read("plugins/opl-studio-client/src/client/bridge/oplBridge.ts"),
-  read("plugins/opl-studio-client/src/client/bridge/oplBridge-commands.ts")
+  read("plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts"),
+  read("plugins/core/opl-studio-client/src/client/bridge/oplBridge-commands.ts")
 ].join("\n");
 for (const command of [
   "opl app state --profile fast --json",
@@ -848,8 +848,8 @@ assert(clientComposition?.shared_product_profile_and_slot_policy === true, "shel
 for (const field of ["independent_host_truth", "second_package_registry", "second_currentness_authority", "second_action_authority", "second_client_composition_graph"]) {
   assert(clientComposition?.[field] === false, `${field} must remain false`);
 }
-const clientCordisSource = read("plugins/opl-studio-client/src/client/composition/clientCordis.ts");
-const oplStudioClientPluginSource = read("plugins/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx");
+const clientCordisSource = read("plugins/core/opl-studio-client/src/client/composition/clientCordis.ts");
+const oplStudioClientPluginSource = read("plugins/core/opl-studio-client/src/client/composition/oplStudioClientPlugin.tsx");
 for (const marker of [
   "opl.app.client-contributions",
   "opl/app-client-contributions/updated",
@@ -861,7 +861,7 @@ for (const marker of [
 }
 assert(
   oplStudioClientPluginSource.includes("provideOplStudioClientContributions(ctx)")
-    && read("plugins/opl-studio-client/src/client/plugin.tsx").includes("oplStudioClientPlugin as default")
+    && read("plugins/core/opl-studio-client/src/client/plugin.tsx").includes("oplStudioClientPlugin as default")
     && read("src/main.tsx").includes("bootDesktopDshClient(rootElement)"),
   "OPL Studio client plugin must provide and load the Host-derived Client Cordis composition"
 );

@@ -4,7 +4,7 @@ import {
   markGatewayAccountCacheStale,
   readGatewayAccountCache,
   writeGatewayAccountCache
-} from "../../plugins/opl-studio-client/src/client/workbench/gatewayAccountCache.ts";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/gatewayAccountCache.ts";
 
 function memoryStorage() {
   const values = new Map<string, string>();

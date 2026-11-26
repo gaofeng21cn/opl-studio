@@ -17,8 +17,8 @@ Object.assign(globalThis, {
   }
 });
 
-const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-const { agentPackagePresentationStatus } = await import("../../plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx");
+const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+const { agentPackagePresentationStatus } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx");
 const fixtureState = (await import("../fixtures/studio-vm-fixture/state.json", { with: { type: "json" } })).default;
 
 test("clean-VM Agent Packages resolve from the synthetic Framework directory", () => {

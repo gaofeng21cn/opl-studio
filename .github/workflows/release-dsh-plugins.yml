@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "plugins/*/package.json"
+      - "plugins/*/*/package.json"
       - "packages/*/package.json"
   workflow_dispatch:
     inputs:
@@ -54,13 +54,12 @@ jobs:
           import fs from "node:fs";
           import { execFileSync, spawnSync } from "node:child_process";
 
-          const PUBLISHABLE = fs.readdirSync("plugins", { withFileTypes: true })
-            .filter(entry => entry.isDirectory())
-            .filter(entry => {
-              const pkg = JSON.parse(fs.readFileSync(`plugins/${entry.name}/package.json`, "utf8"));
-              return !pkg.private && pkg.name?.startsWith("@gaofeng21cn/")
-                && pkg.publishConfig?.registry === "https://npm.pkg.github.com";
-            }).map(entry => entry.name);
+          import { listDshSourcePackages } from "./packages/host-kit/src/dsh-source-packages.mjs";
+
+          const descriptors = listDshSourcePackages(process.cwd()).filter(({ manifest: pkg }) =>
+            !pkg.private && pkg.name?.startsWith("@gaofeng21cn/")
+              && pkg.publishConfig?.registry === "https://npm.pkg.github.com");
+          const PUBLISHABLE = descriptors.map(({ id }) => id);
 
           const PUBLISHABLE_SDKS = fs.readdirSync("packages", { withFileTypes: true })
             .filter(entry => entry.isDirectory())
@@ -93,17 +92,19 @@ jobs:
             if (!hasBase() && base !== "0".repeat(40)) {
               throw new Error("Cannot resolve the prior revision for package version detection");
             }
-            function hasNewVersion(directory) {
+            function hasNewVersion(directory, oldDirectory) {
               const manifestPath = directory + "/package.json";
               const current = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-              const priorRef = base + ":" + manifestPath;
-              const prior = spawnSync("git", ["cat-file", "-e", priorRef], { stdio: "ignore" });
-              if (prior.status !== 0) return true;
+              // Existing packages can move between source groups without republishing the same version.
+              const oldPluginPath = oldDirectory ? `${oldDirectory}/package.json` : null;
+              const priorRef = [manifestPath, oldPluginPath].filter(Boolean).map(file => `${base}:${file}`)
+                .find(ref => spawnSync("git", ["cat-file", "-e", ref], { stdio: "ignore" }).status === 0);
+              if (!priorRef) return true;
               const previous = JSON.parse(execFileSync("git", ["show", priorRef], { encoding: "utf8" }));
               return current.name !== previous.name || current.version !== previous.version;
             }
             // Source changes flow through source validation. Package publication follows version changes.
-            selected = PUBLISHABLE.filter(name => hasNewVersion("plugins/" + name));
+            selected = descriptors.filter(({ id, relativeDirectory }) => hasNewVersion(relativeDirectory, `plugins/${id}`)).map(({ id }) => id);
             selectedSdks = PUBLISHABLE_SDKS.filter(name => hasNewVersion("packages/" + name));
           }
 
@@ -184,9 +185,11 @@ jobs:
           node --input-type=module << 'NODE'
           import fs from "node:fs";
           import { inspectPublication } from "./scripts/check-plugin-publication.mjs";
+          import { listDshSourcePackages } from "./packages/host-kit/src/dsh-source-packages.mjs";
+          const directories = new Map(listDshSourcePackages(process.cwd()).map(({ id, directory }) => [id, directory]));
           const unpublished = [];
           for (const id of JSON.parse(process.env.SELECTED_PLUGINS)) {
-            const publication = inspectPublication(`plugins/${id}`);
+            const publication = inspectPublication(directories.get(id));
             console.log(JSON.stringify(publication));
             if (publication.status === "unpublished") unpublished.push(id);
           }
@@ -212,9 +215,16 @@ jobs:
           jq -r '.[]' <<< "$UNPUBLISHED_SDKS" | while IFS= read -r pkg; do
             (cd "packages/$pkg" && npm publish --provenance)
           done
-          jq -r '.[]' <<< "$UNPUBLISHED_PLUGINS" | while IFS= read -r plugin; do
-            (cd "plugins/$plugin" && npm publish --provenance)
-          done
+          node --input-type=module <<'NODE'
+          import { execFileSync } from "node:child_process";
+          import { listDshSourcePackages } from "./packages/host-kit/src/dsh-source-packages.mjs";
+          const directories = new Map(listDshSourcePackages(process.cwd()).map(({ id, directory }) => [id, directory]));
+          for (const id of JSON.parse(process.env.UNPUBLISHED_PLUGINS)) {
+            const cwd = directories.get(id);
+            if (!cwd) throw new Error(`Unknown DSH source package: ${id}`);
+            execFileSync("npm", ["publish", "--provenance"], { cwd, stdio: "inherit" });
+          }
+          NODE
         env:
           UNPUBLISHED_PLUGINS: ${{ steps.version-check.outputs.plugins }}
           UNPUBLISHED_SDKS: ${{ steps.version-check.outputs.sdk_packages }}

@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import { listDshSourcePackages } from "../packages/host-kit/src/dsh-source-packages.mjs";
 import { initProfile, resolveProfileDir } from "@deepseek-ai/dsh-app-boot";
 import { resolveDshHome } from "@deepseek-ai/dsh-home-paths";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
@@ -17,11 +18,7 @@ const profile = "opl-studio";
 const installedAnchor = "/Applications/One Person Lab.app/Contents/Resources/app.asar.unpacked/package.json";
 
 export function packSourcePlugins(names, cacheRoot) {
-  const directories = fs.readdirSync(path.join(root, "plugins"), { withFileTypes: true })
-    .filter(entry => entry.isDirectory()).map(entry => {
-      const directory = path.join(root, "plugins", entry.name);
-      return { directory, id: entry.name, manifest: JSON.parse(fs.readFileSync(path.join(directory, "package.json"))) };
-    });
+  const directories = listDshSourcePackages(root);
   const selected = names.map(name => {
     const entry = directories.find(entry => entry.id === name || entry.manifest.name === name);
     if (!entry) throw new Error(`Unknown DSH source package: ${name}`);

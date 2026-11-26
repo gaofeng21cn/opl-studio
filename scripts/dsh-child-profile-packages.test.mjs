@@ -102,10 +102,10 @@ test("Superagent child profile boots with the packed Codex Agents dependency clo
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
   const agentDir = registryMode
     ? path.join(root, "node_modules/@gaofeng21cn/opl-codex-agents")
-    : path.join(root, "plugins/opl-codex-agents");
+    : path.join(root, "plugins/core/opl-codex-agents");
   const superagentDir = registryMode
     ? path.join(root, "node_modules/@gaofeng21cn/opl-superagent")
-    : path.join(root, "plugins/opl-superagent");
+    : path.join(root, "plugins/extensions/opl-superagent");
   if (registryMode) {
     for (const directory of [agentDir, superagentDir]) {
       assert.equal((await fs.lstat(directory)).isSymbolicLink(), false, "registry composition must use installed package bytes");

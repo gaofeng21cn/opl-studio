@@ -1,0 +1,39 @@
+{
+  "name": "@gaofeng21cn/opl-studio-client",
+  "version": "0.1.13",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@gaofeng21cn/opl-mcp-apps"
+      ]
+    },
+    "manifestVersion": 1
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "OPL renderer integration for the DSH client module system.",
+  "engines": {
+    "node": ">=20",
+    "dsh": "0.2.3-alpha.2"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/core/opl-studio-client"
+  }
+}

@@ -187,8 +187,8 @@ function sync(sourceRoot) {
     },
     compatibility_patches: currentManifest.compatibility_patches ?? [],
     opl_delta_roots: [
-      "plugins/opl-studio-client/src/client/composition",
-      "plugins/opl-studio-client/src/client/integrations/deepseek-harness",
+      "plugins/core/opl-studio-client/src/client/composition",
+      "plugins/core/opl-studio-client/src/client/integrations/deepseek-harness",
       "scripts/build-renderer.mjs",
       "scripts/deepseek-harness-gui-vendor.mjs"
     ],

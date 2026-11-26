@@ -3,7 +3,7 @@ let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { ComputerUseActionRequest, ComputerUseState } from "@gaofeng21cn/opl-host-contracts";
-import { ComputerUseSettingsSection } from "../../plugins/opl-studio-client/src/client/composition/computerUseSettingsSlot";
+import { ComputerUseSettingsSection } from "../../plugins/core/opl-studio-client/src/client/composition/computerUseSettingsSlot";
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
