@@ -21,7 +21,7 @@ function fixture(context, { assets = [], index, previousIndex, registryMissing =
   const stagingDir = path.join(root, "staging");
   const writes = [];
   for (const id of ["opl-example", "opl-unselected"]) {
-    const directory = path.join(root, "plugins", id);
+    const directory = path.join(root, "plugins", "extensions", id);
     mkdirSync(directory, { recursive: true });
     writeFileSync(path.join(directory, "package.json"), JSON.stringify({
       name: `@gaofeng21cn/${id}`, version, engines: { dsh: "source" }, publishConfig: { registry }

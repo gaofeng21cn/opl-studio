@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { frameworkUpdateEnvironment } from '../../plugins/opl-framework-bridge/src/framework-update-compatibility.mjs';
-import { createOplPassthrough } from '../../plugins/opl-framework-bridge/src/opl-passthrough.mjs';
+import { frameworkUpdateEnvironment } from '../../plugins/core/opl-framework-bridge/src/framework-update-compatibility.mjs';
+import { createOplPassthrough } from '../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs';
 
 async function fixture(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'opl-update-compatibility-'));

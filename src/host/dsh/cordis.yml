@@ -25,6 +25,9 @@
 - id: opl-codex-native
   name: '@gaofeng21cn/opl-codex-native'
 
+- id: opl-channel-weixin
+  name: '@gaofeng21cn/opl-channel-weixin'
+
 - id: opl-framework-bridge
   name: '@gaofeng21cn/opl-framework-bridge'
 

@@ -3,20 +3,22 @@ import { expect, test } from "bun:test";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { Window } from "happy-dom";
-import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
-import { softwareAttentionItems, softwareCanStart } from "../../plugins/opl-studio-client/src/client/workbench/softwareExperience";
-import { DshPluginManagerOwner } from "../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner";
-import { McpAppWorkspace } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
-import { KnowledgeSourcesSection } from "../../plugins/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
-import { readKnowledgeSourcesProjection } from "../../plugins/opl-studio-client/src/client/workbench/knowledgeSources";
-import { compactPackageRows } from "../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs";
+import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
+import { softwareAttentionItems, softwareCanStart } from "../../plugins/core/opl-studio-client/src/client/workbench/softwareExperience";
+import { DshPluginManagerOwner } from "../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner";
+import { McpAppWorkspace } from "../../plugins/core/opl-mcp-apps/src/client/McpAppWorkspace";
+import { KnowledgeSourcesSection } from "../../plugins/core/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
+import { readKnowledgeSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/knowledgeSources";
+import { compactPackageRows, compactSoftwareSources } from "../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs";
+import { SoftwareSourcesPage } from "../../plugins/core/opl-studio-client/src/client/workbench/SoftwareSourcesPage";
+import { readSoftwareSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/softwareSources";
 
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: "test-fixture", defaultModel: "codex-fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "codex-fixture" }], reasoningEfforts: ["high"],
   autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel");
+const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel");
 
 function model() {
   return deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([1, 2, 3].map(id => ({
@@ -90,6 +92,74 @@ test("Start using navigates without dispatching a lifecycle or business action",
     const start = [...row.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Start using")!;
     expect(start).toBeTruthy(); act(() => start.click());
     expect(used).toEqual(["example-1"]); expect(actions).toEqual([]);
+  });
+});
+
+test("product types group different delivery carriers and keep restricted software browseable", async () => {
+  await withDom(async (container, render) => {
+    const entries = compactPackageRows([
+      { package_id: "catalog-extension", display_name: "Catalog Extension", software_type: "extension", catalog_source: { manager: "opl_packages" } },
+      { package_id: "codex-extension", display_name: "Codex Extension", software_type: "capability", catalog_origin: "external", catalog_source: { manager: "codex_plugin_manager" } },
+      { package_id: "private-app", display_name: "Restricted app", description: "Published summary", software_type: "application",
+        package_access: { visibility: "authorized_only", status: "signed_out", discover_allowed: false, download_allowed: false },
+        selection_status: "package_install_source_unavailable" },
+      { package_id: "chat-channel", display_name: "Chat Channel", software_type: "channel" },
+      { package_id: "runtime-helper", display_name: "Runtime Helper", software_type: "dependency" }
+    ].map(entry => ({ catalog_scope: "software", catalog_origin: "opl", installed: false, ...entry })));
+    const dsh = {
+      pluginId: "bundled-extension", packageName: "@example/bundled-extension", tier: "optional_product", origin: "opl", intentCategory: "extension",
+      installed: true, enabled: true, active: true, version: "1.0.0",
+      labelI18n: { zh: "Bundled Extension", en: "Bundled Extension" }, descriptionI18n: { zh: "", en: "" }, permissionsI18n: { zh: [], en: [] },
+      activeVersion: "1.0.0", availableVersion: null, updateAvailable: false, canInstall: false, canUninstall: false, canToggle: false,
+    };
+    Object.assign(window, { oplStudio: { readDshPluginCatalog: async () => ({ entries: [dsh], activity: [] }) } });
+    const actions: unknown[] = [], tabs: string[] = [];
+    render(createElement(DshPluginManagerOwner, { kind: "all", model: deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries } } } }),
+      settings: { ...settingsDefaults, locale: "en" }, actionBusyKey: null, onAction: action => actions.push(action), onTabChange: tab => tabs.push(tab) }));
+    await act(async () => {});
+    const row = (id: string) => container.querySelector(`[data-plugin-owner-package="${id}"]`);
+    for (const id of ["catalog-extension", "codex-extension", "bundled-extension"]) {
+      expect(row(id)?.closest("[data-plugin-owner-group]")?.getAttribute("data-plugin-owner-group")).toBe("extension");
+      expect(row(id)?.querySelector('[data-label="Type"]')?.textContent).toBe("Extension");
+    }
+    expect(row("chat-channel")?.closest('[data-plugin-owner-group="channel"]')).toBeTruthy();
+    expect(row("runtime-helper")).toBeNull();
+    const restricted = row("private-app")!;
+    expect(restricted.closest('[data-plugin-owner-group="application"]')).toBeTruthy();
+    expect(restricted.textContent).toContain("Published summary");
+    expect(restricted.textContent).toContain("Authorization required to install");
+    expect([...restricted.querySelectorAll("button")].some(button => button.textContent === "Install")).toBe(false);
+    act(() => [...restricted.querySelectorAll("button")].find(button => button.textContent === "Manage sources")!.click());
+    expect(tabs).toEqual(["sources"]);
+    expect(actions).toEqual([]);
+    act(() => container.querySelector<HTMLButtonElement>("#opl-catalog-scope-components")!.click());
+    expect(row("runtime-helper")?.closest('[data-plugin-owner-group="runtime-components"]')).toBeTruthy();
+    expect(row("private-app")).toBeNull();
+  });
+});
+
+test("software sources refresh the catalog without running Homebrew or an access check", async () => {
+  const cache = { cached: true, stale: true, fetched_at: "2026-11-24T00:00:00Z", etag: "internal-value" };
+  const projection = readSoftwareSourcesProjection(compactSoftwareSources({
+    surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [
+      { source_id: "public-registry:opl", display_name: "OPL Catalog", source_kind: "registry", provider_id: "public_registry", visibility: "public", status: "public",
+        catalog_cache: cache, verified_at: "2026-11-25T00:00:00Z", available_actions: [
+          { action_id: "source_check" }, { action_id: "source_refresh", payload_fields: ["source_id"] }, { action_id: "source_list" }
+        ] }
+    ]
+  }));
+  expect(projection?.entries[0]?.catalogCache).toEqual({ cached: true, stale: true, fetchedAt: cache.fetched_at });
+  await withDom(async (container, render) => {
+    const requests: unknown[] = [];
+    render(createElement(SoftwareSourcesPage, { projection, locale: "en", actionBusyKey: null, onAction: request => requests.push(request), onRefresh() {} }));
+    const row = container.querySelector('[data-source-id="public-registry:opl"]')!;
+    expect(row.textContent).toContain("Using the last synchronized catalog");
+    expect(row.textContent).toContain("Last synchronized");
+    const buttons = [...row.querySelectorAll("button")];
+    expect(buttons.map(button => button.textContent)).toEqual(["Update catalog"]);
+    act(() => buttons[0]!.click());
+    expect(requests).toEqual([{ key: "source:public-registry:opl:source_refresh", actionId: "source_refresh", label: "Update catalog",
+      payload: { source_id: "public-registry:opl" }, confirmationRequired: false, dryRunSupported: false }]);
   });
 });
 
@@ -167,7 +237,7 @@ test('an active Package task replaces repeat installation controls with its curr
 });
 
 test('background Package tasks are discovered outside Software Center and completion requests fresh state', async () => {
-  const { usePackageOperations } = await import('../../plugins/opl-studio-client/src/client/workbench/usePackageOperations');
+  const { usePackageOperations } = await import('../../plugins/core/opl-studio-client/src/client/workbench/usePackageOperations');
   await withDom(async (_container, render) => {
     let reads = 0, completed = 0;
     const bridge = { executeAction: async (request: any) => {

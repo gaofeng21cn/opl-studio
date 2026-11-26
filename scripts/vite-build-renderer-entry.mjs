@@ -136,6 +136,9 @@ export async function buildRendererEntry(entrypoint, outdir, format = "esm", { e
       "process.env.DSH_CLIENT_VERSION": "undefined",
       "process.env.DSH_CLIENT_GIT_DIRTY": "undefined",
       "process.env.DSH_CLIENT_COMMIT_HASH": JSON.stringify(""),
+      // Cordis's shared Loader checks the Node platform before delegating to
+      // the browser module table. Keep the sandboxed renderer on the browser branch.
+      "process.platform": JSON.stringify("browser"),
       "process.versions.node": JSON.stringify("0.0.0"),
       "process.execArgv": "[]",
       "process.env.CORDIS_SHARED": "undefined"

@@ -4,7 +4,7 @@ import {
   isEventForActiveTurn,
   resolveCanonicalTurn,
   shouldNotifyCanonicalCompletion
-} from "../../plugins/opl-studio-client/src/client/workbench/canonicalThreadReconcile";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/canonicalThreadReconcile";
 
 describe("canonical thread reconcile", () => {
   test("restores an active turn and its stable pending identity from canonical readback", () => {

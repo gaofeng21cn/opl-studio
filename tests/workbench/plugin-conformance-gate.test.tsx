@@ -28,8 +28,8 @@ import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts"
 const studioRoot = path.resolve(import.meta.dir, "../..");
 const appRepoRoot = process.env.OPL_APP_REPO_ROOT || path.resolve(studioRoot, "../one-person-lab-app");
 
-const { DeclarativeSettingsForm } = await import("../../plugins/opl-studio-client/src/client/composition/DeclarativeSettingsForm");
-const { readSettingsFormResult, readUiContributionsProjection } = await import("../../plugins/opl-studio-client/src/client/composition/contributionProjection");
+const { DeclarativeSettingsForm } = await import("../../plugins/core/opl-studio-client/src/client/composition/DeclarativeSettingsForm");
+const { readSettingsFormResult, readUiContributionsProjection } = await import("../../plugins/core/opl-studio-client/src/client/composition/contributionProjection");
 const { exampleTier2ClientPlugin } = await import("../../templates/plugin-devkit/tier2-dsh-client-plugin/src/client/plugin");
 
 let createRoot: typeof import("react-dom/client").createRoot;
@@ -94,11 +94,11 @@ function walkSourceFiles(dir: string): string[] {
 
 test("first-party UI plugins and DevKit Tier 2 template contain zero relative vendor/ imports or rogue top-level settings nav", () => {
   const clientRoots = [
-    path.join(studioRoot, "plugins/opl-team-bots/src/client"),
-    path.join(studioRoot, "plugins/opl-superagent/src/client"),
-    path.join(studioRoot, "plugins/opl-mcp-apps/src/client"),
-    path.join(studioRoot, "plugins/opl-materials-space/src/client"),
-    path.join(studioRoot, "plugins/opl-runtime-status/src/client"),
+    path.join(studioRoot, "plugins/extensions/opl-team-bots/src/client"),
+    path.join(studioRoot, "plugins/extensions/opl-superagent/src/client"),
+    path.join(studioRoot, "plugins/core/opl-mcp-apps/src/client"),
+    path.join(studioRoot, "plugins/extensions/opl-materials-space/src/client"),
+    path.join(studioRoot, "plugins/extensions/opl-runtime-status/src/client"),
     path.join(studioRoot, "templates/plugin-devkit/tier2-dsh-client-plugin/src/client")
   ];
   for (const dir of clientRoots) {
@@ -113,12 +113,12 @@ test("first-party UI plugins and DevKit Tier 2 template contain zero relative ve
 
 test("plugin panels enforce PluginErrorBoundary isolation and support lightweight view reload fallback", async () => {
   const requiredBoundaryFiles = [
-    "plugins/opl-team-bots/src/client/plugin.tsx",
-    "plugins/opl-superagent/src/client/plugin.tsx",
-    "plugins/opl-mcp-apps/src/client/McpAppWorkspace.tsx",
-    "plugins/opl-mcp-apps/src/client/McpTaskWorkbench.tsx",
-    "plugins/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
-    "plugins/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
+    "plugins/extensions/opl-team-bots/src/client/plugin.tsx",
+    "plugins/extensions/opl-superagent/src/client/plugin.tsx",
+    "plugins/core/opl-mcp-apps/src/client/McpAppWorkspace.tsx",
+    "plugins/core/opl-mcp-apps/src/client/McpTaskWorkbench.tsx",
+    "plugins/extensions/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
+    "plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
     "templates/plugin-devkit/tier2-dsh-client-plugin/src/client/plugin.tsx"
   ];
   for (const relPath of requiredBoundaryFiles) {
@@ -225,9 +225,9 @@ test("DevKit Tier 1 template conforms to opl-app-contributions.schema.json and r
 
 test("Tier 2 settings slots declare bilingual titles and search keywords, and register cleanly in DSH slot registry", () => {
   const tier2SlotOwners = [
-    "plugins/opl-team-bots/src/client/plugin.tsx",
-    "plugins/opl-superagent/src/client/plugin.tsx",
-    "plugins/opl-studio-client/src/client/composition/billionContextSettingsSlot.tsx",
+    "plugins/extensions/opl-team-bots/src/client/plugin.tsx",
+    "plugins/extensions/opl-superagent/src/client/plugin.tsx",
+    "plugins/core/opl-studio-client/src/client/composition/billionContextSettingsSlot.tsx",
     "templates/plugin-devkit/tier2-dsh-client-plugin/src/client/plugin.tsx"
   ];
   for (const relPath of tier2SlotOwners) {
@@ -255,7 +255,7 @@ test("Tier 2 settings slots declare bilingual titles and search keywords, and re
 });
 
 test("CSS surfaces and PluginErrorBoundary obey theme CSS custom properties without hardcoded top-level hex colors", () => {
-  const css = readFileSync(path.join(studioRoot, "plugins/opl-mcp-apps/src/client/mcp-apps.css"), "utf8");
+  const css = readFileSync(path.join(studioRoot, "plugins/core/opl-mcp-apps/src/client/mcp-apps.css"), "utf8");
   const boundary = readFileSync(path.join(studioRoot, "packages/opl-plugin-ui-kit/src/PluginErrorBoundary.tsx"), "utf8");
   expect(css).toContain("var(--dsw-");
   expect(boundary).toContain("var(--dsw-");

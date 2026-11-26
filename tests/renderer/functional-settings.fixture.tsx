@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme";
-import { codexWorkbenchStyles } from "../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
-import { ResourcesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
-import { ServicesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ServicesSettingsPage";
-import { CapabilitiesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage";
-import { ProjectedContribution } from "../../plugins/opl-studio-client/src/client/composition/contributionComponents";
-import { readUiContributionsProjection, settingsEntriesForDestination } from "../../plugins/opl-studio-client/src/client/composition/contributionProjection";
-import { McpAppWorkspace } from "../../plugins/opl-mcp-apps/src/client/McpAppWorkspace";
-import { McpTaskWorkbench } from "../../plugins/opl-mcp-apps/src/client/McpTaskWorkbench";
-import { McpAppsClientContext } from "../../plugins/opl-studio-client/src/client/composition/mcpAppsClient";
-import { installWorkspaceClientPlugin } from "../../plugins/opl-studio-client/src/client/composition/workspaceClientPlugin";
+import "../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/theme";
+import { codexWorkbenchStyles } from "../../plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
+import { ResourcesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
+import { ServicesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ServicesSettingsPage";
+import { CapabilitiesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/CapabilitiesSettingsPage";
+import { ProjectedContribution } from "../../plugins/core/opl-studio-client/src/client/composition/contributionComponents";
+import { readUiContributionsProjection, settingsEntriesForDestination } from "../../plugins/core/opl-studio-client/src/client/composition/contributionProjection";
+import { McpAppWorkspace } from "../../plugins/core/opl-mcp-apps/src/client/McpAppWorkspace";
+import { McpTaskWorkbench } from "../../plugins/core/opl-mcp-apps/src/client/McpTaskWorkbench";
+import { McpAppsClientContext } from "../../plugins/core/opl-studio-client/src/client/composition/mcpAppsClient";
+import { installWorkspaceClientPlugin } from "../../plugins/core/opl-studio-client/src/client/composition/workspaceClientPlugin";
 
 const entries = readUiContributionsProjection({ui_contributions: {surface_kind: 'opl_app_ui_contributions_projection.v1', entries: [
   ['channel', 'channel_access', '微信'], ['service', 'service_status', '设备服务'], ['inbox', 'list_detail', '收件箱'],

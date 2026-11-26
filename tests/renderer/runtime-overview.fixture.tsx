@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import "../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme";
-import { codexWorkbenchStyles } from "../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
-import { RuntimeStatusPanel } from "../../plugins/opl-runtime-status/src/client/RuntimeStatusPanel";
-import runtimeStatusStyles from "../../plugins/opl-runtime-status/src/client/runtime-status.css?raw";
-import { deriveServiceRecoveryModel } from "../../plugins/opl-studio-client/src/client/workbench/serviceRecoveryModel";
+import "../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/theme";
+import { codexWorkbenchStyles } from "../../plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles";
+import { RuntimeStatusPanel } from "../../plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel";
+import runtimeStatusStyles from "../../plugins/extensions/opl-runtime-status/src/client/runtime-status.css?raw";
+import { deriveServiceRecoveryModel } from "../../plugins/core/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
 // Uses the shipped renderer and DSH theme, with deterministic owner projections.

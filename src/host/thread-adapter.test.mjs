@@ -5,7 +5,7 @@ import {
   CodexThreadAdapter,
   ThreadAdapterError,
   projectCodexThread
-} from "../../plugins/opl-codex-native/src/thread-adapter.mjs";
+} from "../../plugins/core/opl-codex-native/src/thread-adapter.mjs";
 
 function thread(id, overrides = {}) {
   return {

@@ -11,20 +11,20 @@ function read(relativePath: string) {
 }
 
 const workbenchStyleSources = [
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleFoundation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleStartup.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleContributions.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleNavigation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleConversation.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleComposer.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCore.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCapabilities.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsActions.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
-  "plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleFoundation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleStartup.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleContributions.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleNavigation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleConversation.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleComposer.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCore.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCapabilities.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsActions.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleRuntime.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleThreads.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleDsh.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleResponsive.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsIntegration.ts",
 ];
 
 function zIndexOf(source: string, selector: string) {
@@ -69,7 +69,7 @@ test("settings confirmation dialog layers above the settings modal", () => {
 // the settings modal (body-level z-index 1000). The dialog therefore portals to
 // document.body, exactly like the settings modal itself.
 test("settings confirmation dialog portals out of the shell overlay layer", () => {
-  const dialog = read("plugins/opl-studio-client/src/client/workbench/settings/SettingsActionDialog.tsx");
+  const dialog = read("plugins/core/opl-studio-client/src/client/workbench/settings/SettingsActionDialog.tsx");
   assert.match(dialog, /createPortal\(/, "dialog must use createPortal");
   assert.match(dialog, /document\.body\)/, "dialog must portal to document.body");
 });

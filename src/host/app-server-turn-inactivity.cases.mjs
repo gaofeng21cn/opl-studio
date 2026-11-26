@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 
 const fixture = fileURLToPath(new URL("./fixtures/turn-inactivity-app-server.mjs", import.meta.url));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

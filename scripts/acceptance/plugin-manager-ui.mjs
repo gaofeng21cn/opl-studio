@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildRenderer } from "../build-renderer.mjs";
-import { CodexAppServerTransport } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { createWebUiHost } from "../../src/host/http-host.mjs";
 
 // Isolated UI acceptance for the DSH PluginManager page owner adapter. This

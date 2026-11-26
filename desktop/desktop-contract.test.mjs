@@ -9,7 +9,7 @@ const main = fs.readFileSync(path.join(root, "desktop", "main.mjs"), "utf8");
 const preload = fs.readFileSync(path.join(root, "desktop", "preload.cjs"), "utf8");
 const logDirectoryOwner = fs.readFileSync(path.join(root, "desktop", "app-log-directory.mjs"), "utf8");
 const runtimeBootstrap = fs.readFileSync(path.join(root, "desktop", "runtime-bootstrap.mjs"), "utf8");
-const settingsPanel = fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/workbench", "SettingsPanel.tsx"), "utf8") + fs.readdirSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
+const settingsPanel = fs.readFileSync(path.join(root, "plugins/core/opl-studio-client/src/client/workbench", "SettingsPanel.tsx"), "utf8") + fs.readdirSync(path.join(root, 'plugins/core/opl-studio-client/src/client/workbench/settings'), { recursive: true }).filter(file => file.endsWith('.tsx')).map(file => fs.readFileSync(path.join(root, 'plugins/core/opl-studio-client/src/client/workbench/settings', file), 'utf8')).join('\n');
 
 test("Electron is a thin, isolated adapter over the shared host core", () => {
   assert.match(main, /createLocalNodeHost/);
@@ -45,7 +45,7 @@ test("macOS desktop exposes the official DSH platform and sidebar material", () 
   assert.match(preload, /"opl:native-theme-source"[\s\S]+ipcRenderer\.send\(NATIVE_THEME_SOURCE_CHANNEL, source\)[\s\S]+new MutationObserver\(send\)\.observe\(root/);
   assert.match(main, /window\.webContents\.on\("did-finish-load", sendFullscreen\)/);
   assert.match(preload, /opl:window-fullscreen/);
-  assert.match(fs.readFileSync(path.join(root, "plugins/opl-studio-client/src/client/workbench", "App.tsx"), "utf8"), /data-ds-theme-source", settings\.theme/);
+  assert.match(fs.readFileSync(path.join(root, "plugins/core/opl-studio-client/src/client/workbench", "App.tsx"), "utf8"), /data-ds-theme-source", settings\.theme/);
 });
 
 test("native accessibility support is enabled only by the qualification lane", () => {

@@ -6,7 +6,7 @@ import {
   readRuntimeOverviewCache,
   runtimeOverviewModelFromCache,
   writeRuntimeOverviewCache
-} from "../../plugins/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/runtimeOverviewCache.ts";
 
 function storage() {
   const values = new Map<string, string>();

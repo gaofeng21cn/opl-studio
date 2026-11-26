@@ -17,8 +17,8 @@ import {
   retrySavedAppPermission,
   revokeSavedAppPermission,
   writeComputerUseSettings
-} from "../../plugins/opl-codex-native/src/computer-use.mjs";
-import { OplCodexNative } from "../../plugins/opl-codex-native/src/service.mjs";
+} from "../../plugins/core/opl-codex-native/src/computer-use.mjs";
+import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const installAnchor = path.join(root, "package.json");
@@ -255,4 +255,183 @@ test("OplCodexNative isolates CUA profile initialization failures without blocki
   const state = await service.readComputerUse();
   assert.equal(state.active, false);
   assert.equal(state.unavailableReason, service.computerUseError.code);
+});
+
+test("OplCodexNative automatically reloads Computer Use once an active turn finishes", { skip: process.platform !== "darwin" }, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-auto-reload-"));
+  t.after(() => rm(tempRoot, { recursive: true, force: true }));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  await writeComputerUseSettings(dshHome, { enabled: true, consentMode: "allow" }, "darwin");
+
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin"
+  });
+  let starts = 0;
+  let stops = 0;
+  service.transport.start = async () => {
+    starts += 1;
+    service.transport.initialized = true;
+  };
+  service.transport.stop = async () => {
+    stops += 1;
+    service.transport.initialized = false;
+  };
+
+  await service.start();
+  assert.equal(starts, 1);
+  assert.equal((await service.readComputerUse()).active, true);
+  assert.equal((await service.readComputerUse()).activeConsentMode, "allow");
+
+  // Simulate an active Codex turn holding the transport busy.
+  let releaseTurn;
+  const turnPromise = service.transport.withActivity(() => new Promise((resolve) => {
+    releaseTurn = resolve;
+  }));
+
+  const whileBusy = await service.setComputerUse({ enabled: false });
+  assert.equal(whileBusy.enabled, false);
+  assert.equal(whileBusy.active, true);
+  assert.equal(whileBusy.activeConsentMode, "allow");
+  assert.equal(whileBusy.restartPending, true);
+  assert.equal(starts, 1);
+
+  // Finishing the turn triggers automatic idle reload without any explicit reload call.
+  releaseTurn();
+  await turnPromise;
+  await service.pendingComputerUseReloadPromise;
+
+  assert.equal(stops, 1);
+  assert.equal(starts, 2);
+  const afterIdle = await service.readComputerUse();
+  assert.equal(afterIdle.enabled, false);
+  assert.equal(afterIdle.active, false);
+  assert.equal(afterIdle.activeConsentMode, null);
+  assert.equal(afterIdle.restartPending, false);
+  assert.ok(!service.transport.args.some((arg) => arg.includes("mcp_servers.dsh_cua")));
+});
+
+test("OplCodexNative resolves mid-start concurrent setComputerUse toggles without retaining stale allow flags", { skip: process.platform !== "darwin" }, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-concurrent-start-"));
+  t.after(() => rm(tempRoot, { recursive: true, force: true }));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  await writeComputerUseSettings(dshHome, { enabled: true, consentMode: "elicit" }, "darwin");
+
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin"
+  });
+
+  const observedStarts = [];
+  let releaseFirstReloadStart;
+  let startCount = 0;
+  service.transport.start = async () => {
+    startCount += 1;
+    observedStarts.push([...service.transport.args]);
+    if (startCount === 2) {
+      await new Promise((resolve) => {
+        releaseFirstReloadStart = resolve;
+      });
+    }
+    service.transport.initialized = true;
+  };
+  service.transport.stop = async () => {
+    service.transport.initialized = false;
+  };
+
+  const events = [];
+  service.on("event", (event) => {
+    if (event?.method === "host/computer-use-changed") events.push(event.params);
+  });
+
+  await service.start();
+  const enableAllowPromise = service.setComputerUse({ enabled: true, consentMode: "allow" });
+  while (!releaseFirstReloadStart) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  // User disables Computer Use while the first reload process is still initializing.
+  const midDisable = await service.setComputerUse({ enabled: false });
+  assert.equal(midDisable.enabled, false);
+  assert.equal(midDisable.active, false);
+  assert.equal(midDisable.restartPending, true);
+
+  releaseFirstReloadStart();
+  const firstResult = await enableAllowPromise;
+  assert.equal(firstResult.enabled, false);
+
+  await service.pendingComputerUseReloadPromise;
+  const finalState = await service.readComputerUse();
+  assert.equal(startCount, 3);
+  assert.equal(finalState.enabled, false);
+  assert.equal(finalState.active, false);
+  assert.equal(finalState.activeConsentMode, null);
+  assert.equal(finalState.restartPending, false);
+  // The intermediate start (allow) must accurately report active: true, activeConsentMode: "allow", restartPending: true,
+  // before the automatic follow-up reload turns Computer Use off.
+  assert.ok(events.some((params) =>
+    params.active === true && params.activeConsentMode === "allow" && params.restartPending === true));
+  const lastEvent = events.at(-1);
+  assert.deepEqual(lastEvent, { active: false, activeConsentMode: null, restartPending: false });
+  assert.ok(observedStarts[1].some((arg) => arg.includes('DSH_CUA_CONSENT="allow"')));
+  assert.ok(!observedStarts[2].some((arg) => arg.includes("mcp_servers.dsh_cua")));
+});
+
+test("OplCodexNative stops retrying persistent reload failures and leaves plain Codex activity unblocked", { skip: process.platform !== "darwin" }, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-reload-fail-"));
+  t.after(() => rm(tempRoot, { recursive: true, force: true }));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  await writeComputerUseSettings(dshHome, { enabled: true, consentMode: "elicit" }, "darwin");
+
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin"
+  });
+
+  let startCalls = 0;
+  service.transport.start = async () => {
+    startCalls += 1;
+    if (startCalls === 1) {
+      service.transport.initialized = true;
+      return;
+    }
+    throw Object.assign(new Error("codex spawn failed"), { code: "app_server_unavailable" });
+  };
+  service.transport.stop = async () => {
+    service.transport.initialized = false;
+  };
+
+  await service.start();
+  let releaseTurn;
+  const turnPromise = service.transport.withActivity(() => new Promise((resolve) => {
+    releaseTurn = resolve;
+  }));
+
+  const events = [];
+  service.on("event", (event) => events.push(event));
+
+  const whileBusy = await service.setComputerUse({ enabled: false });
+  assert.equal(whileBusy.restartPending, true);
+
+  releaseTurn();
+  await turnPromise;
+  await service.pendingComputerUseReloadPromise;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.equal(startCalls, 2);
+  assert.equal(service.pendingComputerUseReloadPromise, null);
+  assert.equal(service.appServerError?.code, "app_server_unavailable");
+  const afterFailure = await service.readComputerUse();
+  assert.equal(afterFailure.restartPending, false);
+  assert.equal(afterFailure.active, false);
+  assert.equal(events.some((e) => e.method === "host/computer-use-changed" && e.params?.restartPending === false), true);
+  // Plain Codex activity does not hang on maintenance after reload failure.
+  const ran = await service.transport.withActivity(async () => "ok");
+  assert.equal(ran, "ok");
 });

@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { initProfile } from '@deepseek-ai/dsh-app-boot';
-import { SuperagentProfile } from '../../plugins/opl-superagent/src/index.mjs';
+import { SuperagentProfile } from '../../plugins/extensions/opl-superagent/src/index.mjs';
 
 // Real official CLI, bundle, database and management API; Codex catalog via the parent IPC, with no external Source.
 test('independent Superagent profile preserves settings and setup across restart', { timeout: 45000 }, async () => {

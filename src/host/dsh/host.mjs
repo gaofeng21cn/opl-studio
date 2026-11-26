@@ -21,6 +21,7 @@ import {
   readDisabledPluginPatches,
   reconcileUserExternalPluginsOnBoot
 } from "../../../packages/host-kit/dsh-plugin-catalog.mjs";
+import { applyPendingExternalPluginRemovalsOnBoot } from "../../../packages/host-kit/profile-plugin-updates.mjs";
 
 const dshRoot = path.dirname(fileURLToPath(import.meta.url));
 const profilePath = path.join(dshRoot, "cordis.yml");
@@ -50,6 +51,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
   initProfile(profileDir, []);
 
   async function attemptBoot() {
+    await applyPendingExternalPluginRemovalsOnBoot({ dir: profileDir, installAnchor, home: dshHome });
     reconcileUserExternalPluginsOnBoot(profileDir);
     const dshProfile = loadProfile(profileName, profileName, installAnchor, dshHome);
     const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });

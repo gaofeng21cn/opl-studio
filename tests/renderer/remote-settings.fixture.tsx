@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../plugins/opl-studio-client/src/client/integrations/deepseek-harness/theme';
-import { codexWorkbenchStyles } from '../../plugins/opl-studio-client/src/client/workbench/codexWorkbenchStyles';
-import { ResourcesSettingsPage } from '../../plugins/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage';
-import { ProjectedContribution } from '../../plugins/opl-studio-client/src/client/composition/contributionComponents';
-import { readUiContributionsProjection } from '../../plugins/opl-studio-client/src/client/composition/contributionProjection';
+import '../../plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/theme';
+import { codexWorkbenchStyles } from '../../plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyles';
+import { ResourcesSettingsPage } from '../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage';
+import { ProjectedContribution } from '../../plugins/core/opl-studio-client/src/client/composition/contributionComponents';
+import { readUiContributionsProjection } from '../../plugins/core/opl-studio-client/src/client/composition/contributionProjection';
 const entry = readUiContributionsProjection({ ui_contributions: { surface_kind: 'opl_app_ui_contributions_projection.v1', entries: [{ contribution_key: 'opl-channel-weixin:weixin', contribution_id: 'weixin', package_id: 'opl-channel-weixin', slot: 'settings.section', contribution_kind: 'view', trust_tier: 'declarative', scope: 'root', view: { view_id: 'weixin', view_type: 'channel_access', title_i18n: { en: 'Weixin', 'zh-CN': '微信' }, data_ref: 'weixin#state', command_ids: ['connect', 'submit', 'disconnect'] }, commands: [ ['connect', '连接本人微信'], ['submit', '验证并继续'], ['disconnect', '退出微信'] ].map(([id, title]) => ({ command_id: id, label_i18n: { en: title, 'zh-CN': title }, action_ref: `weixin#${id}`, confirmation_required: false })), badges: [] }] } }).entries[0]!;
 function Fixture() {
   const [state, setState] = useState('disconnected');

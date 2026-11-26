@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { inc } from "semver";
 import { initProfile, loadOptionalPatches } from "@deepseek-ai/dsh-app-boot";
 import { runPluginCommand } from "@deepseek-ai/dsh-plugin-manager/operations";
-import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, resolveBundledPnpm, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
+import { checkRegistryUpdates, discoverPublishablePackages, ensureProfileNpmrc, inspectProfile, packSourcePlugins, pruneSourcePluginCache, resolveBundledPnpm, resolveRegistryVersions, updateRegistryPlugins } from "./dsh-profile-plugins.mjs";
 import { mergePublicFeedIndex } from "./publish-dsh-plugin-feed.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -84,6 +84,36 @@ test("source plugin selection discovers publishable client packages and rejects 
   assert.deepEqual(await fs.readdir(temp), []);
 });
 
+test("source plugin cache pruning retains only the active and newest tarballs per package and skips symlinks", async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-plugin-cache-prune-"));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const pkg = "opl-superagent";
+  const other = "opl-team-bots";
+  const oldest = path.join(temp, `${pkg}-${"1".repeat(64)}.tgz`);
+  const middle = path.join(temp, `${pkg}-${"2".repeat(64)}.tgz`);
+  const active = path.join(temp, `${pkg}-${"3".repeat(64)}.tgz`);
+  const otherArchive = path.join(temp, `${other}-${"4".repeat(64)}.tgz`);
+  const outside = path.join(temp, "outside.tgz");
+  const symlinkArchive = path.join(temp, `${pkg}-${"5".repeat(64)}.tgz`);
+  for (const file of [oldest, middle, active, otherArchive, outside]) {
+    await fs.writeFile(file, "tarball");
+  }
+  await fs.symlink(outside, symlinkArchive);
+  await fs.utimes(oldest, 1000, 1000);
+  await fs.utimes(middle, 2000, 2000);
+  await fs.utimes(active, 3000, 3000);
+
+  const removed = pruneSourcePluginCache(temp, pkg, active, 2);
+  assert.deepEqual(removed, [oldest]);
+  assert.deepEqual((await fs.readdir(temp)).sort(), [
+    path.basename(middle),
+    path.basename(active),
+    path.basename(symlinkArchive),
+    path.basename(otherArchive),
+    "outside.tgz",
+  ].sort());
+});
+
 test("registry authentication survives a later update without a new token", async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "opl-registry-npmrc-"));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
@@ -101,7 +131,7 @@ test("registry authentication survives a later update without a new token", asyn
 
 test("registry resolution uses the selected carrier cohort and skips newer incompatible versions", async () => {
   const name = "@gaofeng21cn/opl-superagent";
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const incompatibleVersion = inc(currentVersion, "patch");
   const queries = [];
   const view = async (_dir, spec) => {
@@ -131,7 +161,7 @@ test("current and unavailable registry checks never create an unnecessary profil
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const view = async (_dir, spec) => ({ exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === name
     ? [currentVersion] : { name, version: currentVersion, engines: { dsh: "0.2.3-alpha.2" } }) });
   let installs = 0;
@@ -150,7 +180,7 @@ test("registry update projection preserves each failed check while reporting com
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-partial-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const good = "@gaofeng21cn/opl-superagent", bad = "@gaofeng21cn/opl-team-bots";
-  const availableVersion = inc(JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version, "patch");
+  const availableVersion = inc(JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version, "patch");
   const projection = await checkRegistryUpdates({ installAnchor: path.join(root, "package.json"), home, names: [good, bad],
     view: async (_dir, spec) => spec === bad ? { exitCode: 1, timedOut: true, stdout: "", stderr: "" }
       : { exitCode: 0, timedOut: false, stderr: "", stdout: JSON.stringify(spec === good ? [availableVersion]
@@ -165,7 +195,7 @@ test("registry updates use the profile scope route without overriding npm's defa
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const name = "@gaofeng21cn/opl-superagent";
   const installAnchor = path.join(root, "package.json");
-  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"))).version;
+  const currentVersion = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"))).version;
   const nextVersion = inc(currentVersion, "patch");
   let managerArgs;
   let managerContext;
@@ -189,7 +219,7 @@ test("public DSH plugin feed works without GitHub tokens, rejects tampered tarba
   const bundledPnpmBin = path.join(carrierDir, "node_modules", "pnpm", "bin", "pnpm.mjs");
   await fs.mkdir(path.dirname(bundledPnpmBin), { recursive: true });
   await fs.writeFile(bundledPnpmBin, "// fixture bundled pnpm\n");
-  const superagentManifest = JSON.parse(await fs.readFile(path.join(root, "plugins/opl-superagent/package.json"), "utf8"));
+  const superagentManifest = JSON.parse(await fs.readFile(path.join(root, "plugins/extensions/opl-superagent/package.json"), "utf8"));
   const bootManifest = JSON.parse(await fs.readFile(path.join(root, "node_modules/@deepseek-ai/dsh-app-boot/package.json"), "utf8"));
   await fs.mkdir(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent"), { recursive: true });
   await fs.writeFile(path.join(carrierDir, "node_modules", "@gaofeng21cn", "opl-superagent", "package.json"), JSON.stringify(superagentManifest));

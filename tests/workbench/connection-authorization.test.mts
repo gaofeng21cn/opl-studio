@@ -5,11 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Window } from "happy-dom";
-import type { SettingsActionRequest } from "../../plugins/opl-studio-client/src/client/workbench/settingsActions";
-import { deriveWorkbenchModelFromState } from "../../plugins/opl-studio-client/src/client/workbench/workbenchModel";
-import { ResourcesSettingsPage } from "../../plugins/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
-import { SharedResourcesPage } from "../../plugins/opl-studio-client/src/client/workbench/SharedResourcesPage";
-import { ConnectionsSection } from "../../plugins/opl-studio-client/src/client/workbench/settings/ConnectionsSection";
+import type { SettingsActionRequest } from "../../plugins/core/opl-studio-client/src/client/workbench/settingsActions";
+import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
+import { ResourcesSettingsPage } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/ResourcesSettingsPage";
+import { SharedResourcesPage } from "../../plugins/core/opl-studio-client/src/client/workbench/SharedResourcesPage";
+import { ConnectionsSection } from "../../plugins/core/opl-studio-client/src/client/workbench/settings/ConnectionsSection";
 
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: "test-fixture", defaultModel: "codex-fixture", defaultReasoningEffort: "high", visibleModels: [{ id: "codex-fixture" }], reasoningEfforts: ["high"],

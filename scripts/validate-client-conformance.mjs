@@ -170,8 +170,8 @@ try {
   });
   assert.equal(hostProjection.contribution_count, 3);
 
-  const studioProjectionModule = await importFresh(path.join(studioRoot, "plugins/opl-studio-client/src/client/composition/contributionProjection.ts"));
-  const clientCordisModule = await importFresh(path.join(studioRoot, "plugins/opl-studio-client/src/client/composition/clientCordis.ts"));
+  const studioProjectionModule = await importFresh(path.join(studioRoot, "plugins/core/opl-studio-client/src/client/composition/contributionProjection.ts"));
+  const clientCordisModule = await importFresh(path.join(studioRoot, "plugins/core/opl-studio-client/src/client/composition/clientCordis.ts"));
   const hostState = {
     app_state: {
       ui_contributions: hostProjection,
@@ -223,7 +223,7 @@ try {
   assert.equal(actionRequest.dryRun, false);
   assert.equal(actionRequest.payload.confirmed, true);
 
-  const studioActionSource = fs.readFileSync(path.join(studioRoot, "plugins/opl-studio-client/src/client/workbench/App.tsx"), "utf8");
+  const studioActionSource = fs.readFileSync(path.join(studioRoot, "plugins/core/opl-studio-client/src/client/workbench/App.tsx"), "utf8");
   for (const marker of [
     "createOplContributionActionRequest(entry, command, confirmed)",
     'receipt.status === "executed"',

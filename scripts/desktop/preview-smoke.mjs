@@ -387,7 +387,7 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
       studioRoot:!!document.querySelector('[data-testid="opl-studio-root"]'),
       startupReadiness:!!document.querySelector('[data-testid="opl-startup-readiness"]'),
       sessionHeader:!!document.querySelector('[data-testid="opl-session-header"]'),
-      composerRunState:!!document.querySelector('[data-testid="opl-composer-run-state"]'),
+      composerRunState:false,
       onboarding:{visible:!!document.querySelector('.opl-first-run'),dismissed:false},
       settings:{opened:false,panel:false,account:false,about:false},
       runtime:{opened:false,panel:false},
@@ -416,6 +416,8 @@ async function runUiInteractions({ evaluate, capture, timeoutMs }) {
     result.runtime.panel=await waitFor('[data-testid="opl-runtime-overview-page"]',Math.min(${uiTimeoutMs},5000));
     const chatButton=clickButton("新建任务")||clickButton("New task")||clickButton("新建会话")||clickButton("New session");
     result.runtime.returnedToConversation=chatButton && await waitFor('[data-testid="opl-context-inspector-trigger"]');
+    // The first-run dialog can precede the conversation composer mount.
+    result.composerRunState=!!result.runtime.returnedToConversation && await waitFor('[data-testid="opl-composer-run-state"]');
     result.inspector.opened=click('[data-testid="opl-context-inspector-trigger"]');
     if(result.inspector.opened){
       const menuItemReady=await waitFor('[role="menu"] [role="menuitem"]');

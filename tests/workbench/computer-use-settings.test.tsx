@@ -3,7 +3,7 @@ let createRoot: typeof import("react-dom/client").createRoot;
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { ComputerUseActionRequest, ComputerUseState } from "@gaofeng21cn/opl-host-contracts";
-import { ComputerUseSettingsSection } from "../../plugins/opl-studio-client/src/client/composition/computerUseSettingsSlot";
+import { ComputerUseSettingsSection } from "../../plugins/core/opl-studio-client/src/client/composition/computerUseSettingsSlot";
 
 let browser: Window;
 let root: ReturnType<typeof createRoot>;
@@ -133,4 +133,135 @@ test("ComputerUseSettingsSection defaults to elicit, warns on unattended allow, 
   expect(actions[0]?.permission).toBe("accessibility");
   expect(actions[1]?.appId).toBe("a".repeat(64));
   expect(document.body.textContent).not.toContain("Notes");
+});
+
+test("ComputerUseSettingsSection surfaces runtime init errors and active-turn disable details", async () => {
+  const initFailedState: ComputerUseState = {
+    supported: true,
+    available: true,
+    enabled: true,
+    active: false,
+    consentMode: "elicit",
+    activeConsentMode: null,
+    restartPending: false,
+    platform: "darwin",
+    permissions: {
+      status: "ready",
+      accessibility: true,
+      screenRecording: true,
+      helperAppPath: "/Applications/One Person Lab.app/Contents/Resources/DSH Computer Use.app",
+      helperBundle: "test-bundle",
+      error: null
+    },
+    allowedApps: [],
+    blockedApps: [],
+    unavailableReason: "EEXIST"
+  };
+
+  let state = initFailedState;
+  const bridge = {
+    async readComputerUse() {
+      return structuredClone(state);
+    },
+    async setComputerUse() {
+      return structuredClone(state);
+    },
+    async performComputerUseAction() {
+      return structuredClone(state);
+    }
+  };
+
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={bridge} />);
+  });
+  await act(async () => {});
+
+  const runtimeError = document.querySelector('[data-testid="opl-cua-runtime-error"]');
+  expect(runtimeError).not.toBeNull();
+  expect(runtimeError?.textContent).toContain("EEXIST");
+  expect(document.body.textContent).toContain("初始化异常 · 不可用");
+
+  state = {
+    ...initFailedState,
+    enabled: false,
+    active: true,
+    activeConsentMode: "allow",
+    restartPending: true,
+    unavailableReason: null
+  };
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={{ ...bridge }} />);
+  });
+  await act(async () => {});
+
+  const pendingBanner = document.querySelector('[data-testid="opl-cua-restart-pending"]');
+  expect(pendingBanner).not.toBeNull();
+  expect(pendingBanner?.textContent).toContain("allow");
+  expect(pendingBanner?.textContent).toContain("自动重载");
+});
+
+test("ComputerUseSettingsSection refreshes live state when host/computer-use-changed arrives", async () => {
+  let state: ComputerUseState = {
+    supported: true,
+    available: true,
+    enabled: false,
+    active: true,
+    consentMode: "elicit",
+    activeConsentMode: "allow",
+    restartPending: true,
+    platform: "darwin",
+    permissions: {
+      status: "ready",
+      accessibility: true,
+      screenRecording: true,
+      helperAppPath: "/Applications/One Person Lab.app/Contents/Resources/DSH Computer Use.app",
+      helperBundle: "test-bundle",
+      error: null
+    },
+    allowedApps: [],
+    blockedApps: [],
+    unavailableReason: null
+  };
+  let listener: ((event: { method?: string; params?: Record<string, unknown> }) => void) | null = null;
+  let unsubscribed = false;
+
+  const bridge = {
+    async readComputerUse() {
+      return structuredClone(state);
+    },
+    async setComputerUse() {
+      return structuredClone(state);
+    },
+    async performComputerUseAction() {
+      return structuredClone(state);
+    },
+    subscribeEvents(onEvent: (event: { method?: string; params?: Record<string, unknown> }) => void) {
+      listener = onEvent;
+      return () => {
+        unsubscribed = true;
+      };
+    }
+  };
+
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={bridge} />);
+  });
+  await act(async () => {});
+
+  expect(document.querySelector('[data-testid="opl-cua-restart-pending"]')).not.toBeNull();
+
+  state = {
+    ...state,
+    active: false,
+    activeConsentMode: null,
+    restartPending: false
+  };
+  await act(async () => {
+    listener?.({ method: "host/computer-use-changed", params: { active: false, restartPending: false } });
+  });
+  await act(async () => {});
+
+  expect(document.querySelector('[data-testid="opl-cua-restart-pending"]')).toBeNull();
+  await act(async () => root.unmount());
+  expect(unsubscribed).toBe(true);
 });

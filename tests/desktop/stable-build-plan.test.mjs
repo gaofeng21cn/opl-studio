@@ -9,7 +9,7 @@ import { writeAppUpdateConfig } from '../../scripts/desktop/write-app-update-con
 import { parse } from 'yaml';
 import crypto from 'node:crypto';
 import { validateDesktopPackage } from '../../scripts/validate-desktop-package.mjs';
-import { validateWslHostPayload } from '../../scripts/desktop/prepare-wsl-host-payload.mjs';
+import { validateWslHostPayload, copyMaterializedTree, isPackagerExcludedNodeModulesEntry } from '../../scripts/desktop/prepare-wsl-host-payload.mjs';
 const env = { OPL_RELEASE_VERSION: '26.9.24', OPL_UPDATER_VERSION: '26.9.2491' };
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -28,7 +28,7 @@ function writePackagedWslHostPayload(payloadRoot, { includeNodeModules = true } 
     'desktop/windows-guest-inspect.mjs': 'inspect',
     'packages/host-kit/official-profile.mjs': 'profile',
     'src/host/create-host.mjs': 'create-host',
-    'plugins/opl-host-core/lib/index.mjs': 'host-core',
+    'plugins/core/opl-host-core/lib/index.mjs': 'host-core',
     'runtime/node/bin/node': 'node',
     'runtime/node/bin/npm': 'npm',
     'runtime/node/lib/node_modules/npm/bin/npm-cli.js': 'npm-cli',
@@ -252,4 +252,47 @@ test('payload environment preserves the Stable display and machine identities us
     assert.equal(local.OPL_RELEASE_VERSION, env.OPL_UPDATER_VERSION);
     assert.equal(local.OPL_UPDATER_VERSION, env.OPL_UPDATER_VERSION);
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('macOS Stable build plan strips Developer ID Application prefix from CSC_NAME while keeping identity', () => {
+  const prefixed = resolveStableBuildPlan(
+    ['--platform', 'darwin', '--arch', 'arm64'],
+    { ...env, CSC_NAME: 'Developer ID Application: Example Team (TEAM123)', identity: 'Developer ID Application: Example Team (TEAM123)' }
+  );
+  assert.equal(prefixed.env.CSC_NAME, 'Example Team (TEAM123)');
+  assert.equal(prefixed.env.identity, 'Developer ID Application: Example Team (TEAM123)');
+  const unprefixed = resolveStableBuildPlan(
+    ['--platform', 'darwin', '--arch', 'arm64'],
+    { ...env, CSC_NAME: 'Example Team (TEAM123)' }
+  );
+  assert.equal(unprefixed.env.CSC_NAME, 'Example Team (TEAM123)');
+});
+
+test('Windows guest Host materialization omits electron-builder VCS markers inside node_modules while keeping lockfiles and code', () => {
+  assert.equal(isPackagerExcludedNodeModulesEntry('node_modules/pnpm/dist/node_modules/undici/lib/llhttp/.gitkeep'), true);
+  assert.equal(isPackagerExcludedNodeModulesEntry('node_modules/pkg/.DS_Store'), true);
+  assert.equal(isPackagerExcludedNodeModulesEntry('package-lock.json'), false);
+  assert.equal(isPackagerExcludedNodeModulesEntry('node_modules/pkg/index.js'), false);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opl-wsl-host-filter-'));
+  try {
+    const src = path.join(root, 'src');
+    const dst = path.join(root, 'dst');
+    for (const [rel, body] of Object.entries({
+      'package-lock.json': '{"lockfileVersion":3}',
+      'node_modules/pnpm/dist/node_modules/undici/lib/llhttp/.gitkeep': '',
+      'node_modules/pkg/.npmignore': 'test',
+      'node_modules/pkg/index.js': 'export default 1;\n',
+    })) {
+      const target = path.join(src, rel);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, body);
+    }
+    copyMaterializedTree(src, dst, fs.realpathSync(src));
+    assert.equal(fs.existsSync(path.join(dst, 'package-lock.json')), true);
+    assert.equal(fs.existsSync(path.join(dst, 'node_modules/pkg/index.js')), true);
+    assert.equal(fs.existsSync(path.join(dst, 'node_modules/pnpm/dist/node_modules/undici/lib/llhttp/.gitkeep')), false);
+    assert.equal(fs.existsSync(path.join(dst, 'node_modules/pkg/.npmignore')), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

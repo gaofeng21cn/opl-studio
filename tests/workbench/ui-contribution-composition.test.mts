@@ -13,7 +13,7 @@ import {
   readUiContributionsProjection,
   settingsContributionDestination,
   type OplUiContributionsProjection
-} from "../../plugins/opl-studio-client/src/client/composition/contributionProjection.ts";
+} from "../../plugins/core/opl-studio-client/src/client/composition/contributionProjection.ts";
 
 (globalThis as typeof globalThis & { __OPL_CODEX_MODEL_POLICY__?: unknown }).__OPL_CODEX_MODEL_POLICY__ = {
   source: "test-fixture",
@@ -28,7 +28,7 @@ import {
   useHighestSupportedReasoningForUnknown: true
 };
 
-const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
+const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
 
 test("startup recovers a failed owner read into the real contribution projection", async () => {
   let attempts = 0;
@@ -106,8 +106,8 @@ function createHost() {
   contexts.push(ctx);
   return new OplStudioDshSlotHost(ctx, {} as never);
 }
-const { OplStudioDshSlotHost } = await import("../../plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx");
-const { installWorkspaceClientPlugin } = await import("../../plugins/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx");
+const { OplStudioDshSlotHost } = await import("../../plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx");
+const { installWorkspaceClientPlugin } = await import("../../plugins/core/opl-studio-client/src/client/composition/workspaceClientPlugin.tsx");
 test("native slot stores and factories follow the client plugin lifetime", async () => {
   const ctx = new Context();
   contexts.push(ctx);
@@ -170,7 +170,7 @@ test("capability workspace installs into DSH main and sidebar panel slots and di
   expect(host.core.entries("sidebar.panellist")).toEqual(beforePanels);
   expect(host.core.entries("main").length).toBe(beforeMain);
 });
-const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx");
+const { buildServiceStatusSummary, channelAttentionMessage } = await import("../../plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx");
 
 test("channel failures explain the reason and recovery action without exposing raw transport errors", () => {
   expect(channelAttentionMessage("timeout", true)).toContain("超时");
@@ -178,7 +178,7 @@ test("channel failures explain the reason and recovery action without exposing r
   expect(channelAttentionMessage("http_error", true)).toContain("网络或代理");
   expect(channelAttentionMessage(undefined, true)).toContain("日志与诊断");
 });
-const { codexModelPolicy, resolveCodexModelOptions } = await import("../../plugins/opl-studio-client/src/client/workbench/modelPolicy.ts");
+const { codexModelPolicy, resolveCodexModelOptions } = await import("../../plugins/core/opl-studio-client/src/client/workbench/modelPolicy.ts");
 
 const projectionState = {
   app_state: {
@@ -735,7 +735,7 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("renders non-image channel payloads with the maintained QR component", () => {
     const source = readFileSync(
-      new URL("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
+      new URL("../../plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
       "utf8"
     );
     expect(source).toMatch(/import \{ QRCodeSVG \} from "qrcode\.react"/);
@@ -746,7 +746,7 @@ describe("OPL Studio DSH contribution composition", () => {
 
   test("keeps remote pairing material in transient component state and routes actions through the owner bridge", () => {
     const source = readFileSync(
-      new URL("../../plugins/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
+      new URL("../../plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx", import.meta.url),
       "utf8"
     );
     expect(source).toMatch(/viewType === "remote_companion_access"/);
@@ -758,7 +758,7 @@ describe("OPL Studio DSH contribution composition", () => {
     expect(source).not.toMatch(/console\.(log|warn|error)/);
     expect(source).toMatch(/function remoteCompanionActionKey/);
 
-    const appSource = readFileSync(new URL("../../plugins/opl-studio-client/src/client/workbench/App.tsx", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../../plugins/core/opl-studio-client/src/client/workbench/App.tsx", import.meta.url), "utf8");
     expect(appSource).toMatch(/function contributionReceiptForDisplay/);
     expect(appSource).toContain("contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))");
   });
@@ -777,4 +777,126 @@ test("phone PIN projections carry a current challenge but never submitted digits
   delete value.actions[0].input.verify_code;
   value.connection.state = "connected";
   expect(readChannelAccessResult(value)).toBeNull();
+});
+
+test("conversation.composer.bar provides renderSlotChain for placeholder and renders composerRunState when a model is available", async () => {
+  const host = createHost();
+  const barEntry = host.core.entries("conversation.composer.bar")[0]!;
+  expect(barEntry.children?.["conversation.input.placeholder"]).toEqual({ kind: "chain", scope: "root", inline: true });
+
+  const extraGlobals = {
+    HTMLInputElement: (browser as any).HTMLInputElement,
+    HTMLSelectElement: (browser as any).HTMLSelectElement,
+    HTMLTextAreaElement: (browser as any).HTMLTextAreaElement,
+    Event: (browser as any).Event,
+    MutationObserver: (browser as any).MutationObserver,
+    getComputedStyle: (browser as any).getComputedStyle,
+    ResizeObserver: class { observe() {} disconnect() {} },
+    IS_REACT_ACT_ENVIRONMENT: true
+  };
+  const saved = new Map(Object.keys(extraGlobals).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const previousFonts = Object.getOwnPropertyDescriptor(document, "fonts");
+  for (const [key, value] of Object.entries(extraGlobals)) {
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+  }
+  Object.defineProperty(document, "fonts", {
+    configurable: true,
+    value: { addEventListener() {}, removeEventListener() {} }
+  });
+
+  const React = await import("react");
+  const { act } = React;
+  const { createRoot } = await import("react-dom/client");
+  const { SlotRegistry } = await import("../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts");
+  const { createSlotRenderer } = await import("../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/scoped-slots.tsx");
+  const { CodexThreadScope } = await import("../../plugins/core/opl-studio-client/src/client/composition/codexThreadScope.ts");
+  const { StudioContext } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
+  const { ComposerAccessory } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ComposerAccessory.tsx");
+
+  const ctx = new Context();
+  contexts.push(ctx);
+  new SlotRegistry(ctx);
+  const slots = ctx.get("slots") as InstanceType<typeof SlotRegistry>;
+  slots.installScope("session", new CodexThreadScope(ctx));
+  slots.install(createSlotRenderer());
+  const errors: unknown[] = [];
+  const stopErrors = slots.onEntryError((slot, _entry, error) => errors.push({ slot, error }));
+  slots.register(
+    { name: "root", registrant: "test", children: { "conversation.composer.bar": { kind: "single", scope: "root" } } } as never,
+    (({ renderSlot }: { renderSlot: (key: string, owner: object) => React.ReactNode }) =>
+      renderSlot("conversation.composer.bar", { variant: "hero", occurrence: "main" })) as never
+  );
+  slots.register(
+    {
+      name: "conversation.composer.bar",
+      registrant: barEntry.registrant,
+      inject: barEntry.inject,
+      children: barEntry.children
+    } as never,
+    barEntry.component as never
+  );
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const reactRoot = createRoot(container);
+  const surface = {
+    locale: "zh" as const,
+    prompt: "",
+    promptRevision: 0,
+    queue: [],
+    composerImages: [],
+    composerOverlay: null,
+    composerAccessory: React.createElement(ComposerAccessory, {
+      locale: "zh",
+      prompt: "",
+      selections: [],
+      selectedAgent: null,
+      sendState: "idle",
+      submissionError: "",
+      unavailableFixedModel: false,
+      onUpdatePrompt: () => {},
+      onRemoveSelection: () => {},
+      onClearAgent: () => {}
+    }),
+    resolvedModelId: "codex-fixture",
+    modelOptions: [],
+    modelSelection: "__auto" as const,
+    reasoningSelection: "high",
+    reasoningOptions: ["high"],
+    sending: false,
+    agentPermissions: ":workspace" as const,
+    currentThreadId: undefined,
+    updatePrompt: () => {},
+    submitPrompt: () => {},
+    steerQueue: () => {},
+    addComposerImages: () => null,
+    removeComposerImage: () => {},
+    openComposerPalette: () => {},
+    stopTurn: () => {},
+    setAgentPermissions: () => {},
+    selectModel: async () => true,
+    narrow: false,
+    detailsOpen: false,
+    toggleSidebar: () => {},
+    closeDetails: () => {}
+  };
+
+  try {
+    await act(async () => {
+      reactRoot.render(React.createElement(StudioContext.Provider, { value: surface as never }, slots.renderSlot("root", {})));
+    });
+    expect(errors).toEqual([]);
+    expect(container.querySelector('[data-testid="opl-composer-run-state"]')).toBeTruthy();
+    expect(container.querySelector("[data-composer-placeholder]")?.textContent).toBe("向 OPL 描述你的目标");
+  } finally {
+    stopErrors();
+    await act(async () => reactRoot.unmount());
+    container.remove();
+    if (previousFonts) Object.defineProperty(document, "fonts", previousFonts);
+    else Reflect.deleteProperty(document, "fonts");
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
 });

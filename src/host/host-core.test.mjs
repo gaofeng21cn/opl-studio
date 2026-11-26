@@ -4,18 +4,18 @@ import os from "node:os";
 import path from "node:path";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
-import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "../../plugins/opl-codex-native/src/app-server-transport.mjs";
+import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
 import {
   createFrameworkChannelCallbackRegistrar,
   loadFrameworkCordisProfiles
-} from "../../plugins/opl-framework-bridge/src/framework-channel-bootstrap.mjs";
-import { OplHostCore } from "../../plugins/opl-host-core/src/service.mjs";
+} from "../../plugins/core/opl-framework-bridge/src/framework-channel-bootstrap.mjs";
+import { OplHostCore } from "../../plugins/core/opl-host-core/src/service.mjs";
 import { createOplHostCore as createHostCore } from "./create-host.mjs";
-import { OplCodexNative } from "../../plugins/opl-codex-native/src/service.mjs";
-import { OplFrameworkBridge } from "../../plugins/opl-framework-bridge/src/service.mjs";
-import { McpAppHost } from "../../plugins/opl-mcp-apps/src/service.mjs";
-import { createOplPassthrough } from "../../plugins/opl-framework-bridge/src/opl-passthrough.mjs";
+import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
+import { OplFrameworkBridge } from "../../plugins/core/opl-framework-bridge/src/service.mjs";
+import { McpAppHost } from "../../plugins/core/opl-mcp-apps/src/service.mjs";
+import { createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 const dshHome = await mkdtemp(path.join(os.tmpdir(), "opl-host-test-dsh-"));
@@ -548,6 +548,61 @@ test("Framework registrar loads only the carrier public Cordis export and return
   assert.deepEqual(calls, [
     { operation: "attach", callback },
     { operation: "dispose" }
+  ]);
+});
+
+test("Studio owns Weixin only after Framework can exclude the old provider", async () => {
+  const packageId = "opl-channel-weixin";
+  const spareId = "another-channel";
+  const callback = Object.freeze({});
+  const events = [];
+  const makeHost = (owner, ids) => ({
+    appStatePatch: () => ({
+      ui_contributions: { entries: ids.map(package_id => ({ package_id })) },
+      transport_bindings: { status: "available", bindings: ids.map(provider_id => ({ binding_id: provider_id, provider_id })) }
+    }),
+    readChannelAccess: async request => ({ owner, ref: request.ref }),
+    executeChannelAccessAction: async request => ({ owner, ref: request.ref }),
+    dispose: async () => { events.push(`stop ${owner}`); }
+  });
+  const studioWeixin = {
+    async connect(adapter) {
+      assert.equal(adapter, callback);
+      events.push("start native");
+      return makeHost("native", [packageId]);
+    }
+  };
+  const register = (supportsExclusion) => createFrameworkChannelCallbackRegistrar({
+    loadProfiles: async () => ({
+      CHANNEL_PROVIDER_EXCLUSION_ABI: supportsExclusion ? 1 : undefined,
+      async startCordisChannelProviderHost({ callback: adapter, excludedProviderIds = [] }) {
+        assert.equal(adapter, callback);
+        events.push(`start framework ${excludedProviderIds.join(",")}`.trim());
+        return makeHost("framework", [packageId, spareId].filter(id => !excludedProviderIds.includes(id)));
+      }
+    })
+  });
+
+  const oldCarrier = await register(false)(callback, studioWeixin);
+  assert.equal(oldCarrier.replacedPackageIds, undefined);
+  assert.equal((await oldCarrier.readChannelAccess({ package_id: packageId, ref: "state" })).owner, "framework");
+  await oldCarrier.dispose();
+
+  const newCarrier = await register(true)(callback, studioWeixin);
+  assert.deepEqual(newCarrier.replacedPackageIds, [packageId]);
+  assert.deepEqual(newCarrier.appStatePatch().ui_contributions.entries.map(entry => entry.package_id), [spareId, packageId]);
+  assert.deepEqual(newCarrier.appStatePatch().transport_bindings.bindings.map(entry => entry.provider_id), [spareId, packageId]);
+  assert.equal((await newCarrier.readChannelAccess({ package_id: packageId, ref: "state" })).owner, "native");
+  assert.equal((await newCarrier.executeChannelAccessAction({ package_id: spareId, ref: "connect" })).owner, "framework");
+  await newCarrier.dispose();
+
+  const disabled = await register(true)(callback, null);
+  assert.deepEqual(disabled.appStatePatch().ui_contributions.entries.map(entry => entry.package_id), [spareId]);
+  await disabled.dispose();
+  assert.deepEqual(events, [
+    "start framework", "stop framework",
+    `start framework ${packageId}`, "start native", "stop framework", "stop native",
+    `start framework ${packageId}`, "stop framework"
   ]);
 });
 

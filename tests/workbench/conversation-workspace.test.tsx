@@ -11,7 +11,7 @@ import {
   StudioContext,
   useStudioDirectoryFlow,
   type StudioContextValue
-} from "../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx";
+} from "../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx";
 
 const readSource = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const sourceSection = (source: string, start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
@@ -37,7 +37,7 @@ test("native directory picking is a direct pinned cohort dependency", () => {
 
 test("native directory picking uses the package public source entrypoint", () => {
   // Given the static composition importing the official flow.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
+  const navigation = readSource("plugins/core/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   const picker = JSON.parse(readFileSync(
     new URL("../../node_modules/@deepseek-ai/dsh-client-ui-directory-picker-native/package.json", import.meta.url),
     "utf8"
@@ -52,7 +52,7 @@ test("native directory picking uses the package public source entrypoint", () =>
 
 test("sidebar Workspace composition preserves the official renderSlot seam and hook order", () => {
   // Given the Studio sidebar and picker adapters.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
+  const navigation = readSource("plugins/core/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
   const sidebar = sourceSection(navigation, "export function SidebarWorkspacesSlot", "function RecentSessionsSection");
 
   // When the composed component is inspected.
@@ -64,8 +64,8 @@ test("sidebar Workspace composition preserves the official renderSlot seam and h
 
 test("blank hero and sidebar compose official directory-flow occupants", () => {
   // Given the current static DSH composition.
-  const navigation = readSource("plugins/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
-  const host = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx");
+  const navigation = readSource("plugins/core/opl-studio-client/src/client/composition/slotHost/navigationSlots.tsx");
+  const host = readSource("plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx");
 
   // When the two picker surfaces are inspected.
   // Then both reuse official components and expose their native-flow holes.
@@ -78,7 +78,7 @@ test("blank hero and sidebar compose official directory-flow occupants", () => {
 
 test("adding directoryFlow must not remove official session-row child slots", () => {
   // Given the Studio sidebar.workspaces registration.
-  const host = readSource("plugins/opl-studio-client/src/client/composition/dshSlotHost.tsx");
+  const host = readSource("plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx");
   const registration = sourceSection(host, 'register({ name: "sidebar.workspaces"', 'register({ name: "sidebar.settings"');
 
   // When its declared children are inspected.
@@ -92,7 +92,7 @@ test("adding directoryFlow must not remove official session-row child slots", ()
 
 test("new/open navigation resets pending state and first send owns the cwd override", () => {
   // Given the App navigation and submission implementations.
-  const app = readSource("plugins/opl-studio-client/src/client/workbench/App.tsx");
+  const app = readSource("plugins/core/opl-studio-client/src/client/workbench/App.tsx");
   const open = sourceSection(app, "async function openThread(", "async function openCanonicalThreadRef(");
   const fresh = sourceSection(app, "function startNewChat()", "function threadById(");
   const send = sourceSection(app, "function sendCodexMessage(", "function startNewChat()");

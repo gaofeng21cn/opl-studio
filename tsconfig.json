@@ -73,13 +73,13 @@
         "./vendor/deepseek-harness/packages/util/official-bundles/src/index.ts"
       ],
       "@deepseek-ai/dsh-client-ui-conversation/client": [
-        "./plugins/opl-studio-client/src/client/integrations/deepseek-harness/emptyModule.ts"
+        "./plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/emptyModule.ts"
       ],
       "@deepseek-ai/dsh-client-ui-sidebar/client": [
-        "./plugins/opl-studio-client/src/client/integrations/deepseek-harness/emptyModule.ts"
+        "./plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/emptyModule.ts"
       ],
       "@deepseek-ai/dsh-client-runtime/client": [
-        "./plugins/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts"
+        "./plugins/core/opl-studio-client/src/client/integrations/deepseek-harness/runtimeShim.ts"
       ],
       "@opl-vendor/dsh-files-body": [
         "./vendor/deepseek-harness/packages/client/ui-sidebar-files/src/client/FilesBody.tsx"
@@ -110,8 +110,8 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    "plugins/*/src/client/**/*.ts",
-    "plugins/*/src/client/**/*.tsx"
+    "plugins/*/*/src/client/**/*.ts",
+    "plugins/*/*/src/client/**/*.tsx"
   ],
   "exclude": [
     "node_modules",

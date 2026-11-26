@@ -7,14 +7,14 @@ import { Window } from "happy-dom";
 import { Context } from "@deepseek-ai/cordis";
 import { OPL_STUDIO_SHELL_SERVICE } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
-import { createStudioShellStore } from "../../plugins/opl-studio-client/src/client/composition/studioShellStore";
-import { createMaterialsSpaceService } from "../../plugins/opl-materials-space/src/materials-service.mjs";
-import { materialsSpaceClientPlugin } from "../../plugins/opl-materials-space/src/client/plugin";
+import { createStudioShellStore } from "../../plugins/core/opl-studio-client/src/client/composition/studioShellStore";
+import { createMaterialsSpaceService } from "../../plugins/extensions/opl-materials-space/src/materials-service.mjs";
+import { materialsSpaceClientPlugin } from "../../plugins/extensions/opl-materials-space/src/client/plugin";
 import {
   MaterialsSpacePanel,
   MaterialsSpaceSlotPanel,
   type MaterialsSpaceBridge
-} from "../../plugins/opl-materials-space/src/client/MaterialsSpacePanel";
+} from "../../plugins/extensions/opl-materials-space/src/client/MaterialsSpacePanel";
 import type { MaterialSpaceCatalog } from "@gaofeng21cn/opl-host-contracts";
 
 let createRoot: typeof import("react-dom/client").createRoot;

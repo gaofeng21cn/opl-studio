@@ -22,7 +22,7 @@
     ],
     "headless_host": "node_http_sse",
     "docker_host": "node_http_sse",
-    "shared_host_core": "plugins/opl-host-core/src/service.mjs",
+    "shared_host_core": "plugins/core/opl-host-core/src/service.mjs",
     "workspace_product_name": "One Person Lab",
     "shared_renderer_and_bridge_shape_required": true,
     "runtime_backend_scope": "codex_cli_only",
@@ -56,6 +56,7 @@
     "studio_plugins": [
       "opl-dsh-tool-mcp",
       "opl-codex-native",
+      "opl-channel-weixin",
       "opl-framework-bridge",
       "opl-host-core",
       "opl-web-routes",

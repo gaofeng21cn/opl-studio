@@ -18,11 +18,11 @@ Object.assign(globalThis, {
   }
 });
 
-const presentation = await import("../../plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx");
-const workbenchServices = await import("../../plugins/opl-studio-client/src/client/workbench/plugins/WorkbenchServicesPanel.tsx");
-const { mergeBackgroundTaskIssue, startupCheckPresentation } = await import("../../plugins/opl-studio-client/src/client/workbench/startupCheckPresentation.ts");
-const { normalizeInitializeReadback } = await import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts");
-const settingsSource = readFileSync(new URL("../../plugins/opl-studio-client/src/client/workbench/SettingsPanel.tsx", import.meta.url), "utf8") + readdirSync(new URL("../../plugins/opl-studio-client/src/client/workbench/settings/", import.meta.url), { recursive: true }).filter(file => String(file).endsWith(".tsx")).map(file => readFileSync(new URL(`../../plugins/opl-studio-client/src/client/workbench/settings/${file}`, import.meta.url), "utf8")).join("\n");
+const presentation = await import("../../plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx");
+const workbenchServices = await import("../../plugins/core/opl-studio-client/src/client/workbench/plugins/WorkbenchServicesPanel.tsx");
+const { mergeBackgroundTaskIssue, startupCheckPresentation } = await import("../../plugins/core/opl-studio-client/src/client/workbench/startupCheckPresentation.ts");
+const { normalizeInitializeReadback } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
+const settingsSource = readFileSync(new URL("../../plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx", import.meta.url), "utf8") + readdirSync(new URL("../../plugins/core/opl-studio-client/src/client/workbench/settings/", import.meta.url), { recursive: true }).filter(file => String(file).endsWith(".tsx")).map(file => readFileSync(new URL(`../../plugins/core/opl-studio-client/src/client/workbench/settings/${file}`, import.meta.url), "utf8")).join("\n");
 
 test("missing startup data never becomes false readiness or fabricated 0/0 counts", () => {
   const input = normalizeInitializeReadback({ readback: { exitCode: 0 } });
@@ -344,7 +344,7 @@ test("agent catalog follows declared product type and preserves legacy standard-
 });
 
 test("package catalog defaults to unified all-software scope and keeps manifest import in other sources", () => {
-  const ownerSource = readFileSync(new URL("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx", import.meta.url), "utf8");
+  const ownerSource = readFileSync(new URL("../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx", import.meta.url), "utf8");
   assert.match(ownerSource, /useState<SoftwareCatalogScope>\("all"\)/);
   assert.match(ownerSource, /PluginManagerOwnerPage/);
   assert.match(ownerSource, /manifest_url: manifestUrl\.trim\(\), trust_tier: trustTier/);
@@ -503,7 +503,7 @@ test("maintenance permission is not inferred from publisher, installer, or tempo
   }
 });
 
-const { gatewayAccountErrorMessage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/gatewayAccountMessages.ts");
+const { gatewayAccountErrorMessage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/gatewayAccountMessages.ts");
 
 const CANONICAL_GATEWAY_ERROR_CODES = [
   "invalid_credentials",
@@ -566,8 +566,8 @@ test("an unknown gateway error code falls back to a localized sentence, never ra
 test("unified catalog includes private capability packages and defers package status reads", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "private-phone", catalog_scope: "software", catalog_origin: "opl", package_role: "capability_package", display_name: "Private Phone", publisher: "Local owner", installed: true, activated: true, app_enabled: false, selected_version: "2.7" },
     { package_id: "future-app", catalog_scope: "software", catalog_origin: "opl", package_role: "future_extension", display_name: "Future App", installed: true, app_enabled: true }
@@ -586,8 +586,8 @@ test("unified catalog includes private capability packages and defers package st
 test("unified catalog shows private source access and hides gated install", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "private-agent", catalog_scope: "software", catalog_origin: "opl", package_role: "standard_agent", display_name: "Private Agent", publisher: "OPL", installed: false,
       package_access: { visibility: "authorized_only", status: "signed_out", provider_id: "github", discover_allowed: true, download_allowed: false, reason: "github_source_account_required" },
@@ -595,7 +595,7 @@ test("unified catalog shows private source access and hides gated install", asyn
   ] } } } });
   const html = renderToStaticMarkup(createElement(presentation.PackageCatalog, { kind: "all", model, settings: { ...settingsDefaults, locale: "zh" }, actionBusyKey: null, onAction() {} }));
   assert.match(html, /Private Agent/);
-  assert.match(html, /私有/);
+  assert.match(html, /需授权安装/);
   assert.match(html, /data-plugin-owner-package="private-agent"/);
   assert.doesNotMatch(html, />安装<\/button>/);
 });
@@ -603,7 +603,7 @@ test("unified catalog shows private source access and hides gated install", asyn
 test("software source management keeps private credentials refs-only", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const { SoftwareSourcesPage } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
+  const { SoftwareSourcesPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
   const projection = {
     status: "attention_required",
     entries: [{
@@ -624,10 +624,10 @@ test("native software shares the application catalog and dispatches revision-bou
   const { createRoot } = await import("react-dom/client");
   const { flushSync } = await import("react-dom");
   const { Window } = await import("happy-dom");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { NativeSoftwareList } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
-  const { nativeSoftwareEntries } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { NativeSoftwareList } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
+  const { nativeSoftwareEntries } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
       source_id: "homebrew", display_name: "OPL Homebrew", source_kind: "tap", status: "public", inventory_status: "available", entry_count: 1, native_items: [{
@@ -706,7 +706,7 @@ async function withSettingsTestDom(run: (surface: { container: HTMLElement; rend
 test("settings delegates software and update management to one software center", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { SoftwareCenterSettingsLink } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/SoftwareCenterSettingsLink.tsx");
+  const { SoftwareCenterSettingsLink } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/SoftwareCenterSettingsLink.tsx");
   const opened: string[] = [];
   await withSettingsTestDom(({ container, render }) => {
     for (const section of ["applications", "updates"] as const) {
@@ -721,7 +721,7 @@ test("settings delegates software and update management to one software center",
 });
 
 test("runtime catalog versions stay concise while mixed SDK versions remain explicit", async () => {
-  const { managedDependencyVersionSummary } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
+  const { managedDependencyVersionSummary } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
   assert.equal(managedDependencyVersionSummary("ffmpeg version 9.0.2 Copyright 2000-2026\nffprobe version 9.0.2"), "9.0.2");
   assert.equal(managedDependencyVersionSummary({ client: "1.25.0", worker: "1.25.0" }), "1.25.0");
   assert.equal(managedDependencyVersionSummary({ client: "1.25.0", worker: "1.26.0" }), "client 1.25.0, worker 1.26.0");
@@ -731,9 +731,9 @@ test("runtime catalog versions stay concise while mixed SDK versions remain expl
 test("runtime dependencies stay outside software counts and preserve owner maintenance routing", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState, readManagedUpdateProjection } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const { deriveWorkbenchModelFromState, readManagedUpdateProjection } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
   const tabs: string[] = [];
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
   const managedUpdate = readManagedUpdateProjection({ managed_update: { components: [{ component_id: "opl_base", label: "OPL Base", current: {
@@ -754,9 +754,9 @@ test("runtime dependencies stay outside software counts and preserve owner maint
 
 test("official package restore is exposed through an explicit confirmation action", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { SettingsActionDialog } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/SettingsActionDialog.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { SettingsActionDialog } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/SettingsActionDialog.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: {
     agent_packages: { surface_kind: "opl_app_agent_packages_projection", directory: { entries: [], status: "ready" }, sources: { surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [] } },
     actions: [{ action_id: "official_profile_restore", label: "Restore official combination", payload_fields: ["intent"], mutates: "opl_packages", dry_run_supported: true, confirmation_required: true }]
@@ -795,8 +795,8 @@ test("official package restore is exposed through an explicit confirmation actio
 
 test("official catalog keeps an unknown native installation state as unconfirmed", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
     surface_kind: "opl_app_agent_packages_projection",
     directory: { entries: [] },
@@ -820,9 +820,9 @@ test("official catalog keeps an unknown native installation state as unconfirmed
 
 test("application updates tab lists native software with an available update", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: {
     surface_kind: "opl_app_agent_packages_projection",
     directory: { entries: [] },
@@ -858,10 +858,10 @@ test("application updates tab lists native software with an available update", a
 
 test("managed Framework updates keep the exact installation owner across catalog and updates", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
-  const { OplSoftwareUpdates } = await import("../../plugins/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const { OplSoftwareUpdates } = await import("../../plugins/core/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
   const productId = "github:gaofeng21cn/one-person-lab";
   const payload = { package_id: "opl-framework", installation_id: "framework-runtime", expected_revision: "install-r1", operation: "update", version: "0.3.13" };
   const installation = {
@@ -883,9 +883,9 @@ test("managed Framework updates keep the exact installation owner across catalog
     }]
   } } } };
   const model = deriveWorkbenchModelFromState(state);
-  const actions: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsActionRequest[] = [];
-  const hostActions: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent[] = [];
-  const hostCheck: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+  const actions: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsActionRequest[] = [];
+  const hostActions: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent[] = [];
+  const hostCheck: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
     transport: "managed_update_host", key: "runtime-check", label: "检查运行组件", operation: "check",
     componentIds: ["opl_base"], confirmationRequired: false, availability: "ready", sourceRef: "owner:runtime"
   };
@@ -949,14 +949,14 @@ test("managed Framework updates keep the exact installation owner across catalog
 
 test("preview host identity never falls back to an installed App version", async () => {
   const { createElement } = await import("react");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { AboutSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/AboutSettingsPage.tsx");
-  const { ManagedUpdateGroup } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
-  const component: import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts").ManagedUpdateComponentRef = {
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { AboutSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/AboutSettingsPage.tsx");
+  const { ManagedUpdateGroup } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
+  const component: import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts").ManagedUpdateComponentRef = {
     componentId: "opl_app", lifecycleOwner: "opl_app", label: "OPL App", state: "current",
     installedVersion: "26.11.10", autoApplyEligible: null, backgroundSafe: null
   };
-  const preview: import("../../plugins/opl-studio-client/src/client/bridge/oplBridge.ts").NativeAppUpdateResult = {
+  const preview: import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts").NativeAppUpdateResult = {
     schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron",
     operation: "status", supported: false, state: "unsupported", reasonCode: "desktop_updater_requires_packaged_app"
   };
@@ -982,8 +982,8 @@ test("preview host identity never falls back to an installed App version", async
 test("catalog defaults to unified all-software view and separates host components without inventing maturity", async () => {
   const { flushSync } = await import("react-dom");
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "kindle-pilot", display_name: "Kindle Pilot", catalog_scope: "software", catalog_origin: "opl", package_role: "capability_package", release_channel: "preview", distribution_channel: "source", installed: true, installed_version: "1.2.0", selected_version: "1.1.0", description: "Manage a reading device." },
     { package_id: "host-browser", display_name: "Host Browser", catalog_scope: "host_component", installed: true },
@@ -1016,15 +1016,15 @@ test("catalog defaults to unified all-software view and separates host component
 
 test("nonstandard agents use declared type and local installations never masquerade as host plugins", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const installation = { installation_id: "owner:rednote", kind: "owner_managed", version: "0.2.3", mode: "installed", manager: "package_owner", management_scope: "owner_only", location_ref: "local-data:rednote/app/current", evidence_ref: "owner:status", entrypoint_verified: true };
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "persona", display_name: "Persona", catalog_scope: "software", catalog_origin: "opl", software_type: "agent", package_role: "capability_package", installed: true, installed_version: "1" },
     { package_id: "rednote", display_name: "RedNote", catalog_scope: "software", catalog_origin: "opl", software_type: "application", package_role: "capability_package", installed: false, selected_version: "0.2.3", local_installations: [installation] },
     { package_id: "vault", display_name: "Vault", catalog_scope: "software", catalog_origin: "opl", software_type: "application", package_role: "capability_package", installed: false, selected_version: "0.1.0", local_installations: [{ ...installation, installation_id: "uv:vault", kind: "uv_tool", version: "0.1.0", mode: "development", manager: "uv" }] }
   ] } } } });
-  const { packageInstalledLocally, packageDevelopmentLinked } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/packages.tsx");
+  const { packageInstalledLocally, packageDevelopmentLinked } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/packages.tsx");
   assert.equal(packageInstalledLocally(model.packageLifecycle[1]), true);
   assert.equal(packageInstalledLocally(model.packageLifecycle[2]), false);
   assert.equal(packageDevelopmentLinked(model.packageLifecycle[2]), true);
@@ -1047,8 +1047,8 @@ test("nonstandard agents use declared type and local installations never masquer
 test("unified catalog shows all software origins while OPL filter and other sources keep independent Skills separated", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "our-app", display_name: "Our App", catalog_origin: "opl", catalog_scope: "software", software_type: "application", installed: true, installed_version: "2.0", selected_version: "1.0" },
     { package_id: "pdf@openai", display_name: "PDF", catalog_origin: "external", catalog_scope: "software", catalog_source: { manager: "codex_plugin_manager", marketplace_id: "openai", delivery: "host_bundled" }, installed: true, installed_version: "1.2" },
@@ -1072,7 +1072,7 @@ test("unified catalog shows all software origins while OPL filter and other sour
     const external = container.querySelector<HTMLButtonElement>('#opl-catalog-scope-external')!;
     flushSync(() => external.click());
     assert.match(container.textContent ?? "", /PDF/);
-    assert.match(container.textContent ?? "", /Codex 插件/);
+    assert.equal(container.querySelector('[data-plugin-owner-package="pdf@openai"] [data-label="类型"]')?.textContent, "效率扩展");
     assert.match(container.textContent ?? "", /Independent skill|独立 Skills/);
     assert.match(container.textContent ?? "", /Unconfirmed publisher/);
     assert.doesNotMatch(container.textContent ?? "", /Our App|Packaged skill/);
@@ -1081,9 +1081,9 @@ test("unified catalog shows all software origins while OPL filter and other sour
 });
 
 test("catalog state counts development as installed and prioritizes blocked access over a known update", async () => {
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { packageCatalogState, softwareCatalogInventory, catalogInstalledVersion, nativeCatalogAvailableVersion } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareCatalog.ts");
-  const { nativeSoftwareProducts } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { packageCatalogState, softwareCatalogInventory, catalogInstalledVersion, nativeCatalogAvailableVersion } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog.ts");
+  const { nativeSoftwareProducts } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [
     { package_id: "dev", catalog_origin: "opl", catalog_scope: "software", installed: false, local_installations: [{ installation_id: "uv:dev", kind: "uv_tool", mode: "development", version: "1.0", manager: "uv", management_scope: "owner_only", location_ref: "tool:dev", evidence_ref: "uv:dev", entrypoint_verified: true }] },
     { package_id: "private", catalog_origin: "opl", catalog_scope: "software", installed: true, installed_version: "1.0", package_currentness: { status: "update_available" }, package_access: { visibility: "authorized_only", status: "revoked", discover_allowed: false, download_allowed: false } },
@@ -1104,10 +1104,10 @@ test("catalog state counts development as installed and prioritizes blocked acce
 
 test("native catalog shows owner display versions and identifies development builds separately from channel receipts", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { NativeSoftwareList } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
-  const { nativeSoftwareEntries } = await import("../../plugins/opl-studio-client/src/client/workbench/softwareSources.ts");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { NativeSoftwareList } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareSourcesPage.tsx");
+  const { nativeSoftwareEntries } = await import("../../plugins/core/opl-studio-client/src/client/workbench/softwareSources.ts");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] }, sources: {
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [{
       source_id: "tap", display_name: "OPL Homebrew", source_kind: "tap", inventory_status: "available", native_items: [{
@@ -1151,9 +1151,9 @@ test("native catalog shows owner display versions and identifies development bui
 test("source access attention opens sources and does not repair an installation", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { OplSoftwareUpdates } = await import("../../plugins/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { OplSoftwareUpdates } = await import("../../plugins/core/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
   const actions: unknown[] = [], tabs: string[] = [];
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [{
     package_id: "private", display_name: "Private Agent", catalog_origin: "opl", catalog_scope: "software", installed: true, installed_version: "1.0",
@@ -1179,7 +1179,7 @@ test("source access attention opens sources and does not repair an installation"
 test("installation details show exact paths and dispatch only the selected instance's owner action", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { SoftwareInstallations } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
+  const { SoftwareInstallations } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
   const calls: unknown[] = [];
   const action = { actionId: "software_installation_manage", label: "Activate", status: "available", payload: { package_id: "example", installation_id: "dev", expected_revision: "r2", operation: "activate" }, payloadFields: ["package_id", "installation_id", "expected_revision", "operation"], confirmationRequired: true, dryRunSupported: true, followUpActionIds: [] };
   const installations = [
@@ -1206,7 +1206,7 @@ test("installation details show exact paths and dispatch only the selected insta
 test("first installation dispatches the owner version and revision without inventing an installation id", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { SoftwareInstallations } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
+  const { SoftwareInstallations } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
   const calls: unknown[] = [];
   const action = { actionId: "software_installation_execute", label: "Install", status: "available", payload: { package_id: "example", expected_revision: "catalog-r2", operation: "install", version: "1.1" }, payloadFields: ["package_id", "expected_revision", "operation", "version"], confirmationRequired: true, dryRunSupported: true, followUpActionIds: [] };
   await withSettingsTestDom(({ container, render }) => {
@@ -1225,9 +1225,9 @@ test("first installation dispatches the owner version and revision without inven
 test("offline media profile survives the Host bridge and dispatches from the existing product", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { compactPackageRows } = await import("../../plugins/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { SoftwareInstallations } = await import("../../plugins/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
+  const { compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { SoftwareInstallations } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
   const payload = { package_id: "fixture-media", expected_revision: "catalog-r3", operation: "install", version: "1.2.3", profile: "offline" };
   const entries = compactPackageRows([{
     package_id: "fixture-media", catalog_origin: "opl", catalog_scope: "software", installed: true,
@@ -1252,9 +1252,9 @@ test("offline media profile survives the Host bridge and dispatches from the exi
 test("a missing Weixin component distinguishes a directory version from a verified install action", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
   const packageId = "opl-channel-weixin";
   const request = { action_id: "agent_package_install", action_ref: "app_state.actions#agent_package_install", semantic: "install",
     payload: { package_id: packageId }, required_payload_fields: ["package_id"], confirmation_required: true };
@@ -1295,9 +1295,9 @@ test("a missing Weixin component distinguishes a directory version from a verifi
 test("installed configurable plugin offers direct configure action from the software list and interactive summary filters work", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
   const opened: Array<{ destination: string; focus?: unknown }> = [];
   const model = deriveWorkbenchModelFromState({ app_state: {
     ui_contributions: {
@@ -1366,9 +1366,9 @@ test("installed configurable plugin offers direct configure action from the soft
 
 test("updates tab surfaces actionable desktop app updates and collapses up-to-date extension components", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
   await withSettingsTestDom(async ({ container, render }) => {
     const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
@@ -1401,8 +1401,8 @@ test("updates tab surfaces actionable desktop app updates and collapses up-to-da
 });
 
 test("nativeAppUpdateFeedback and formatStatus translate updater outcomes without false success", async () => {
-  const { nativeAppUpdateFeedback } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
-  const { formatStatus } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/presentation.tsx");
+  const { nativeAppUpdateFeedback } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/maintenance.tsx");
+  const { formatStatus } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/presentation.tsx");
   const base = { schema: "opl_native_app_updater.v1", owner: "one-person-lab-app_desktop_host", host: "electron" } as const;
 
   const failed = nativeAppUpdateFeedback({ ...base, operation: "check", supported: true, state: "error", message: "Network unreachable" }, "check", "zh");
@@ -1439,8 +1439,8 @@ test("nativeAppUpdateFeedback and formatStatus translate updater outcomes withou
 test("OplSoftwareUpdates manages external packages, Billion Context restarts, and DSH plugin retries uniformly", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { OplSoftwareUpdates } = await import("../../plugins/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { OplSoftwareUpdates } = await import("../../plugins/core/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: {
     actions: [{ action_id: "agent_package_update", label: "Update package", dry_run_supported: true, confirmation_required: true }],
     agent_packages: { directory: { entries: [{
@@ -1504,8 +1504,8 @@ test("OplSoftwareUpdates manages external packages, Billion Context restarts, an
 test("AboutSettingsPage navigates to Software Center Updates and isolates raw maintenance codes", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { AboutSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/AboutSettingsPage.tsx");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { AboutSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/AboutSettingsPage.tsx");
   const opened: Array<string | undefined> = [];
   await withSettingsTestDom(({ container, render }) => {
     render(createElement(AboutSettingsPage, {
@@ -1532,11 +1532,11 @@ test("AboutSettingsPage navigates to Software Center Updates and isolates raw ma
 test("UpdatesSettingsPage exposes Check all updates button and shows desktop update error details", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { UpdatesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { UpdatesSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
-  const hostCheck: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+  const hostCheck: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
     transport: "native_app_updater", key: "app-check", label: "检查桌面更新", operation: "check",
     componentIds: ["opl_app"], confirmationRequired: false, availability: "ready", sourceRef: "desktop:updater"
   };
@@ -1562,9 +1562,9 @@ test("UpdatesSettingsPage exposes Check all updates button and shows desktop upd
 test("DshPluginManagerOwner unified all-software scope displays Billion Context with direct install action", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
   const ops: string[] = [];
   await withSettingsTestDom(async ({ container, render }) => {
@@ -1604,8 +1604,8 @@ test("DshPluginManagerOwner unified all-software scope displays Billion Context 
 
 test("OplSoftwareUpdates surfaces quarantined DSH profile boot recovery notice without collapsing", async () => {
   const { createElement } = await import("react");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { OplSoftwareUpdates } = await import("../../plugins/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { OplSoftwareUpdates } = await import("../../plugins/core/opl-studio-client/src/client/workbench/OplSoftwareUpdates.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
   await withSettingsTestDom(async ({ container, render }) => {
     const previousBridge = (window as unknown as { oplStudio?: unknown }).oplStudio;
@@ -1640,11 +1640,11 @@ test("OplSoftwareUpdates surfaces quarantined DSH profile boot recovery notice w
 test("UpdatesSettingsPage Update All orchestrates DSH plugins, desktop updates, and package updates", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { UpdatesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { UpdatesSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [] } } } });
-  const appApply: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+  const appApply: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
     transport: "native_app_updater", key: "app-apply", label: "下载桌面更新", operation: "apply",
     componentIds: ["opl_app"], confirmationRequired: false, availability: "ready", sourceRef: "desktop:updater"
   };
@@ -1690,8 +1690,8 @@ test("UpdatesSettingsPage Update All orchestrates DSH plugins, desktop updates, 
 test("ShellOverlaySlot shows global lightweight restart pill outside Software Center and hides inside it", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
-  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
+  const { ShellOverlaySlot } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
   let restarted = 0;
   await withSettingsTestDom(({ container, render }) => {
     const baseSurface = {
@@ -1714,9 +1714,9 @@ test("ShellOverlaySlot shows global lightweight restart pill outside Software Ce
 test("Software Center generic DSH catalog renders optional plugins, staged single-restart Billion Context, core runtime under components, and unified activity tab", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { ApplicationManagementPage } = await import("../../plugins/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { ApplicationManagementPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/ApplicationManagementPage.tsx");
   const model = deriveWorkbenchModelFromState({
     app_state: {
       agent_packages: {
@@ -1873,8 +1873,8 @@ test("Software Center generic DSH catalog renders optional plugins, staged singl
 test("ShellOverlaySlot shows global reload pill for renderer_reload updates outside Software Center", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { ShellOverlaySlot } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
-  const { StudioContext } = await import("../../plugins/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
+  const { ShellOverlaySlot } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
   let reloaded = 0;
   await withSettingsTestDom(({ container, render }) => {
     const baseSurface = {
@@ -1897,9 +1897,9 @@ test("ShellOverlaySlot shows global reload pill for renderer_reload updates outs
 test("UpdatesSettingsPage Update All handles opl_base, renderer_reload, external DSH plugins, and batch package queue without duplicate DSH bulk button", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { UpdatesSettingsPage } = await import("../../plugins/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { UpdatesSettingsPage } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settings/pages/UpdatesSettingsPage.tsx");
   const makePkg = (id: string) => ({
     package_id: id, display_name: id, catalog_origin: "opl", catalog_scope: "software",
     installed: true, installed_version: "1.0.0", selected_version: "1.1.0",
@@ -1910,7 +1910,7 @@ test("UpdatesSettingsPage Update All handles opl_base, renderer_reload, external
     actions: [{ action_id: "agent_package_update", label: "Update package", dry_run_supported: true, confirmation_required: true }],
     agent_packages: { directory: { entries: [makePkg("pkg-a"), makePkg("pkg-b")] } }
   } });
-  const baseApply: import("../../plugins/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
+  const baseApply: import("../../plugins/core/opl-studio-client/src/client/workbench/settingsActions.ts").SettingsHostActionIntent = {
     transport: "managed_update_host", key: "base-apply", label: "应用基础服务更新", operation: "apply",
     componentIds: ["opl_base"], confirmationRequired: false, availability: "ready", sourceRef: "host:base"
   };
@@ -2007,9 +2007,9 @@ test("UpdatesSettingsPage Update All handles opl_base, renderer_reload, external
 test("DshPluginManagerOwner unifies external scope without jargon groups and opens npm install modal", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { deriveWorkbenchModelFromState } = await import("../../plugins/opl-studio-client/src/client/workbench/workbenchModel.ts");
-  const { settingsDefaults } = await import("../../plugins/opl-studio-client/src/client/workbench/settingsModel.ts");
-  const { DshPluginManagerOwner } = await import("../../plugins/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
+  const { DshPluginManagerOwner } = await import("../../plugins/core/opl-studio-client/src/client/composition/dshPluginManagerOwner.tsx");
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [{
     package_id: "codex-plugin-a", display_name: "Codex Tool", catalog_origin: "external", catalog_scope: "software",
     catalog_source: { manager: "codex_plugin_manager" }, installed: true, installed_version: "1.0.0"

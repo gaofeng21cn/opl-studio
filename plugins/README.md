@@ -1,7 +1,9 @@
 # DSH 插件开发入口
 
 OPL 自有 DSH 插件统一放在这里，每个目录都是标准 npm/DSH 插件包。官方和社区包
-从固定 npm 依赖取得；需要适配时在这里建立自己的包并保留上游来源与许可证。
+从固定 npm 依赖取得，需要适配时在这里建立自己的包并保留上游来源与许可证。
+`core/` 承载运行底座，`extensions/` 承载效率扩展及其引擎，`channels/` 承载内置连接通道。
+构建、发布与组合校验从三组目录发现标准 `package.json`，profile 按稳定的 npm 名称加载。
 
 官方实现优先于 OPL 自研。新增、扩展或升级插件前先检查官方同类实现；官方能够覆盖
 现有行为时，在同一改动中切换真实调用者、验证并删除旧实现。需要 OPL 数据或权限
@@ -58,8 +60,10 @@ npm 发布。兼容 Host/Client 包（包括 `opl-studio-client`）可通过原�
 会在新包就位后移除对应的旧 `@one-person-lab` profile override，并更新其 patch 包名，
 保留无关配置；只读检查和主 profile 的普通启动不自动迁移。
 
-本目录不放 Codex 插件市场的领域能力包；微信等由 Framework 托管的能力通过
-`opl-framework-bridge` 接入。它们有自己的 ABI，不是 DSH 插件。
+`channels/opl-channel-weixin` 负责微信 iLink 登录和收发，通过 Studio 的 Codex 回调沿用会话绑定。
+登录凭证和验证码挑战保存在当前进程，重启后重新扫码。兼容切换依赖 Framework 在加载前排除旧微信 provider。
+由外部软件源分发的生态软件在 `opl-catalog` 维护目录投影，通过 `opl-framework-bridge`
+聚合到同一个软件中心。
 
 ## MCP Apps
 

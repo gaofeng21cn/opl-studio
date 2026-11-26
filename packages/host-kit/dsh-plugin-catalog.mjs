@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { withFileLock } from "@deepseek-ai/dsh-atomic-write";
+import { listDshSourcePackages } from "./src/dsh-source-packages.mjs";
 
 const PREFERENCES_FILE = "opl-plugin-preferences.json";
 const ACTIVITY_FILE = "opl-plugin-activity.json";
@@ -20,7 +21,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-team-bots",
     tier: "optional_product",
     origin: "opl",
-    intentCategory: "efficiency",
+    intentCategory: "extension",
     canToggle: true,
     canInstall: false,
     canUninstall: false,
@@ -40,7 +41,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-superagent",
     tier: "optional_product",
     origin: "opl",
-    intentCategory: "agent",
+    intentCategory: "extension",
     canToggle: true,
     canInstall: false,
     canUninstall: false,
@@ -58,13 +59,12 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
   {
     pluginId: "opl-mcp-apps",
     packageName: "@gaofeng21cn/opl-mcp-apps",
-    tier: "optional_product",
+    tier: "core_runtime",
     origin: "opl",
-    intentCategory: "application",
-    canToggle: true,
+    intentCategory: "dependency",
+    canToggle: false,
     canInstall: false,
     canUninstall: false,
-    settingsDestination: "resources",
     labelI18n: { zh: "MCP 应用宿主", en: "MCP App Host" },
     descriptionI18n: {
       zh: "在沙箱交互界面中运行已安装软件提供的领域应用与审阅看板。",
@@ -80,7 +80,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-materials-space",
     tier: "optional_product",
     origin: "opl",
-    intentCategory: "application",
+    intentCategory: "extension",
     canToggle: true,
     canInstall: false,
     canUninstall: false,
@@ -99,7 +99,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-runtime-status",
     tier: "optional_product",
     origin: "opl",
-    intentCategory: "efficiency",
+    intentCategory: "extension",
     canToggle: true,
     canInstall: false,
     canUninstall: false,
@@ -114,11 +114,31 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     }
   },
   {
+    pluginId: "opl-channel-weixin",
+    packageName: "@gaofeng21cn/opl-channel-weixin",
+    tier: "optional_product",
+    origin: "opl",
+    intentCategory: "channel",
+    canToggle: true,
+    canInstall: false,
+    canUninstall: false,
+    settingsDestination: "resources",
+    labelI18n: { zh: "微信远程", en: "Weixin Remote" },
+    descriptionI18n: {
+      zh: "通过微信连接当前 OPL App 会话。",
+      en: "Connect Weixin to the current OPL App conversation."
+    },
+    permissionsI18n: {
+      zh: ["经扫码授权后收发微信消息", "将微信会话绑定到当前设备的 Codex 线程"],
+      en: ["Send and receive Weixin messages after QR authorization", "Bind Weixin conversations to this device’s Codex threads"]
+    }
+  },
+  {
     pluginId: "billion-context",
     packageName: "billion-context",
     tier: "external_plugin",
     origin: "external",
-    intentCategory: "efficiency",
+    intentCategory: "extension",
     canToggle: true,
     canInstall: true,
     canUninstall: true,
@@ -139,7 +159,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-host-core",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -158,7 +178,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-codex-native",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -177,7 +197,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-framework-bridge",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -196,7 +216,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-studio-client",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -215,7 +235,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-dsh-tool-mcp",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -234,7 +254,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-web-routes",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -253,7 +273,7 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     packageName: "@gaofeng21cn/opl-codex-agents",
     tier: "core_runtime",
     origin: "opl",
-    intentCategory: "runtime",
+    intentCategory: "dependency",
     canToggle: false,
     canInstall: false,
     canUninstall: false,
@@ -469,8 +489,44 @@ export function reconcileUserExternalPluginsOnBoot(profileDir) {
   let changed = false;
   const next = { ...records };
   for (const [pkg, record] of Object.entries(records)) {
+    if (record.pendingOperation === "remove") {
+      // Best-effort synchronous cleanup if async pnpm remove did not run or failed.
+      const manifestPath = path.join(profileDir, "package.json");
+      const manifest = readJsonSafe(manifestPath);
+      if (manifest && typeof manifest === "object") {
+        let manifestChanged = false;
+        if (manifest.dependencies && Object.hasOwn(manifest.dependencies, pkg)) {
+          delete manifest.dependencies[pkg];
+          manifestChanged = true;
+        }
+        const bundles = manifest.dsh?.profile?.bundles;
+        if (Array.isArray(bundles) && bundles.includes(pkg)) {
+          manifest.dsh.profile.bundles = bundles.filter(name => name !== pkg);
+          manifestChanged = true;
+        }
+        if (manifestChanged) {
+          writeJsonAtomic(manifestPath, manifest);
+        }
+      }
+      const pkgDir = path.join(profileDir, "node_modules", ...pkg.split("/"));
+      if (fs.existsSync(pkgDir)) {
+        try {
+          fs.rmSync(pkgDir, { recursive: true, force: true });
+        } catch (error) {
+          console.warn("[OPL:dsh-plugin-reconcile]", JSON.stringify({
+            packageName: pkg,
+            operation: "remove_cleanup",
+            code: error?.code ?? null,
+            message: error instanceof Error ? error.message : String(error)
+          }));
+        }
+      }
+      delete next[pkg];
+      changed = true;
+      continue;
+    }
     const installedManifest = readInstalledExternalPackageManifest(profileDir, pkg);
-    if (record.pendingOperation === "remove" || !installedManifest) {
+    if (!installedManifest) {
       delete next[pkg];
       changed = true;
       continue;
@@ -548,7 +604,7 @@ function readInstalledBundledVersion(packageName, { dshProfileDir, dshInstallAnc
       // Try reading directly from plugins/ in workspace checkouts where exports omit package.json
       const rootDir = path.dirname(dshInstallAnchor);
       const shortName = packageName.replace(/^@gaofeng21cn\//, "");
-      const localManifest = readJsonSafe(path.join(rootDir, "plugins", shortName, "package.json"));
+      const localManifest = listDshSourcePackages(rootDir).find(entry => entry.id === shortName)?.manifest;
       if (localManifest?.version) return { version: localManifest.version, overridden: false };
     }
   }
@@ -564,6 +620,7 @@ export function buildDshPluginCatalog({
   dshInstallAnchor,
   disabledAtBoot = [],
   activeExternalPlugins = [],
+  nativeWeixin = false,
   externalEntries,
   billionContext,
   updateProjection
@@ -580,7 +637,9 @@ export function buildDshPluginCatalog({
   const externalMap = new Map(resolvedExternalEntries.map(entry => [entry.pluginId, entry]));
 
   let restartRequired = false;
-  const entries = DSH_PLUGIN_DESCRIPTORS.map(descriptor => {
+  const descriptors = nativeWeixin ? DSH_PLUGIN_DESCRIPTORS
+    : DSH_PLUGIN_DESCRIPTORS.filter(descriptor => descriptor.pluginId !== "opl-channel-weixin");
+  const entries = descriptors.map(descriptor => {
     const adapterEntry = externalMap.get(descriptor.pluginId);
     if (descriptor.tier === "external_plugin") {
       const state = adapterEntry ?? externalPluginEntryFromBillionContext(undefined);
@@ -599,6 +658,7 @@ export function buildDshPluginCatalog({
         pendingOperation: state.pendingOperation ?? null,
         pendingVersion: state.pendingVersion ?? null,
         requiresRestartOnMutate: state.requiresRestartOnMutate ?? Boolean(state.installed && (state.active || state.pendingOperation)),
+        canCancelPending: Boolean(state.pendingOperation),
         ...(state.sourceLabel ? { sourceLabel: state.sourceLabel } : {}),
         ...(state.checkErrorReason ? { checkErrorReason: state.checkErrorReason } : {})
       };
@@ -642,13 +702,14 @@ export function buildDshPluginCatalog({
     const pendingOperation = record.pendingOperation ?? null;
     const pendingVersion = record.pendingVersion ?? null;
     const pendingRestart = Boolean(pendingOperation) || enabled !== active || Boolean(installed && !active && enabled);
+    const canCancelPending = pendingOperation === "remove" && Boolean(profileVersion);
     if (pendingRestart) restartRequired = true;
     entries.push({
       pluginId: record.pluginId,
       packageName: record.packageName,
       tier: "external_plugin",
       origin: "external",
-      intentCategory: record.intentCategory ?? "efficiency",
+      intentCategory: record.intentCategory ?? "extension",
       canToggle: true,
       canInstall: true,
       canUninstall: true,
@@ -674,6 +735,7 @@ export function buildDshPluginCatalog({
       pendingOperation,
       pendingVersion,
       requiresRestartOnMutate: true,
+      canCancelPending,
       sourceLabel: "npm",
       ...(record.checkErrorReason ? { checkErrorReason: record.checkErrorReason } : {})
     });

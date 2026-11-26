@@ -126,9 +126,9 @@ Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替
 
 ## 实现入口
 
-`plugins/opl-studio-client/src/client/workbench/settings/packages.tsx` 复用目录与生命周期操作；
-`plugins/opl-studio-client/src/client/composition/contributionProjection.ts` 消费 App 使用偏好并过滤贡献；
-`plugins/opl-studio-client/src/client/workbench/App.tsx` 将包详情懒渲染及动作接入既有 bridge。
+`plugins/core/opl-studio-client/src/client/workbench/settings/packages.tsx` 复用目录与生命周期操作；
+`plugins/core/opl-studio-client/src/client/composition/contributionProjection.ts` 消费 App 使用偏好并过滤贡献；
+`plugins/core/opl-studio-client/src/client/workbench/App.tsx` 将包详情懒渲染及动作接入既有 bridge。
 `settings.section` 由 DSH root 唯一声明；设置页与软件中心共用该 owner 的 renderer，
 避免重复声明或从其他插槽跨越 DSH 的渲染归属边界。
 

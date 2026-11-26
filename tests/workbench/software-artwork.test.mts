@@ -8,8 +8,8 @@ import {
   localSoftwareIconUrl,
   softwareArtworkById,
   softwareArtworkCatalogIds
-} from "../../plugins/opl-studio-client/src/client/workbench/softwareArtworkRegistry.ts";
-import { publicSoftwareIconUrl, SoftwareArtwork } from "../../plugins/opl-studio-client/src/client/workbench/SoftwareArtwork.tsx";
+} from "../../plugins/core/opl-studio-client/src/client/workbench/softwareArtworkRegistry.ts";
+import { publicSoftwareIconUrl, SoftwareArtwork } from "../../plugins/core/opl-studio-client/src/client/workbench/SoftwareArtwork.tsx";
 
 test("every managed OPL catalog identity has bundled PNG artwork", () => {
   assert.ok(softwareArtworkCatalogIds.length > 0);

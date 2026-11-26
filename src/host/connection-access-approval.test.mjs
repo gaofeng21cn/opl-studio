@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { createConnectionAccessApproval } from "../../plugins/opl-framework-bridge/src/connection-access-approval.mjs";
+import { createConnectionAccessApproval } from "../../plugins/core/opl-framework-bridge/src/connection-access-approval.mjs";
 
 function fakeSpawn(response, observed) {
   return (command, args, options) => {
