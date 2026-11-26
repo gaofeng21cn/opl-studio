@@ -132,11 +132,11 @@ export class OplFrameworkBridge extends EventEmitter {
       return registerConnect({ provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }, "codex_api_key_failed");
     });
     this.closePromise = null;
-    this.startError = null;
+    this.startError = null; this.nativeWeixin = false;
   }
 
-  async start() {
-    this.startError = null;
+  async start(studioWeixin) {
+    this.startError = null; this.nativeWeixin = studioWeixin !== undefined;
     if (!this.hasCustomOpl) {
       try { await this.client.connect(); }
       catch (err) {
@@ -146,6 +146,7 @@ export class OplFrameworkBridge extends EventEmitter {
     }
     return this.capabilities();
   }
+  hasNativeWeixinChannel() { return this.nativeWeixin; }
 
   capabilities() {
     return {

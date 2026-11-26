@@ -31,10 +31,7 @@ const closedErr = () => new OpldRpcError("OpldClient is closed", { code: "client
 export function resolveDaemonBinary(env = process.env, explicitBin) {
   const names = process.platform === "win32" ? ["opld.exe", "opld.cmd", "opld"] : ["opld"];
   const candidates = [explicitBin?.trim(), env.OPL_DAEMON_BIN?.trim()].filter(Boolean);
-  for (const ref of [env.OPL_APP_OPL_BIN, env.OPL_COMMAND, env.OPL_BIN]) {
-    const t = ref?.trim();
-    if (t && (path.isAbsolute(t) || t.includes(path.sep))) names.forEach((n) => candidates.push(path.join(path.dirname(t), n)));
-  }
+  for (const ref of [env.OPL_APP_OPL_BIN, env.OPL_COMMAND, env.OPL_BIN]) { const t = ref?.trim(); if (t && (path.isAbsolute(t) || t.includes(path.sep))) names.forEach((n) => candidates.push(path.join(path.dirname(t), n))); }
   for (const dir of (env.PATH ?? "").split(path.delimiter).filter(Boolean)) names.forEach((n) => candidates.push(path.join(dir, n)));
   return candidates.find(isExecutable) ?? null;
 }
@@ -90,19 +87,27 @@ export class OpldClient extends EventEmitter {
     const child = spawn(bin, [], { cwd: this.paths.stateDir, env: { ...this.env, OPL_STATE_DIR: this.paths.stateDir }, detached: true, stdio: ["ignore", logFd, logFd], windowsHide: true });
     child.once("exit", (code) => { childExit = code ?? 1; }).unref();
     fs.closeSync(logFd);
-    for (let deadline = Date.now() + this.connectTimeoutMs, delay = 25; Date.now() < deadline; delay = Math.min(100, delay * 2)) {
-      this.#guardOpen();
-      const sess = this.#findSession();
-      if (sess && isPidAlive(sess.pid) && await probeSocket(sess.socket_path, 250)) return sess;
-      this.#guardOpen();
-      if (childExit !== null && childExit !== 0) {
-        const raced = this.#findSession();
-        if (raced && isPidAlive(raced.pid) && await probeSocket(raced.socket_path, 250)) return raced;
-        throw new OpldRpcError(`Detached opld exited with code ${childExit}`, { code: "DAEMON_START_FAILED" });
+    try {
+      for (let deadline = Date.now() + this.connectTimeoutMs, delay = 25; Date.now() < deadline; delay = Math.min(100, delay * 2)) {
+        this.#guardOpen();
+        const sess = this.#findSession(), ok = sess && isPidAlive(sess.pid) && await probeSocket(sess.socket_path, 250);
+        this.#guardOpen(); if (ok) return sess;
+        if (childExit !== null && childExit !== 0) {
+          const r = this.#findSession();
+          if (r && isPidAlive(r.pid) && await probeSocket(r.socket_path, 250)) { this.#guardOpen(); return r; }
+          throw new OpldRpcError(`Detached opld exited with code ${childExit}`, { code: "DAEMON_START_FAILED" });
+        }
+        await new Promise((r) => setTimeout(r, delay));
       }
-      await new Promise((r) => setTimeout(r, delay));
+      throw new OpldRpcError("Timed out waiting for opld readiness", { code: "DAEMON_START_TIMEOUT" });
+    } catch (err) {
+      if ((this.#closed || err?.code === "DAEMON_START_TIMEOUT") && childExit === null && child.pid > 0) {
+        try { process.kill(child.pid, "SIGTERM"); } catch {}
+        for (let i = 0; i < 10 && childExit === null && isPidAlive(child.pid); i += 1) await new Promise((r) => setTimeout(r, 25));
+        if (childExit === null && isPidAlive(child.pid)) try { process.kill(child.pid, "SIGKILL"); } catch {}
+      }
+      throw err;
     }
-    throw new OpldRpcError("Timed out waiting for opld readiness", { code: "DAEMON_START_TIMEOUT" });
   }
 
   #onLine(line) {
@@ -144,8 +149,7 @@ export class OpldClient extends EventEmitter {
   }
 
   async #doConnect() {
-    clearTimeout(this.#reconnectTimer);
-    this.#reconnectTimer = null;
+    clearTimeout(this.#reconnectTimer); this.#reconnectTimer = null;
     for (let deadline = Date.now() + this.connectTimeoutMs; ;) {
       this.#guardOpen();
       const sess = await this.#ensureSession();
@@ -169,9 +173,7 @@ export class OpldClient extends EventEmitter {
         const hs = await this.#sendRaw(sock, "daemon.handshake", { token: sess.token, client_kind: this.clientKind, api_version: this.apiVersion }, Math.max(500, deadline - Date.now()));
         this.#guardOpen();
         const serverVer = String(hs?.api_version ?? sess.api_version ?? "2.0");
-        if (serverVer.split(".")[0] !== this.apiVersion.split(".")[0]) {
-          throw new OpldRpcError(`Incompatible api_version '${this.apiVersion}'; base_upgrade_required`, { rpcCode: -32002, code: "base_upgrade_required", data: { code: "base_upgrade_required", expected_major: Number(serverVer.split(".")[0]) || 2, received_api_version: this.apiVersion } });
-        }
+        if (serverVer.split(".")[0] !== this.apiVersion.split(".")[0]) throw new OpldRpcError(`Incompatible api_version '${this.apiVersion}'; base_upgrade_required`, { rpcCode: -32002, code: "base_upgrade_required", data: { code: "base_upgrade_required", expected_major: Number(serverVer.split(".")[0]) || 2, received_api_version: this.apiVersion } });
         handshaked = true; this.connected = true; this.serverApiVersion = serverVer; this.sessionInfo = hs; this.#reconnectDelay = 100;
         return hs;
       } catch (err) {
@@ -182,10 +184,7 @@ export class OpldClient extends EventEmitter {
         const transient = ["connection_closed", "ECONNRESET", "EPIPE", "ECONNREFUSED", "ENOENT"].includes(err?.code);
         const f = err?.rpcCode === -32001 && this.autoStart ? this.#findSession() : null;
         const staleToken = err?.rpcCode === -32001 && this.autoStart && (!isPidAlive(sess.pid) || (f && (f.pid !== sess.pid || f.token !== sess.token)));
-        if ((transient || staleToken) && this.autoStart && !this.#fatalError && Date.now() + 25 < deadline) {
-          await new Promise((r) => setTimeout(r, 25));
-          continue;
-        }
+        if ((transient || staleToken) && this.autoStart && !this.#fatalError && Date.now() + 25 < deadline) { await new Promise((r) => setTimeout(r, 25)); continue; }
         throw err;
       }
     }
@@ -206,8 +205,7 @@ export class OpldClient extends EventEmitter {
       try { return await this.#sendRaw(this.#socket, method, params, timeoutMs); }
       catch (err) {
         if (attempt > 0 || err?.code !== "connection_closed" || this.#closed || this.#fatalError || !this.autoStart || method === "daemon.shutdown" || method === "daemon.handshake") throw err;
-        if (this.#socket) { this.#socket.destroy(); this.#socket = null; }
-        this.connected = false;
+        if (this.#socket) { this.#socket.destroy(); this.#socket = null; } this.connected = false;
       }
     }
   }
@@ -216,5 +214,6 @@ export class OpldClient extends EventEmitter {
     this.#closed = true; clearTimeout(this.#reconnectTimer); this.#reconnectTimer = null;
     this.#rejectPending(closedErr()); this.connected = false;
     if (this.#socket) { this.#socket.destroy(); this.#socket = null; }
+    await this.#connectPromise?.catch(() => {});
   }
 }

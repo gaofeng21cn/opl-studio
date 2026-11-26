@@ -45,20 +45,40 @@ function createIsolatedEnv() {
   return { root, home, stateDir, env };
 }
 
+function readSandboxPids(stateDir) {
+  const pids = new Set();
+  for (const name of ["opld.session.json", "opld.lock"]) {
+    try {
+      const p = path.join(stateDir, "run", name);
+      if (fs.existsSync(p)) {
+        const pid = JSON.parse(fs.readFileSync(p, "utf8")).pid;
+        if (Number.isInteger(pid) && pid > 0) pids.add(pid);
+      }
+    } catch { /* ignore */ }
+  }
+  return pids;
+}
+
+function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; } catch (e) { return e?.code === "EPERM"; }
+}
+
 async function shutdownSandbox(root, stateDir, bridge) {
-  let pid = null;
-  const sessionFile = path.join(stateDir, "run", "opld.session.json");
-  try {
-    if (fs.existsSync(sessionFile)) pid = JSON.parse(fs.readFileSync(sessionFile, "utf8")).pid ?? null;
-  } catch { /* ignore */ }
+  const pids = readSandboxPids(stateDir);
   try {
     if (bridge?.client?.connected) await bridge.client.call("daemon.shutdown", {});
   } catch { /* ignore */ }
   try { await bridge?.close(); } catch { /* ignore */ }
-  if (pid && pid > 0) {
+  for (const p of readSandboxPids(stateDir)) pids.add(p);
+  for (const pid of pids) {
     for (let i = 0; i < 20; i += 1) {
-      try { process.kill(pid, 0); } catch { break; }
+      if (!isPidAlive(pid)) break;
       if (i === 10) try { process.kill(pid, "SIGTERM"); } catch { /* ignore */ }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    if (isPidAlive(pid)) {
+      try { process.kill(pid, "SIGKILL"); } catch { /* ignore */ }
       await new Promise((r) => setTimeout(r, 50));
     }
   }
@@ -114,10 +134,15 @@ test("Wave 1 Gate 2A: bridge budget, exports, resolveOplStatePaths precedence, o
   const bridge = new OplFrameworkBridge({ env });
   t.after(() => shutdownSandbox(root, stateDir, bridge));
 
+  assert.equal(bridge.hasNativeWeixinChannel(), false);
   const caps = await bridge.start();
   assert.equal(caps.available, true);
   assert.equal(caps.connected, true);
   assert.equal(caps.authorityBoundary, "app_bridge_no_domain_authority");
+  assert.equal(bridge.hasNativeWeixinChannel(), false);
+  const weixinNullBridge = new OplFrameworkBridge({ env, opl: bridge.opl, client: bridge.client });
+  await weixinNullBridge.start(null);
+  assert.equal(weixinNullBridge.hasNativeWeixinChannel(), true);
 
   const sessionPath = path.join(stateDir, "run", "opld.session.json");
   const sockPath = path.join(stateDir, "run", "opld.sock");
@@ -332,6 +357,8 @@ test("Wave 1 Gate 2F: zero-sleep daemon.shutdown & SIGKILL recovery + close() mi
     assert.notEqual(bridge.client.sessionInfo.session_id, prevSid);
   }
 
+  await bridge.close();
+
   for (let i = 0; i < 5; i += 1) {
     const b1 = new OplFrameworkBridge({ env });
     await b1.start();
@@ -343,6 +370,7 @@ test("Wave 1 Gate 2F: zero-sleep daemon.shutdown & SIGKILL recovery + close() mi
     const st = await b2.opl.readState("fast");
     assert.equal(st.profile, "fast");
     assert.notEqual(JSON.parse(fs.readFileSync(sessionFile, "utf8")).pid, prevPid);
+    await b2.client.call("daemon.shutdown", {}).catch(() => {});
     await b2.close();
   }
 
@@ -351,6 +379,23 @@ test("Wave 1 Gate 2F: zero-sleep daemon.shutdown & SIGKILL recovery + close() mi
   await raceClient.close();
   await assert.rejects(() => connectP, (err) => err instanceof OpldRpcError && err.code === "client_closed");
   assert.equal(raceClient.connected, false);
+
+  for (const delayMs of [0, 15]) {
+    const cold = createIsolatedEnv();
+    const coldClient = new OpldClient({ env: cold.env });
+    try {
+      const coldConnectP = coldClient.connect();
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+      await coldClient.close();
+      await assert.rejects(() => coldConnectP, (err) => err instanceof OpldRpcError && err.code === "client_closed");
+      assert.equal(coldClient.connected, false);
+      for (const pid of readSandboxPids(cold.stateDir)) {
+        assert.equal(isPidAlive(pid), false, `Cold raceClient leaked opld PID ${pid}`);
+      }
+    } finally {
+      await shutdownSandbox(cold.root, cold.stateDir, null);
+    }
+  }
 });
 
 test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", async (t) => {
