@@ -1028,7 +1028,10 @@ test("Settings uses the App-owned navigation groups and one shared read model", 
   assert.match(settingsPanel, /visible,/);
   assert.match(settingsPanel, /sort_order: sortOrder/);
   assert.match(settingsRoot, /renderFactorySlot\('settings\.section\.view'/);
-  assert.match(slotHost, /settingsDestinations\("en"\)\.entries\(\)/);
+  assert.match(slotHost, /settingsPages = settingsDestinations\("en"\)/);
+  assert.match(slotHost, /settingsPages\.entries\(\)/);
+  assert.match(slotHost, /registerFactory\(\{ name: "settings\.section\.view"/);
+  assert.match(slotHost, /renderFactorySlot=\{renderFactorySlot\}/);
   assert.match(slotHost, /id: settingsSectionId\(destination\.id\)/);
   assert.match(slotHost, /renderSettings\(selected, renderContribution \?\? undefined, setSelected, close\)/);
   assert.match(settingsPanel, /settings-mobile-nav/);
