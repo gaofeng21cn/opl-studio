@@ -42,4 +42,18 @@ test("plist helper parses XML and binary bplist00 documents cleanly", async (t) 
   assert.equal(identity.status, "passed");
   assert.equal(identity.actual.productName, "One Person Lab Preview");
   assert.equal(identity.actual.bundleId, "cn.onepersonlab.opl.studio.preview");
+
+  if (process.platform === "darwin") {
+    const previous = process.env.OPL_PLIST_FORCE_PLUTIL_FALLBACK;
+    process.env.OPL_PLIST_FORCE_PLUTIL_FALLBACK = "1";
+    t.after(() => {
+      if (previous === undefined) delete process.env.OPL_PLIST_FORCE_PLUTIL_FALLBACK;
+      else process.env.OPL_PLIST_FORCE_PLUTIL_FALLBACK = previous;
+    });
+    assert.deepEqual(parsePlistDocument(xmlText), sample);
+    assert.deepEqual(readPlistFile(xmlPath), sample);
+    assert.deepEqual(readPlistFile(binaryPath), sample);
+    assert.equal(readPlistKey(binaryPath, "CFBundleShortVersionString"), "0.1.19");
+    assert.equal(readPlistKey(binaryPath, "MissingKey", { allowFailure: true }), null);
+  }
 });
