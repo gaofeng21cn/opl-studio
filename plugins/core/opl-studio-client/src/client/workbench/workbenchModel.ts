@@ -339,6 +339,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     workItemRuntime,
     managedCompanions: readManagedCompanions(appState),
     uiContributions: readUiContributionsProjection(state),
+    canExecuteUiContributions: actionRecords.has("package_contribution_execute"),
     stateGeneratedAt: asString(meta?.generated_at) ?? fallback.stateGeneratedAt
   };
 }

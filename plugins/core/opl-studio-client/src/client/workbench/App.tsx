@@ -1706,9 +1706,7 @@ export function App({
       .catch((error) => setLastDryRun(formatReceipt({ actionId, dryRun: true, error: String(error) })));
   }
 
-  const contributionActionAvailable = !contributionActionBusy && model.contextActions.some(
-    (action) => action.id === "package_contribution_execute"
-  );
+  const contributionActionAvailable = !contributionActionBusy && model.canExecuteUiContributions === true;
   async function executeContributionAction(
     entry: OplUiContribution,
     command: OplUiContributionCommand,

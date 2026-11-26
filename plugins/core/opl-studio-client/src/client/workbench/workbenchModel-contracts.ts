@@ -56,6 +56,7 @@ export type WorkbenchModel = {
   workItemRuntime?: WorkItemRuntimeProjection;
   managedCompanions: ManagedCompanionViewModel[];
   uiContributions: OplUiContributionsProjection;
+  canExecuteUiContributions?: boolean;
   stateGeneratedAt?: string;
 };
 
