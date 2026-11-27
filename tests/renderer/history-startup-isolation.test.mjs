@@ -23,6 +23,10 @@ test("history read failures stay local while the live Codex path allows a new se
     browser.structuredClone = structuredClone;
     let sentPrompt;
     browser.oplStudio = {
+      readInitialize: async () => ({
+        system_initialize: { setup_flow: { is_first_run: false, ready_to_launch: true } },
+        readback: { exitCode: 0, timedOut: false }
+      }),
       listThreads: () => Promise.reject(new Error("thread/list fixture unavailable")),
       readCodexModels: async () => ({ data: [] }),
       sendMessage: request => { sentPrompt = request.prompt; return new Promise(() => {}); },
