@@ -109,6 +109,10 @@ test("Full offline launch isolates VM networking and preserves the Electron sand
   assert.match(restore, /delete -inet6 -net 8000::\/1/);
   const launch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/offline.log", managedUpdates: false });
   assert.match(launch, /OPL_STUDIO_MANAGED_UPDATES=0/);
+  const defaultLaunch = buildGuestLaunchCommand({ appExecutable: "/Applications/One Person Lab.app/Contents/MacOS/One Person Lab", logPath: "/tmp/online.log" });
+  assert.doesNotMatch(defaultLaunch, /OPL_STUDIO_MANAGED_UPDATES=0/);
+  const cleanVmSource = fs.readFileSync(path.join(root, "scripts/desktop/qualify-clean-vm.mjs"), "utf8");
+  assert.match(cleanVmSource, /buildGuestLaunchCommand\(\{ \.\.\.launchOptions, managedUpdates: false \}\)/);
   assert.doesNotMatch(launch, /sandbox-exec|--no-sandbox/);
   assert.doesNotMatch(launch, /OPL_CODEX_BIN=/);
 });

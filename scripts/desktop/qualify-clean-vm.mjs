@@ -689,7 +689,9 @@ async function qualifyCleanGuest(options, offline = false) {
         publicMetadataBin: metadata ? guestMetadataRoot : null,
         allowActions: options.allowActions
       };
-      const launch = buildGuestLaunchCommand({ ...launchOptions, managedUpdates: !offline });
+      // Keep the frozen release candidate immutable during clean-VM qualification;
+      // offlineRelaunch below explicitly verifies relaunch with automatic updates enabled.
+      const launch = buildGuestLaunchCommand({ ...launchOptions, managedUpdates: false });
       progress({ phase: "guest-launch", status: "started" });
       guestAppProcessId = Number(guestRun(options, ip, launch).stdout.trim());
       invariant(Number.isSafeInteger(guestAppProcessId) && guestAppProcessId > 0, "Guest App launch did not return its process ID");
