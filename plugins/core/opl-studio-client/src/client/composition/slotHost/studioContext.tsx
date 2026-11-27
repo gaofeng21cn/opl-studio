@@ -231,8 +231,9 @@ const BUILTIN_PANEL_LABELS: Record<string, { zh: string; en: string; order: numb
   runtime: { zh: "运行状态", en: "Runtime status", order: 20 },
   materials: { zh: "资料空间", en: "Materials Space", order: 25 },
   schedules: { zh: "计划任务", en: "Scheduled tasks", order: 30 },
+  "opl-flow": { zh: "OPL Flow 总控", en: "OPL Flow", order: 34 },
   teams: { zh: "智能体协作", en: "Agent collaboration", order: 35 },
-  superagent: { zh: "Superagent", en: "Superagent", order: 36 },
+  superagent: { zh: "Superagent 工单台", en: "Superagent", order: 36 },
   workspace: { zh: "应用工作台", en: "App workspace", order: 40 }
 };
 

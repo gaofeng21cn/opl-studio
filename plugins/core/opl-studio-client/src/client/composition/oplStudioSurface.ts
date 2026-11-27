@@ -32,6 +32,7 @@ export type OplStudioPrimaryView =
   | "schedules"
   | "workspace"
   | "applications"
+  | "opl-flow"
   | "teams"
   | "superagent"
   | (string & {});
@@ -40,6 +41,11 @@ export type RenderSettingsContribution = (options?: { only?: string }, owner?: {
 export type OplStudioSurface = {
   superagent: { read(): Promise<SuperagentState>; execute(request: { operation: "start" | "stop" }): Promise<SuperagentState> };
   teamBots: { read(): Promise<TeamBotsState>; execute(request: TeamBotAction): Promise<unknown> };
+  gatewayAccount?: {
+    displayName: string;
+    email?: string;
+    status: string;
+  };
   locale: "zh" | "en";
   projectTitle: string;
   sessionTitle: string;

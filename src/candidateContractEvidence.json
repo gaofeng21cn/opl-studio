@@ -53,6 +53,7 @@
       "opl-host-core",
       "opl-web-routes",
       "opl-mcp-apps",
+      "opl-flow-workbench",
       "opl-runtime-status",
       "opl-materials-space",
       "opl-codex-agents",

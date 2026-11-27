@@ -46,10 +46,10 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     canInstall: false,
     canUninstall: false,
     settingsDestination: "capabilities",
-    labelI18n: { zh: "Superagent 自治工作流", en: "Superagent Workflows" },
+    labelI18n: { zh: "Superagent 工单台", en: "Superagent Tickets" },
     descriptionI18n: {
-      zh: "运行由 Codex 驱动的长时自治研究与工程工作流。",
-      en: "Long-running autonomous research and engineering workflows powered by Codex."
+      zh: "面向外部 GitHub / 飞书来单的无人值守工单台与自治工作流。",
+      en: "Unattended external ticket intake and autonomous Codex engineering workflows."
     },
     permissionsI18n: {
       zh: ["读写选定工作区目录中的项目文件", "运行本地自治任务编排 Web 服务"],
@@ -111,6 +111,25 @@ export const DSH_PLUGIN_DESCRIPTORS = Object.freeze([
     permissionsI18n: {
       zh: ["读取运行态工作项与服务恢复快照", "向左侧导航注入「运行状态」概览面板"],
       en: ["Reads work-item runtime and service recovery snapshots", "Registers the Runtime Overview navigation panel"]
+    }
+  },
+  {
+    pluginId: "opl-flow-workbench",
+    packageName: "@gaofeng21cn/opl-flow-workbench",
+    tier: "optional_product",
+    origin: "opl",
+    intentCategory: "extension",
+    canToggle: true,
+    canInstall: false,
+    canUninstall: false,
+    labelI18n: { zh: "OPL Flow 总控", en: "OPL Flow Control Tower" },
+    descriptionI18n: {
+      zh: "个人跨 Codex / AntiGravity / OPL DSH 与多机器 Beads/Dolt 长期目标总账与自动路由控制塔（仅在已启用 opl-flow Package 时条件挂载）。",
+      en: "Cross-carrier personal Beads/Dolt objective ledger and zero-token auto-router control tower (conditionally mounted when opl-flow is enabled)."
+    },
+    permissionsI18n: {
+      zh: ["通过 Framework 公开 RPC 读取 opl-flow 决策看板并执行审批/投递/路由控制", "按 jump_mode 切换或拉起宿主原生会话，不自建第二套聊天框"],
+      en: ["Reads opl-flow decision dashboard and executes actions via Framework RPC", "Switches to or launches native host threads per jump_mode"]
     }
   },
   {
