@@ -73,20 +73,22 @@ export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt,
   let observed = projection ?? projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')", timeoutMs), expectedRootPackageIds);
   let attempt = await readFirstInstallAttempt?.() ?? null;
   const missingRoots = () => expectedRootPackageIds.filter((id) => !observed.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
+  const terminalAttemptRequired = () => observed.packageSource === "app.state.get";
+  const rootsReady = () => missingRoots().length === 0 && (!terminalAttemptRequired() || attempt?.status === "completed");
   const hostReady = () => observed.initializeExitCode === 0
     && observed.stateExitCode === 0
     && observed.launchReady === true
     && observed.packageDirectoryPresent === true;
   // Standard is a host: optional Profile installation stays visible as
   // diagnostics, without delaying its readiness. Full verifies its selected seed.
-  while (requireRootPackages && hostReady() && missingRoots().length > 0 && attempt?.status !== "failed") {
+  while (requireRootPackages && hostReady() && !rootsReady() && attempt?.status !== "failed") {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     // The owner helper uses this same state surface during Package installation.
     // Let the current attempt settle before issuing another potentially slow read.
     if (attempt?.status !== "running") {
       observed = projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')", remaining), expectedRootPackageIds);
-      if (!hostReady() || missingRoots().length === 0) {
+      if (!hostReady() || rootsReady()) {
         attempt = await readFirstInstallAttempt?.() ?? attempt;
         break;
       }
@@ -102,7 +104,7 @@ export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt,
     requireRootPackages,
     missingRootPackageIds,
     firstInstallStatus: attempt?.status ?? null,
-    status: hostReady() && (!requireRootPackages || (missingRootPackageIds.length === 0 && attempt?.status !== "failed")) ? "passed" : "failed"
+    status: hostReady() && (!requireRootPackages || (rootsReady() && attempt?.status !== "failed")) ? "passed" : "failed"
   };
 }
 
@@ -174,7 +176,8 @@ export function validateStableRuntimeEvidence(summary) {
   const requireRootPackages = Object.hasOwn(summary.checks?.runtime ?? {}, "full");
   invariant(framework?.status === "passed" && framework.launchReady === true && framework.packageDirectoryPresent === true
     && framework.requireRootPackages === requireRootPackages
-    && (!requireRootPackages || (framework.missingRootPackageIds?.length === 0 && framework.firstInstallStatus !== "failed")), "Framework host readiness or selected Full seed is not proven");
+    && (!requireRootPackages || (framework.missingRootPackageIds?.length === 0 && framework.firstInstallStatus !== "failed"
+      && (framework.packageSource !== "app.state.get" || framework.firstInstallStatus === "completed"))), "Framework host readiness or selected Full seed is not proven");
   return { schema: "opl_settings_runtime_refresh_evidence_verification.v1", status: "passed", shell: "opl-studio", production_default_targets_required: true, synthetic_target_injection_allowed: false, generation_requested: false, runtime_surface: "opl-runtime-overview-page" };
 }
 

@@ -179,13 +179,25 @@ test("Full readiness waits for the active first-install attempt and verifies Fra
       assert.equal(statuses.length, 0, "must wait for the current owner attempt");
       assert.match(expression, /readState\('fast'\)/);
       assert.ok(timeoutMs > 120_000 && timeoutMs < 900_000, "must honor the remaining Full readiness budget");
-      return { readback: { exitCode: 0 }, app_state: { installed_packages: [{ package_id: "mas" }] } };
+      return { readback: { exitCode: 0 }, app_state: { installed_packages: [{ package_id: "mas", enabled: true }] } };
     }
   });
   assert.equal(result.status, "passed");
   assert.equal(result.packageSource, "app.state.get");
   assert.equal(result.firstInstallStatus, "completed");
   assert.deepEqual(result.missingRootPackageIds, []);
+});
+
+test("Full v2 readiness rejects disabled required roots and incomplete first-install receipts", async () => {
+  for (const [enabled, status] of [[false, "completed"], [true, "running"], [true, null]]) {
+    const result = await runFrameworkReadiness({
+      expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0,
+      readFirstInstallAttempt: async () => status && { status },
+      evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { installed_packages: [{ package_id: "mas", enabled }] } })
+    });
+    assert.equal(result.status, "failed");
+    assert.deepEqual(result.missingRootPackageIds, enabled ? [] : ["mas"]);
+  }
 });
 
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {
