@@ -272,7 +272,7 @@ export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
       ? entries.map((entry) => ({
         id: entry.package_id ?? null,
         present: v2 || entry.installed === true || entry.presence?.present === true,
-        installed: v2 || entry.installed === true || entry.presence?.installed === true,
+        installed: v2 ? entry.enabled === true : entry.installed === true || entry.presence?.installed === true,
         role: entry.package_role ?? null
       }))
       : []
