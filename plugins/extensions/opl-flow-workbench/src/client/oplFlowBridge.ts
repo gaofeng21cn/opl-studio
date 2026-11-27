@@ -56,6 +56,7 @@ export type OplFlowSessionEntry = {
   status?: string;
   updated_at?: string;
   bound_bead_id?: string | null;
+  is_subagent?: boolean;
 };
 
 export type OplFlowPendingEvent = {
@@ -88,6 +89,11 @@ export type OplFlowDashboardData = {
     safe_to_archive: number;
     active_objectives: number;
     active_sessions: number;
+    running_sessions?: number;
+    primary_sessions?: number;
+    subagent_sessions?: number;
+    unique_occupied_workspaces?: number;
+    collision_workspaces?: number;
     blocked: number;
     backlog: number;
     pending_events: number;
