@@ -18,7 +18,7 @@ NSRect(x: 0, y: 0, width: 1024, height: 1024).fill(using: .copy)
 // macOS does not mask ICNS images. Keep the canvas transparent outside the tile.
 let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
 NSBezierPath(roundedRect: tile, xRadius: 184, yRadius: 184).addClip()
-let sourceTile = NSRect(x: 40, y: 40, width: artwork.size.width - 80, height: artwork.size.height - 80)
+let sourceTile = NSRect(x: 0, y: 0, width: artwork.size.width, height: artwork.size.height)
 artwork.draw(in: tile, from: sourceTile, operation: .sourceOver, fraction: 1)
 NSGraphicsContext.restoreGraphicsState()
 guard let png = bitmap.representation(using: .png, properties: [:]) else {
@@ -29,7 +29,9 @@ try png.write(to: assets.appendingPathComponent("opl-studio.png"))
 for (x, y) in [(0, 0), (1023, 0), (0, 1023), (1023, 1023), (512, 0), (100, 100)] {
     precondition(bitmap.colorAt(x: x, y: y)!.alphaComponent == 0, "Icon canvas must be transparent")
 }
-precondition(bitmap.colorAt(x: 512, y: 512)!.alphaComponent == 1, "Icon artwork must remain opaque")
+for (x, y) in [(512, 512), (220, 220), (804, 804)] {
+    precondition(bitmap.colorAt(x: x, y: y)!.alphaComponent == 1, "Icon artwork must remain opaque")
+}
 
 let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("opl-icon-\(UUID().uuidString)")
 let iconset = temporary.appendingPathComponent("opl-studio.iconset")

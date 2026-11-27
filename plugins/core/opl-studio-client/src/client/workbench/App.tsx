@@ -127,6 +127,7 @@ import {
   type ProjectedGatewayAction,
   type SettingsHostActionIntent
 } from "./settingsActions";
+import { gatewayConnectionPresentation } from "./settings/presentation";
 import { ThreadDetailPopover } from "./threads/ThreadDetailPopover";
 import { ThreadLifecycleConfirmationDialog } from "./threads/ThreadLifecycleConfirmationDialog";
 import type { ThreadLifecycleAction } from "./threads/ThreadLifecycleConfirmationDialog";
@@ -2825,6 +2826,15 @@ export function App({
     primaryView,
     superagent: { read: bridge.readSuperagent, execute: bridge.executeSuperagent },
     teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
+    gatewayAccount: gatewayConnectionPresentation(model.settingsProjection, model.gatewayAccount, stateStatus) === "account"
+      && model.gatewayAccount
+      && !["setup_required", "reauth_required"].includes(model.gatewayAccount.status)
+      ? {
+          displayName: model.gatewayAccount.displayName,
+          ...(model.gatewayAccount.email ? { email: model.gatewayAccount.email } : {}),
+          status: model.gatewayAccount.status
+        }
+      : undefined,
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
     openPackageActivity: () => { setApplicationManagementTab('activity'); setPrimaryView('applications'); },
     packageUpdateActivation,
