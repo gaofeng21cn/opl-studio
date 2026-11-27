@@ -1,3 +1,4 @@
+import { useFirstRunNavigation } from "./useFirstRunNavigation";
 import { useSettingsActions } from "./useSettingsActions";
 import { FirstInstallProgress, type FirstInstallSnapshot } from "./FirstInstallProgress";
 import { usePackageOperations } from './usePackageOperations';
@@ -61,6 +62,7 @@ import {
 import {
   createBrowserBridge,
   readStartupState,
+  normalizeInitializeReadback,
   type CodexAgentSelectionSnapshot,
   type CodexCapabilityCatalog,
   type CodexComposerInput,
@@ -815,12 +817,29 @@ export function App({
   }
 
 
+  const { firstRunVisible, openFirstRun, completeFirstRun, acceptStartupReadiness } = useFirstRunNavigation();
+  const initializeReadSequence = useRef(0);
   const stateReadSequence = useRef(0);
-  function loadState(profile = settings.runtimeProfile, recoverStartup = false) {
+  function loadState(profile = settings.runtimeProfile, recoverStartup = false, includeSetup = false) {
     const sequence = ++stateReadSequence.current;
     setStateStatus("loading");
     setStateError("");
-    const read = () => bridge.readState(profile);
+    const setupSequence = includeSetup ? ++initializeReadSequence.current : undefined;
+    const read = () => bridge.readState(profile, includeSetup).then(state => {
+      if (setupSequence === initializeReadSequence.current) {
+        const setup = normalizeInitializeReadback({ system_initialize: state.app_state.system_initialize, readback: state.readback });
+        setInitializeReadback(setup);
+        setInitializeStatus("ready");
+        acceptStartupReadiness(setup.systemInitialize.setupFlow.readyToLaunch);
+      }
+      return state;
+    }).catch(error => {
+      if (setupSequence === initializeReadSequence.current) {
+        setInitializeStatus("error");
+        acceptStartupReadiness(undefined);
+      }
+      throw error;
+    });
     return (recoverStartup ? readStartupState(read, () => sequence === stateReadSequence.current) : read())
       .then((state) => {
         if (!state || sequence !== stateReadSequence.current) return null;
@@ -872,14 +891,17 @@ export function App({
   }
 
   function loadInitialize() {
+    const sequence = ++initializeReadSequence.current;
     setInitializeStatus("loading");
     return bridge.readInitialize()
       .then((readback) => {
+        if (sequence !== initializeReadSequence.current) return null;
         setInitializeReadback(readback);
         setInitializeStatus(readback.readback.exitCode === 0 && !readback.readback.timedOut ? "ready" : "error");
         return readback;
       })
       .catch(() => {
+        if (sequence !== initializeReadSequence.current) return null;
         setInitializeReadback(null);
         setInitializeStatus("error");
         return null;
@@ -1443,7 +1465,11 @@ export function App({
     if (startupLoadKeyRef.current === loadKey) return;
     startupLoadKeyRef.current = loadKey;
     void Promise.all([
-      loadState(settings.runtimeProfile, true),
+      // The first shared fast snapshot includes the bounded Core setup read.
+      // Restore a user-selected full profile after the startup snapshot.
+      loadState("fast", true, true).then(() => {
+        if (settings.runtimeProfile === "full" && startupLoadKeyRef.current === loadKey) return loadState("full");
+      }),
       loadThreadDirectory(true),
       loadModels(),
       loadCapabilities(true)
@@ -1455,9 +1481,15 @@ export function App({
     setStartupAttempt((attempt) => attempt + 1);
   }
 
+  // Older owners can return a fast snapshot without setup details. Opening
+  // setup explicitly is the point at which to request their deep read.
+  const checkedExplicitSetup = useRef(false);
   useEffect(() => {
-    void loadInitialize();
-  }, [bridge]);
+    if (!firstRunVisible) { checkedExplicitSetup.current = false; return; }
+    if (checkedExplicitSetup.current || initializeStatus === "loading") return;
+    checkedExplicitSetup.current = true;
+    if (initializeStatus === "error" || initializeReadback?.systemInitialize.setupFlow.readyToLaunch === undefined) void loadInitialize();
+  }, [firstRunVisible, initializeStatus, initializeReadback]);
 
   useEffect(() => () => onHostStateDispose?.(), [onHostStateDispose]);
 
@@ -1501,6 +1533,7 @@ export function App({
     }
     if (method === "desktop/deep-link") {
       const destination = resolveDeepLinkDestination(params);
+      if (destination) completeFirstRun();
       if (destination?.kind === "schedules") {
         setSettingsNavigation(current => ({ open: false, revision: (current?.revision ?? 0) + 1 }));
         setPrimaryView("schedules");
@@ -2881,6 +2914,9 @@ export function App({
     settingsNavigation,
     installationProgress,
     installationState: desktopSetup,
+    firstRunVisible,
+    openFirstRun,
+    completeFirstRun,
     initializationStatus: initializeStatus,
     initialization: initializeReadback,
     refreshInitialization: () => { void loadInitialize(); },

@@ -40,7 +40,7 @@ import {
   settingsSectionId,
 } from "./slotHost/shellSettingsSlots";
 import { installStudioMenus } from "./slotHost/studioMenus";
-import { FirstRunOnboardingSlot } from "./slotHost/firstRunOnboarding";
+import { FirstRunOnboardingSlot, FirstRunSidebarEntry } from "./slotHost/firstRunOnboarding";
 import {
   ConversationBodySlot,
   ConversationHeaderSlot,
@@ -175,6 +175,7 @@ export class OplStudioDshSlotHost {
     registerComputerUseSettingsSlot(this.core);
     register({ name: "sidebar", registrant: "dsh-ui-sidebar", children: { "sidebar.brand.mark": { kind: "single", scope: "root" }, "sidebar.brand.name": { kind: "single", scope: "root" }, "sidebar.workspaces": { kind: "single", scope: "root", inject: { hooks: { sectionScroller: (_standard: unknown, hookContext: any) => hookContext.useSectionScroller } } }, "sidebar.session.action": { kind: "hoc", scope: "root" }, "sidebar.settings": { kind: "single", scope: "root" }, "sidebar.footer.action": { kind: "list", scope: "root" }, "sidebar.panellist.actions": { kind: "list", scope: "root" }, "sidebar.toggle.badge": { kind: "single", scope: "root" } } }, SidebarSlot);
     registerFactory({ name: "sidebar.panel.icon", scope: "root", children: { "sidebar.panellist": { kind: "list", scope: "root" } } }, PanelIcon);
+    register({ name: "sidebar.footer.action", id: "opl-first-run-resume", registrant: "opl-studio" }, FirstRunSidebarEntry);
     register({ name: "sidebar.panellist.actions", id: "opl-sidebar-panel-actions", registrant: "opl-studio" }, SidebarPanelActionsSlot);
     register({ name: "sidebar.panellist", id: "applications", order: 10, registrant: "opl-studio" }, ({ size }: { size: number }) => <IconAppsAddOutlineRegular size={size} />);
     register({ name: "sidebar.panellist", id: "schedules", order: 30, registrant: "opl-studio" }, ({ size }: { size: number }) => <IconAlarmClockOutlineRegular size={size} />);

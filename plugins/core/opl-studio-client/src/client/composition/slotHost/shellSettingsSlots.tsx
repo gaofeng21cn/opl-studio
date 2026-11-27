@@ -253,12 +253,7 @@ export function SettingsSlot({ wide, renderSlot, renderFactorySlot, useStore, ac
   // Package contributions are rendered inside the owning Studio destination;
   // they are not extra top-level settings pages.
   const rows = studioRows;
-  const setupFlow = studio.initialization?.systemInitialize.setupFlow;
-  const preparingRuntime = studio.installationState?.status === 'running'
-    && !['ready', 'preparing_packages'].includes(studio.installationState.stage);
-  const onboardingVisible = preparingRuntime || (studio.initializationStatus === "ready"
-    && setupFlow?.isFirstRun === true
-    && setupFlow.readyToLaunch === false);
+  const onboardingVisible = studio.firstRunVisible;
   const sessions = { phase: "ready", current: "opl-current", byId: { "opl-current": { id: "opl-current", blank: onboardingVisible, retainedBy: { mainView: 1 } } } };
   const onboardingSteps = onboardingVisible ? [{ id: "opl-first-run", order: 0 }] : [];
   const renderContribution = useCallback((options?: { only?: string }) => (
