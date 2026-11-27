@@ -17,7 +17,7 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(rendererBuilder, /COPY packages \.\/packages/);
   assert.ok(rendererBuilder.indexOf("COPY packages ./packages") < rendererBuilder.indexOf("RUN npm run build:webui"), "the renderer build must receive shared Host package sources");
   assert.ok(rendererBuilder.indexOf("COPY vendor ./vendor") < rendererBuilder.indexOf("RUN npm run build:webui"), "the plugin build must receive the unmodified Superagent source");
-  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e/);
+  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=70418f07847b1e7c11b5f5e84de6e7224a8b0a92/);
   assert.match(dockerfile, /ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
   const frameworkBuilder = dockerfile.slice(dockerfile.indexOf("AS framework-builder"), dockerfile.indexOf("AS codex-builder"));
   assert.match(frameworkBuilder, /npm run framework:archive -- \/tmp\/opl-framework-artifact/);
@@ -30,7 +30,7 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   );
   assert.match(productionDependencies, /COPY plugins \.\/plugins/);
   assert.match(productionDependencies, /npm ci --omit=dev/);
-  assert.match(compose, /OPL_FRAMEWORK_REF:-1a295253f7cfd89c5345feddef28e7677f23243e/);
+  assert.match(compose, /OPL_FRAMEWORK_REF:-70418f07847b1e7c11b5f5e84de6e7224a8b0a92/);
   assert.match(compose, /OPL_APP_REF:-2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
   const runtime = dockerfile.slice(dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime"));
   assert.match(runtime, /org\.opencontainers\.image\.revision="\$\{OPL_SOURCE_REVISION\}"/);

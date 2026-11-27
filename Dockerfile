@@ -9,7 +9,7 @@ RUN apt-get update \
 
 FROM source-builder-base AS framework-builder
 ARG OPL_FRAMEWORK_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab.git
-ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e
+ARG OPL_FRAMEWORK_REF=70418f07847b1e7c11b5f5e84de6e7224a8b0a92
 WORKDIR /src/opl-framework
 
 RUN git init \
@@ -89,7 +89,7 @@ COPY --from=framework-builder /opt/opl-framework /opt/opl-framework
 COPY --from=codex-builder /opt/codex /opt/codex
 COPY --from=app-product-profile /opt/opl/resources /opt/opl/resources
 COPY scripts/headless/image-manifest.mjs /tmp/image-manifest.mjs
-ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e
+ARG OPL_FRAMEWORK_REF=70418f07847b1e7c11b5f5e84de6e7224a8b0a92
 ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc
 ARG OPL_CODEX_NPM_SPEC
 RUN OPL_FRAMEWORK_REF="${OPL_FRAMEWORK_REF}" OPL_APP_REF="${OPL_APP_REF}" OPL_CODEX_NPM_SPEC="${OPL_CODEX_NPM_SPEC}" OPL_SOURCE_REVISION="${OPL_SOURCE_REVISION}" node /tmp/image-manifest.mjs \
