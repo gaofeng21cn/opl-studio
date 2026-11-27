@@ -11,7 +11,7 @@ test("OpldClient enforces requestTimeoutMs and reconnects transparently after a 
         await new Promise((r) => setTimeout(r, 120));
         return { ok: true };
       }
-      if (method === "drop.once" && !droppedOnce) {
+      if (method === "app.state.get" && !droppedOnce) {
         droppedOnce = true;
         daemon.dropSockets();
         await new Promise((r) => setTimeout(r, 20));
@@ -29,7 +29,28 @@ test("OpldClient enforces requestTimeoutMs and reconnects transparently after a 
 
   const autoClient = new OpldClient({ stateDir: daemon.stateDir, autoStart: true });
   t.after(() => autoClient.close());
-  assert.deepEqual(await autoClient.call("drop.once", {}), { recovered: true });
+  assert.deepEqual(await autoClient.call("app.state.get", {}), { recovered: true });
+});
+
+test("OpldClient does not repeat a mutation when its receipt is lost", async (t) => {
+  let writes = 0;
+  const daemon = await startFakeOpld({
+    onCall(method, _params, { socket }) {
+      if (method === "app.action.execute") {
+        writes++;
+        socket.destroy();
+      }
+      return { writes };
+    }
+  });
+  const client = new OpldClient({ stateDir: daemon.stateDir });
+  t.after(async () => { await client.close(); await daemon.close(); });
+
+  await assert.rejects(
+    client.call("app.action.execute", { action_id: "gateway_account_refresh", dry_run: false }),
+    (error) => error.code === "connection_closed"
+  );
+  assert.deepEqual(await client.call("app.state.get"), { writes: 1 });
 });
 
 test("readState, readInitialize, and readFullDrilldown pass through daemon projections and attach readback", async (t) => {
