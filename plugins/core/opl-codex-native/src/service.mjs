@@ -57,6 +57,18 @@ function defaultChannelBindingFile(env) {
     ?? path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "channel-transport-bindings.json");
 }
 
+function codexLaunchEnvironment(env) {
+  if (env.OPL_CODEX_BIN || env.CODEX_APP_SERVER_COMMAND) return env;
+  const home = env.HOME?.trim() || env.USERPROFILE?.trim() || os.homedir();
+  const runtimeRoot = env.OPL_RUNTIME_ROOT?.trim() || path.join(home, "Library", "Application Support", "OPL", "runtime");
+  const managedBin = path.resolve(runtimeRoot, "current", "bin");
+  const pathKey = process.platform === "win32" ? Object.keys(env).find(key => key.toUpperCase() === "PATH") ?? "PATH" : "PATH";
+  const searchPath = env[pathKey] ?? (process.platform === "win32" ? process.env.PATH ?? "" : "/usr/bin:/bin");
+  if (searchPath.split(path.delimiter).includes(managedBin)) return env;
+  // Keep external commands first. A later first-run install creates this directory while the Host stays open.
+  return { ...env, [pathKey]: searchPath + path.delimiter + managedBin };
+}
+
 export class OplCodexNative extends EventEmitter {
   constructor({
     workspaceRoot = defaultWorkspaceRoot,
@@ -80,9 +92,10 @@ export class OplCodexNative extends EventEmitter {
       filePath: channelBindingFile ?? defaultChannelBindingFile(env)
     });
     const connection = dshToolMcp?.codexConnection?.();
+    const launchEnv = codexLaunchEnvironment(env);
     const childEnv = connection
-      ? { ...env, [connection.bearerTokenEnvVar]: connection.bearerToken }
-      : env;
+      ? { ...launchEnv, [connection.bearerTokenEnvVar]: connection.bearerToken }
+      : launchEnv;
     const baseArgs = env.CODEX_APP_SERVER_ARGS?.split(" ").filter(Boolean)
       ?? ["app-server"];
     this.baseCodexArgs = [...baseArgs];
@@ -114,7 +127,7 @@ export class OplCodexNative extends EventEmitter {
       // or a caller-managed configuration.
       extraLaunchArgs: !env.CODEX_APP_SERVER_ARGS ? () => sharedAppsMcpArgs({
         command: env.OPL_CODEX_BIN ?? env.CODEX_APP_SERVER_COMMAND ?? "codex",
-        cwd: workspaceRoot, env, stateDir
+        cwd: workspaceRoot, env: launchEnv, stateDir
       }) : undefined,
       prepareLaunch: () => this.#prepareTransportLaunch(),
       channelBindingStore,

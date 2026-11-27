@@ -1,10 +1,47 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
 import { sharedAppsMcpArgs } from "../../plugins/core/opl-codex-native/src/shared-apps-mcp.mjs";
 import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
+
+test("a running native Host finds a new managed Codex for the catalog and app server", { skip: process.platform === "win32" }, async t => {
+  const home = await mkdtemp(path.join(await realpath(os.tmpdir()), "studio-managed-codex-"));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).href;
+  for (const custom of [false, true]) {
+    const root = custom ? path.join(home, "custom") : path.join(home, "Library", "Application Support", "OPL", "runtime");
+    const runtimeBin = path.join(root, "current", "bin");
+    const pathBin = path.join(root, "external");
+    const log = path.join(root, "calls.jsonl");
+    const env = { HOME: home, PATH: pathBin, ...(custom ? { OPL_RUNTIME_ROOT: root } : {}) };
+    const host = new OplCodexNative({ env, workspaceRoot: home, channelBindingFile: path.join(home, "bindings.json") });
+    try {
+      await host.start();
+      assert.equal(host.capabilities().available, false);
+      for (const directory of [runtimeBin, pathBin]) {
+        await mkdir(directory, { recursive: true });
+        await writeFile(path.join(directory, "codex"), `#!${process.execPath}
+const { appendFileSync } = require("node:fs");
+const mode = process.argv[2];
+appendFileSync(${JSON.stringify(log)}, JSON.stringify([__filename, mode]) + "\\n");
+if (mode === "mcp") process.stdout.write("[]");
+else if (mode === "app-server") import(${JSON.stringify(fixture)});
+`, { mode: 0o755 });
+        await host.start();
+        assert.equal(host.capabilities().available, true);
+        assert.deepEqual((await readFile(log, "utf8")).trim().split("\n").slice(-2).map(line => JSON.parse(line)), [
+          [path.join(directory, "codex"), "mcp"], [path.join(directory, "codex"), "app-server"],
+        ]);
+        await host.transport.stop();
+      }
+    } finally {
+      await host.close();
+    }
+  }
+});
 
 test("uses scoped Codex overrides for clean workbenches and honors user MCP transports", async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "studio-catalog-"));
