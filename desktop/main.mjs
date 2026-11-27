@@ -337,10 +337,14 @@ async function createDesktopHost(appLogDirectory) {
   let activatedCodexPath;
   if (app.isPackaged && !windowsRuntime && !updaterQualificationEnabled
     && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1") {
-    ({ activationStatus, activatedCodexPath } = await prepareDesktopCodexRuntime({
-      env: activationEnvironment, activatePending: managedUpdatesEnabled, refreshUpdates: managedUpdatesEnabled, onProgress: reportDesktopSetup,
-      opl: createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] })
-    }));
+    const startupOpl = createOplPassthrough({ env: activationEnvironment, cwd: homeDir, candidateActionAllowlist: ["codex_install"] });
+    try {
+      ({ activationStatus, activatedCodexPath } = await prepareDesktopCodexRuntime({
+        env: activationEnvironment, activatePending: managedUpdatesEnabled, refreshUpdates: managedUpdatesEnabled,
+        firstInstall: officialProfileAdmission?.eligible === true && bootstrapStatus === "available",
+        onProgress: reportDesktopSetup, opl: startupOpl
+      }));
+    } finally { await startupOpl.close(); }
     if (runtime?.env.OPL_FULL_RUNTIME_HOME) {
       runtime = activateInstalledStudioRuntime({ homeDir, env: process.env, identity: stableIdentity ? "stable" : "preview" }) ?? runtime;
     }

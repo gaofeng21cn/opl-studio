@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"; import { EventEmitter } from "node:events"; import fs from "node:fs"; import net from "node:net"; import os from "node:os"; import path from "node:path";
 // A lost response does not tell us whether the daemon committed the request.
 const replayableReads = new Set([
-  "daemon.health", "daemon.info", "daemon.doctor", "app.state.get", "app.initialize.get",
+  "daemon.health", "daemon.info", "daemon.doctor", "app.state.get", "app.initialize.get", "app.codexRuntime.get",
   "app.operatorDrilldown.get", "app.domainDetail.get", "ledger.timeline", "runway.task.list", "pack.list", "pack.inspect", "connect.list",
 ]);
 const codexGatewayMethods = new Set(["login", "repair", "disconnect", "completeSetup", "useForModelAccess"]);
@@ -123,8 +123,8 @@ export class OpldClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       if (!socket || socket.destroyed || socket.writableEnded) return reject(new OpldRpcError("Socket not connected", { code: "connection_closed" }));
       const id = this.#nextId++;
-      const timer = setTimeout(() => { this.#pending.delete(id); reject(new OpldRpcError(`RPC timeout calling ${method}`, { code: "rpc_timeout" })); }, timeoutMs);
-      timer.unref?.();
+      const timer = timeoutMs === null ? null : setTimeout(() => { this.#pending.delete(id); reject(new OpldRpcError(`RPC timeout calling ${method}`, { code: "rpc_timeout" })); }, timeoutMs);
+      timer?.unref?.();
       this.#pending.set(id, { resolve, reject, timer, socket });
       socket.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     });

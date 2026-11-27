@@ -39,7 +39,7 @@ test("runManagedUpdate validates operations pre-RPC and enforces read-only host 
         packages: [{ package_id: "mas", status: "available" }],
         managed_update: { components: [{ component_id: "opl_packages" }], execution: { status: "completed" } }
       };
-      if (method === "daemon.health") return { status: "ok" };
+      if (method === "app.codexRuntime.get") return { __rpcError: { code: -32601, message: "Unknown method", data: { code: "METHOD_NOT_FOUND" } } };
       return {};
     }
   });
@@ -61,7 +61,8 @@ test("runManagedUpdate validates operations pre-RPC and enforces read-only host 
   assert.equal(check.managed_update.packages[0].package_id, "mas");
   const status = await ro.runManagedUpdate("status");
   assert.deepEqual(status.managed_update.components, [{ component_id: "opl_packages" }]);
-  assert.deepEqual(calls, ["pack.updatePlan", "pack.updatePlan"]);
+  assert.equal(status.runtime_activation.status, "unsupported");
+  assert.deepEqual(calls, ["pack.updatePlan", "pack.updatePlan", "app.codexRuntime.get"]);
 });
 
 test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trusted-host errors without synthesizing completion", async (t) => {
@@ -77,7 +78,7 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
         assert.deepEqual(params, { background: true });
         return { batch_id: "batch-1", managed_update: { components: [], execution: { status: "partial_failure" } } };
       }
-      if (method === "daemon.health") return { ok: true };
+      if (method === "app.codexRuntime.activate") return { runtime_activation: { status: "active", codex: { runtime_binary_path: "/managed/bin/codex" } } };
       return { packages: [] };
     }
   });
@@ -92,7 +93,8 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
 
   const activated = await opl.runManagedUpdate("activate");
   assert.equal(activated.runtime_activation.status, "active");
-  assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "daemon.health"]);
+  assert.equal(activated.runtime_activation.codex.runtime_binary_path, "/managed/bin/codex");
+  assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "app.codexRuntime.activate"]);
 
   legacy = true;
   await assert.rejects(() => opl.runManagedUpdate("apply"), { code: "base_upgrade_required" });
@@ -117,4 +119,22 @@ test("unavailable daemon and missing binary errors reject fail-closed when expli
   });
   t.after(() => explicitBadBin.close());
   await assert.rejects(() => explicitBadBin.start(), (err) => err instanceof OpldRpcError && err.code === "daemon_not_found");
+});
+
+test("Codex installation takes its source from the calling Host when reusing a daemon", async (t) => {
+  const requested = [];
+  const daemon = await startFakeOpld({ onCall: async (method, params) => {
+    assert.equal(method, 'app.action.execute');
+    requested.push(params.payload);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    return { status: 'executed' };
+  } });
+  t.after(() => daemon.close());
+  for (const env of [{ OPL_FULL_RUNTIME_HOME: '/installed/Full' }, {}]) {
+    const opl = createOplPassthrough({ env, stateDir: daemon.stateDir, autoStart: false, requestTimeoutMs: 5 });
+    try {
+      await opl.executeAction({ actionId: 'codex_install', dryRun: false, payload: { confirmed: true, full_runtime_root: '/untrusted/request' } });
+    } finally { await opl.close(); }
+  }
+  assert.deepEqual(requested, [{ confirmed: true, full_runtime_root: '/installed/Full' }, { confirmed: true, full_runtime_root: null }]);
 });

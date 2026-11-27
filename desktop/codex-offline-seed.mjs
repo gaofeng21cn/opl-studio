@@ -32,20 +32,28 @@ function executableFile(file) {
   try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; }
 }
 
-export async function ensureFullCodexFirstInstall({ env, opl, executable = executableFile }) {
-  if (!env.OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL || !env.OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL) return null;
-  if (env.CODEX_APP_SERVER_COMMAND || [env.OPL_CODEX_BIN, env.CODEX_CLI_PATH, env.CODEX_BIN].filter(Boolean).some(executable)) return null;
+async function installCodexRuntime({ opl, executable }) {
   const result = await opl.executeAction({ actionId: "codex_install", dryRun: false, payload: { confirmed: true } });
-  if (result.status !== "executed" && result.status !== "no_op") throw new Error("Framework could not initialize the Full Codex offline seed");
+  if (result.status !== "executed" && result.status !== "no_op") throw new Error("Framework could not initialize the Codex runtime");
   const activation = await opl.runManagedUpdate("activate");
   const binary = activation.runtime_activation?.codex?.runtime_binary_path;
   if (!path.isAbsolute(binary ?? "") || !executable(binary)) throw new Error("Framework did not activate a usable Codex executable");
   return binary;
 }
 
+function hasCodexSeed(env) {
+  return Boolean(env.OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL && env.OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL);
+}
+
+function hasConfiguredCodex(env, managedBinary, executable) {
+  if (env.CODEX_APP_SERVER_COMMAND) return true;
+  const selected = env.OPL_CODEX_BIN || env.CODEX_CLI_PATH || env.CODEX_BIN;
+  return selected && path.resolve(selected) !== managedBinary && executable(selected);
+}
+
 // Pending updates are optional at launch. Packaged first-install inputs must
 // still reach Framework when update activation fails or automatic updates are off.
-export async function prepareDesktopCodexRuntime({ env, opl, activatePending = true, refreshUpdates = false, onProgress = () => {}, executable = executableFile }) {
+export async function prepareDesktopCodexRuntime({ env, opl, activatePending = true, refreshUpdates = false, firstInstall = false, onProgress = () => {}, executable = executableFile }) {
   let activationStatus = 'disabled';
   let activatedCodexPath;
   let currentnessError;
@@ -60,20 +68,32 @@ export async function prepareDesktopCodexRuntime({ env, opl, activatePending = t
       }
     } catch (error) { currentnessError = error.code ?? 'startup_update_failed'; }
   }
-  if (activatePending) {
-    try {
-      const activation = await opl.runManagedUpdate('activate');
-      activationStatus = activation.runtime_activation?.status ?? 'unknown';
-      const binary = activation.runtime_activation?.codex?.runtime_binary_path;
-      if (typeof binary === 'string' && path.isAbsolute(binary) && executable(binary)) activatedCodexPath = binary;
-    } catch (error) { activationStatus = error.code ?? 'failed'; }
-  }
-  if (!activatedCodexPath) {
-    const hasSeed = env.OPL_FIRST_RUN_CODEX_PACKAGE_TARBALL && env.OPL_FIRST_RUN_CODEX_PLATFORM_PACKAGE_TARBALL;
-    if (hasSeed && !env.OPL_CODEX_BIN && !env.CODEX_APP_SERVER_COMMAND && !env.CODEX_CLI_PATH && !env.CODEX_BIN) {
-      onProgress({ stage: 'preparing_codex', source: 'bundled' });
+  let activation;
+  try {
+    activation = activatePending ? await opl.runManagedUpdate('activate') : await opl.readCodexRuntime?.();
+    if (activatePending) activationStatus = activation?.runtime_activation?.status ?? 'unknown';
+  } catch (error) {
+    activationStatus = error.code ?? 'failed';
+    // A failed pending generation can coexist with an older usable current.
+    if (activatePending && opl.readCodexRuntime) {
+      try { activation = await opl.readCodexRuntime(); } catch { /* Keep the activation error. */ }
     }
-    activatedCodexPath = await ensureFullCodexFirstInstall({ env, opl, executable }) ?? undefined;
+  }
+  const codex = activation?.runtime_activation?.codex;
+  if (typeof codex?.runtime_binary_path === 'string' && path.isAbsolute(codex.runtime_binary_path) && executable(codex.runtime_binary_path)) {
+    activatedCodexPath = codex.runtime_binary_path;
+  }
+  const bundled = hasCodexSeed(env);
+  if (!activatedCodexPath && !hasConfiguredCodex(env, codex?.managed_binary_path, executable)
+    && (bundled || (firstInstall && !env.OPL_FULL_RUNTIME_HOME))) {
+    onProgress({ stage: 'preparing_codex', source: bundled ? 'bundled' : 'network' });
+    try {
+      activatedCodexPath = await installCodexRuntime({ opl, executable });
+    } catch (error) {
+      if (bundled) throw error;
+      currentnessError = error.code ?? 'codex_install_failed';
+      onProgress({ stage: 'preparing_codex', status: 'failed', source: 'network' });
+    }
   }
   return { activationStatus: currentnessError ?? activationStatus, activatedCodexPath };
 }
