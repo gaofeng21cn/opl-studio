@@ -5,6 +5,16 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const server = "mcp_servers.opl-apps";
 const stdioArgs = ["connect", "mcp-app-stdio"];
+const oplCommand = value => ["opl", "opl.exe", "opl.cmd"].includes(path.basename(value || ""));
+
+function installedWorkbench(transport) {
+  if (transport?.type !== "stdio" || !Array.isArray(transport.args)) return false;
+  const args = transport.args;
+  if (args.at(-2) !== "connect" || args.at(-1) !== "mcp-app-stdio") return false;
+  return (args.length === 2 && oplCommand(transport.command))
+    || (args.length === 3 && ["node", "node.exe"].includes(path.basename(transport.command || ""))
+      && path.isAbsolute(args[0]) && oplCommand(args[0]));
+}
 
 // Codex owns the effective configuration, including disabled, HTTP and managed
 // servers. Inspect it with the same binary, working directory and home as the
@@ -24,15 +34,14 @@ export async function sharedAppsMcpArgs({ command, cwd, env, stateDir }) {
   if (!Array.isArray(servers)) return [];
   const existing = servers.find(entry => entry?.name === "opl-apps");
   const transport = existing?.transport;
-  if (existing && (!existing.enabled || transport?.type !== "stdio"
-    || !["opl", "opl.exe", "opl.cmd"].includes(path.basename(transport.command || ""))
-    || JSON.stringify(transport.args) !== JSON.stringify(stdioArgs))) return [];
+  if (existing && (!existing.enabled || !installedWorkbench(transport))) return [];
 
   const overrides = [];
   const set = (field, value) => overrides.push("-c", `${server}.${field}=${JSON.stringify(value)}`);
   const readOnly = env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1";
   if (!existing) set("command", env.OPL_APP_OPL_BIN || env.OPL_COMMAND || "opl");
-  if (!existing || readOnly) set("args", readOnly ? [...stdioArgs, "--read-only"] : stdioArgs);
+  const args = existing ? transport.args : stdioArgs;
+  if (!existing || readOnly) set("args", readOnly ? [...args, "--read-only"] : args);
 
   const declared = new Set([...Object.keys(transport?.env ?? {}), ...(transport?.env_vars ?? [])]);
   if (!declared.has("OPL_STATE_DIR") && !declared.has("OPL_DATA_DIR")) {

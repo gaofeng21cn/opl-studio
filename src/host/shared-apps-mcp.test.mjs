@@ -30,6 +30,11 @@ process.stdout.write(process.env.TEST_CATALOG);`, { mode: 0o755 });
   assert.deepEqual(await probe([configured], { OPL_NATIVE_WORKBENCH_READ_ONLY: "1" }), [
     "-c", 'mcp_servers.opl-apps.args=["connect","mcp-app-stdio","--read-only"]'
   ]);
+  const nodeTransport = { ...configured.transport, command: "/installed/bin/node",
+    args: ["/installed/bin/opl", "connect", "mcp-app-stdio"] };
+  assert.deepEqual(await probe([{ ...configured, transport: nodeTransport }], { OPL_STUDIO_READ_ONLY: "1" }), [
+    "-c", 'mcp_servers.opl-apps.args=["/installed/bin/opl","connect","mcp-app-stdio","--read-only"]'
+  ]);
   for (const entry of [
     { ...configured, enabled: false },
     { ...configured, transport: { type: "streamable_http", url: "http://localhost/custom" } },
