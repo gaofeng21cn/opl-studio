@@ -163,7 +163,7 @@ import type {
 } from "../composition/contributionProjection";
 import { SettingsSurface } from "../composition/surfaces/SettingsSurface";
 import { SoftwareCenterSurface } from "../composition/surfaces/SoftwareCenterSurface";
-import { contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
+import { captureContributionActionInput, contributionActionOutcome, contributionLabel, createOplContributionActionRequest } from "../composition/contributionProjection";
 import type { OplAgentPermission, OplSetupOperationResult, OplStudioPrimaryView, RenderOplStudioShell } from "../composition/oplStudioSurface";
 import type { OplStudioDetailTab } from "../composition/clientCordis";
 import { CodexServerRequestPanel } from "./CodexServerRequestPanel";
@@ -1701,8 +1701,7 @@ export function App({
     setContributionActionBusy(true);
     setContributionActionConfirmation(null);
     try {
-      const actionRequest = createOplContributionActionRequest(entry, command, confirmed);
-      actionRequest.payload.input = input;
+      const actionRequest = createOplContributionActionRequest(entry, command, confirmed, input);
       const receipt = await bridge.executeAction(actionRequest);
       const outcome = contributionActionOutcome(receipt.stdoutJson, entry, command);
       setLastDryRun(formatReceipt(contributionReceiptForDisplay(entry, receipt, Boolean(outcome.presentation))));
@@ -1736,16 +1735,29 @@ export function App({
     contributionActionResolver.current = null;
     resolve?.(await executeContributionAction(pending.entry, pending.command, true, pending.input));
   }
+  const runtimeDetailIdentity = selectedRuntimeWorkItem?.domainId
+      && selectedRuntimeWorkItem.domainWorkItemId
+      && selectedRuntimeWorkItem.workItemScopeId
+      && selectedRuntimeWorkItem.identityState === "resolved" ? {
+      agentId: selectedRuntimeWorkItem.agentId,
+      domainId: selectedRuntimeWorkItem.domainId,
+      workItemId: selectedRuntimeWorkItem.workItemId,
+      domainWorkItemId: selectedRuntimeWorkItem.domainWorkItemId,
+      workItemScopeId: selectedRuntimeWorkItem.workItemScopeId,
+      identityState: "resolved" as const
+    } : undefined;
   const handleContributionAction: OplContributionAction = (entry, command, input = {}, preview) => {
     if (disabledAppPackages.current.has(entry.packageId)) return Promise.resolve({ status: "cancelled" });
     if (!contributionActionAvailable || contributionActionResolver.current) return Promise.resolve({status: "failed", message: settings.locale === "zh" ? "其他操作仍在处理，请稍后重试" : "Another action is in progress"});
+    const actionInput = captureContributionActionInput(entry, input, runtimeDetailIdentity);
+    if (!actionInput) return Promise.resolve({status: "failed", message: settings.locale === "zh" ? "任务选择与操作对象不符，请重新选择。" : "The action does not match the selected task. Select the task again."});
     if (command.confirmationRequired) {
       return new Promise(resolve => {
         contributionActionResolver.current = resolve;
-        setContributionActionConfirmation({ entry, command, input, preview });
+        setContributionActionConfirmation({ entry, command, input: actionInput, preview });
       });
     }
-    return executeContributionAction(entry, command, false, input);
+    return executeContributionAction(entry, command, false, actionInput);
   };
   const readContributionData = useCallback((entry: OplUiContributionsProjection["entries"][number], input: Record<string, unknown> = {}) => {
     if (disabledAppPackages.current.has(entry.packageId)) return Promise.reject(new Error("Contribution is disabled in OPL App"));
@@ -1756,19 +1768,9 @@ export function App({
     locale: settings.locale,
     actionAvailable: contributionActionAvailable,
     developerDetails: settings.developerDetails,
-    ...(selectedRuntimeWorkItem?.domainId
-      && selectedRuntimeWorkItem.domainWorkItemId
-      && selectedRuntimeWorkItem.workItemScopeId
-      && selectedRuntimeWorkItem.identityState === "resolved" ? { runtimeDetailIdentity: {
-      agentId: selectedRuntimeWorkItem.agentId,
-      domainId: selectedRuntimeWorkItem.domainId,
-      workItemId: selectedRuntimeWorkItem.workItemId,
-      domainWorkItemId: selectedRuntimeWorkItem.domainWorkItemId,
-      workItemScopeId: selectedRuntimeWorkItem.workItemScopeId,
-      identityState: "resolved" as const
-    } } : {}),
-    openRuntimeWorkbench: selectedRuntimeWorkItem ? () => {
-      setMcpTaskTarget({ itemId: selectedRuntimeWorkItem.id, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace");
+    runtimeDetailIdentity,
+    openRuntimeWorkbench: selectedRuntimeWorkItem ? (viewId?: string) => {
+      setMcpTaskTarget({ itemId: selectedRuntimeWorkItem.id, viewId, threadId: codexThreadId }); setMcpAppSelectedLaunch(undefined); setPrimaryView("workspace");
     } : undefined,
     openSoftwareCenter: () => setPrimaryView("applications"),
     pickDirectory: bridge.platformCapabilities.workspaceRootSelection ? async () => (await bridge.pickDirectory()).find(item => item.kind === "folder")?.path : undefined,

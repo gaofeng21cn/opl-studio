@@ -5,6 +5,7 @@ import { Window } from "happy-dom";
 import { readFileSync } from "node:fs";
 import {
   OPL_UI_CONTRIBUTION_SLOTS,
+  captureContributionActionInput,
   createOplContributionActionRequest,
   createOplContributionReadInput,
   groupSettingsContributions,
@@ -627,6 +628,27 @@ describe("OPL Studio DSH contribution composition", () => {
       unavailable_reason: "producer_absent",
       refresh_after_ms: 1_000
     })).toBeNull();
+  });
+
+  test("confirms a runtime command against its original work item and rejects mismatched inputs", () => {
+    const entry = readUiContributionsProjection(projectionState).entries.find(candidate => candidate.slot === "runtime.detail")!;
+    const identity = { agentId: entry.packageId, domainId: "project", workItemId: "task-a", domainWorkItemId: "domain-a",
+      workItemScopeId: "project:task-a", identityState: "resolved" as const };
+    const expectedRead = createOplContributionReadInput(entry, identity);
+    const input = { note: "approved", work_item_identity: { work_item_id: "task-a" } };
+    const captured = captureContributionActionInput(entry, input, identity);
+    expect(captured).toEqual({ note: "approved", ...expectedRead });
+    expect(captureContributionActionInput(entry, { work_item_identity: { work_item_id: "task-b" } }, identity)).toBeNull();
+    expect(captureContributionActionInput(entry, {}, { ...identity, agentId: "another-agent" })).toBeNull();
+    expect(captureContributionActionInput(entry, {}, undefined)).toBeNull();
+
+    identity.workItemId = "task-b";
+    input.work_item_identity.work_item_id = "task-b";
+    expect(createOplContributionActionRequest(entry, entry.commands[0]!, true, captured!).payload.input).toEqual({
+      note: "approved", ...expectedRead
+    });
+    const settingsEntry = { ...entry, slot: "settings.section" as const, scope: "root" as const };
+    expect(captureContributionActionInput(settingsEntry, { note: "saved" })).toEqual({ note: "saved" });
   });
 
   test("parses the closed remote_companion_access result contract and keeps invalid states local", () => {

@@ -408,7 +408,7 @@ function ContributionView({ entry, owner }: {
   owner: OplContributionSlotOwner;
 }) {
   if (entry.slot === "runtime.detail") return owner.runtimeDetailIdentity && owner.openRuntimeWorkbench
-    ? <button type="button" onClick={owner.openRuntimeWorkbench}>{owner.locale === "zh" ? "打开任务工作台" : "Open task workbench"}</button>
+    ? <button type="button" onClick={() => owner.openRuntimeWorkbench?.(entry.view?.viewId)}>{owner.locale === "zh" ? "打开任务工作台" : "Open task workbench"}</button>
     : <p role="status">{owner.locale === "zh" ? "请选择一个任务后打开工作台" : "Select a task to open the workbench"}</p>;
   if (entry.view?.viewType === "channel_access") return <ChannelAccessView entry={entry} owner={owner} />;
   if (entry.view?.viewType === "remote_companion_access") return <RemoteCompanionAccessView entry={entry} owner={owner} />;
@@ -1082,6 +1082,7 @@ export function ProjectedContribution({ entry, owner }: {
   entry: OplUiContribution;
   owner: OplContributionSlotOwner;
 }) {
+  if (entry.slot === "runtime.detail" && entry.scope === "work_item" && entry.packageId !== owner.runtimeDetailIdentity?.agentId) return null;
   const supported = entry.contributionKind === "command_group"
     || (entry.contributionKind === "view" && entry.view !== undefined);
   const title = entry.view

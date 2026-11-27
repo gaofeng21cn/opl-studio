@@ -325,7 +325,7 @@ export type OplContributionSlotOwner = {
   openSoftwareCenter?(): void;
   pickDirectory?: () => Promise<string | undefined>;
   runtimeDetailIdentity?: OplRuntimeDetailIdentity;
-  openRuntimeWorkbench?(): void;
+  openRuntimeWorkbench?(viewId?: string): void;
   readData(entry: OplUiContribution, input?: OplContributionInput): Promise<unknown>;
   refreshRevision: number;
   onAction: OplContributionAction;
@@ -334,7 +334,7 @@ export type OplContributionSlotOwner = {
 export function createOplContributionReadInput(
   entry: OplUiContribution,
   identity?: OplRuntimeDetailIdentity
-): OplContributionInput | undefined {
+) {
   if (entry.slot !== "runtime.detail" || !identity) return undefined;
   return {
     work_item_identity: {
@@ -346,6 +346,26 @@ export function createOplContributionReadInput(
       identity_state: identity.identityState
     }
   };
+}
+
+// Bind the domain operation to the selection shown when its command was clicked.
+// The confirmation can outlive that selection.
+export function captureContributionActionInput(
+  entry: OplUiContribution,
+  input: OplContributionInput,
+  identity?: OplRuntimeDetailIdentity
+): OplContributionInput | null {
+  if (entry.slot !== "runtime.detail" || entry.scope !== "work_item") return input;
+  if (!identity || entry.packageId !== identity.agentId) return null;
+  const selected = createOplContributionReadInput(entry, identity)?.work_item_identity;
+  if (!selected) return null;
+  if ("work_item_identity" in input) {
+    const supplied = asRecord(input.work_item_identity);
+    if (!supplied) return null;
+    const target: Record<string, unknown> = selected;
+    if (Object.entries(supplied).some(([key, value]) => !Object.hasOwn(target, key) || target[key] !== value)) return null;
+  }
+  return { ...input, work_item_identity: selected };
 }
 
 export type RenderOplContributionSlot = (
