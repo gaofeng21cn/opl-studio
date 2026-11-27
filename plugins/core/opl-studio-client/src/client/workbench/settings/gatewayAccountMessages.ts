@@ -27,8 +27,8 @@ const GATEWAY_ACCOUNT_ERROR_MESSAGES: Record<GatewayAccountMessageCode, { zh: st
     en: "OPL Gateway did not return a persistent session. Try again later or contact support."
   },
   group_selection_required: {
-    zh: "该账号有多个可用分组，需要先选择一个分组才能完成本机设置。",
-    en: "This account has several available groups; select one to finish device setup."
+    zh: "无法确定本机使用的 Gateway 分组。请在 Gateway 中确认可用分组，然后刷新账户。",
+    en: "The Gateway group for this device is unclear. Check the available groups in Gateway, then refresh the account."
   },
   auth_expired: {
     zh: "登录状态已过期。请重新登录。",

@@ -85,7 +85,8 @@ function gatewayFreshness(gatewayFreshnessRecord: Record<string, unknown> | null
 }
 
 function deriveGatewayAccount(
-  gatewayAccountProjection: Record<string, unknown> | null
+  gatewayAccountProjection: Record<string, unknown> | null,
+  actionRecords: ReadonlyMap<string, Record<string, unknown>>
 ): WorkbenchGatewayAccount | undefined {
   const account = asRecord(gatewayAccountProjection?.account);
   const balance = asRecord(account?.balance);
@@ -106,6 +107,15 @@ function deriveGatewayAccount(
     const id = asString(group.group_id);
     return id ? [{ id, label: asString(group.label) ?? id }] : [];
   });
+  // Older Framework versions publish the available groups without a resolved ID.
+  // Apply the same App policy only for those versions. An explicit null is authoritative.
+  let resolvedGroupId = asString(gatewayAccountProjection.resolved_group_id);
+  if (!Object.hasOwn(gatewayAccountProjection, "resolved_group_id")) {
+    const codexGroups = availableGroups.filter((group) => group.label.toLowerCase().includes("codex"));
+    resolvedGroupId = codexGroups.length === 1 ? codexGroups[0].id
+      : availableGroups.length === 1 ? availableGroups[0].id : null;
+  }
+  const setupActionId = asString(asRecord(gatewayAccountProjection.actions)?.complete_setup);
   const accountBalance = asFiniteNumber(balance?.amount);
   const balanceCurrency = asString(balance?.currency);
   const managedKeyName = asString(managedKey?.name);
@@ -126,6 +136,8 @@ function deriveGatewayAccount(
       }
     } : {}),
     ...(availableGroups.length ? { availableGroups } : {}),
+    ...(resolvedGroupId && availableGroups.some((group) => group.id === resolvedGroupId) ? { resolvedGroupId } : {}),
+    ...(setupActionId && actionRecords.has(setupActionId) ? { setupActionId } : {}),
     ...(deviceLabel || deviceShortId ? {
       installation: {
         ...(deviceLabel ? { deviceLabel } : {}),
@@ -137,13 +149,16 @@ function deriveGatewayAccount(
   };
 }
 
-function deriveGatewayProjection(appSettingsReadModel: Record<string, unknown> | null): {
+function deriveGatewayProjection(
+  appSettingsReadModel: Record<string, unknown> | null,
+  actionRecords: ReadonlyMap<string, Record<string, unknown>>
+): {
   gatewayAccount?: WorkbenchGatewayAccount;
   gatewayConnectionMode: WorkbenchSettingsProjection["gatewayConnectionMode"];
 } {
   const gatewayAccountProjection = asRecord(appSettingsReadModel?.opl_gateway_account);
   return {
-    gatewayAccount: deriveGatewayAccount(gatewayAccountProjection),
+    gatewayAccount: deriveGatewayAccount(gatewayAccountProjection, actionRecords),
     gatewayConnectionMode: gatewayConnectionMode(gatewayAccountProjection)
   };
 }
@@ -501,7 +516,7 @@ export function deriveWorkbenchSettingsProjection({
   actionRecords
 }: WorkbenchSettingsProjectionInput): WorkbenchSettingsProjectionResult {
   const appSettingsReadModel = asRecord(settingsControlCenter?.app_settings_read_model);
-  const gateway = deriveGatewayProjection(appSettingsReadModel);
+  const gateway = deriveGatewayProjection(appSettingsReadModel, actionRecords);
   const codexModelPolicy = asRecord(appSettingsReadModel?.codex_model_policy);
   const localEnvironment = asRecord(appSettingsReadModel?.local_environment);
   const statusSummary = asRecord(settingsControlCenter?.status_summary);
