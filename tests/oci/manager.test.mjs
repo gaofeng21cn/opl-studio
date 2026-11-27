@@ -275,6 +275,7 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     sourceRevision: "a".repeat(40),
     frameworkRef: "b".repeat(40),
     appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3",
     output: "./out/one-person-lab.oci.tar"
   });
   assert.deepEqual(plan.platforms, multiArchPlatforms);
@@ -283,10 +284,18 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
   assert.ok(plan.command.includes("--sbom=true"));
   assert.deepEqual(plan.externalCohort, {
     frameworkRef: "b".repeat(40),
-    appRef: "c".repeat(40)
+    appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3"
   });
   assert.ok(plan.command.includes(`OPL_FRAMEWORK_REF=${"b".repeat(40)}`));
   assert.ok(plan.command.includes(`OPL_APP_REF=${"c".repeat(40)}`));
+  assert.ok(plan.command.includes("OPL_CODEX_NPM_SPEC=@openai/codex@1.2.3"));
+  for (const codexSpec of [undefined, "@openai/codex@latest", "@other/codex@1.2.3"]) {
+    assert.throws(() => createMultiArchBuildPlan({
+      image: plan.image, sourceRevision: plan.sourceRevision, output: plan.output,
+      ...plan.externalCohort, codexSpec
+    }), /codexSpec/);
+  }
   assert.equal(plan.evidenceBoundary.executesBuild, false);
   assert.equal(plan.evidenceBoundary.hostedArchitectureQualified, false);
   const nativeArmPlan = createMultiArchBuildPlan({
@@ -294,6 +303,7 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     sourceRevision: "a".repeat(40),
     frameworkRef: "b".repeat(40),
     appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3",
     output: "./out/one-person-lab-arm64.oci.tar",
     platform: "linux/arm64"
   });
@@ -305,6 +315,7 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     sourceRevision: "a".repeat(40),
     frameworkRef: "b".repeat(40),
     appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3",
     output: "./out/image.tar"
   }), /latest/);
   assert.throws(() => createMultiArchBuildPlan({
@@ -312,6 +323,7 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     sourceRevision: "a".repeat(40),
     frameworkRef: "main",
     appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3",
     output: "./out/image.tar"
   }), /frameworkRef/);
   assert.throws(() => createMultiArchBuildPlan({
@@ -319,6 +331,7 @@ test("multi-arch build contract is plan-only and requests SBOM plus provenance",
     sourceRevision: "a".repeat(40),
     frameworkRef: "b".repeat(40),
     appRef: "c".repeat(40),
+    codexSpec: "@openai/codex@1.2.3",
     output: "./out/image.tar",
     platform: "linux/s390x"
   }), /platform/);
@@ -403,6 +416,7 @@ test("OCI CLI argument parsers preserve flags and error contracts", () => {
       "--source-revision", "a".repeat(40),
       "--framework-ref", "b".repeat(40),
       "--app-ref", "c".repeat(40),
+      "--codex-spec", "@openai/codex@1.2.3",
       "--output", "./out/image.tar",
       "--platform", "linux/arm64"
     ]),
@@ -411,6 +425,7 @@ test("OCI CLI argument parsers preserve flags and error contracts", () => {
       sourceRevision: "a".repeat(40),
       frameworkRef: "b".repeat(40),
       appRef: "c".repeat(40),
+      codexSpec: "@openai/codex@1.2.3",
       output: "./out/image.tar",
       platform: "linux/arm64"
     }

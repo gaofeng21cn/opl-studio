@@ -28,11 +28,24 @@ function exactRevision(value, name) {
   return revision;
 }
 
-export function createMultiArchBuildPlan({ image, sourceRevision, frameworkRef, appRef, output, platform }) {
+export function cohortBuildArgs({ frameworkRef, appRef, codexSpec }) {
+  exactRevision(frameworkRef, "frameworkRef");
+  exactRevision(appRef, "appRef");
+  if (!/^@openai\/codex@\d+\.\d+\.\d+$/.test(required(codexSpec, "codexSpec"))) {
+    throw new Error("codexSpec must be the exact Framework-resolved @openai/codex version");
+  }
+  return [
+    "--build-arg", `OPL_FRAMEWORK_REF=${frameworkRef}`,
+    "--build-arg", `OPL_APP_REF=${appRef}`,
+    "--build-arg", `OPL_CODEX_NPM_SPEC=${codexSpec}`
+  ];
+}
+
+export function createMultiArchBuildPlan({ image, sourceRevision, frameworkRef, appRef, codexSpec, output, platform }) {
   const imageRef = required(image, "image");
   const revision = exactRevision(sourceRevision, "sourceRevision");
-  const frameworkRevision = exactRevision(frameworkRef, "frameworkRef");
-  const appRevision = exactRevision(appRef, "appRef");
+  const externalCohort = { frameworkRef, appRef, codexSpec };
+  const cohortArgs = cohortBuildArgs(externalCohort);
   const destination = path.resolve(required(output, "output"));
   const platforms = selectedPlatforms(platform);
   if (/:latest$/.test(imageRef)) throw new Error("image must not use the latest tag");
@@ -42,10 +55,7 @@ export function createMultiArchBuildPlan({ image, sourceRevision, frameworkRef, 
     platforms,
     image: imageRef,
     sourceRevision: revision,
-    externalCohort: {
-      frameworkRef: frameworkRevision,
-      appRef: appRevision
-    },
+    externalCohort,
     output: destination,
     command: [
       "docker", "buildx", "build",
@@ -54,8 +64,7 @@ export function createMultiArchBuildPlan({ image, sourceRevision, frameworkRef, 
       "--sbom=true",
       "--output", `type=oci,dest=${destination}`,
       "--build-arg", `OPL_SOURCE_REVISION=${revision}`,
-      "--build-arg", `OPL_FRAMEWORK_REF=${frameworkRevision}`,
-      "--build-arg", `OPL_APP_REF=${appRevision}`,
+      ...cohortArgs,
       "--tag", imageRef,
       "."
     ],
@@ -81,6 +90,7 @@ export function parseBuildPlanArgs(argv) {
         "source-revision": { type: "string" },
         "framework-ref": { type: "string" },
         "app-ref": { type: "string" },
+        "codex-spec": { type: "string" },
         output: { type: "string" },
         platform: { type: "string" }
       }
@@ -95,6 +105,7 @@ export function parseBuildPlanArgs(argv) {
     ["source-revision", "sourceRevision"],
     ["framework-ref", "frameworkRef"],
     ["app-ref", "appRef"],
+    ["codex-spec", "codexSpec"],
     ["output", "output"],
     ["platform", "platform"]
   ];

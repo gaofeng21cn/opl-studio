@@ -896,7 +896,25 @@ jobs:
             sudo loginctl disable-linger "$OPL_HEADLESS_USER_NAME"
           fi
 
+  oci-inputs:
+    name: Resolve native OCI build inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      framework_ref: ${{ steps.inputs.outputs.framework_ref }}
+      app_ref: ${{ steps.inputs.outputs.app_ref }}
+      codex_npm_spec: ${{ steps.inputs.outputs.codex_npm_spec }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - id: inputs
+        uses: ./.github/actions/resolve-oci-inputs
+
   oci-distribution:
+    needs: oci-inputs
     name: OCI native ${{ matrix.architecture }} build and lifecycle
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -929,26 +947,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install OCI source test dependencies
+        run: npm ci --ignore-scripts
 
       - name: Run OCI source gates
         run: npm run test:oci
 
       - name: Build non-public native-architecture OCI layout
+        id: build
+        env:
+          FRAMEWORK_REF: ${{ needs.oci-inputs.outputs.framework_ref }}
+          APP_REF: ${{ needs.oci-inputs.outputs.app_ref }}
+          CODEX_SPEC: ${{ needs.oci-inputs.outputs.codex_npm_spec }}
         shell: bash
         run: |
-          cohort_json="$(node -e 'const fs=require("fs");const e=JSON.parse(fs.readFileSync("src/candidateContractEvidence.json","utf8"));process.stdout.write(JSON.stringify(e.candidate_runtime_qualification?.external_cohort??{}))')"
-          framework_ref="$(jq -er '.framework_commit | select(test("^[0-9a-f]{40}$"))' <<<"$cohort_json")"
-          app_ref="$(jq -er '.app_commit | select(test("^[0-9a-f]{40}$"))' <<<"$cohort_json")"
           archive="$RUNNER_TEMP/one-person-lab-${GITHUB_SHA}.oci.tar"
           plan="$RUNNER_TEMP/one-person-lab-oci-build-plan.json"
 
           npm run --silent plan:oci:multiarch -- \
             --image "opl-studio:non-release-${GITHUB_SHA}" \
             --source-revision "$GITHUB_SHA" \
-            --framework-ref "$framework_ref" \
-            --app-ref "$app_ref" \
+            --framework-ref "$FRAMEWORK_REF" \
+            --app-ref "$APP_REF" \
+            --codex-spec "$CODEX_SPEC" \
             --platform "$OPL_OCI_LIFECYCLE_PLATFORM" \
             --output "$archive" > "$plan"
 
@@ -956,6 +977,7 @@ jobs:
           jq -e '.command | index("--push") == null and all(.[]; contains("type=registry") | not)' "$plan"
           node -e 'const fs=require("fs"),{spawnSync}=require("child_process");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=spawnSync(p.command[0],p.command.slice(1),{stdio:"inherit"});process.exit(r.status??1)' "$plan"
           test -s "$archive"
+          echo "plan=$plan" >> "$GITHUB_OUTPUT"
           image_index_digest="$(tar -xOf "$archive" index.json | jq -er '
             [.manifests[] | select(.mediaType == "application/vnd.oci.image.index.v1+json")]
               | if length == 1 then .[0].digest else error("expected exactly one image index") end
@@ -972,4 +994,6 @@ jobs:
           '
 
       - name: Prove hosted native OCI lifecycle
+        env:
+          OPL_OCI_BUILD_PLAN: ${{ steps.build.outputs.plan }}
         run: npm run smoke:docker:lifecycle

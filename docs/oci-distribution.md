@@ -75,7 +75,7 @@ bind its local distribution to loopback.
 ## Multi-Architecture Contract
 
 The source contract targets `linux/amd64` and `linux/arm64` from one Dockerfile.
-Generate the non-executing build plan with an exact source revision:
+For the build plan, set `OPL_CODEX_NPM_SPEC` to the exact `@openai/codex@<version>` selected by the App dependency resolver for the chosen Framework and App commits.
 
 ```bash
 node scripts/oci/build-plan.mjs \
@@ -83,6 +83,7 @@ node scripts/oci/build-plan.mjs \
   --source-revision 0123456789abcdef0123456789abcdef01234567 \
   --framework-ref 0123456789abcdef0123456789abcdef01234567 \
   --app-ref 0123456789abcdef0123456789abcdef01234567 \
+  --codex-spec "$OPL_CODEX_NPM_SPEC" \
   --output ./out/one-person-lab.oci.tar
 ```
 

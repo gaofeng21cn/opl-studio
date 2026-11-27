@@ -56,8 +56,17 @@ test("additional carriers remain independent manual qualifications outside defau
     "desktop-distribution",
     "headless-installed-macos",
     "headless-installed-linux",
+    "oci-inputs",
     "oci-distribution"
   ]);
+  const oci = workflow.jobs["oci-distribution"];
+  assert.equal(oci.needs, "oci-inputs");
+  assert.ok(workflow.jobs[oci.needs].steps.some(step => step.uses === "./.github/actions/resolve-oci-inputs"));
+  const build = oci.steps.find(step => step.id === "build");
+  assert.equal(build.env.CODEX_SPEC, "${{ needs.oci-inputs.outputs.codex_npm_spec }}");
+  assert.match(build.run, /--codex-spec "\$CODEX_SPEC"/);
+  assert.equal(oci.steps.find(step => step.run === "npm run smoke:docker:lifecycle").env.OPL_OCI_BUILD_PLAN,
+    "${{ steps.build.outputs.plan }}");
   assert.match(source, /ubuntu-24\.04-arm/);
   assert.doesNotMatch(source, /setup-qemu-action|\bQEMU\b/i);
 });

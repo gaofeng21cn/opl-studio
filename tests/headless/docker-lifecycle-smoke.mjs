@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cohortBuildArgs } from "../../scripts/oci/build-plan.mjs";
+import { resolveDockerBuildInputs } from "../../scripts/oci/resolve-build-inputs.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const suffix = `${process.pid}-${Date.now()}`;
@@ -78,6 +80,11 @@ if (requireNativeArchitecture) {
   assert.equal(process.arch, expectedNodeArchitecture, `${qualificationPlatform} lifecycle must run on native hardware`);
 }
 
+const cohort = process.env.OPL_OCI_BUILD_PLAN
+  ? JSON.parse(await readFile(process.env.OPL_OCI_BUILD_PLAN, "utf8")).externalCohort
+  : resolveDockerBuildInputs();
+const cohortArgs = cohortBuildArgs(cohort);
+
 try {
   for (const [image, revision] of [[imageA, revisionA], [imageB, revisionB]]) {
     const buildArgs = qualificationPlatform ? [
@@ -89,6 +96,7 @@ try {
     ] : ["build"];
     const build = spawnSync("docker", [
       ...buildArgs,
+      ...cohortArgs,
       "--build-arg", `OPL_SOURCE_REVISION=${revision}`,
       "--tag", image,
       "."
