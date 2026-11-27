@@ -187,11 +187,12 @@ test("capability workspace installs into DSH main and sidebar panel slots and di
   const beforeMain = host.core.entries("main").length;
   const beforePanels = host.core.entries("sidebar.panellist");
   const beforeOverlay = host.core.entries("shell.overlay").length;
+  const beforeFooter = host.core.entries("sidebar.footer.action");
   const dispose = installWorkspaceClientPlugin(host.core, () => ({} as never));
   expect(host.core.entries("sidebar.panellist").map(entry => entry.options.id)).toContain("workspace");
   expect(host.core.entries("main").length).toBe(beforeMain + 1);
   expect(host.core.entries("shell.overlay").length).toBe(beforeOverlay);
-  expect(host.core.entries("sidebar.footer.action")).toHaveLength(0);
+  expect(host.core.entries("sidebar.footer.action")).toEqual(beforeFooter);
   dispose();
   expect(host.core.entries("sidebar.panellist")).toEqual(beforePanels);
   expect(host.core.entries("main").length).toBe(beforeMain);
