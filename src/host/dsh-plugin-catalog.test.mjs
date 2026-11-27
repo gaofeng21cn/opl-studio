@@ -336,6 +336,7 @@ test("external npm plugin updates preserve disabled choice and staged removals a
       fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({
         name: "@community/dsh-toggle",
         version: remoteVersion,
+        exports: { ".": "./lib/index.js" },
         dsh: { manifestVersion: 1, client: "./lib/client.js" }
       }));
       const manifestPath = path.join(profileCtx.dir, "package.json");
@@ -384,9 +385,12 @@ test("external npm plugin updates preserve disabled choice and staged removals a
     });
     const updateCatalog = buildDshPluginCatalog({
       dshProfileDir: profileDir,
-      activeExternalPlugins: ["@community/dsh-toggle"]
+      activeExternalPlugins: ["@community/dsh-toggle"],
+      activeExternalPluginVersions: { "@community/dsh-toggle": "1.1.0" }
     });
     const stagedUpdateEntry = updateCatalog.entries.find(e => e.packageName === "@community/dsh-toggle");
+    assert.equal(stagedUpdateEntry?.version, "1.2.0");
+    assert.equal(stagedUpdateEntry?.activeVersion, "1.1.0");
     assert.equal(stagedUpdateEntry?.pendingOperation, "update");
     assert.equal(stagedUpdateEntry?.canCancelPending, false);
     await assert.rejects(
@@ -626,7 +630,10 @@ test("bootOplStudioHost continues cleanly when staged external plugin directory 
     activeAtBoot: true
   });
 
-  // Make @community read-only so both pnpm remove and fs.rmSync(pkgDir) hit EACCES.
+  // Fail the official pnpm removal before it edits dependencies, and the
+  // fallback filesystem cleanup after the bundle has been detached.
+  const operationLogRoot = path.join(profileDir, ".plugin-manager");
+  fs.writeFileSync(operationLogRoot, "fixture blocks creation of pnpm logs");
   fs.chmodSync(scopeDir, 0o555);
   const fakeTransport = {
     initialized: true,
@@ -654,9 +661,19 @@ test("bootOplStudioHost continues cleanly when staged external plugin directory 
   const { core } = await bootOplStudioHost({ dshHome, transport: fakeTransport, opl: emptyOpl(), webPort: 0 });
   try {
     const updatedManifest = readProfileManifest("opl-studio", profileDir);
-    assert.equal(Object.hasOwn(updatedManifest.dependencies ?? {}, "@community/dsh-locked"), false);
+    assert.equal(updatedManifest.dependencies?.["@community/dsh-locked"], "1.0.0");
     assert.equal(updatedManifest.dsh?.profile?.bundles?.includes("@community/dsh-locked"), false);
-    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-locked"], undefined);
+    assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-locked"]?.pendingOperation, "remove");
+
+    fs.chmodSync(scopeDir, 0o755);
+    const next = await bootOplStudioHost({ dshHome, transport: fakeTransport, opl: emptyOpl(), webPort: 0 });
+    try {
+      assert.equal(fs.existsSync(pkgDir), false);
+      assert.equal(Object.hasOwn(readProfileManifest("opl-studio", profileDir).dependencies ?? {}, "@community/dsh-locked"), false);
+      assert.equal(readUserExternalDshPlugins(profileDir)["@community/dsh-locked"], undefined);
+    } finally {
+      await next.core.close();
+    }
   } finally {
     await core.close();
   }

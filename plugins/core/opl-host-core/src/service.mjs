@@ -464,6 +464,7 @@ export class OplHostCore extends EventEmitter {
       dshInstallAnchor: options.dshInstallAnchor,
       disabledAtBoot: options.dshDisabledAtBoot,
       activeExternalPlugins: options.dshActiveExternalPlugins,
+      activeExternalPluginVersions: options.dshActiveExternalPluginVersions,
       nativeWeixin: this.framework.hasNativeWeixinChannel?.() === true,
       externalEntries: externalEntries.filter(Boolean),
       updateProjection: this.latestDshPluginUpdates
