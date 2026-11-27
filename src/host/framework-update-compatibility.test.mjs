@@ -35,7 +35,10 @@ test("runManagedUpdate validates operations pre-RPC and enforces read-only host 
   const daemon = await startFakeOpld({
     onCall: async (method) => {
       calls.push(method);
-      if (method === "pack.list") return { packages: [{ package_id: "mas" }] };
+      if (method === "pack.updatePlan") return {
+        packages: [{ package_id: "mas", status: "available" }],
+        managed_update: { components: [{ component_id: "opl_packages" }], execution: { status: "completed" } }
+      };
       if (method === "daemon.health") return { status: "ok" };
       return {};
     }
@@ -57,20 +60,22 @@ test("runManagedUpdate validates operations pre-RPC and enforces read-only host 
   const check = await ro.runManagedUpdate("check");
   assert.equal(check.managed_update.packages[0].package_id, "mas");
   const status = await ro.runManagedUpdate("status");
-  assert.equal(status.runtime_activation.status, "active");
-  assert.equal(status.health.status, "ok");
-  assert.deepEqual(calls, ["pack.list", "daemon.health"]);
+  assert.deepEqual(status.managed_update.components, [{ component_id: "opl_packages" }]);
+  assert.deepEqual(calls, ["pack.updatePlan", "pack.updatePlan"]);
 });
 
 test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trusted-host errors without synthesizing completion", async (t) => {
   let failApply = false;
+  let legacy = false;
   const calls = [];
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
       calls.push({ method, params });
       if (method === "pack.updateAll") {
         if (failApply) return { __rpcError: { code: -32003, message: "Trusted host required", data: { code: "TRUSTED_HOST_REQUIRED" } } };
-        return { batch_id: "batch-1", updated: [] };
+        if (legacy) return { batch_id: "batch-1", results: [] };
+        assert.deepEqual(params, { background: true });
+        return { batch_id: "batch-1", managed_update: { components: [], execution: { status: "partial_failure" } } };
       }
       if (method === "daemon.health") return { ok: true };
       return { packages: [] };
@@ -83,12 +88,14 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
 
   const applied = await opl.runManagedUpdate("apply");
   assert.equal(applied.managed_update.batch_id, "batch-1");
-  assert.equal(applied.managed_update.execution.status, "completed");
+  assert.equal(applied.managed_update.execution.status, "partial_failure");
 
   const activated = await opl.runManagedUpdate("activate");
   assert.equal(activated.runtime_activation.status, "active");
   assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "daemon.health"]);
 
+  legacy = true;
+  await assert.rejects(() => opl.runManagedUpdate("apply"), { code: "base_upgrade_required" });
   failApply = true;
   await assert.rejects(
     () => opl.runManagedUpdate("apply"),

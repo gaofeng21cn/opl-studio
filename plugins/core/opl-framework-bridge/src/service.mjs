@@ -117,9 +117,15 @@ export function createOplPassthrough(options = {}) {
     async runManagedUpdate(operation = "status") {
       if (!["check", "plan", "apply", "status", "activate"].includes(operation)) throw errReq(`Unsupported managed update operation: ${operation}`);
       if (["apply", "activate"].includes(operation) && readOnly()) throw errReq("Managed update is blocked in read-only mode", "blocked_read_only");
-      if (operation === "check" || operation === "plan") return { managed_update: { components: [], packages: (await client.call("pack.list", {}))?.packages ?? [], execution: { status: "completed" } } };
-      if (operation === "apply") return { managed_update: { components: [], execution: { status: "completed" }, ...(await client.call("pack.updateAll", { updates: [] })) } };
-      return { managed_update: { components: [], execution: { status: "completed" } }, runtime_activation: { status: "active" }, health: await client.call("daemon.health", {}) };
+      if (operation === "activate") return { runtime_activation: { status: "active" }, health: await client.call("daemon.health", {}) };
+      const result = operation === "apply"
+        ? await client.call("pack.updateAll", { background: true })
+        : await client.call("pack.updatePlan", {});
+      if (!Array.isArray(result?.managed_update?.components) || !result.managed_update.execution?.status) {
+        throw errReq("Framework does not provide managed Package update results", "base_upgrade_required");
+      }
+      const { managed_update, ...details } = result;
+      return { ...details, managed_update: { ...details, ...managed_update } };
     },
     async runStartupMaintenance() {
       if (readOnly()) throw errReq("Startup maintenance is blocked in read-only mode", "blocked_read_only");
