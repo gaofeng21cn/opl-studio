@@ -1,22 +1,11 @@
-import { spawn } from "node:child_process";
-import { EventEmitter } from "node:events";
-import fs from "node:fs";
-import net from "node:net";
-import os from "node:os";
-import path from "node:path";
-
+import { spawn } from "node:child_process"; import { EventEmitter } from "node:events"; import fs from "node:fs"; import net from "node:net"; import os from "node:os"; import path from "node:path";
 export class OpldRpcError extends Error {
-  constructor(message, { rpcCode = -32000, code = "rpc_error", data } = {}) {
-    super(message);
-    Object.assign(this, { name: "OpldRpcError", rpcCode, code, data });
-  }
+  constructor(message, { rpcCode = -32000, code = "rpc_error", data } = {}) { super(message); Object.assign(this, { name: "OpldRpcError", rpcCode, code, data }); }
 }
 
 export function resolveOplStatePaths(env = process.env, explicitStateDir) {
   const home = env.HOME?.trim() || os.homedir(), explicit = explicitStateDir?.trim(), envState = env.OPL_STATE_DIR?.trim(), envData = env.OPL_DATA_DIR?.trim();
-  const stateDir = explicit ? path.resolve(explicit)
-    : envState ? path.resolve(envState)
-    : envData ? path.join(path.resolve(envData), "opl", "state")
+  const stateDir = explicit ? path.resolve(explicit) : envState ? path.resolve(envState) : envData ? path.join(path.resolve(envData), "opl", "state")
     : process.platform === "darwin" ? path.join(home, "Library", "Application Support", "OPL", "state")
     : process.platform === "win32" ? path.join(env.LOCALAPPDATA?.trim() || path.join(home, "AppData", "Local"), "OPL", "state")
     : path.join(env.XDG_STATE_HOME?.trim() || path.join(home, ".local", "state"), "opl");
@@ -40,15 +29,13 @@ function readSession(sessionFile) {
   try {
     const raw = fs.existsSync(sessionFile) ? JSON.parse(fs.readFileSync(sessionFile, "utf8")) : null;
     if (raw?.pid > 0 && typeof raw.socket_path === "string" && raw.socket_path && /^[0-9a-f]{64}$/i.test(raw.token ?? "")) return raw;
-  } catch { /* ignore unreadable/partial session */ }
+  } catch {}
   return null;
 }
-
 function probeSocket(socketPath, timeoutMs = 250) {
   return new Promise((resolve) => {
     if (process.platform !== "win32" && !fs.existsSync(socketPath)) return resolve(false);
-    const sock = net.createConnection(socketPath);
-    let done = false;
+    const sock = net.createConnection(socketPath); let done = false;
     const finish = (ok) => { if (!done) { done = true; sock.destroy(); resolve(ok); } };
     sock.setTimeout(timeoutMs, () => finish(false)).once("connect", () => finish(true)).once("error", () => finish(false));
   });
@@ -61,13 +48,7 @@ export class OpldClient extends EventEmitter {
   constructor(options = {}) {
     super();
     const env = options.env ?? process.env;
-    Object.assign(this, {
-      env, paths: resolveOplStatePaths(env, options.stateDir), clientKind: options.clientKind ?? "opl_app",
-      apiVersion: String(options.apiVersion ?? env.OPL_BRIDGE_API_VERSION ?? "2.0"), daemonBin: options.daemonBin,
-      autoStart: options.autoStart !== false && env.OPL_DAEMON_AUTO_START !== "0",
-      requestTimeoutMs: options.requestTimeoutMs ?? 30_000, connectTimeoutMs: options.connectTimeoutMs ?? 5_000,
-      connected: false, serverApiVersion: null, sessionInfo: null,
-    });
+    Object.assign(this, { env, paths: resolveOplStatePaths(env, options.stateDir), clientKind: options.clientKind ?? "opl_app", apiVersion: String(options.apiVersion ?? env.OPL_BRIDGE_API_VERSION ?? "2.0"), daemonBin: options.daemonBin, autoStart: options.autoStart !== false && env.OPL_DAEMON_AUTO_START !== "0", requestTimeoutMs: options.requestTimeoutMs ?? 30_000, connectTimeoutMs: options.connectTimeoutMs ?? 5_000, connected: false, serverApiVersion: null, sessionInfo: null });
   }
 
   #findSession() { return readSession(this.paths.sessionFile) ?? (!this.paths.hasExplicitStateDir ? readSession(this.paths.fallbackSessionFile) : null); }
@@ -135,15 +116,12 @@ export class OpldClient extends EventEmitter {
   }
 
   #rejectPending(err, sock) {
-    for (const [id, entry] of this.#pending) {
-      if (!sock || entry.socket === sock) { clearTimeout(entry.timer); entry.reject(err); this.#pending.delete(id); }
-    }
+    for (const [id, entry] of this.#pending) if (!sock || entry.socket === sock) { clearTimeout(entry.timer); entry.reject(err); this.#pending.delete(id); }
   }
 
   #scheduleReconnect() {
     if (this.#closed || this.#fatalError || this.#reconnectTimer) return;
-    const delay = this.#reconnectDelay;
-    this.#reconnectDelay = Math.min(5_000, delay * 2);
+    const delay = this.#reconnectDelay; this.#reconnectDelay = Math.min(5_000, delay * 2);
     this.#reconnectTimer = setTimeout(() => { this.#reconnectTimer = null; this.connect().catch(() => {}); }, delay);
     this.#reconnectTimer.unref?.();
   }
@@ -194,8 +172,7 @@ export class OpldClient extends EventEmitter {
     if (this.#fatalError) throw this.#fatalError;
     this.#guardOpen();
     if (this.connected && this.#socket && !this.#socket.destroyed && !this.#socket.writableEnded && this.#socket.writable) return this.sessionInfo;
-    this.#connectPromise ??= this.#doConnect().finally(() => { this.#connectPromise = null; });
-    return this.#connectPromise;
+    return (this.#connectPromise ??= this.#doConnect().finally(() => { this.#connectPromise = null; }));
   }
 
   async call(method, params = {}, timeoutMs = this.requestTimeoutMs) {
@@ -205,7 +182,7 @@ export class OpldClient extends EventEmitter {
       try { return await this.#sendRaw(this.#socket, method, params, timeoutMs); }
       catch (err) {
         if (attempt > 0 || err?.code !== "connection_closed" || this.#closed || this.#fatalError || !this.autoStart || method === "daemon.shutdown" || method === "daemon.handshake") throw err;
-        if (this.#socket) { this.#socket.destroy(); this.#socket = null; } this.connected = false;
+        this.#socket?.destroy(); this.#socket = null; this.connected = false;
       }
     }
   }

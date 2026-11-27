@@ -1,80 +1,78 @@
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
 import test from "node:test";
-import { createConnectionAccessApproval } from "../../plugins/core/opl-framework-bridge/src/connection-access-approval.mjs";
+import { OplFrameworkBridge, OpldRpcError } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+import { startFakeOpld } from "./fixtures/fake-opld.mjs";
 
-function fakeSpawn(response, observed) {
-  return (command, args, options) => {
-    Object.assign(observed, { command, args, options });
-    const child = new EventEmitter();
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    child.stdout.setEncoding = () => undefined;
-    child.stderr.setEncoding = () => undefined;
-    child.kill = () => undefined;
-    queueMicrotask(() => {
-      if (response.stdout) child.stdout.emit("data", response.stdout);
-      if (response.stderr) child.stderr.emit("data", response.stderr);
-      child.emit("close", response.exitCode ?? 0);
-    });
-    return child;
-  };
-}
-
-test("Connect approval calls the dedicated Framework command and returns no projection", async () => {
-  const observed = {};
-  const approve = createConnectionAccessApproval({
-    command: "/test/opl",
-    cwd: "/workspace",
-    env: { PATH: "/bin" },
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ connection_authorization: { grants: [] } }) }, observed)
+test("Connect approval dispatches connect.approveRequest via callable and .approve() and strips extra/secret fields", async (t) => {
+  const calls = [];
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => {
+      calls.push({ method, params });
+      return { ok: true, stateRefreshRequired: true, grants: [{ grant_id: "g-1" }] };
+    }
   });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
 
-  assert.deepEqual(await approve({ requestId: "request-123" }), { ok: true, stateRefreshRequired: true });
-  assert.equal(observed.command, "/test/opl");
-  assert.deepEqual(observed.args, [
-    "connect", "authorization", "approve", "--request-id", "request-123", "--json"
+  assert.deepEqual(await bridge.connectionAccessApproval({ requestId: "request-123" }), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(await bridge.connectionAccessApproval.approve("request-456"), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(calls, [
+    { method: "connect.approveRequest", params: { request_id: "request-123" } },
+    { method: "connect.approveRequest", params: { request_id: "request-456" } }
   ]);
-  assert.deepEqual(observed.options.stdio, ["ignore", "pipe", "pipe"]);
 });
 
-test("Connect approval accepts only requestId and rejects malformed ids before spawning", async () => {
-  let spawned = false;
-  const approve = createConnectionAccessApproval({
-    spawnImpl: () => { spawned = true; throw new Error("must not spawn"); }
-  });
+test("Connect approval accepts only requestId and rejects malformed ids or extra keys before RPC", async () => {
+  let called = 0;
+  const spyClient = { on() {}, off() {}, close: async () => {}, async call() { called += 1; return {}; } };
+  const bridge = new OplFrameworkBridge({ client: spyClient });
 
-  for (const request of [null, {}, { requestId: "r1", confirmed: true }, { requestId: " " }, { requestId: "bad\nid" }]) {
-    assert.deepEqual(await approve(request), { ok: false, errorCode: "invalid_request" });
+  for (const request of [null, undefined, {}, { requestId: "r1", confirmed: true }, { requestId: " " }, { requestId: "bad\nid" }, { requestId: "bad;id" }, { requestId: "" }]) {
+    await assert.rejects(() => bridge.connectionAccessApproval(request), (err) => err?.code === "invalid_request");
   }
-  assert.equal(spawned, false);
+  await assert.rejects(() => bridge.connectionAccessApproval.approve("bad;id"), (err) => err?.code === "invalid_request");
+  assert.equal(called, 0);
 });
 
-test("Connect approval returns only a normalized owner error code", async () => {
-  const approve = createConnectionAccessApproval({
-    spawnImpl: fakeSpawn({
-      exitCode: 1,
-      stdout: JSON.stringify({ error: { code: "authorization_failed", message: "private details", details: { reason_code: "authorization_request_stale" } } }),
-      stderr: "private diagnostic"
-    }, {})
+test("Connect approval maps non-trusted-host domain RPC errors cleanly and still rejects -32003 TRUSTED_HOST_REQUIRED", async (t) => {
+  const daemon = await startFakeOpld({
+    onCall: async (_method, params) => {
+      if (params.request_id === "stale-req") {
+        return { __rpcError: { code: -32000, message: "private details", data: { code: "authorization_failed", reason_code: "authorization_request_stale" } } };
+      }
+      return { __rpcError: { code: -32003, message: "Trusted host required", data: { code: "TRUSTED_HOST_REQUIRED" } } };
+    }
   });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
 
-  assert.deepEqual(await approve({ requestId: "request-123" }), {
+  assert.deepEqual(await bridge.connectionAccessApproval({ requestId: "stale-req" }), {
     ok: false,
     errorCode: "authorization_request_stale"
   });
+  await assert.rejects(
+    () => bridge.connectionAccessApproval({ requestId: "untrusted-req" }),
+    (err) => err instanceof OpldRpcError && err.rpcCode === -32003 && err.code === "TRUSTED_HOST_REQUIRED"
+  );
 });
 
-test("Connect approval rejects malformed or secret-bearing successful output", async () => {
-  for (const stdout of [
-    "not json",
-    JSON.stringify({ ok: true }),
-    JSON.stringify({ connection_authorization: { access_token: "must-not-escape" } })
-  ]) {
-    const approve = createConnectionAccessApproval({ spawnImpl: fakeSpawn({ stdout }, {}) });
-    assert.deepEqual(await approve({ requestId: "request-123" }), {
-      ok: false,
-      errorCode: "internal_contract_violation"
-    });
-  }
+test("Connect approval rejects secret-bearing daemon output with internal_contract_violation and wraps custom callbacks", async (t) => {
+  const daemon = await startFakeOpld({
+    onCall: async () => ({ ok: true, stateRefreshRequired: true, grants: [{ access_token: "must-not-escape" }] })
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  assert.deepEqual(await bridge.connectionAccessApproval({ requestId: "request-123" }), {
+    ok: false,
+    errorCode: "internal_contract_violation"
+  });
+
+  const customSeen = [];
+  const customBridge = new OplFrameworkBridge({
+    connectionAccessApproval: async (req) => { customSeen.push(req); return { ok: true, stateRefreshRequired: true }; }
+  });
+  t.after(() => customBridge.close());
+  assert.deepEqual(await customBridge.connectionAccessApproval.approve("req-custom"), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(customSeen, [{ requestId: "req-custom" }]);
 });

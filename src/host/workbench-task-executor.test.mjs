@@ -1,62 +1,102 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { createWorkbenchTaskExecutor } from '../../plugins/core/opl-framework-bridge/src/workbench-task-executor.mjs';
-import { createOplPassthrough, compactFastState } from '../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs';
+import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import test from "node:test";
+import { CodexAppServerTransport, turnPermissionOverrides } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
+import { OpldRpcError, createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+import { startFakeOpld } from "./fixtures/fake-opld.mjs";
 
-test('scheduled turns use the current App Server, explicit permissions and canonical readback', async () => {
+test("scheduled turns use CodexAppServerTransport, explicit turnPermissionOverrides, and canonical readback", async () => {
   const calls = [];
-  const executor = createWorkbenchTaskExecutor({
-    startThread: async input => { calls.push(input); return { thread: { id: 'canonical' } }; },
-    renameThread: async () => { throw Error('rename failed'); },
-    startTurn: async (...input) => { calls.push(input); return { turn: { id: 'turn' } }; },
-    readThread: async () => ({ thread: { id: 'canonical', turns: [{ id: 'turn', status: 'completed', items: [{ type: 'agentMessage', text: 'done' }] }] } }),
-    interruptTurn: async (...input) => calls.push(input),
+  const transport = new CodexAppServerTransport({ cwd: "/workspace" });
+  transport.initialized = true;
+  transport.request = async (method, params) => {
+    calls.push({ method, params });
+    if (method === "thread/start") return { thread: { id: "canonical" } };
+    if (method === "turn/start") return { turn: { id: "turn" } };
+    if (method === "thread/read") return { thread: { id: "canonical", turns: [{ id: "turn", status: "completed", items: [{ type: "agentMessage", text: "done" }] }] } };
+    if (method === "turn/interrupt") return {};
+    return {};
+  };
+
+  const thread = await transport.startThread({ cwd: "/workspace", permissions: ":read-only" });
+  assert.equal(thread.thread.id, "canonical");
+  assert.equal(calls[0].method, "thread/start");
+  assert.equal(calls[0].params.cwd, "/workspace");
+  assert.equal(calls[0].params.approvalPolicy, "on-request");
+  assert.equal(calls[0].params.sandbox, "read-only");
+
+  const roTurn = await transport.startTurn("canonical", "fixture", [], turnPermissionOverrides(":read-only", "/workspace"));
+  assert.equal(roTurn.turn.id, "turn");
+  assert.equal(calls[1].params.sandboxPolicy.type, "readOnly");
+  assert.equal(calls[1].params.sandboxPolicy.networkAccess, true);
+
+  await transport.startTurn("canonical", "fixture", [], turnPermissionOverrides(":workspace", "/workspace"));
+  assert.equal(calls[2].params.sandboxPolicy.type, "workspaceWrite");
+  assert.equal(calls[2].params.sandboxPolicy.networkAccess, true);
+
+  const read = await transport.readThread("canonical", { includeTurns: true });
+  assert.equal(read.thread.turns[0].status, "completed");
+  assert.equal(read.thread.turns[0].items[0].text, "done");
+
+  await transport.interruptTurn("canonical", "turn");
+  assert.deepEqual(calls.at(-1), { method: "turn/interrupt", params: { threadId: "canonical", turnId: "turn" } });
+});
+
+test("workbench action bridge retains preview/read-only/execute contracts, contribution read, and full drilldown via opld", async (t) => {
+  const calls = [];
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "app.action.execute") return { status: params.dry_run ? "preview" : "executed", confirmationId: "confirmation", result: { summary: "preview" } };
+      if (method === "app.contribution.read") return { ok: true, result: { status: "available", items: [] } };
+      if (method === "runway.task.list") return { tasks: [{ task_id: "sched-task-1", status: "running" }] };
+      if (method === "ledger.timeline") return { entries: [{ entry_id: "entry-1" }], timeline: [{ entry_id: "entry-1" }] };
+      if (method === "app.state.get") return { profile: params.profile, schedules: [{ schedule_id: "s-1" }] };
+      return {};
+    }
   });
-  const task = { title: 'schedule', cwd: '/workspace', permissions: ':read-only', prompt: 'fixture' };
-  const thread = await executor.createThread(task);
-  const ref = await executor.startTask(task, thread);
-  assert.equal(calls[0].permissions, ':read-only');
-  assert.equal(calls[1][3].sandboxPolicy.type, 'readOnly');
-  assert.equal(calls[1][3].sandboxPolicy.networkAccess, true);
-  await executor.startTask({ ...task, permissions: ':workspace' }, thread);
-  assert.equal(calls.at(-1)[3].sandboxPolicy.type, 'workspaceWrite');
-  assert.equal(calls.at(-1)[3].sandboxPolicy.networkAccess, true);
-  // Temporal admitted the run; time spent waiting for a worker is not a second
-  // execution permission or a reason to leave a newly created thread empty.
-  const delayedThread = await executor.createThread(task, Date.now() - 600_000);
-  assert.deepEqual(delayedThread, { threadId: 'canonical' });
-  assert.deepEqual(await executor.startTask(task, delayedThread, Date.now() - 600_000), { threadId: 'canonical', turnId: 'turn' });
-  assert.deepEqual(await executor.readTask(ref), { ...ref, status: 'completed', summary: 'done' });
-  await executor.interruptTask(ref);
-  assert.deepEqual(calls.at(-1), ['canonical', 'turn']);
+  t.after(() => daemon.close());
+
+  const ro = createOplPassthrough({ stateDir: daemon.stateDir, autoStart: false, env: { OPL_STUDIO_READ_ONLY: "1" } });
+  t.after(() => ro.close());
+  const request = { actionId: "package_contribution_execute", payload: { package_id: "opl-workbench-services", ref: "workbench#cleanup", input: { ids: ["logs:x"] } } };
+  const preview = await ro.executeAction(request);
+  assert.equal(preview.dryRun, true);
+  assert.equal(preview.status, "preview_ready");
+  assert.equal(preview.stdoutJson.confirmationId, "confirmation");
+
+  const blocked = await ro.executeAction({ ...request, dryRun: false });
+  assert.equal(blocked.status, "blocked_read_only");
+  assert.equal(calls.filter((c) => c.method === "app.action.execute").length, 1);
+
+  const read = await ro.readContribution({ packageId: "opl-workbench-services", ref: "workbench#tasks" });
+  assert.equal(read.stdoutJson.opl_app_contribution.response.result.status, "available");
+
+  const drill = await ro.readFullDrilldown();
+  assert.equal(drill.detail, "full");
+  assert.equal(drill.drilldown.tasks[0].task_id, "sched-task-1");
+  assert.equal(drill.drilldown.entries[0].entry_id, "entry-1");
+  assert.equal(drill.drilldown.state.schedules[0].schedule_id, "s-1");
 });
 
-test('workbench action bridge retains preview/confirmation/error, protects read-only, and preserves projection', async () => {
-  let executed = 0;
-  const opl = createOplPassthrough({ env: { OPL_STUDIO_READ_ONLY: '1' } });
-  await opl.registerWorkbenchServices(async () => ({
-    appStatePatch: () => ({ workbench_services: { schema_version: 'opl-workbench-services.v1' } }),
-    read: async () => ({ status: 'available', items: [] }),
-    execute: async request => { executed++; return { status: 'preview_ready', confirmationId: 'confirmation', result: { summary: 'preview' } }; },
-    dispose() {},
-  }));
-  const request = { actionId: 'package_contribution_execute', payload: { package_id: 'opl-workbench-services', ref: 'workbench#cleanup', input: { ids: ['logs:x'] } } };
-  const preview = await opl.executeAction(request);
-  assert.equal(preview.dryRun, true); assert.equal(preview.status, 'preview_ready'); assert.equal(preview.confirmationId, 'confirmation');
-  const blocked = await opl.executeAction({ ...request, dryRun: false });
-  assert.equal(blocked.status, 'failed'); assert.equal(executed, 1);
-  const read = await opl.readContribution({ packageId: 'opl-workbench-services', ref: 'workbench#tasks' });
-  assert.equal(read.stdoutJson.opl_app_contribution.response.result.status, 'available');
-  const services = { schema_version: 'opl-workbench-services.v1', tasks: { status: 'not_configured' } };
-  assert.deepEqual(compactFastState({ app_state: { workbench_services: services } }).app_state.workbench_services, services);
-  await opl.closeWorkbenchServices();
-});
+test("incompatible daemon or unavailable package contribution degrades cleanly with typed OpldRpcError", async (t) => {
+  const daemon = await startFakeOpld({
+    apiVersion: "2.0",
+    onCall: async () => ({ __rpcError: { code: -32004, message: "Package not found", data: { code: "PACKAGE_NOT_FOUND" } } })
+  });
+  t.after(() => daemon.close());
 
-test('an incompatible Framework workbench export degrades locally', async () => {
-  let disposed = 0;
-  const opl = createOplPassthrough();
-  await opl.registerWorkbenchServices(async () => ({ dispose: async () => { disposed++; } }));
-  assert.equal(disposed, 1);
-  await assert.rejects(opl.readContribution({packageId:'opl-workbench-services',ref:'workbench#tasks'}), /Update Framework/);
-  await opl.closeWorkbenchServices();
+  const opl = createOplPassthrough({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(() => opl.close());
+  await assert.rejects(
+    () => opl.readContribution({ packageId: "opl-workbench-services", ref: "workbench#tasks" }),
+    (err) => err instanceof OpldRpcError && err.rpcCode === -32004 && err.code === "PACKAGE_NOT_FOUND"
+  );
+
+  const incompatible = createOplPassthrough({ stateDir: daemon.stateDir, apiVersion: "1.0", autoStart: false });
+  t.after(() => incompatible.close());
+  await assert.rejects(
+    () => incompatible.readState("fast"),
+    (err) => err instanceof OpldRpcError && err.rpcCode === -32002 && err.code === "base_upgrade_required"
+  );
 });

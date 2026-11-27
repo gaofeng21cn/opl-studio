@@ -1,180 +1,9 @@
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import test from "node:test";
-import { createCodexApiKeyConfiguration, createGatewayAccountLogin } from "../../plugins/core/opl-framework-bridge/src/gateway-account-login.mjs";
+import { OplFrameworkBridge } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+import { startFakeOpld } from "./fixtures/fake-opld.mjs";
 
-function fakeSpawn(response, observed) {
-  return (command, args, options) => {
-    observed.command = command;
-    observed.args = args;
-    observed.options = options;
-    const child = new EventEmitter();
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    child.stdout.setEncoding = () => undefined;
-    child.stderr.setEncoding = () => undefined;
-    child.kill = () => undefined;
-    child.stdin = new EventEmitter();
-    child.stdin.end = (input) => {
-      observed.stdin = input;
-      queueMicrotask(() => {
-        if (response.stdinError) child.stdin.emit("error", response.stdinError);
-        if (response.stdout) child.stdout.emit("data", response.stdout);
-        if (response.stderr) child.stderr.emit("data", response.stderr);
-        child.emit("close", response.exitCode ?? 0);
-      });
-    };
-    return child;
-  };
-}
-
-test("Gateway account login keeps credentials on stdin and returns only the typed result", async () => {
-  const observed = {};
-  const password = "gateway-secret-must-not-escape";
-  const login = createGatewayAccountLogin({
-    command: "/test/opl",
-    cwd: "/workspace",
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ ok: true, account: "user@example.com" }) }, observed)
-  });
-
-  const result = await login({ email: " user@example.com ", password });
-
-  assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
-  assert.equal(observed.command, "/test/opl");
-  assert.deepEqual(observed.args, ["connect", "gateway", "login", "--credentials-stdin", "--json"]);
-  assert.deepEqual(observed.options.stdio, ["pipe", "pipe", "pipe"]);
-  assert.equal(observed.stdin, `${JSON.stringify({ email: "user@example.com", password })}\n`);
-  assert.equal(observed.stdin.includes("device_label"), false);
-  assert.equal(JSON.stringify({ result, args: observed.args }).includes(password), false);
-  assert.equal("stdout" in result || "stderr" in result, false);
-});
-
-test("Gateway account login contains stdin EPIPE after a successful child exit", async () => {
-  const observed = {};
-  const stdinError = new Error("write EPIPE");
-  stdinError.code = "EPIPE";
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({
-      stdinError,
-      stdout: JSON.stringify({ ok: true, account: "user@example.com" })
-    }, observed)
-  });
-
-  assert.deepEqual(await login({ email: "user@example.com", password: "secret" }), {
-    ok: true,
-    stateRefreshRequired: true
-  });
-});
-
-test("Gateway account login rejects unexpected request fields before spawning", async () => {
-  let spawned = false;
-  const login = createGatewayAccountLogin({
-    spawnImpl: () => {
-      spawned = true;
-      throw new Error("must not spawn");
-    }
-  });
-
-  assert.deepEqual(
-    await login({ email: "user@example.com", password: "secret", deviceLabel: "must-use-framework-default" }),
-    { ok: false, errorCode: "invalid_request", stateRefreshRequired: false }
-  );
-  assert.equal(spawned, false);
-});
-
-test("Gateway account login rejects secret-bearing CLI output without returning it", async () => {
-  const observed = {};
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ ok: true, password: "echoed-secret" }) }, observed)
-  });
-
-  const result = await login({ email: "user@example.com", password: "input-secret" });
-  assert.deepEqual(result, {
-    ok: false,
-    errorCode: "internal_contract_violation",
-    stateRefreshRequired: false
-  });
-  assert.equal(JSON.stringify(result).includes("echoed-secret"), false);
-});
-
-test("Gateway account login rejects a secret value echoed under a non-secret field", async () => {
-  const observed = {};
-  const password = "echoed-under-message";
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ ok: true, message: password }) }, observed)
-  });
-
-  assert.deepEqual(await login({ email: "user@example.com", password }), {
-    ok: false,
-    errorCode: "internal_contract_violation",
-    stateRefreshRequired: false
-  });
-});
-
-test("Gateway account login maps structured failures without returning stderr", async () => {
-  const observed = {};
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({
-      exitCode: 1,
-      stdout: JSON.stringify({ ok: false, error: { code: "credentials_stdin_invalid" } }),
-      stderr: "private diagnostic"
-    }, observed)
-  });
-
-  const result = await login({ email: "user@example.com", password: "input-secret" });
-  assert.deepEqual(result, { ok: false, errorCode: "invalid_request", stateRefreshRequired: false });
-  assert.equal(JSON.stringify(result).includes("private diagnostic"), false);
-});
-
-test("Codex API key configuration keeps the key on stdin and returns only typed status", async () => {
-  const observed = {};
-  const apiKey = "sk-test-must-not-escape";
-  const configure = createCodexApiKeyConfiguration({
-    command: "/test/opl",
-    cwd: "/workspace",
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ configured: true, api_key_present: true }) }, observed)
-  });
-
-  const result = await configure({ apiKey });
-
-  assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
-  assert.equal(observed.command, "/test/opl");
-  assert.deepEqual(observed.args, ["system", "configure-codex", "--api-key-stdin", "--json"]);
-  assert.equal(observed.stdin, `${apiKey}\n`);
-  assert.equal(JSON.stringify({ result, args: observed.args }).includes(apiKey), false);
-  assert.equal("stdout" in result || "stderr" in result, false);
-});
-
-test("Codex API key configuration rejects unexpected fields and secret-bearing output", async () => {
-  let spawned = false;
-  const rejectsUnexpected = createCodexApiKeyConfiguration({
-    spawnImpl: () => {
-      spawned = true;
-      throw new Error("must not spawn");
-    }
-  });
-  assert.deepEqual(await rejectsUnexpected({ apiKey: "secret", provider: "other" }), {
-    ok: false,
-    errorCode: "invalid_request",
-    stateRefreshRequired: false
-  });
-  assert.equal(spawned, false);
-
-  const observed = {};
-  const apiKey = "echoed-api-key";
-  const rejectsEcho = createCodexApiKeyConfiguration({
-    spawnImpl: fakeSpawn({ stdout: JSON.stringify({ configured: true, message: apiKey }) }, observed)
-  });
-  assert.deepEqual(await rejectsEcho({ apiKey }), {
-    ok: false,
-    errorCode: "internal_contract_violation",
-    stateRefreshRequired: false
-  });
-});
-
-// Every reason_code the OPL Framework gateway surface can emit. Sourced from
-// one-person-lab src/adapters/integration/opl-gateway-account*.ts plus the
-// connect CLI credentials-stdin guard.
 const FRAMEWORK_GATEWAY_REASON_CODES = [
   "invalid_credentials",
   "account_disabled",
@@ -213,80 +42,153 @@ const FRAMEWORK_GATEWAY_REASON_CODES = [
   "credentials_stdin_too_large"
 ];
 
-test("Gateway account login maps every framework reason code to a specific error", async () => {
-  for (const reason of FRAMEWORK_GATEWAY_REASON_CODES) {
-    const login = createGatewayAccountLogin({
-      spawnImpl: fakeSpawn({
-        exitCode: 4,
-        stdout: "",
-        stderr: `${JSON.stringify({
-          version: "g2",
-          error: {
-            code: "launcher_failed",
-            message: "OPL Gateway rejected the request.",
-            exit_code: 4,
-            details: { reason_code: reason, http_status: 409 }
-          }
-        }, null, 2)}\n`
-      }, {})
-    });
+test("Gateway account login sends credentials over 0600 RPC socket and returns only typed status", async (t) => {
+  const calls = [];
+  const password = "gateway-secret-must-not-escape";
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => {
+      calls.push({ method, params });
+      return { connection_id: "conn-1", provider_type: params.provider_type, status: "active" };
+    }
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
 
-    const result = await login({ email: "user@example.com", password: "input-secret" });
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(daemon.socketPath).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(daemon.sessionFile).mode & 0o777, 0o600);
+  }
+
+  const result = await bridge.gatewayAccountLogin({ email: " user@example.com ", password });
+  assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "connect.add");
+  assert.deepEqual(calls[0].params, {
+    provider_type: "opl_gateway",
+    display_name: "user@example.com",
+    account_label: "user@example.com",
+    secret: password
+  });
+  assert.equal(JSON.stringify(result).includes(password), false);
+  assert.equal("stdout" in result || "stderr" in result, false);
+});
+
+test("Gateway account login and Codex API key reject unexpected request fields or oversized payloads before RPC", async () => {
+  let called = 0;
+  const spyClient = { on() {}, off() {}, close: async () => {}, async call() { called += 1; return {}; } };
+  const bridge = new OplFrameworkBridge({ client: spyClient });
+
+  for (const badLogin of [
+    null, undefined, {}, { email: "  ", password: "x" }, { email: "a@b.c", password: "  " },
+    { email: "user@example.com", password: "secret", deviceLabel: "must-use-framework-default" }
+  ]) {
+    assert.deepEqual(await bridge.gatewayAccountLogin(badLogin), {
+      ok: false, errorCode: "invalid_request", stateRefreshRequired: false
+    });
+  }
+  for (const badKey of [
+    null, undefined, {}, { apiKey: "" }, { apiKey: " \n\t " },
+    { apiKey: "secret", provider: "other" },
+    { apiKey: "x".repeat(65_537) }
+  ]) {
+    assert.deepEqual(await bridge.codexApiKeyConfiguration(badKey), {
+      ok: false, errorCode: "invalid_request", stateRefreshRequired: false
+    });
+  }
+  assert.equal(called, 0);
+});
+
+test("Gateway account login and Codex API key reject secret-echoing RPC responses without leaking secrets", async (t) => {
+  const password = "echoed-under-message";
+  const apiKey = "sk-echoed-secret-key";
+  let mode = "field";
+  const daemon = await startFakeOpld({
+    onCall: async () => {
+      if (mode === "field") return { ok: true, password: "echoed-secret" };
+      if (mode === "message") return { ok: true, message: password };
+      return { configured: true, message: apiKey };
+    }
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  const r1 = await bridge.gatewayAccountLogin({ email: "user@example.com", password: "input-secret" });
+  assert.deepEqual(r1, { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false });
+  assert.equal(JSON.stringify(r1).includes("echoed-secret"), false);
+
+  mode = "message";
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "user@example.com", password }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
+
+  mode = "apikey";
+  const r3 = await bridge.codexApiKeyConfiguration({ apiKey });
+  assert.deepEqual(r3, { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false });
+  assert.equal(JSON.stringify(r3).includes(apiKey), false);
+});
+
+test("Codex API key configuration dispatches connect.add for openai_codex and strips extra fields", async (t) => {
+  const calls = [];
+  const apiKey = "sk-test-must-not-escape";
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => { calls.push({ method, params }); return { connection_id: "conn-codex" }; }
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  const result = await bridge.codexApiKeyConfiguration({ apiKey: ` ${apiKey} ` });
+  assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(calls, [{
+    method: "connect.add",
+    params: { provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }
+  }]);
+  assert.equal(JSON.stringify(result).includes(apiKey), false);
+});
+
+test("Gateway account login maps every framework reason code and RPC/network code cleanly", async (t) => {
+  let nextError = null;
+  const daemon = await startFakeOpld({
+    onCall: async () => ({ __rpcError: nextError })
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  for (const reason of FRAMEWORK_GATEWAY_REASON_CODES) {
+    nextError = { code: -32000, message: "Gateway rejected", data: { code: "launcher_failed", reason_code: reason } };
+    const result = await bridge.gatewayAccountLogin({ email: "user@example.com", password: "input-secret" });
     assert.equal(result.ok, false);
     assert.equal(result.stateRefreshRequired, false);
-    assert.notEqual(
-      result.errorCode,
-      "gateway_account_failed",
-      `reason code ${reason} collapsed into the non-actionable generic bucket`
-    );
+    assert.notEqual(result.errorCode, "gateway_account_failed", `${reason} collapsed to generic bucket`);
+  }
+
+  for (const [rpcErrCode, expected] of [
+    ["UNAUTHORIZED", "auth_expired"],
+    ["INVALID_INPUT", "invalid_request"],
+    ["TRUSTED_HOST_REQUIRED", "internal_contract_violation"],
+    ["unknown_daemon_error", "gateway_account_failed"]
+  ]) {
+    nextError = { code: -32000, message: "raw stderr must not leak", data: { code: rpcErrCode } };
+    const result = await bridge.gatewayAccountLogin({ email: "user@example.com", password: "input-secret" });
+    assert.deepEqual(result, { ok: false, errorCode: expected, stateRefreshRequired: false });
+    assert.equal(JSON.stringify(result).includes("raw stderr"), false);
   }
 });
 
-test("Gateway account login no longer mislabels a bare 401 status as bad credentials", async () => {
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({
-      exitCode: 4,
-      stdout: "",
-      stderr: "OPL Gateway rejected the request. http_status=401"
-    }, {})
-  });
-
-  const result = await login({ email: "user@example.com", password: "input-secret" });
-  assert.equal(result.ok, false);
-  assert.notEqual(result.errorCode, "invalid_credentials");
-});
-
-test("Gateway account login accepts a password that is also part of the submitted email", async () => {
-  // Qualification accounts are often provisioned as <token>@<domain> with the
-  // same <token> as the password. The CLI echoes the signed-in email inside the
-  // account projection, which used to be read as the password leaking and turned
-  // a successful sign-in into a failure.
+test("Gateway account login accepts a password that is a substring of the submitted email, while still catching password echoes", async (t) => {
   const password = "operator-token";
   const email = "operator-token@example.com";
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({
-      stdout: JSON.stringify({ gateway_account: { status: "connected", account: { email } } })
-    }, {})
+  let echoPassword = false;
+  const daemon = await startFakeOpld({
+    onCall: async () => (echoPassword
+      ? { gateway_account: { status: "connected", account: { email } }, echo: { password } }
+      : { gateway_account: { status: "connected", account: { email } } })
   });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
 
-  assert.deepEqual(await login({ email, password }), { ok: true, stateRefreshRequired: true });
-});
-
-test("Gateway account login still rejects a CLI that echoes the password itself", async () => {
-  const password = "operator-token";
-  const email = "operator-token@example.com";
-  const login = createGatewayAccountLogin({
-    spawnImpl: fakeSpawn({
-      stdout: JSON.stringify({
-        gateway_account: { status: "connected", account: { email } },
-        echo: { password }
-      })
-    }, {})
-  });
-
-  assert.deepEqual(await login({ email, password }), {
-    ok: false,
-    errorCode: "internal_contract_violation",
-    stateRefreshRequired: false
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email, password }), { ok: true, stateRefreshRequired: true });
+  echoPassword = true;
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email, password }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
   });
 });

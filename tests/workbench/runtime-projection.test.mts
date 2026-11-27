@@ -8,7 +8,7 @@ import {
   parseDomainDetailViewDescriptors,
   readManagedUpdateProjection
 } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts";
-import { compactFastState } from "../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs";
+import { createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
 
 test("runtime projection keeps component health, carriers, and only App-projected maintenance actions", () => {
   const model = deriveWorkbenchModelFromState({
@@ -580,10 +580,20 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
   }]);
 });
 
-test("Framework fast managed-update output survives Host compression and renderer parsing", () => {
-  const compressed = compactFastState({
-    app_state: {
-      managed_update: {
+test("Framework fast managed-update output survives Host bridge and renderer parsing", async () => {
+  Object.assign(globalThis, {
+    __OPL_CODEX_MODEL_POLICY__: {
+      source: "test App policy", defaultModel: "test-model", defaultReasoningEffort: "high", visibleModels: [{ id: "test-model" }], reasoningEfforts: ["high"],
+      autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true,
+      customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true
+    }
+  });
+  const { normalizeStateReadback } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
+  const compressed = normalizeStateReadback(await createOplPassthrough({
+    client: {
+      call: async () => ({
+        app_state: {
+          managed_update: {
         operation: "status",
         update_channel: "stable",
         components: [
@@ -634,7 +644,10 @@ test("Framework fast managed-update output survives Host compression and rendere
         }))
       }
     }
-  });
+      }),
+      on() {}, off() {}, close: async () => {}
+    }
+  }).readState("fast"), "fast");
 
   const projection = readManagedUpdateProjection(compressed);
   assert.ok(projection);
@@ -883,10 +896,20 @@ test("initial loading and a failed read without a snapshot have distinct recover
   assert.doesNotMatch(failed, /当前范围没有工作|后台服务配置已变化/);
 });
 
-test("work item projection preserves control generation, root, package status, heartbeat, action keys, and does not fall back to diagnostic stage", () => {
-  const compacted = compactFastState({
-    app_state: {
-      operator: {
+test("work item projection preserves control generation, root, package status, heartbeat, action keys, and does not fall back to diagnostic stage", async () => {
+  Object.assign(globalThis, {
+    __OPL_CODEX_MODEL_POLICY__: {
+      source: "test App policy", defaultModel: "test-model", defaultReasoningEffort: "high", visibleModels: [{ id: "test-model" }], reasoningEfforts: ["high"],
+      autoLabel: { zh: "自动（推荐）", en: "Auto (recommended)" }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true,
+      customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true
+    }
+  });
+  const { normalizeStateReadback } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
+  const compacted = normalizeStateReadback(await createOplPassthrough({
+    client: {
+      call: async () => ({
+        app_state: {
+          operator: {
         workbench: {
           work_item_projection_v2: {
             schema_version: "work-item-projection.v2",
@@ -945,7 +968,10 @@ test("work item projection preserves control generation, root, package status, h
         }
       }
     }
-  });
+      }),
+      on() {}, off() {}, close: async () => {}
+    }
+  }).readState("fast"), "fast");
 
   const model = deriveWorkbenchModelFromState(compacted);
   const item = model.workItemRuntime?.items[0];

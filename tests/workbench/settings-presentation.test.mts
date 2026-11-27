@@ -1225,15 +1225,14 @@ test("first installation dispatches the owner version and revision without inven
 test("offline media profile survives the Host bridge and dispatches from the existing product", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");
-  const { compactPackageRows } = await import("../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs");
   const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
   const { SoftwareInstallations } = await import("../../plugins/core/opl-studio-client/src/client/workbench/SoftwareInstallations.tsx");
   const payload = { package_id: "fixture-media", expected_revision: "catalog-r3", operation: "install", version: "1.2.3", profile: "offline" };
-  const entries = compactPackageRows([{
+  const entries = [{
     package_id: "fixture-media", catalog_origin: "opl", catalog_scope: "software", installed: true,
     installations: [{ installation_id: "core", kind: "codex_plugin", mode: "installed", version: "1.2.3", manager: "codex_plugin_manager", location: "/cache/core", active: true, revision: "core-r3", available_actions: [] }],
     installation_actions: [{ action_id: "software_installation_execute", label: "Install complete offline library", label_i18n: { "zh-CN": "安装离线完整版", "en-US": "Install complete offline library" }, status: "available", confirmation_required: true, dry_run_supported: false, required_payload_fields: Object.keys(payload), payload }]
-  }]);
+  }];
   const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries } } } });
   assert.equal(model.packageLifecycle.length, 1);
   const product = model.packageLifecycle[0];

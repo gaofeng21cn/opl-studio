@@ -593,7 +593,7 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   ].join("\n");
   const hostTransport = read("plugins/core/opl-codex-native/src/app-server-transport.mjs");
   const codexNative = read("plugins/core/opl-codex-native/src/service.mjs");
-  const oplPassthrough = read("plugins/core/opl-framework-bridge/src/opl-passthrough.mjs");
+  const oplPassthrough = [read("plugins/core/opl-framework-bridge/src/opld-client.mjs"), read("plugins/core/opl-framework-bridge/src/service.mjs")].join("\n");
   const appRepoRoot = resolveAppRepoRoot(root);
   const appProductProfilePath = path.join(appRepoRoot, "contracts", "app-product-profile.json");
   const appProductProfile = JSON.parse(fs.readFileSync(appProductProfilePath, "utf8"));
@@ -676,7 +676,7 @@ function assertCodexModelControls(evidence, app, rendererSource) {
   assert(hostTransport.includes("...(reasoningEffort ? { effort: reasoningEffort } : {})"), "shared host core must pass effort to app-server turn/start");
   assert(hostTransport.includes("env.OPL_CODEX_BIN"), "shared host core must consume the App launcher Codex executable from its injected environment");
   assert(codexNative.includes("process.env.OPL_NATIVE_WORKBENCH_CODEX_CWD"), "opl-codex-native must consume the App launcher workspace");
-  for (const marker of ["OPL_APP_OPL_BIN", "OPL_NATIVE_WORKBENCH_READ_ONLY", "blocked_read_only", "candidate_read_only_policy"]) {
+  for (const marker of ["OPL_APP_OPL_BIN", "OPL_NATIVE_WORKBENCH_READ_ONLY", "blocked_read_only", "read_only_host"]) {
     assert(oplPassthrough.includes(marker), `shared host core must preserve launcher/runtime safety marker ${marker}`);
   }
   assert(!rendererBuilder.includes("policyScript"), "static carrier HTML must not inject product policy");

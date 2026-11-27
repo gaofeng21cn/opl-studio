@@ -6,16 +6,13 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:f
 import test, { after } from "node:test";
 import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
-import {
-  createFrameworkChannelCallbackRegistrar,
-  loadFrameworkCordisProfiles
-} from "../../plugins/core/opl-framework-bridge/src/framework-channel-bootstrap.mjs";
+import { startFakeOpld } from "./fixtures/fake-opld.mjs";
 import { OplHostCore } from "../../plugins/core/opl-host-core/src/service.mjs";
 import { createOplHostCore as createHostCore } from "./create-host.mjs";
 import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
-import { OplFrameworkBridge } from "../../plugins/core/opl-framework-bridge/src/service.mjs";
+import { OplFrameworkBridge, resolveOplStatePaths } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+import { resolveDaemonBinary } from "../../plugins/core/opl-framework-bridge/src/opld-client.mjs";
 import { McpAppHost } from "../../plugins/core/opl-mcp-apps/src/service.mjs";
-import { createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
 const dshHome = await mkdtemp(path.join(os.tmpdir(), "opl-host-test-dsh-"));
@@ -105,30 +102,52 @@ test("desktop hosts can supply a real working directory instead of the packaged 
   });
 });
 
-test("desktop runtime environment drives Codex and Gateway commands from one host boundary", async (t) => {
+test("desktop runtime environment drives Codex and Gateway RPC calls from one host boundary", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-host-runtime-env-test-"));
-  const oplCommand = path.join(directory, "opl");
-  const runtimePath = `${directory}:/usr/bin:/bin:/usr/sbin:/sbin`;
-  await writeFile(oplCommand, [
-    "#!/bin/sh",
-    `[ "$PATH" = '${runtimePath}' ] || exit 17`,
-    "printf '%s\\n' '{\"app_state\":{\"settings_control_center\":{\"app_settings_read_model\":{\"opl_gateway_account\":{\"surface_kind\":\"opl_gateway_account_read_model.v1\",\"connection_mode\":\"account\",\"status\":\"connected\",\"account_card_visible\":true,\"account\":{\"display_name\":\"OPL User\",\"status\":\"active\"}}}}}}'",
-    ""
-  ].join("\n"), "utf8");
-  await chmod(oplCommand, 0o755);
   t.after(() => rm(directory, { recursive: true, force: true }));
+  const connectCalls = [];
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => {
+      if (method === "app.state.get") {
+        return {
+          profile: params.profile,
+          app_state: {
+            settings_control_center: {
+              app_settings_read_model: {
+                opl_gateway_account: {
+                  surface_kind: "opl_gateway_account_read_model.v1",
+                  connection_mode: "account",
+                  status: "connected",
+                  account_card_visible: true,
+                  account: { display_name: "OPL User", status: "active" }
+                }
+              }
+            }
+          }
+        };
+      }
+      if (method === "connect.add") {
+        connectCalls.push(params);
+        return { connection_id: `conn-${connectCalls.length}` };
+      }
+      return {};
+    }
+  });
+  t.after(() => daemon.close());
 
   const env = {
-    PATH: runtimePath,
+    PATH: `${directory}:/usr/bin:/bin:/usr/sbin:/sbin`,
     OPL_CODEX_BIN: "/Users/opl/.local/bin/codex",
-    OPL_APP_OPL_BIN: oplCommand,
+    OPL_STATE_DIR: daemon.stateDir,
     OPL_APP_VERSION: "1.2.3"
   };
   const core = createStandaloneHostCore({
     workspaceRoot: directory,
     channelBindingFile: path.join(directory, "bindings.json"),
+    autoStart: false,
     env
   });
+  t.after(() => core.close());
   let reloadCount = 0;
   core.codex.reloadConfiguration = async () => {
     reloadCount += 1;
@@ -141,7 +160,7 @@ test("desktop runtime environment drives Codex and Gateway commands from one hos
   const state = await core.invoke("readState", { profile: "fast" });
   assert.equal(state.readback.exitCode, 0);
   assert.equal(
-    state.app_state.app_state.settings_control_center.app_settings_read_model.opl_gateway_account.status,
+    state.app_state.settings_control_center.app_settings_read_model.opl_gateway_account.status,
     "connected"
   );
   assert.deepEqual(await core.invoke("loginGatewayAccount", {
@@ -151,6 +170,7 @@ test("desktop runtime environment drives Codex and Gateway commands from one hos
   assert.deepEqual(await core.invoke("configureCodexApiKey", {
     apiKey: "sk-test"
   }), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(connectCalls.map((c) => c.provider_type), ["opl_gateway", "openai_codex"]);
   assert.equal(reloadCount, 1);
 });
 
@@ -254,6 +274,7 @@ test("App Server exit clears pending interactive requests instead of leaving sta
 
 test("optional channel provider receives canonical App Server callbacks without changing the default host path", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-host-channel-callback-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
   const transport = new CodexAppServerTransport({
     command: process.execPath,
     args: [fixture],
@@ -263,23 +284,10 @@ test("optional channel provider receives canonical App Server callbacks without 
     requestTimeoutMs: 2_000,
     turnTimeoutMs: 2_000
   });
-  let callbacks;
-  let disposeCount = 0;
   const core = await createOplHostCore({
     transport,
     channelBindingFile: path.join(directory, "channel-bindings.json"),
-    opl: createOplPassthrough({
-      cwd: directory,
-      channelCallbackRegistrar: async (value) => {
-        callbacks = value;
-        return {
-          appStatePatch: () => ({ ui_contributions: { entries: [] } }),
-          readChannelAccess: async () => ({}),
-          executeChannelAccessAction: async () => ({}),
-          dispose: () => { disposeCount += 1; }
-        };
-      }
-    })
+    opl: { readState: async () => ({ profile: "fast" }) }
   });
   let closed = false;
   t.after(async () => {
@@ -288,9 +296,10 @@ test("optional channel provider receives canonical App Server callbacks without 
 
   assert.deepEqual(core.capabilities().oplPassthrough.channelCallback, {
     schema: "opl_channel_canonical_thread_callbacks.v1",
-    status: "registered",
-    registered: true
+    status: "dormant",
+    registered: false
   });
+  const callbacks = core.codex.channelCallbackAdapter;
   assert.deepEqual(
     Object.keys(callbacks).sort(),
     ["readTransportBindings", "resumeThread", "startThread", "startTurn", "subscribeTurn"]
@@ -338,7 +347,6 @@ test("optional channel provider receives canonical App Server callbacks without 
   );
   await core.close();
   closed = true;
-  assert.equal(disposeCount, 1);
   const bindings = JSON.parse(await readFile(path.join(directory, "channel-bindings.json"), "utf8"));
   assert.deepEqual(bindings.entries, [{
     provider_id: "opl-channel-weixin",
@@ -476,18 +484,28 @@ test("shared Host attaches after App Server start and tears the provider down be
     calls.push("transport:stop");
     transport.initialized = false;
   };
-  const opl = createOplPassthrough({
-    channelCallbackRegistrar: async () => {
-      calls.push("provider:attach");
-      return {
-        appStatePatch: () => ({ ui_contributions: { entries: [] } }),
-        readChannelAccess: async () => ({}),
-        executeChannelAccessAction: async () => ({}),
-        dispose: async () => { calls.push("provider:dispose"); }
-      };
-    }
+  const codex = new OplCodexNative({ transport, env: {} });
+  const framework = new OplFrameworkBridge({
+    codex,
+    opl: { readState: async () => ({}) },
+    client: { on() {}, off() {}, connect: async () => {}, close: async () => { calls.push("bridge:close"); } }
   });
-  const core = await createOplHostCore({ transport, opl });
+  const core = new OplHostCore({ codex, framework, mcpApps: new McpAppHost(transport) });
+  core.attachHostContext({
+    get: (key) => (key === "oplWeixinChannel" ? {
+      async connect(adapter) {
+        assert.equal(adapter, codex.channelCallbackAdapter);
+        calls.push("provider:attach");
+        return {
+          appStatePatch: () => ({ ui_contributions: { entries: [] } }),
+          readChannelAccess: async () => ({}),
+          executeChannelAccessAction: async () => ({}),
+          dispose: async () => { calls.push("provider:dispose"); }
+        };
+      }
+    } : undefined)
+  });
+  await core.start();
   assert.deepEqual(calls, ["transport:start", "provider:attach"]);
   await core.close();
   await core.close();
@@ -495,143 +513,119 @@ test("shared Host attaches after App Server start and tears the provider down be
     "transport:start",
     "provider:attach",
     "provider:dispose",
+    "bridge:close",
     "transport:stop"
   ]);
 });
 
-test("Framework registrar loads only the carrier public Cordis export and returns its disposable Host", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-framework-carrier-test-"));
-  await mkdir(path.join(directory, "bin"), { recursive: true });
-  await mkdir(path.join(directory, "dist", "host"), { recursive: true });
-  const command = path.join(directory, "bin", "opl");
-  await writeFile(command, "#!/bin/sh\nexit 0\n", "utf8");
-  await chmod(command, 0o755);
-  await writeFile(path.join(directory, "package.json"), JSON.stringify({
-    name: "opl-framework",
-    type: "module",
-    exports: { "./cordis-profiles": "./dist/host/composition-profiles.js" }
-  }), "utf8");
-  await writeFile(
-    path.join(directory, "dist", "host", "composition-profiles.js"),
-    "export const publicCarrierMarker = 'framework-public-export';\n",
-    "utf8"
-  );
-  const profiles = await loadFrameworkCordisProfiles({ command, env: { PATH: "" } });
-  assert.equal(profiles.publicCarrierMarker, "framework-public-export");
+test("OpldClient binary and state path resolution honor explicit, env, and sibling priorities", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-daemon-resolve-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const binDir = path.join(directory, "bin");
+  const pathDir = path.join(directory, "path-bin");
+  await mkdir(binDir, { recursive: true });
+  await mkdir(pathDir, { recursive: true });
+  const explicitBin = path.join(directory, "explicit-opld");
+  const envBin = path.join(directory, "env-opld");
+  const siblingOpl = path.join(binDir, "opl");
+  const siblingOpld = path.join(binDir, process.platform === "win32" ? "opld.cmd" : "opld");
+  const pathOpld = path.join(pathDir, process.platform === "win32" ? "opld.cmd" : "opld");
+  const nonExec = path.join(directory, "not-exec-opld");
+  for (const f of [explicitBin, envBin, siblingOpl, siblingOpld, pathOpld]) {
+    await writeFile(f, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(f, 0o755);
+  }
+  await writeFile(nonExec, "#!/bin/sh\nexit 0\n", "utf8");
+  await chmod(nonExec, 0o644);
 
-  const calls = [];
-  const callback = Object.freeze({});
-  const registrar = createFrameworkChannelCallbackRegistrar({
-    command,
-    env: { PATH: "" },
-    loadProfiles: async () => ({
-      startCordisChannelProviderHost: async (options) => {
-        calls.push({ operation: "attach", callback: options.callback });
-        return {
-          appStatePatch: () => ({ ui_contributions: { entries: [] } }),
-          readChannelAccess: async (input) => ({ input }),
-          executeChannelAccessAction: async (input) => ({ input }),
-          dispose: async () => { calls.push({ operation: "dispose" }); }
-        };
-      }
-    })
-  });
-  const registration = await registrar(callback);
-  assert.deepEqual(calls, [{ operation: "attach", callback }]);
-  assert.deepEqual(registration.appStatePatch(), { ui_contributions: { entries: [] } });
-  assert.deepEqual(await registration.readChannelAccess({ ref: "state" }), { input: { ref: "state" } });
-  assert.deepEqual(
-    await registration.executeChannelAccessAction({ ref: "connect" }),
-    { input: { ref: "connect" } }
-  );
-  await registration.dispose();
-  assert.deepEqual(calls, [
-    { operation: "attach", callback },
-    { operation: "dispose" }
-  ]);
+  assert.equal(resolveDaemonBinary({ OPL_DAEMON_BIN: envBin, PATH: pathDir }, explicitBin), explicitBin);
+  assert.equal(resolveDaemonBinary({ OPL_DAEMON_BIN: envBin, PATH: pathDir }), envBin);
+  assert.equal(resolveDaemonBinary({ OPL_APP_OPL_BIN: siblingOpl, PATH: pathDir }), siblingOpld);
+  assert.equal(resolveDaemonBinary({ OPL_DAEMON_BIN: nonExec, PATH: pathDir }), process.platform === "win32" ? nonExec : pathOpld);
+  assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_STATE_DIR: "/s", OPL_DATA_DIR: "/d" }, "/e").stateDir, path.resolve("/e"));
+  assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_STATE_DIR: "/s", OPL_DATA_DIR: "/d" }).stateDir, path.resolve("/s"));
+  assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_DATA_DIR: "/d" }).stateDir, path.join(path.resolve("/d"), "opl", "state"));
 });
 
-test("Studio owns Weixin only after Framework can exclude the old provider", async () => {
-  const packageId = "opl-channel-weixin";
-  const spareId = "another-channel";
-  const callback = Object.freeze({});
+test("OplFrameworkBridge connects studioWeixin, merges appStatePatch, routes opl-channel-weixin, and preserves disabled ownership", async (t) => {
   const events = [];
-  const makeHost = (owner, ids) => ({
-    appStatePatch: () => ({
-      ui_contributions: { entries: ids.map(package_id => ({ package_id })) },
-      transport_bindings: { status: "available", bindings: ids.map(provider_id => ({ binding_id: provider_id, provider_id })) }
-    }),
-    readChannelAccess: async request => ({ owner, ref: request.ref }),
-    executeChannelAccessAction: async request => ({ owner, ref: request.ref }),
-    dispose: async () => { events.push(`stop ${owner}`); }
+  const daemon = await startFakeOpld({
+    onCall: async (method) => {
+      if (method === "app.state.get") {
+        return {
+          profile: "fast",
+          app_state: {
+            ui_contributions: { entries: [{ package_id: "legacy", view: { view_type: "channel_access" } }, { package_id: "opl-fleet-agent", view: { view_type: "list_detail" } }] }
+          }
+        };
+      }
+      return {};
+    }
+  });
+  t.after(() => daemon.close());
+
+  const callback = Object.freeze({
+    readTransportBindings: async () => [],
+    startThread: async () => {},
+    resumeThread: async () => {},
+    startTurn: async () => {},
+    subscribeTurn: () => ({ dispose() {} })
   });
   const studioWeixin = {
     async connect(adapter) {
       assert.equal(adapter, callback);
       events.push("start native");
-      return makeHost("native", [packageId]);
+      return {
+        appStatePatch: () => ({
+          ui_contributions: {
+            surface_kind: "opl_app_ui_contributions_projection.v1",
+            entries: [{ package_id: "opl-channel-weixin", view: { view_type: "channel_access" } }]
+          },
+          transport_bindings: { status: "available", bindings: [{ binding_id: "b1", provider_id: "opl-channel-weixin", canonical_thread_id: "t1" }] }
+        }),
+        readChannelAccess: async (req) => ({ opl_app_contribution: { package_id: req.package_id, ref: req.ref, response: { ok: true, result: { state: "disconnected" } } } }),
+        executeChannelAccessAction: async (req) => ({ opl_app_contribution: { surface_kind: "opl_app_package_contribution.v1", package_id: req.package_id, ref: req.ref, operation: "execute", response: { schema_version: "opl-package-app-contribution-response.v1", ref: req.ref, operation: "execute", ok: true, result: { ok: true } } } }),
+        dispose: async () => { events.push("stop native"); }
+      };
     }
   };
-  const register = (supportsExclusion) => createFrameworkChannelCallbackRegistrar({
-    loadProfiles: async () => ({
-      CHANNEL_PROVIDER_EXCLUSION_ABI: supportsExclusion ? 1 : undefined,
-      async startCordisChannelProviderHost({ callback: adapter, excludedProviderIds = [] }) {
-        assert.equal(adapter, callback);
-        events.push(`start framework ${excludedProviderIds.join(",")}`.trim());
-        return makeHost("framework", [packageId, spareId].filter(id => !excludedProviderIds.includes(id)));
-      }
-    })
+
+  const bridge = new OplFrameworkBridge({
+    stateDir: daemon.stateDir,
+    autoStart: false,
+    codex: { channelCallbackAdapter: callback, capabilities: () => ({ channelCallbackSchema: "v1" }) }
   });
+  const caps = await bridge.start(studioWeixin);
+  assert.equal(bridge.hasNativeWeixinChannel(), true);
+  assert.ok(bridge.nativeWeixinHost);
+  assert.equal(caps.channelCallback.status, "dormant");
 
-  const oldCarrier = await register(false)(callback, studioWeixin);
-  assert.equal(oldCarrier.replacedPackageIds, undefined);
-  assert.equal((await oldCarrier.readChannelAccess({ package_id: packageId, ref: "state" })).owner, "framework");
-  await oldCarrier.dispose();
+  const st = await bridge.opl.readState("fast");
+  assert.deepEqual(st.app_state.ui_contributions.entries.map((e) => e.package_id), ["opl-fleet-agent", "opl-channel-weixin"]);
+  assert.equal(st.app_state.transport_bindings.bindings[0].canonical_thread_id, "t1");
 
-  const newCarrier = await register(true)(callback, studioWeixin);
-  assert.deepEqual(newCarrier.replacedPackageIds, [packageId]);
-  assert.deepEqual(newCarrier.appStatePatch().ui_contributions.entries.map(entry => entry.package_id), [spareId, packageId]);
-  assert.deepEqual(newCarrier.appStatePatch().transport_bindings.bindings.map(entry => entry.provider_id), [spareId, packageId]);
-  assert.equal((await newCarrier.readChannelAccess({ package_id: packageId, ref: "state" })).owner, "native");
-  assert.equal((await newCarrier.executeChannelAccessAction({ package_id: spareId, ref: "connect" })).owner, "framework");
-  await newCarrier.dispose();
+  const read = await bridge.opl.readContribution({ packageId: "opl-channel-weixin", ref: "weixin.channel-access#state" });
+  assert.equal(read.stdoutJson.opl_app_contribution.response.result.state, "disconnected");
 
-  const disabled = await register(true)(callback, null);
-  assert.deepEqual(disabled.appStatePatch().ui_contributions.entries.map(entry => entry.package_id), [spareId]);
-  await disabled.dispose();
-  assert.deepEqual(events, [
-    "start framework", "stop framework",
-    `start framework ${packageId}`, "start native", "stop framework", "stop native",
-    `start framework ${packageId}`, "stop framework"
-  ]);
-});
-
-test("Framework registrar accepts a packaged runtime wrapper with an explicit Package root", async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-framework-wrapper-test-"));
-  const wrapperRoot = path.join(directory, "runtime");
-  const packageRoot = path.join(wrapperRoot, "opl");
-  const command = path.join(wrapperRoot, "bin", "opl");
-  await mkdir(path.dirname(command), { recursive: true });
-  await mkdir(path.join(packageRoot, "dist", "host"), { recursive: true });
-  await writeFile(command, "#!/bin/sh\nexit 0\n", "utf8");
-  await chmod(command, 0o755);
-  await writeFile(path.join(packageRoot, "package.json"), JSON.stringify({
-    name: "opl-framework",
-    type: "module",
-    exports: { "./cordis-profiles": "./dist/host/composition-profiles.js" }
-  }), "utf8");
-  await writeFile(
-    path.join(packageRoot, "dist", "host", "composition-profiles.js"),
-    "export const packagedRuntimeMarker = 'packaged-runtime';\n",
-    "utf8"
-  );
-  t.after(() => rm(directory, { recursive: true, force: true }));
-
-  const profiles = await loadFrameworkCordisProfiles({
-    command,
-    env: { PATH: "", OPL_FRAMEWORK_PACKAGE_ROOT: packageRoot }
+  const exec = await bridge.opl.executeAction({
+    actionId: "package_contribution_execute",
+    dryRun: false,
+    payload: { package_id: "opl-channel-weixin", ref: "weixin.channel-access#connect", confirmed: true }
   });
-  assert.equal(profiles.packagedRuntimeMarker, "packaged-runtime");
+  assert.equal(exec.status, "executed");
+  await bridge.close();
+
+  const disabledBridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(() => disabledBridge.close());
+  await disabledBridge.start(null);
+  assert.equal(disabledBridge.hasNativeWeixinChannel(), true);
+  assert.equal(disabledBridge.nativeWeixinHost, null);
+
+  const absentBridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(() => absentBridge.close());
+  await absentBridge.start(undefined);
+  assert.equal(absentBridge.hasNativeWeixinChannel(), false);
+  assert.deepEqual(events, ["start native", "stop native"]);
 });
 
 test("shared host core serves desktop and HTTP adapters through one typed method surface", async (t) => {
