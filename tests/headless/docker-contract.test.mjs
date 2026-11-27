@@ -17,19 +17,21 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(rendererBuilder, /COPY packages \.\/packages/);
   assert.ok(rendererBuilder.indexOf("COPY packages ./packages") < rendererBuilder.indexOf("RUN npm run build:webui"), "the renderer build must receive shared Host package sources");
   assert.ok(rendererBuilder.indexOf("COPY vendor ./vendor") < rendererBuilder.indexOf("RUN npm run build:webui"), "the plugin build must receive the unmodified Superagent source");
-  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec/);
-  assert.match(dockerfile, /ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507/);
-  assert.match(dockerfile, /npm pack --ignore-scripts/);
-  assert.doesNotMatch(dockerfile, /npm pack --workspaces/);
-  assert.match(dockerfile, /npm install --global --prefix \/opt\/opl-framework --omit=dev \/tmp\/opl-framework-\*\.tgz/);
+  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e/);
+  assert.match(dockerfile, /ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
+  const frameworkBuilder = dockerfile.slice(dockerfile.indexOf("AS framework-builder"), dockerfile.indexOf("AS codex-builder"));
+  assert.match(frameworkBuilder, /npm run framework:archive -- \/tmp\/opl-framework-artifact/);
+  assert.match(frameworkBuilder, /WORKDIR \/opt\/opl-framework\/runtime\s+RUN tar -xzf [^\n]+--strip-components=1/);
+  assert.match(frameworkBuilder, /npm ci --omit=dev --ignore-scripts/);
+  assert.match(frameworkBuilder, /npm install --global --prefix \/opt\/opl-framework --omit=dev --ignore-scripts --offline \./);
   const productionDependencies = dockerfile.slice(
     dockerfile.indexOf("FROM ${NODE_IMAGE} AS production-dependencies"),
     dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime")
   );
   assert.match(productionDependencies, /COPY plugins \.\/plugins/);
   assert.match(productionDependencies, /npm ci --omit=dev/);
-  assert.match(compose, /OPL_FRAMEWORK_REF:-2a490a41c30106d08f982f96eec439144af88cec/);
-  assert.match(compose, /OPL_APP_REF:-da71d20448cdbcc9425c0dae2d81dd1b6f005507/);
+  assert.match(compose, /OPL_FRAMEWORK_REF:-1a295253f7cfd89c5345feddef28e7677f23243e/);
+  assert.match(compose, /OPL_APP_REF:-2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
   const runtime = dockerfile.slice(dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime"));
   assert.match(runtime, /org\.opencontainers\.image\.revision="\$\{OPL_SOURCE_REVISION\}"/);
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/package\.json \.\/package\.json/);

@@ -9,7 +9,7 @@ RUN apt-get update \
 
 FROM source-builder-base AS framework-builder
 ARG OPL_FRAMEWORK_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab.git
-ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
+ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e
 WORKDIR /src/opl-framework
 
 RUN git init \
@@ -18,9 +18,11 @@ RUN git init \
   && git checkout --detach FETCH_HEAD \
   && test "$(git rev-parse HEAD)" = "${OPL_FRAMEWORK_REF}"
 RUN npm ci --ignore-scripts \
-  && npm run build \
-  && npm pack --ignore-scripts --silent --pack-destination /tmp \
-  && npm install --global --prefix /opt/opl-framework --omit=dev /tmp/opl-framework-*.tgz \
+  && npm run framework:archive -- /tmp/opl-framework-artifact
+WORKDIR /opt/opl-framework/runtime
+RUN tar -xzf /tmp/opl-framework-artifact/one-person-lab-framework-*.tar.gz --strip-components=1 \
+  && npm ci --omit=dev --ignore-scripts \
+  && npm install --global --prefix /opt/opl-framework --omit=dev --ignore-scripts --offline . \
   && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS codex-builder
@@ -31,7 +33,7 @@ RUN node -e 'if (!/^@openai\/codex@\d+\.\d+\.\d+$/.test(process.argv[1])) throw 
 
 FROM source-builder-base AS app-product-profile
 ARG OPL_APP_REPOSITORY=https://github.com/gaofeng21cn/one-person-lab-app.git
-ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
+ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc
 WORKDIR /src/one-person-lab-app
 RUN git init \
   && git remote add origin "${OPL_APP_REPOSITORY}" \
@@ -87,8 +89,8 @@ COPY --from=framework-builder /opt/opl-framework /opt/opl-framework
 COPY --from=codex-builder /opt/codex /opt/codex
 COPY --from=app-product-profile /opt/opl/resources /opt/opl/resources
 COPY scripts/headless/image-manifest.mjs /tmp/image-manifest.mjs
-ARG OPL_FRAMEWORK_REF=2a490a41c30106d08f982f96eec439144af88cec
-ARG OPL_APP_REF=da71d20448cdbcc9425c0dae2d81dd1b6f005507
+ARG OPL_FRAMEWORK_REF=1a295253f7cfd89c5345feddef28e7677f23243e
+ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc
 ARG OPL_CODEX_NPM_SPEC
 RUN OPL_FRAMEWORK_REF="${OPL_FRAMEWORK_REF}" OPL_APP_REF="${OPL_APP_REF}" OPL_CODEX_NPM_SPEC="${OPL_CODEX_NPM_SPEC}" OPL_SOURCE_REVISION="${OPL_SOURCE_REVISION}" node /tmp/image-manifest.mjs \
   && rm /tmp/image-manifest.mjs
