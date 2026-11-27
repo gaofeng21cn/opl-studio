@@ -26,6 +26,8 @@ export function createManagedUpdateMaintenance({
     lastCompletedAt: null,
     nextAttemptAt: null,
     reloadPending: false,
+    packageRestartRequired: false,
+    packageRendererReloadReady: false,
     dshPluginRestartRequired: false,
     dshPluginReloadReady: false,
     dshPluginUpdateStatus: "idle",
@@ -33,6 +35,8 @@ export function createManagedUpdateMaintenance({
     failureRetryCount: 0,
     retryExhausted: false
   };
+  let packageRendererRevision = 0;
+  let dshRendererRevision = 0;
   let timer;
   let inFlight;
   let stopped = false;
@@ -45,6 +49,42 @@ export function createManagedUpdateMaintenance({
     if (!stateFile) return;
     await writeFileAtomic(stateFile, `${JSON.stringify(state)}\n`, { mode: 0o600 });
   };
+  const syncProfilePlugins = async () => {
+    if (!syncDshPlugins) return;
+    try {
+      const dshResult = await syncDshPlugins();
+      const installedPlugins = dshResult?.installed ?? {};
+      const dshFailures = dshResult?.failures ?? {};
+      const externalStaged = Array.isArray(dshResult?.externalStaged) ? dshResult.externalStaged : [];
+      const hasInstalled = Object.keys(installedPlugins).length > 0;
+      if (
+        dshResult?.reloadMode === "renderer_reload"
+        && hasInstalled
+        && !state.dshPluginRestartRequired
+        && externalStaged.length === 0
+      ) {
+        dshRendererRevision++;
+        emit({
+          dshPluginReloadReady: true,
+          dshPluginUpdateStatus: "reload_ready",
+          updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
+        });
+      } else if (dshResult?.application === "restart-required" || hasInstalled || externalStaged.length > 0) {
+        emit({
+          dshPluginRestartRequired: true,
+          dshPluginReloadReady: false,
+          dshPluginUpdateStatus: "restart_required",
+          updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
+        });
+      } else if (Object.keys(dshFailures).length > 0) {
+        emit({ dshPluginUpdateStatus: "failed" });
+      } else if (!state.dshPluginRestartRequired && !state.dshPluginReloadReady) {
+        emit({ dshPluginUpdateStatus: "current" });
+      }
+    } catch {
+      emit({ dshPluginUpdateStatus: "failed" });
+    }
+  };
   const run = async () => {
     // Reserve the next automatic attempt before invoking an external writer.
     // Failure, process exit and restart must not create an unbounded apply loop.
@@ -56,74 +96,53 @@ export function createManagedUpdateMaintenance({
       appUpdateFailed = true;
       emit({ appUpdateStatus: "failed" });
     }
-    await opl.runManagedUpdate("check");
-    const plan = await opl.runManagedUpdate("plan");
-    const eligible = eligibleBackgroundComponents(plan);
-    if (eligible.length > 0 || state.reloadPending) {
-      const lease = await codex.transport.runWhenIdle(async () => {
-        emit({ status: "applying", components: eligible.map((item) => item.component_id) });
-        // Framework rechecks eligibility under its own cross-process update lock.
-        const result = eligible.length > 0 ? await opl.runManagedUpdate("apply") : null;
-        const components = result?.managed_update?.components ?? [];
-        const reload = state.reloadPending || components.some((component) => component.component_id === "opl_packages"
-          && (component.receipt?.reload_guidance?.reload_recommended === true
-            || component.post_apply_guidance?.reload_guidance?.reload_recommended === true));
-        if (reload) {
-          emit({ reloadPending: true });
+    try {
+      await opl.runManagedUpdate("check");
+      const plan = await opl.runManagedUpdate("plan");
+      const eligible = eligibleBackgroundComponents(plan);
+      if (eligible.length > 0 || state.reloadPending) {
+        const lease = await codex.transport.runWhenIdle(async () => {
+          emit({ status: "applying", components: eligible.map((item) => item.component_id) });
+          // Framework rechecks eligibility under its own cross-process update lock.
+          const result = eligible.length > 0 ? await opl.runManagedUpdate("apply") : null;
+          const components = result?.managed_update?.components ?? [];
+          const guidance = components.filter((component) => component.component_id === "opl_packages")
+            .flatMap((component) => [component.receipt?.reload_guidance, component.post_apply_guidance?.reload_guidance])
+            .filter(Boolean);
+          if (guidance.some((item) => item.restart_required === true || item.reload_mode === "restart_required")) {
+            emit({ packageRestartRequired: true, packageRendererReloadReady: false, reloadPending: false });
+            await persist();
+          } else if (!state.packageRestartRequired && guidance.some((item) => item.reload_mode === "renderer_reload")) {
+            packageRendererRevision++;
+            emit({ packageRendererReloadReady: true });
+          }
+          const reload = !state.packageRestartRequired && (state.reloadPending
+            || guidance.some((item) => item.reload_recommended === true && !item.reload_mode));
+          if (reload) {
+            emit({ reloadPending: true });
+            await persist();
+            await codex.reloadConfiguration({ maintenanceHeld: true });
+            emit({ reloadPending: false });
+          }
+          const executionStatus = result?.managed_update?.execution?.status;
+          if (result && !["completed", "skipped"].includes(executionStatus)) {
+            throw Object.assign(new Error("Framework update did not complete"), { code: "managed_update_incomplete" });
+          }
+          await opl.runManagedUpdate("status");
+          return { reloaded: reload };
+        });
+        if (lease.status === "deferred") {
+          emit({ status: "deferred", reasonCode: lease.reasonCode, nextAttemptAt: now() + BUSY_RETRY_INTERVAL });
           await persist();
-          await codex.reloadConfiguration({ maintenanceHeld: true });
-          emit({ reloadPending: false });
+          return;
         }
-        const executionStatus = result?.managed_update?.execution?.status;
-        if (result && !["completed", "skipped"].includes(executionStatus)) {
-          throw Object.assign(new Error("Framework update did not complete"), { code: "managed_update_incomplete" });
-        }
-        await opl.runManagedUpdate("status");
-        return { reloaded: reload };
-      });
-      if (lease.status === "deferred") {
-        emit({ status: "deferred", reasonCode: lease.reasonCode, nextAttemptAt: now() + BUSY_RETRY_INTERVAL });
-        await persist();
-        return;
+        emit({ reloaded: lease.result.reloaded });
       }
-      emit({ reloaded: lease.result.reloaded });
+    } finally {
+      if (state.status !== "deferred") await syncProfilePlugins();
     }
     const failedRetryCount = appUpdateFailed ? Math.min(MAX_FAILURE_RETRIES, state.failureRetryCount + 1) : 0;
     const retryExhausted = failedRetryCount >= MAX_FAILURE_RETRIES;
-    if (typeof syncDshPlugins === "function") {
-      try {
-        const dshResult = await syncDshPlugins();
-        const installedPlugins = dshResult?.installed ?? {};
-        const dshFailures = dshResult?.failures ?? {};
-        const externalStaged = Array.isArray(dshResult?.externalStaged) ? dshResult.externalStaged : [];
-        const hasInstalled = Object.keys(installedPlugins).length > 0;
-        if (
-          dshResult?.reloadMode === "renderer_reload"
-          && hasInstalled
-          && !state.dshPluginRestartRequired
-          && externalStaged.length === 0
-        ) {
-          emit({
-            dshPluginReloadReady: true,
-            dshPluginUpdateStatus: "reload_ready",
-            updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
-          });
-        } else if (dshResult?.application === "restart-required" || hasInstalled || externalStaged.length > 0) {
-          emit({
-            dshPluginRestartRequired: true,
-            dshPluginReloadReady: false,
-            dshPluginUpdateStatus: "restart_required",
-            updatedDshPlugins: { ...state.updatedDshPlugins, ...installedPlugins }
-          });
-        } else if (Object.keys(dshFailures).length > 0) {
-          emit({ dshPluginUpdateStatus: "failed" });
-        } else if (!state.dshPluginRestartRequired && !state.dshPluginReloadReady) {
-          emit({ dshPluginUpdateStatus: "current" });
-        }
-      } catch {
-        emit({ dshPluginUpdateStatus: "failed" });
-      }
-    }
     emit({
       status: "completed",
       lastCompletedAt: now(),
@@ -136,6 +155,21 @@ export function createManagedUpdateMaintenance({
   };
   const controller = {
     snapshot: () => ({ ...state }),
+    captureRendererUpdateAcknowledgement() {
+      const packageRevision = packageRendererRevision;
+      const dshRevision = dshRendererRevision;
+      return () => {
+        const acknowledged = {};
+        if (state.packageRendererReloadReady && packageRevision === packageRendererRevision) {
+          acknowledged.packageRendererReloadReady = false;
+        }
+        if (state.dshPluginReloadReady && dshRevision === dshRendererRevision) {
+          acknowledged.dshPluginReloadReady = false;
+          acknowledged.dshPluginUpdateStatus = "current";
+        }
+        if (Object.keys(acknowledged).length) emit(acknowledged);
+      };
+    },
     async runNow() {
       if (stopped) return controller.snapshot();
       inFlight ??= run().catch(async (error) => {
