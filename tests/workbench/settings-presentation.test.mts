@@ -721,7 +721,7 @@ test("first-run actions use host capabilities or open the matching settings dest
     ] as const) {
       const actions: string[] = [];
       const surface = {
-        locale, initializationStatus: "ready",
+        locale, initializationStatus: "ready", firstRunVisible: true,
         initialization: normalizeInitializeReadback({ system_initialize: {
           setup_flow: { is_first_run: true, ready_to_launch: false },
           checklist: [{ item_id: itemId, blocking: true, readiness_layer: "core_launch" }]
@@ -729,6 +729,7 @@ test("first-run actions use host capabilities or open the matching settings dest
         setupCapabilities: { workspaceRoot: hostAction, codexInstall: hostAction },
         chooseWorkspaceRoot: async () => { actions.push("choose"); return { status: "completed" }; },
         installCodex: async () => { actions.push("install"); return { status: "completed" }; },
+        completeFirstRun: () => actions.push("finish"),
         openSettingsDestination: (destination: string) => actions.push(destination),
       };
       render(createElement(StudioContext.Provider, { value: surface as never },
@@ -738,7 +739,7 @@ test("first-run actions use host capabilities or open the matching settings dest
       assert.ok(primary, itemId);
       flushSync(() => primary.click());
       await new Promise(resolve => setImmediate(resolve));
-      assert.deepEqual(actions, hostAction ? [expected] : ["complete", expected]);
+      assert.deepEqual(actions, hostAction ? [expected] : ["finish", "complete", expected]);
       if (expected === "install" || expected === "choose") continue;
       const group = presentation.settingsDestinations(locale).find(page =>
         presentation.settingsSubDestinations(page.id, locale).some(subpage => subpage.id === expected));
