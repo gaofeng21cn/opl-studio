@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -400,6 +401,17 @@ test("Wave 1 Gate 2F: zero-sleep daemon.shutdown & SIGKILL recovery + close() mi
 
 test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", async (t) => {
   const { root, stateDir, env } = createIsolatedEnv();
+  const gatewayCalls = [];
+  const gateway = http.createServer((req, res) => {
+    gatewayCalls.push([req.method, req.url]);
+    const rejected = req.url === "/api/v1/auth/login";
+    res.writeHead(rejected ? 401 : 200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(rejected ? { code: 401, message: "Invalid credentials" } : { code: 0, data: {} }));
+  });
+  await new Promise((resolve) => gateway.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => gateway.close(resolve)));
+  env.NODE_ENV = "test";
+  env.OPL_GATEWAY_CONTROL_BASE_URL = `http://127.0.0.1:${gateway.address().port}/api/v1`;
   const bridge = new OplFrameworkBridge({ env });
   t.after(() => shutdownSandbox(root, stateDir, bridge));
   await bridge.start();
@@ -447,10 +459,11 @@ test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", as
   const listedEmpty = await bridge.client.call("connect.list", {});
   assert.equal(listedEmpty.connections.length, 0);
 
-  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "alice@opl.dev", password: "pw-secret-1" }), { ok: true, stateRefreshRequired: true });
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "alice@opl.dev", password: "pw-secret-1" }), { ok: false, errorCode: "invalid_credentials", stateRefreshRequired: false });
+  assert.ok(gatewayCalls.some(([method, route]) => method === "POST" && route === "/api/v1/auth/login"));
   assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey: "sk-valid-key" }), { ok: true, stateRefreshRequired: true });
   const listedAfter = await bridge.client.call("connect.list", {});
-  assert.equal(listedAfter.connections.some((connection) => connection.provider_type === "openai_codex"), false);
+  assert.deepEqual(listedAfter.connections, []);
   const codexConfig = fs.readFileSync(path.join(env.CODEX_HOME, "config.toml"), "utf8");
   assert.match(codexConfig, /experimental_bearer_token = "sk-valid-key"/);
   const keyState = await bridge.opl.readState("fast");

@@ -106,6 +106,7 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-host-runtime-env-test-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const connectCalls = [];
+  const loginCalls = [];
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
       if (method === "app.state.get") {
@@ -130,6 +131,10 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
         assert.deepEqual(params, { api_key: "sk-test" });
         connectCalls.push({ method });
         return { ok: true };
+      }
+      if (method === "connect.gateway.login") {
+        loginCalls.push(params);
+        return { gateway_account: { surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", status: "connected", account: { email: params.email, status: "active" } } };
       }
       if (method === "connect.add") {
         connectCalls.push(params);
@@ -175,7 +180,8 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
   assert.deepEqual(await core.invoke("configureCodexApiKey", {
     apiKey: "sk-test"
   }), { ok: true, stateRefreshRequired: true });
-  assert.deepEqual(connectCalls.map((c) => c.method ?? c.provider_type), ["opl_gateway", "connect.configureCodexApiKey"]);
+  assert.deepEqual(loginCalls, [{ email: "user@example.com", password: "secret" }]);
+  assert.deepEqual(connectCalls, [{ method: "connect.configureCodexApiKey" }]);
   assert.equal(reloadCount, 1);
 });
 

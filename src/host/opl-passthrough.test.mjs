@@ -191,6 +191,7 @@ test("executeAction enforces read-only matrix, authorityBoundary, and preserves 
 test("OplFrameworkBridge capabilities, Server-Push events, tolerant daemon_not_found, and credential/Weixin routes", async (t) => {
   const daemon = await startFakeOpld({
     onCall: async (method) => {
+      if (method === "connect.gateway.login") return { gateway_account: { surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", status: "connected", account: { status: "active" } } };
       if (method === "connect.add") return { connection_id: "conn-1" };
       if (method === "connect.approveRequest") return { ok: true, stateRefreshRequired: true };
       return {};
