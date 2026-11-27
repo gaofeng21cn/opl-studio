@@ -93,6 +93,7 @@ export type OplStudioSurface = {
   applicationManagement: ReactNode;
   packageActivity?: PackageActivity;
   openPackageActivity?(): void;
+  packageUpdateActivation?: "restart" | "reload";
   pendingUpdateRestart?: boolean;
   onRestartForUpdates?(): void;
   pendingUpdateReload?: boolean;

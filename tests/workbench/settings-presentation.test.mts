@@ -1707,6 +1707,15 @@ test("ShellOverlaySlot shows global lightweight restart pill outside Software Ce
     const hiddenSurface = { ...baseSurface, primaryView: "applications" } as never;
     render(createElement(StudioContext.Provider, { value: hiddenSurface }, createElement(ShellOverlaySlot)));
     assert.equal(container.querySelector('[data-testid="opl-global-restart-trigger"]'), null);
+
+    const packageSurface = { ...hiddenSurface, pendingUpdateRestart: false, packageUpdateActivation: "restart" } as never;
+    render(createElement(StudioContext.Provider, { value: packageSurface }, createElement(ShellOverlaySlot)));
+    flushSync(() => container.querySelector<HTMLButtonElement>('[data-testid="opl-global-restart-trigger"]')!.click());
+    assert.equal(restarted, 2);
+    const reloadSurface = { ...packageSurface, packageUpdateActivation: "reload" } as never;
+    render(createElement(StudioContext.Provider, { value: reloadSurface }, createElement(ShellOverlaySlot)));
+    assert.equal(container.querySelector('[data-testid="opl-global-restart-trigger"]'), null);
+    assert.ok(container.querySelector('[data-testid="opl-global-reload-trigger"]'));
   });
 });
 

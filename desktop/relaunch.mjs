@@ -56,3 +56,26 @@ export async function performDesktopRestart({
     accepted: true
   };
 }
+
+export function scheduleRendererReload(target, maintenance) {
+  if (!target || target.isDestroyed()) return { accepted: false, mode: "renderer_reload" };
+  const acknowledge = maintenance?.captureRendererUpdateAcknowledgement?.();
+  setImmediate(() => {
+    if (target.isDestroyed()) return;
+    const cleanup = () => {
+      target.off("did-finish-load", onLoaded);
+      target.off("did-fail-load", onFailed);
+      target.off("destroyed", cleanup);
+    };
+    const onLoaded = () => { cleanup(); acknowledge?.(); };
+    const onFailed = (_event, _code, _description, _url, isMainFrame) => { if (isMainFrame) cleanup(); };
+    if (acknowledge) {
+      target.once("did-finish-load", onLoaded);
+      target.on("did-fail-load", onFailed);
+      target.once("destroyed", cleanup);
+    }
+    if (typeof target.reloadIgnoringCache === "function") target.reloadIgnoringCache();
+    else target.reload();
+  });
+  return { accepted: true, mode: "renderer_reload" };
+}

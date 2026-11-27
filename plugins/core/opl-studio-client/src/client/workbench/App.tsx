@@ -338,6 +338,7 @@ export function App({
   const [nativeAppUpdate, setNativeAppUpdate] = useState<NativeAppUpdateResult | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
+  const [packageUpdateActivation, setPackageUpdateActivation] = useState<"restart" | "reload">();
   const [dshPluginRestartRequired, setDshPluginRestartRequired] = useState(false);
   const [dshPluginReloadReady, setDshPluginReloadReady] = useState(false);
   const [projectedManagedUpdateActions, setProjectedManagedUpdateActions] = useState<ProjectedManagedUpdateAction[]>([]);
@@ -840,6 +841,8 @@ export function App({
         setProjectedManifestInstallAction(readProjectedManifestInstallAction(state));
         setCarrierDiagnostics(state.carrierDiagnostics);
         setMaintenanceStatus(state.managedUpdateMaintenance?.status ?? null);
+        const maintenance = state.managedUpdateMaintenance;
+        if (maintenance) setPackageUpdateActivation(maintenance.packageRestartRequired ? "restart" : maintenance.packageRendererReloadReady ? "reload" : undefined);
         if (typeof state.managedUpdateMaintenance?.dshPluginRestartRequired === "boolean") {
           setDshPluginRestartRequired(state.managedUpdateMaintenance.dshPluginRestartRequired);
         }
@@ -1556,6 +1559,9 @@ export function App({
     if (method === "host/managed-update" && typeof params.status === "string") {
       setMaintenanceError(typeof params.errorCode === "string" ? params.errorCode : null);
       setMaintenanceStatus(params.status);
+      if (typeof params.packageRestartRequired === "boolean" || typeof params.packageRendererReloadReady === "boolean") {
+        setPackageUpdateActivation(params.packageRestartRequired === true ? "restart" : params.packageRendererReloadReady === true ? "reload" : undefined);
+      }
       if (typeof params.dshPluginRestartRequired === "boolean") {
         setDshPluginRestartRequired(params.dshPluginRestartRequired);
       }
@@ -2809,6 +2815,7 @@ export function App({
     teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
     openPackageActivity: () => { setApplicationManagementTab('activity'); setPrimaryView('applications'); },
+    packageUpdateActivation,
     pendingUpdateRestart: dshPluginRestartRequired
       || nativeAppUpdate?.state === "downloaded"
       || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")

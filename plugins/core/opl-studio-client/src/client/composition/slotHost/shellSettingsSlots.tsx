@@ -56,13 +56,16 @@ export function ShellOverlaySlot() {
       });
     };
   }, [detailsOpen]);
+  const packageActivation = studio.packageUpdateActivation;
+  const showRestart = packageActivation === "restart" || (studio.pendingUpdateRestart && studio.primaryView !== "applications");
+  const showReload = !studio.pendingUpdateRestart && (packageActivation === "reload" || (studio.pendingUpdateReload && studio.primaryView !== "applications"));
   return <>
     {studio.overlay}
     <div className="opl-shell-status-actions" data-inspector-open={detailsOpen || undefined}>
     {studio.packageActivity && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
       <PackageActivityButton activity={studio.packageActivity} locale={studio.locale} onOpen={() => studio.openPackageActivity ? studio.openPackageActivity() : studio.openPrimaryView('applications')} />
     </div> : null}
-    {studio.pendingUpdateRestart && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
+    {showRestart ? <div className="opl-shell-package-activity">
       <button type="button" className="opl-package-activity-trigger" data-testid="opl-global-restart-trigger" data-tone="active"
         onClick={() => studio.onRestartForUpdates ? studio.onRestartForUpdates() : studio.openPrimaryView('applications')}
         aria-label={studio.locale === 'zh' ? '更新已就绪，点击重启应用生效' : 'Updates ready, click to restart app'}
@@ -70,11 +73,11 @@ export function ShellOverlaySlot() {
         <RotateCw size={15} aria-hidden="true" />
         <span role="status">{studio.locale === 'zh' ? '更新已就绪 · 重启生效' : 'Updates ready · Restart'}</span>
       </button>
-    </div> : !studio.pendingUpdateRestart && studio.pendingUpdateReload && studio.primaryView !== 'applications' ? <div className="opl-shell-package-activity">
+    </div> : showReload ? <div className="opl-shell-package-activity">
       <button type="button" className="opl-package-activity-trigger" data-testid="opl-global-reload-trigger" data-tone="active"
         onClick={() => studio.onReloadForUpdates ? studio.onReloadForUpdates() : studio.openPrimaryView('applications')}
         aria-label={studio.locale === 'zh' ? '界面更新已就绪，点击刷新生效' : 'UI updates ready, click to reload window'}
-        title={studio.locale === 'zh' ? '新的界面扩展已准备就绪，刷新界面即可立即生效' : 'Updated interface extensions are ready; reload the view to apply immediately'}>
+        title={studio.locale === 'zh' ? '刷新界面即可应用更新' : 'Reload the interface to apply updates'}>
         <RotateCw size={15} aria-hidden="true" />
         <span role="status">{studio.locale === 'zh' ? '界面更新已就绪 · 刷新生效' : 'UI updates ready · Reload'}</span>
       </button>

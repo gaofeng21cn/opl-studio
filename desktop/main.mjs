@@ -29,7 +29,7 @@ import {
   performDesktopUpdaterQualification,
   createDesktopUpdater
 } from "./updater.mjs";
-import { performDesktopRestart } from "./relaunch.mjs";
+import { performDesktopRestart, scheduleRendererReload } from "./relaunch.mjs";
 
 const { autoUpdater } = updaterPackage;
 protocol.registerSchemesAsPrivileged([{ scheme: "opl-client", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
@@ -644,14 +644,8 @@ app.whenReady().then(async () => {
       const target = event.sender && !event.sender.isDestroyed()
         ? event.sender
         : (mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null);
-      if (!target) return { accepted: false, mode: "renderer_reload" };
-      setImmediate(() => {
-        if (!target.isDestroyed()) {
-          if (typeof target.reloadIgnoringCache === "function") target.reloadIgnoringCache();
-          else target.reload();
-        }
-      });
-      return { accepted: true, mode: "renderer_reload" };
+      const maintenance = target === mainWindow?.webContents ? hostCore?.updateMaintenance : undefined;
+      return scheduleRendererReload(target, maintenance);
     }
     const updateOperation = {
       readNativeAppUpdateStatus: "status", checkNativeAppUpdate: "check",
@@ -710,7 +704,7 @@ app.whenReady().then(async () => {
         const softwareRestartRequired = entries.some((entry) => entry?.installed === true && (entry?.update_status === "needs_restart" || entry?.update_state === "needs_restart"))
           || nativeItems.some((item) => item?.installed === true && item?.update_status === "needs_restart");
         const maintenanceSnapshot = activeHost.core.updateMaintenance?.snapshot?.();
-        const restartRequired = Boolean(desktop.restartRequired || maintenanceSnapshot?.dshPluginRestartRequired || softwareRestartRequired);
+        const restartRequired = Boolean(desktop.restartRequired || maintenanceSnapshot?.packageRestartRequired || maintenanceSnapshot?.dshPluginRestartRequired || softwareRestartRequired);
         if (pluginUpdatesCount > 0 && activeHost.core.updateMaintenance) {
           void activeHost.core.updateMaintenance.runNow().catch(() => undefined);
         }
