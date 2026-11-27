@@ -161,7 +161,8 @@ npm run start:headless
 构建本地 Docker 候选镜像：
 
 ```bash
-docker compose up --build
+npm run build:docker
+docker compose up --no-build
 ```
 
 这两个本地入口默认绑定回环地址。Cloud 部署使用 [OCI 分发](./docs/oci-distribution.md)

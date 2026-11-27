@@ -299,7 +299,7 @@
     "dist:mac": "npm run build:desktop && npm run materialize:bootstrap && electron-builder --mac --config electron-builder.yml --publish never && npm run qualify:desktop:mac",
     "dist:windows": "npm run build:desktop && npm run materialize:bootstrap && electron-builder --win --config electron-builder.yml --publish never",
     "dist:linux": "npm run build:desktop && npm run materialize:bootstrap && electron-builder --linux --config electron-builder.yml --publish never",
-    "build:docker": "docker build --tag one-person-lab-app:headless-candidate .",
+    "build:docker": "node scripts/oci/resolve-build-inputs.mjs",
     "plan:oci:multiarch": "node scripts/oci/build-plan.mjs",
     "smoke:desktop-live": "node scripts/smoke-desktop-live.mjs",
     "smoke:preview": "node scripts/desktop/preview-smoke.mjs",

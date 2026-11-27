@@ -179,7 +179,8 @@ npm run start:headless
 Build the local Docker candidate:
 
 ```bash
-docker compose up --build
+npm run build:docker
+docker compose up --no-build
 ```
 
 Both local routes default to loopback. Cloud deployment uses the password,
