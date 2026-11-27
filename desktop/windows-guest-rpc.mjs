@@ -55,6 +55,7 @@ export function createGuestRpc({ input, output, onRequest, onEvent = () => {}, t
   });
   input.once("end", close);
   input.once("error", close);
+  output.once("error", close);
   return {
     events, close,
     emit(value) { if (!closed) write({ type: "event", value }); },

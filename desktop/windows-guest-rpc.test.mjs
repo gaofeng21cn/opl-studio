@@ -45,3 +45,13 @@ test("an inbound frame that never terminates remains bounded", async () => {
   await rejected;
   await assert.rejects(rpc.request("account"), { code: "guest_host_closed" });
 });
+
+test("writing to a closed guest stdin rejects the request through the RPC boundary", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const rpc = createGuestRpc({ input, output });
+  const receipt = rpc.request("initialize");
+  output.destroy(Object.assign(new Error("broken pipe"), { code: "EPIPE" }));
+  await assert.rejects(receipt, { code: "guest_host_closed" });
+  await assert.rejects(rpc.request("initialize"), { code: "guest_host_closed" });
+});
