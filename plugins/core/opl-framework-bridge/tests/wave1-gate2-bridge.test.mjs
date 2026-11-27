@@ -295,7 +295,7 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
   t.after(() => shutdownSandbox(root, stateDir, boot));
   await boot.start();
 
-  const opl = createOplPassthrough({ env, candidateActionAllowlist: ["codex_install"] });
+  const opl = createOplPassthrough({ env });
   t.after(() => opl.close());
 
   const st = await opl.readState("fast");
@@ -352,15 +352,19 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
   const plan = await opl.runManagedUpdate("plan");
   assert.equal(Array.isArray(plan.managed_update.components), true);
 
-  const act = await opl.executeAction({ actionId: "codex_install", dryRun: true });
+  const dir = writeV2Pkg(path.join(root, "preview-app"), { id: "preview-app" });
+  await opl.client.call("pack.link", { dir, sync_codex: false });
+  const packageRequest = { actionId: "agent_package_uninstall", payload: { package_id: "preview-app" } };
+  const act = await opl.executeAction({ ...packageRequest, dryRun: true });
   assert.equal(act.status, "preview_ready");
   assert.equal(act.authorityBoundary, "app_bridge_no_domain_authority");
 
   const previewModeRo = createOplPassthrough({ env: { ...env, OPL_STUDIO_READ_ONLY: "1" }, client: opl.client });
-  const actPreviewMode = await previewModeRo.executeAction({ actionId: "codex_install", dryRun: false, mode: "preview" });
+  const actPreviewMode = await previewModeRo.executeAction({ ...packageRequest, dryRun: false, mode: "preview" });
   assert.equal(actPreviewMode.dryRun, true);
   assert.equal(actPreviewMode.receiptKind, "preview");
   assert.equal(actPreviewMode.status, "preview_ready");
+  assert.ok((await opl.client.call("pack.inspect", { package_id: "preview-app" })).installed);
 
   const missingBinBridge = new OplFrameworkBridge({ env: { ...env, OPL_DAEMON_BIN: path.join(root, "no-such-opld"), OPL_STATE_DIR: path.join(root, "empty-state") } });
   t.after(() => missingBinBridge.close());
