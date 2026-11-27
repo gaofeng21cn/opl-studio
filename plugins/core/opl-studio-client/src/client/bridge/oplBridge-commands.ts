@@ -6,7 +6,7 @@ import type {
 export const OPL_COMMANDS = {
   fastState: "opl app state --profile fast --json",
   fullState: "opl app state --profile full --json",
-  fullDrilldown: "opl runtime app-operator-drilldown --detail full --json",
+  fullDrilldown: "opld app.operatorDrilldown.get",
   domainDetailViewPrefix: "opl app view read",
   actionPrefix: "opl app action execute --action"
 } as const;

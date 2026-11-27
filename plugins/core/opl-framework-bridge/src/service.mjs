@@ -41,9 +41,19 @@ export function createOplPassthrough(options = {}) {
     },
     async readInitialize() { return { ...(await client.call("app.initialize.get", {})), readback: readback("opld app.initialize.get") }; },
     async readFullDrilldown() {
-      const [tasks, state] = await Promise.all([client.call("runway.task.list", { detail: "full" }), client.call("app.state.get", { profile: "full" })]);
-      const firstTaskId = tasks?.tasks?.[0]?.task_id, timeline = firstTaskId ? await client.call("ledger.timeline", { task_id: firstTaskId }) : { entries: [], timeline: [] };
-      return { detail: "full", drilldown: { ...tasks, ...timeline, state }, readback: readback("opld runway.task.list") };
+      const method = "app.operatorDrilldown.get";
+      const command = readback(`opld ${method}`);
+      try {
+        const drilldown = await client.call(method, {});
+        if (drilldown?.schema !== "opl.operator_drilldown.v2" || drilldown.detail !== "full") {
+          throw errReq("Framework returned an invalid operator drilldown.", "invalid_operator_drilldown");
+        }
+        return { detail: "full", drilldown, readback: command };
+      } catch (error) {
+        if (error.rpcCode !== -32601) throw error;
+        return { detail: "full", drilldown: { status: "unsupported" },
+          readback: { ...command, exitCode: 1, stderr: "The connected Framework does not support operator drilldown." } };
+      }
     },
     async readDomainDetailView({ itemId, viewId, ifRevision } = {}) {
       if (!nonEmptyStr(itemId) || !nonEmptyStr(viewId)) throw errReq("itemId and viewId are required");

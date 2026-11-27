@@ -54,6 +54,13 @@ test("OpldClient does not repeat a mutation when its receipt is lost", async (t)
 });
 
 test("readState, readInitialize, and readFullDrilldown pass through daemon projections and attach readback", async (t) => {
+  const projection = {
+    schema: "opl.operator_drilldown.v2", detail: "full", api_version: "2.0",
+    daemon: { version: "0.3.26", started_at: "2026-11-27T01:00:00Z" },
+    summary: { task_count: 2, stage_run_count: 0, attempt_count: 0, ledger_entry_count: 1, package_operation_count: 0 },
+    tasks: [{ task_id: "task-1" }, { task_id: "task-2" }], stage_runs: [], attempts: [],
+    ledger_refs: [{ entry_id: "e-1", task_id: "task-2" }], package_operations: []
+  };
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
       if (method === "app.state.get") {
@@ -68,9 +75,9 @@ test("readState, readInitialize, and readFullDrilldown pass through daemon proje
         };
       }
       if (method === "app.initialize.get") return { system_initialize: { setup_flow: { ready_to_launch: true } } };
-      if (method === "runway.task.list") return { tasks: [{ task_id: "task-1", status: "running" }] };
-      if (method === "ledger.timeline") return { entries: [{ entry_id: "e-1", task_id: params.task_id }], timeline: [{ entry_id: "e-1" }] };
-      return {};
+      assert.equal(method, "app.operatorDrilldown.get");
+      assert.deepEqual(params, {});
+      return projection;
     }
   });
   const opl = createOplPassthrough({ stateDir: daemon.stateDir, autoStart: false });
@@ -87,9 +94,22 @@ test("readState, readInitialize, and readFullDrilldown pass through daemon proje
 
   const drill = await opl.readFullDrilldown();
   assert.equal(drill.detail, "full");
-  assert.equal(drill.drilldown.tasks[0].task_id, "task-1");
-  assert.equal(drill.drilldown.entries[0].entry_id, "e-1");
-  assert.equal(drill.drilldown.state.profile, "full");
+  assert.equal(drill.readback.command, "opld app.operatorDrilldown.get");
+  assert.deepEqual(drill.drilldown, projection);
+});
+
+test("an older daemon reports unavailable operator diagnostics without reading task payloads", async (t) => {
+  const calls = [];
+  const daemon = await startFakeOpld({ onCall(method) {
+    calls.push(method);
+    return { __rpcError: { code: -32601, message: "Unknown method", data: { code: "METHOD_NOT_FOUND" } } };
+  } });
+  const opl = createOplPassthrough({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await opl.close(); await daemon.close(); });
+  const outcome = await opl.readFullDrilldown();
+  assert.deepEqual(calls, ["app.operatorDrilldown.get"]);
+  assert.equal(outcome.drilldown.status, "unsupported");
+  assert.notEqual(outcome.readback.exitCode, 0);
 });
 
 test("readDomainDetailView normalizes available, not_modified, missing envelopes and validates inputs pre-RPC", async (t) => {

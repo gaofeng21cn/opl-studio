@@ -49,9 +49,10 @@ test("workbench action bridge retains preview/read-only/execute contracts, contr
       calls.push({ method, params });
       if (method === "app.action.execute") return { status: params.dry_run ? "preview" : "executed", confirmationId: "confirmation", result: { summary: "preview" } };
       if (method === "app.contribution.read") return { ok: true, result: { status: "available", items: [] } };
-      if (method === "runway.task.list") return { tasks: [{ task_id: "sched-task-1", status: "running" }] };
-      if (method === "ledger.timeline") return { entries: [{ entry_id: "entry-1" }], timeline: [{ entry_id: "entry-1" }] };
-      if (method === "app.state.get") return { profile: params.profile, schedules: [{ schedule_id: "s-1" }] };
+      if (method === "app.operatorDrilldown.get") return {
+        schema: "opl.operator_drilldown.v2", detail: "full", tasks: [{ task_id: "sched-task-1" }],
+        ledger_refs: [{ entry_id: "entry-1", task_id: "sched-task-1" }]
+      };
       return {};
     }
   });
@@ -75,8 +76,8 @@ test("workbench action bridge retains preview/read-only/execute contracts, contr
   const drill = await ro.readFullDrilldown();
   assert.equal(drill.detail, "full");
   assert.equal(drill.drilldown.tasks[0].task_id, "sched-task-1");
-  assert.equal(drill.drilldown.entries[0].entry_id, "entry-1");
-  assert.equal(drill.drilldown.state.schedules[0].schedule_id, "s-1");
+  assert.equal(drill.drilldown.ledger_refs[0].entry_id, "entry-1");
+  assert.deepEqual(calls.at(-1), { method: "app.operatorDrilldown.get", params: {} });
 });
 
 test("incompatible daemon or unavailable package contribution degrades cleanly with typed OpldRpcError", async (t) => {

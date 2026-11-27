@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"; import { EventEmitter } from "node:e
 // A lost response does not tell us whether the daemon committed the request.
 const replayableReads = new Set([
   "daemon.health", "daemon.info", "daemon.doctor", "app.state.get", "app.initialize.get",
-  "app.domainDetail.get", "ledger.timeline", "runway.task.list", "pack.list", "pack.inspect", "connect.list",
+  "app.operatorDrilldown.get", "app.domainDetail.get", "ledger.timeline", "runway.task.list", "pack.list", "pack.inspect", "connect.list",
 ]);
 const codexGatewayMethods = new Set(["login", "repair", "disconnect", "completeSetup", "useForModelAccess"]);
 const codexGatewayActions = new Set(["gateway_account_complete_setup", "gateway_account_repair", "gateway_account_disconnect", "gateway_account_use_for_model_access"]);

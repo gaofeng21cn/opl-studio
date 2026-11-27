@@ -734,7 +734,7 @@ const bridge = [
 for (const command of [
   "opl app state --profile fast --json",
   "opl app state --profile full --json",
-  "opl runtime app-operator-drilldown --detail full --json",
+  "opld app.operatorDrilldown.get",
   "opl app action execute --action"
 ]) {
   assert(bridge.includes(command), `missing bridge command ${command}`);

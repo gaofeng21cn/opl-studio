@@ -7,7 +7,7 @@ Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: 'test-fixture', defaultModel: 'codex-fixture', defaultReasoningEffort: 'high', visibleModels: [{ id: 'codex-fixture' }], reasoningEfforts: ['high'],
   autoLabel: { zh: '自动（推荐）', en: 'Auto (recommended)' }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { normalizeActionReceipt, normalizeStateReadback } = await import('../../plugins/core/opl-studio-client/src/client/bridge/oplBridge');
+const { normalizeActionReceipt, normalizeStateReadback, normalizeFullDrilldownReadback } = await import('../../plugins/core/opl-studio-client/src/client/bridge/oplBridge');
 import { actionReceiptView } from '../../plugins/core/opl-studio-client/src/client/workbench/actionReceiptView';
 import { readMemoryRefs } from '../../plugins/core/opl-studio-client/src/client/workbench/MemoryRefsPanel';
 
@@ -63,4 +63,16 @@ test('memory reads only explicit locator projection, never memory content', () =
 
  test('memory refs unwrap the real operator envelope', () => {
   expect(readMemoryRefs({ drilldown: { app_operator_drilldown: { ref_family_refs: { memory_refs: { refs: [{ ref: 'memory://real', role: 'consumed_memory_ref' }] } } } } } as never)).toEqual([{ ref: 'memory://real', role: 'consumed_memory_ref' }]);
+});
+
+
+test('missing operator readback and unprojected memory differ from an empty owner list', () => {
+  expect(normalizeFullDrilldownReadback(undefined).readback.exitCode).not.toBe(0);
+  const v2 = normalizeFullDrilldownReadback({
+    detail: 'full', drilldown: { schema: 'opl.operator_drilldown.v2', ledger_refs: [{ entry_id: 'e1' }] },
+    readback: { command: 'opld app.operatorDrilldown.get', exitCode: 0 }
+  });
+  expect(v2.readback.commandArgs).toEqual([]);
+  expect(readMemoryRefs(v2)).toBeNull();
+  expect(readMemoryRefs({ drilldown: { ref_family_refs: { memory_refs: { refs: [] } } } } as never)).toEqual([]);
 });

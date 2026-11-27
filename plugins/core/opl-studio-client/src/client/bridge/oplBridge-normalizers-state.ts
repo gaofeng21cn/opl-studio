@@ -123,14 +123,8 @@ function defaultStateReadback(profile: OplStateProfile): OplStateReadback {
 export function defaultFullDrilldown(): OplFullDrilldownReadback {
   return {
     detail: "full",
-    drilldown: {
-      runtime_status: "full_drilldown_placeholder",
-      authorityBoundary: "app_bridge_no_domain_authority"
-    },
-    readback: createCommandReadback(
-      OPL_COMMANDS.fullDrilldown,
-      ["opl", "runtime", "app-operator-drilldown", "--detail", "full", "--json"]
-    )
+    drilldown: { status: "unavailable" },
+    readback: createCommandReadback(OPL_COMMANDS.fullDrilldown, [], 1, "", "No operator drilldown readback.")
   };
 }
 
@@ -289,18 +283,9 @@ export async function readStartupState<T>(read: () => Promise<T>, isCurrent: () 
 
 export function normalizeFullDrilldownReadback(value: unknown): OplFullDrilldownReadback {
   const fallback = defaultFullDrilldown();
-  const commandReadback = normalizeCommandReadback(
-    value,
-    OPL_COMMANDS.fullDrilldown,
-    ["opl", "runtime", "app-operator-drilldown", "--detail", "full", "--json"]
-  );
   const record = asRecord(value);
-  const parsed = asRecord(parseJsonValue(commandReadback.stdout));
-  return {
-    detail: "full",
-    drilldown: parsed ?? asRecord(record?.drilldown) ?? fallback.drilldown,
-    readback: record?.readback
-      ? normalizeCommandReadback(record.readback, commandReadback.command, commandReadback.commandArgs)
-      : commandReadback
-  };
+  const readback = normalizeCommandReadback(record?.readback ?? value, OPL_COMMANDS.fullDrilldown, []);
+  const drilldown = asRecord(record?.drilldown) ?? asRecord(parseJsonValue(readback.stdout));
+  if (!drilldown && readback.exitCode === 0) return fallback;
+  return { detail: "full", drilldown: drilldown ?? fallback.drilldown, readback };
 }
