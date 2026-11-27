@@ -248,7 +248,7 @@ export function RuntimeStatusPanel({
     [agentId, projectId, projection?.items]
   );
   const libraryItems = useMemo(
-    () => scopedItems.filter((item) => item.archived === showArchived),
+    () => scopedItems.filter((item) => (item.archived === true) === showArchived),
     [scopedItems, showArchived]
   );
   const items = useMemo(
@@ -317,36 +317,32 @@ export function RuntimeStatusPanel({
     setArchiveBusy(true);
     setArchiveError("");
     setArchiveNotice("");
+    const unconfirmed = zh ? `「${item.title}」的归档状态尚未确认。请刷新任务列表查看。`
+      : `Archive state for "${item.title}" is unconfirmed. Refresh the task list to check.`;
     try {
-      const receipt = await onExecuteAction({
-        actionId: "work_item_visibility_set",
-        mode: "execute",
-        payload: {
-          confirmed: true,
-          agent_id: item.agentId,
-          project_id: item.projectId,
-          work_item_id: item.workItemId,
-          visibility_state: targetArchived ? "archived" : "visible",
-          ...(item.visibilityGeneration !== undefined ? { expected_generation: item.visibilityGeneration } : {})
-        }
-      });
-      const stderrText = `${receipt.stderr ?? ""} ${receipt.stdout ?? ""}`;
-      if (receipt.status !== "executed" && receipt.status !== "no_op") {
-        const isConflict = stderrText.includes("work_item_control_generation_conflict");
-        if (isConflict) {
-          await onRefresh();
-          setArchiveError(
-            zh
-              ? "状态已被其他操作更新，页面已刷新最新数据，请重新确认后再操作。"
-              : "Control generation changed elsewhere. State refreshed; review and retry."
-          );
+      let conflict = false;
+      try {
+        const receipt = await onExecuteAction({
+          actionId: "work_item_visibility_set",
+          mode: "execute",
+          payload: {
+            confirmed: true,
+            agent_id: item.agentId,
+            project_id: item.projectId,
+            work_item_id: item.workItemId,
+            visibility_state: targetArchived ? "archived" : "visible",
+            ...(item.visibilityGeneration !== undefined ? { expected_generation: item.visibilityGeneration } : {})
+          }
+        });
+        conflict = `${receipt.stderr ?? ""} ${receipt.stdout ?? ""}`.includes("work_item_control_generation_conflict");
+        if (!conflict && !receipt.timedOut && receipt.status !== "timed_out"
+          && receipt.status !== "executed" && receipt.status !== "no_op") {
+          setArchiveError(receipt.stderr?.trim() || (zh ? "归档状态更新失败，请检查维护状态后重试。" : "Failed to update archive visibility."));
           return;
         }
-        setArchiveError(
-          receipt.stderr?.trim()
-            || (zh ? "归档状态更新失败，请检查维护状态后重试。" : "Failed to update archive visibility.")
-        );
-        return;
+      } catch (reason) {
+        // A lost response can follow a committed change. Reconcile through the same owner read.
+        conflict = String(reason).includes("work_item_control_generation_conflict");
       }
       const refreshed = (await onRefresh()) as
         | { workItemRuntime?: WorkItemRuntimeProjection }
@@ -359,43 +355,35 @@ export function RuntimeStatusPanel({
           : refreshed && typeof refreshed === "object" && "items" in refreshed
             ? refreshed
             : undefined;
-      const refreshedItem = refreshedProjection?.items?.find(
-        (candidate) =>
-          candidate.id === item.id ||
-          (candidate.agentId === item.agentId &&
-            candidate.projectId === item.projectId &&
-            candidate.workItemId === item.workItemId)
+      const matches = refreshedProjection?.items?.filter((candidate) =>
+        candidate.agentId === item.agentId && candidate.projectId === item.projectId && candidate.workItemId === item.workItemId
       );
-      if (refreshedItem && Boolean(refreshedItem.archived) !== targetArchived) {
-        setArchiveError(
-          zh
-            ? "归档状态回读校验不一致，请刷新页面后确认最新状态。"
-            : "Readback verification did not reflect the updated archive state. Refresh and check again."
-        );
+      const refreshedItem = matches?.length === 1 ? matches[0] : undefined;
+      if (conflict && refreshedItem?.archived === !targetArchived) {
+        setArchiveConfirm({ item: refreshedItem, targetArchived });
+        setArchiveError(zh ? "状态已被其他操作更新，页面已刷新最新数据，请重新确认后再操作。"
+          : "Control generation changed elsewhere. Review the refreshed state before retrying.");
         return;
       }
       setArchiveConfirm(null);
+      if (refreshedItem?.archived !== targetArchived) {
+        setArchiveNotice(unconfirmed);
+        return;
+      }
       setArchiveNotice(
         targetArchived
           ? (zh ? `已归档「${item.title}」（任务如在运行将继续执行）` : `Archived "${item.title}"`)
           : (zh ? `已将「${item.title}」恢复至当前任务` : `Restored "${item.title}"`)
       );
-    } catch (reason) {
-      const message = String(reason instanceof Error ? reason.message : reason);
-      if (message.includes("work_item_control_generation_conflict")) {
-        await onRefresh();
-        setArchiveError(
-          zh
-            ? "状态已被其他操作更新，页面已刷新最新数据，请重新确认后再操作。"
-            : "Control generation changed elsewhere. State refreshed; review and retry."
-        );
-      } else {
-        setArchiveError(message);
-      }
+    } catch {
+      setArchiveConfirm(null);
+      setArchiveNotice(unconfirmed);
     } finally {
       setArchiveBusy(false);
     }
   }, [archiveConfirm, onExecuteAction, onRefresh, zh]);
+
+  const archiveStatus = archiveNotice ? <p className="runtime-action-notice" role="status">{archiveNotice}</p> : null;
 
   if (activeDetailItem) {
     return (
@@ -418,6 +406,7 @@ export function RuntimeStatusPanel({
               : undefined
           }
         />
+        {archiveStatus}
         <ArchiveConfirmDialog
           item={archiveConfirm?.item ?? null}
           targetArchived={archiveConfirm?.targetArchived ?? true}
@@ -602,11 +591,7 @@ export function RuntimeStatusPanel({
         ) : null}
       </p>
 
-      {archiveNotice ? (
-        <p className="runtime-action-notice" role="status">
-          {archiveNotice}
-        </p>
-      ) : null}
+      {archiveStatus}
 
       {projection && recoveryNeedsAttention && serviceRecovery ? (
         <section className="runtime-service-notice" aria-labelledby="runtime-service-title" data-tone={serviceNoticeTone}>

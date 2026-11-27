@@ -142,7 +142,6 @@ for (const marker of [
   "canonical_agent_packages",
   "legacy_modules_fallback",
   "missing_bridge",
-  "canonicalSummaryRow",
   "source !== \"canonical_agent_packages\"",
   "sourceExplanation",
   "searchMetadata",

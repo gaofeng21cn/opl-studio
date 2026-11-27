@@ -111,78 +111,7 @@ export const initialWorkbenchModel: WorkbenchModel = {
   artifactPreviews: [],
   deliveryPackages: [],
   actionReceipts: [],
-  packageLifecycle: [
-    {
-      id: "package-lifecycle-missing-bridge",
-      packageId: "missing_bridge",
-      label: "Agent package lifecycle",
-      description: "No canonical App package lifecycle projection is available.",
-      publisher: "unknown",
-      packageRole: "unknown",
-      roleGroup: "other",
-      official: false,
-      displayNameI18n: {},
-      descriptionI18n: {},
-      sessionRoutingSummaryI18n: {},
-      requiredSkillIds: [],
-      optionalSkillRefs: [],
-      dependencies: [],
-      installed: null,
-      activated: null,
-      appEnabled: true,
-      readiness: {
-        status: "unknown",
-        operationalReady: null,
-        launchAllowed: null,
-        verificationDeferred: null,
-        present: null,
-        callable: null,
-        selectionStatus: "checking",
-        selectable: false
-      },
-      currentness: "unknown",
-      sourceMode: "unknown",
-      automaticUpdate: null,
-      homeShortcuts: [],
-      status: "missing_bridge",
-      summary: "No canonical App package lifecycle projection is available; fallback stays preview-only and unavailable.",
-      sourceRef: "opl app state --profile fast --json#app_state.agent_packages.directory + app_state.agent_packages.status_index",
-      sourceExplanation: "missing App/root package bridge; no package lifecycle truth or executable action is inferred.",
-      searchMetadata: {
-        query: "missing_bridge agent package lifecycle missing_codex_surface required_skill:not_reported",
-        tags: ["missing_bridge", "missing_codex_surface", "required_skill:not_reported"],
-        filters: [
-          { label: "Source", ref: "missing_bridge", summary: "No canonical agent_packages projection is available." },
-          { label: "Codex surface", ref: "missing_codex_surface", summary: "No Codex/App exposure surface ref is available." },
-          { label: "Required skill", ref: "required_skill:not_reported", summary: "No required skill ref is available." }
-        ]
-      },
-      refs: [
-        {
-          label: "Canonical projection",
-          ref: "opl app state --profile fast --json#app_state.agent_packages",
-          summary: "Preferred App/root package lifecycle source."
-        }
-      ],
-      details: [
-        { label: "Status", value: "missing_bridge", source: "missing_bridge", summary: "No canonical package projection is available." },
-        { label: "Conditions", value: "missing App/root bridge", source: "missing_bridge", summary: "Fallback mode cannot infer package truth." },
-        { label: "Recommended action", value: "open App state/action refs", source: "missing_bridge", summary: "Bind canonical app_state.agent_packages before showing executable lifecycle actions." },
-        { label: "Physical surface", value: "not_reported", source: "missing_bridge", summary: "No physical surface ref is available." },
-        { label: "Required skill", value: "not_reported", source: "missing_bridge", summary: "No required skill ref is available." },
-        { label: "Codex surface", value: "missing_codex_surface", source: "missing_bridge", summary: "No Codex/App exposure surface ref is available." }
-      ],
-      statusAxes: [
-        { label: "Install", value: "missing_bridge", source: "missing_bridge" },
-        { label: "Update", value: "missing_bridge", source: "missing_bridge" },
-        { label: "Source", value: "missing_bridge", source: "missing_bridge" },
-        { label: "Trust", value: "missing_bridge", source: "missing_bridge" },
-        { label: "Codex surface", value: "missing_bridge", source: "missing_bridge" }
-      ],
-      actions: [],
-      authorityBoundary: "One Person Lab displays App/root package refs only; it cannot infer installed, ready, synced, or release state."
-    }
-  ],
+  packageLifecycle: [],
   starters: [
     {
       id: "mas",

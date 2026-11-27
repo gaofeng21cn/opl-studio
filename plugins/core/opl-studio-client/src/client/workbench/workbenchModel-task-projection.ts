@@ -30,7 +30,6 @@ import {
   usageSummary
 } from "./workbenchModel-presentation";
 import {
-  canonicalSummaryRow,
   legacyPackageRowsFromModules,
   packageLifecycleItem,
   packageRowsFromCanonicalProjection
@@ -46,7 +45,6 @@ export type WorkbenchTaskProjectionInput = {
   homeAgentShortcuts: unknown;
   moduleItems: Record<string, unknown>[];
   fallback: {
-    packageLifecycle: AgentPackageLifecycleRef[];
     deliverables: WorkbenchArtifactRef[];
     receipts: WorkbenchArtifactRef[];
   };
@@ -82,23 +80,13 @@ function derivePackageLifecycle(
   canonicalPackageProjection: Record<string, unknown> | null,
   homeAgentShortcuts: unknown,
   moduleItems: Record<string, unknown>[],
-  actionMap: Map<string, WorkbenchActionRef>,
-  fallback: AgentPackageLifecycleRef[]
+  actionMap: Map<string, WorkbenchActionRef>
 ): AgentPackageLifecycleRef[] {
-  const canonicalPackageRows = packageRowsFromCanonicalProjection(canonicalPackageProjection, {
-    agent_packages: canonicalPackageProjection,
-    home_agent_shortcuts: homeAgentShortcuts
-  });
-  const canonicalPackageItems = canonicalPackageRows.length
-    ? canonicalPackageRows
-    : canonicalPackageProjection
-      ? [canonicalSummaryRow(canonicalPackageProjection)]
-      : [];
-  return canonicalPackageItems.length
-    ? canonicalPackageItems.map((item) => packageLifecycleItem(item, actionMap, "canonical_agent_packages"))
-    : moduleItems.length
-      ? legacyPackageRowsFromModules(moduleItems).map((item) => packageLifecycleItem(item, actionMap, "legacy_modules_fallback"))
-      : fallback;
+  if (canonicalPackageProjection) {
+    const rows = packageRowsFromCanonicalProjection(canonicalPackageProjection, { home_agent_shortcuts: homeAgentShortcuts });
+    return rows.map((item) => packageLifecycleItem(item, actionMap, "canonical_agent_packages"));
+  }
+  return legacyPackageRowsFromModules(moduleItems).map((item) => packageLifecycleItem(item, actionMap, "legacy_modules_fallback"));
 }
 
 function deriveTaskContextActions(
@@ -563,7 +551,7 @@ export function deriveWorkbenchTaskProjection({
   moduleItems,
   fallback
 }: WorkbenchTaskProjectionInput): WorkbenchTaskProjectionResult {
-  const packageLifecycle = derivePackageLifecycle(canonicalPackageProjection, homeAgentShortcuts, moduleItems, actionMap, fallback.packageLifecycle);
+  const packageLifecycle = derivePackageLifecycle(canonicalPackageProjection, homeAgentShortcuts, moduleItems, actionMap);
   const contextActions = deriveTaskContextActions(taskDrilldowns, settingsTaskEntries, actionMap);
   const { deliverables, receipts } = deriveTaskArtifacts(taskDrilldowns, fallback);
   const lead = deriveLeadTaskProjection(taskDrilldowns, currentOwnerDelta);

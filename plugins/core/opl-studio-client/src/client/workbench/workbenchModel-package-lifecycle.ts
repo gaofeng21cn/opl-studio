@@ -68,42 +68,6 @@ function packageFileRef(record: Record<string, unknown>, key: string): string | 
   return asString(asRecord(record.files)?.[key]);
 }
 
-function canonicalSummaryRow(agentPackages: Record<string, unknown>): Record<string, unknown> {
-  const directory = asRecord(agentPackages.directory);
-  const statusIndex = asRecord(agentPackages.status_index);
-  const files = {
-    ...(asRecord(directory?.files) ?? {}),
-    ...(asRecord(statusIndex?.files) ?? {}),
-    ...(asRecord(agentPackages.files) ?? {})
-  };
-  const installedCount = directory?.installed_package_count ?? statusIndex?.installed_package_count ?? 0;
-  return {
-    surface_kind: asString(agentPackages.surface_kind) ?? "opl_app_agent_packages_projection",
-    package_id: "agent_packages_directory",
-    display_name: "Agent package directory",
-    lifecycle_status: installedCount ? "canonical_projection_available" : "canonical_projection_available_no_installed_packages",
-    install_state: installedCount ? "canonical_rows_available" : "no_installed_package_rows",
-    update_state: asString(directory?.status) ?? "no_package_update_status",
-    source_state: "canonical_agent_packages_projection",
-    trust_state: "not_reported",
-    codex_surface_state: installedCount ? "from_agent_packages_projection" : "no_codex_package_surface_rows",
-    conditions: [
-      `entry_count=${directory?.entry_count ?? 0}`,
-      `installed_package_count=${installedCount}`,
-      `migration_required_count=${directory?.migration_required_count ?? 0}`,
-      "modules.items fallback suppressed because canonical agent_packages projection is present"
-    ],
-    recommended_action: installedCount ? "inspect package refs from app_state.agent_packages" : "install_from_manifest_url through App action refs",
-    source_kind: asString(directory?.source_catalog_kind) ?? "canonical_agent_packages",
-    source_surface: asString(asRecord(agentPackages.source)?.list_surface),
-    files,
-    physical_surface: {
-      status: installedCount ? "package_rows_reported" : "no_installed_package_physical_surface",
-      home_shortcut_preferences_file: asString(files.home_shortcut_preferences_file)
-    }
-  };
-}
-
 function packageRowsFromCanonicalProjection(agentPackages: Record<string, unknown> | null, appState: Record<string, unknown>): Record<string, unknown>[] {
   if (!agentPackages) return [];
   const directory = asRecord(agentPackages.directory);
@@ -718,7 +682,6 @@ function legacyPackageRowsFromModules(moduleItems: Record<string, unknown>[]): R
 }
 
 export {
-  canonicalSummaryRow,
   packageRowsFromCanonicalProjection,
   packageLifecycleItem,
   legacyPackageRowsFromModules
