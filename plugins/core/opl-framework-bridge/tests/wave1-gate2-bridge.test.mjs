@@ -20,7 +20,7 @@ import {
 
 const BRIDGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_DIR = path.join(BRIDGE_DIR, "src");
-const DAEMON_BIN = process.env.OPL_DAEMON_BIN || "/Users/gaofeng/workspace/one-person-lab/packages/daemon/bin/opld";
+const DAEMON_BIN = process.env.OPL_DAEMON_BIN || path.resolve(BRIDGE_DIR, "../../../../one-person-lab/packages/daemon/bin/opld");
 
 function createIsolatedEnv() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-bridge-gate2-"));
