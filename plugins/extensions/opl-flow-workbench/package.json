@@ -1,0 +1,38 @@
+{
+  "name": "@gaofeng21cn/opl-flow-workbench",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "Apache-2.0",
+  "description": "OPL App Tier 2 control-tower workbench for OPL Flow multi-carrier ledger overview, active session collision guard, router controls, and native conversation handoff.",
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.3-alpha.2"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@gaofeng21cn/opl-studio-client"
+      ]
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaofeng21cn/opl-studio.git",
+    "directory": "plugins/extensions/opl-flow-workbench"
+  }
+}

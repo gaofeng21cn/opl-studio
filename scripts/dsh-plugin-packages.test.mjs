@@ -146,7 +146,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
       };
       const registrations = new Map();
       browser.__ModuleLoader__ = { load: registration => registrations.set(registration.id, registration) };
-      for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-runtime-status", "opl-materials-space", "opl-superagent", "opl-team-bots"]) {
+      for (const id of ["opl-studio-client", "opl-mcp-apps", "opl-flow-workbench", "opl-runtime-status", "opl-materials-space", "opl-superagent", "opl-team-bots"]) {
         const name = `@gaofeng21cn/${id}`;
         const clientPath = require.resolve(`${name}/client`);
         runInNewContext(await fs.readFile(clientPath, "utf8"), sandbox, { filename: clientPath });
@@ -203,7 +203,7 @@ test("packed DSH packages boot outside the checkout and retain native inventory 
     await host.context.oplSuperagent.stop();
     const inventory = await readPluginInventory(host.context);
     const own = inventory.entries.filter((entry) => entry.moduleName.startsWith("@gaofeng21cn/"));
-    assert.equal(own.length, 11);
+    assert.equal(own.length, 12);
     assert.equal(typeof host.context.get("oplWeixinChannel")?.connect, "function");
     assert.ok(host.context.oplRuntimeStatus);
     assert.equal(typeof host.context.oplMaterialsSpace?.listSpaces, "function");

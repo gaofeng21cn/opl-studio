@@ -49,6 +49,9 @@
 - id: opl-studio-client
   name: '@gaofeng21cn/opl-studio-client'
 
+- id: opl-flow-workbench
+  name: '@gaofeng21cn/opl-flow-workbench'
+
 - id: opl-runtime-status
   name: '@gaofeng21cn/opl-runtime-status'
 

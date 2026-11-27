@@ -99,6 +99,7 @@ test("first-party UI plugins and DevKit Tier 2 template contain zero relative ve
     path.join(studioRoot, "plugins/core/opl-mcp-apps/src/client"),
     path.join(studioRoot, "plugins/extensions/opl-materials-space/src/client"),
     path.join(studioRoot, "plugins/extensions/opl-runtime-status/src/client"),
+    path.join(studioRoot, "plugins/extensions/opl-flow-workbench/src/client"),
     path.join(studioRoot, "templates/plugin-devkit/tier2-dsh-client-plugin/src/client")
   ];
   for (const dir of clientRoots) {
@@ -119,6 +120,7 @@ test("plugin panels enforce PluginErrorBoundary isolation and support lightweigh
     "plugins/core/opl-mcp-apps/src/client/McpTaskWorkbench.tsx",
     "plugins/extensions/opl-materials-space/src/client/MaterialsSpacePanel.tsx",
     "plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel.tsx",
+    "plugins/extensions/opl-flow-workbench/src/client/OplFlowWorkbenchPanel.tsx",
     "templates/plugin-devkit/tier2-dsh-client-plugin/src/client/plugin.tsx"
   ];
   for (const relPath of requiredBoundaryFiles) {

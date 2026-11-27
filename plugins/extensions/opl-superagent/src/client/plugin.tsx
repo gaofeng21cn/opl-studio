@@ -40,9 +40,9 @@ export function SuperagentPanel() {
     finally { setBusy(false); }
   }
   return (
-    <PluginErrorBoundary pluginId="@gaofeng21cn/opl-superagent" pluginLabel="Superagent" locale={locale}>
+    <PluginErrorBoundary pluginId="@gaofeng21cn/opl-superagent" pluginLabel={zh ? "Superagent 工单台" : "Superagent"} locale={locale}>
       <section className="opl-superagent" data-testid="opl-superagent">
-        <header><div><h1>Superagent</h1><p>{zh ? "按来源和授权策略接收请求，建立工单，并通过 Codex 执行与恢复。" : "Receive requests from Sources under a Policy, create Tickets, and execute or recover each in its own Session."}</p></div>
+        <header><div><h1>{zh ? "Superagent 工单台" : "Superagent Tickets"}</h1><p>{zh ? "面向外部 GitHub / 飞书来单的无人值守工单台：按来源与授权策略建立工单并通过 Codex 执行与恢复；个人跨工具长期任务请使用「OPL Flow 总控」，单会话组队请使用「智能体协作」。" : "Unattended ticket desk for external GitHub/Feishu intake via Codex. Use OPL Flow for personal cross-carrier goals and Agent collaboration for in-thread teams."}</p></div>
           <Button disabled={busy || !state} onClick={() => void execute(state?.state === "running" ? "stop" : "start")}>{busy ? (zh ? "处理中…" : "Working…") : state?.state === "running" ? (zh ? "停止" : "Stop") : (zh ? "启动工作台" : "Start workbench")}</Button></header>
         {error && <p role="alert">{error}</p>}
         {state?.error && <p role="alert">{state.error}</p>}
@@ -105,7 +105,17 @@ export const superagentClientPlugin = {
   name: "opl-superagent-client", inject: ["slots"],
   apply(ctx: Context) {
     const slots = ctx.get("slots") as any;
-    slots.register({ name: "sidebar.panellist", id: "superagent", order: 36, label: () => "Superagent", registrant: "opl-superagent" }, ({ size }: { size: number }) => <Hammer size={size} />);
+    slots.register(
+      {
+        name: "sidebar.panellist",
+        id: "superagent",
+        order: 36,
+        label: (locale: string) => (locale === "zh" ? "Superagent 工单台" : "Superagent"),
+        labelI18n: { zh: "Superagent 工单台", en: "Superagent" },
+        registrant: "opl-superagent"
+      },
+      ({ size }: { size: number }) => <Hammer size={size} />
+    );
     slots.register({ name: "main", key: "superagent", registrant: "opl-superagent" }, SuperagentPanel);
     registerOplSettingsGroup(
       slots,
