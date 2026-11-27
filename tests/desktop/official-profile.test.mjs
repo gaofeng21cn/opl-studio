@@ -6,7 +6,9 @@ import path from "node:path";
 import test from "node:test";
 import { captureOfficialProfileAdmission, readOfficialProfileResources, buildOfficialProfileCommand, startOfficialProfileFirstInstall } from "../../packages/host-kit/official-profile.mjs";
 
-function fixture() {
+import { createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+
+function fixture(helperSource = "// exact App-owned helper bytes\n") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-official-profile-"));
   const homeDir = path.join(root, "home");
   fs.mkdirSync(homeDir);
@@ -14,7 +16,7 @@ function fixture() {
   const resources = path.join(resourcesPath, "opl-official-profile");
   fs.mkdirSync(resources, { recursive: true });
   const profile = Buffer.from(JSON.stringify({ official_profile: { authority: "one-person-lab-app", apply_on: ["first_install", "explicit_restore"], never_apply_on: ["app_update"], desired_root_package_ids: ["mas", "mag"] } }));
-  const helper = Buffer.from("// exact App-owned helper bytes\n");
+  const helper = Buffer.from(helperSource);
   fs.writeFileSync(path.join(resources, "app-product-profile.json"), profile);
   fs.writeFileSync(path.join(resources, "official-profile-package-apply.ts"), helper);
   fs.writeFileSync(path.join(resources, "manifest.json"), JSON.stringify({ schema: "opl_app_official_profile_resources.v1", authority: "one-person-lab-app", helper_sha256: createHash("sha256").update(helper).digest("hex"), profile_sha256: createHash("sha256").update(profile).digest("hex") }));
@@ -121,4 +123,58 @@ test('packaged helper emits root progress without forwarding raw stderr', async 
     assert.equal(events.at(-1).status, 'completed');
     assert.equal(JSON.stringify(events).includes('never-forward'), false);
   } finally { f.cleanup(); }
+});
+
+test("Software Center restores the App-owned roots only after a confirmed preview", async (t) => {
+  const f = fixture(`
+    import fs from "node:fs";
+    const args = process.argv.slice(2);
+    const dry = args.includes("--dry-run");
+    const roots = args.flatMap((arg, index) => arg === "--root-package-id" ? [args[index + 1]] : []);
+    fs.appendFileSync(process.env.ACTION_LOG, dry ? "preview\\n" : "execute\\n");
+    const failed = process.env.FAIL_PACKAGE === "1";
+    process.stdout.write(JSON.stringify({ official_profile_package_apply: {
+      surface_kind: "opl_app_official_profile_package_apply.v1", status: failed ? "partial_failure" : dry ? "validated" : "completed",
+      intent: args[args.indexOf("--intent") + 1], dry_run: dry, root_package_ids: roots,
+      items: roots.map((package_id, index) => failed && index === 0
+        ? { package_id, status: "failed", error: { message: "source unavailable" } }
+        : { package_id, status: dry ? "validated" : "installed" })
+    } }));
+    if (failed) process.exitCode = 1;
+  `);
+  t.after(f.cleanup);
+  const env = { ...process.env, OPL_OFFICIAL_PROFILE_RESOURCES: f.resourcesPath, OPL_STATE_DIR: f.homeDir, ACTION_LOG: path.join(f.root, "action-log") };
+  const actionId = "official_profile_restore";
+  const nativeAction = { action_id: "other" };
+  const state = { app_state: { actions: [{ action_id: actionId, owner: "incorrect" }, nativeAction] } };
+  const client = { async call(method) { assert.equal(method, "app.state.get"); return state; } };
+  const bridge = createOplPassthrough({ client, env });
+  const actions = (await bridge.readState()).app_state.actions;
+  assert.deepEqual(actions.map(item => item.action_id), ["other", actionId]);
+  assert.equal(actions[1].owner, "one-person-lab-app");
+  const payload = { intent: "explicit_restore" };
+  assert.equal((await bridge.executeAction({ actionId, payload: {}, dryRun: true })).status, "error");
+  assert.equal((await bridge.executeAction({ actionId, payload, dryRun: false })).status, "confirmation_required");
+  const readOnly = createOplPassthrough({ client, env: { ...env, OPL_STUDIO_READ_ONLY: "1" } });
+  assert.equal((await readOnly.executeAction({ actionId, payload: { ...payload, confirmed: true }, dryRun: false })).status, "blocked_read_only");
+  assert.equal(fs.existsSync(env.ACTION_LOG), false);
+  const preview = await bridge.executeAction({ actionId, payload, dryRun: true });
+  assert.equal(preview.status, "preview_ready");
+  assert.equal(preview.confirmationRequired, true);
+  assert.equal(fs.readFileSync(env.ACTION_LOG, "utf8"), "preview\n");
+  const confirmed = { actionId, payload: { ...payload, confirmed: true }, dryRun: false };
+  const receipt = await bridge.executeAction(confirmed);
+  assert.equal(receipt.status, "executed");
+  assert.deepEqual(receipt.stdoutJson.result.root_package_ids, ["mas", "mag"]);
+  env.FAIL_PACKAGE = "1";
+  const failure = await bridge.executeAction(confirmed);
+  assert.equal(failure.status, "error");
+  assert.match(failure.blockedReason, /mas: source unavailable/);
+  assert.equal(fs.readFileSync(env.ACTION_LOG, "utf8"), "preview\nexecute\nexecute\n");
+  fs.appendFileSync(path.join(f.resourcesPath, "opl-official-profile", "official-profile-package-apply.ts"), "// bytes changed\n");
+  assert.deepEqual((await bridge.readState()).app_state.actions, [nativeAction]);
+  const unavailable = await bridge.executeAction(confirmed);
+  assert.equal(unavailable.status, "error");
+  assert.match(unavailable.blockedReason, /digest mismatch/);
+  assert.equal(fs.readFileSync(env.ACTION_LOG, "utf8"), "preview\nexecute\nexecute\n");
 });
