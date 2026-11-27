@@ -261,7 +261,10 @@
     },
     "katex": "$katex",
     "zod": "4.6.7",
-    "minimatch@>=7": "11.0.5"
+    "minimatch@>=7": "11.0.5",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "fflate": "0.8.3"
   },
   "scripts": {
     "build:icon": "swift scripts/desktop/build-app-icon.swift",

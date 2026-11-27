@@ -213,19 +213,22 @@ try {
   assert.deepEqual(actionContract.required_payload_fields, ["package_id", "ref", "input", "confirmed"]);
   const settingsEntry = studioProjection.entries.find((entry) => entry.contributionId === "settings");
   assert.ok(settingsEntry?.commands[0], "Framework fixture did not project the settings command");
+  const actionInput = { enabled: false };
   const actionRequest = studioProjectionModule.createOplContributionActionRequest(
     settingsEntry,
     settingsEntry.commands[0],
-    true
+    true,
+    actionInput
   );
   assert.equal(actionRequest.actionId, actionContract.action_id);
   assert.deepEqual(Object.keys(actionRequest.payload), actionContract.required_payload_fields);
   assert.equal(actionRequest.dryRun, false);
   assert.equal(actionRequest.payload.confirmed, true);
+  assert.deepEqual(actionRequest.payload.input, actionInput);
 
   const studioActionSource = fs.readFileSync(path.join(studioRoot, "plugins/core/opl-studio-client/src/client/workbench/App.tsx"), "utf8");
   for (const marker of [
-    "createOplContributionActionRequest(entry, command, confirmed)",
+    "createOplContributionActionRequest(entry, command, confirmed, input)",
     'receipt.status === "executed"',
     "loadState(settings.runtimeProfile)"
   ]) {

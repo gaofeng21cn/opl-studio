@@ -54,6 +54,7 @@ export class CodexAppServerTransport extends EventEmitter {
     this.args = args;
     this.extraLaunchArgs = options.extraLaunchArgs;
     this.stopGeneration = 0;
+    this.prepareLaunch = options.prepareLaunch;
     this.cwd = cwd;
     this.host = requiredChannelString(host, "host");
     this.env = env;
@@ -180,6 +181,30 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async #startProcess() {
+    while (!this.disposed) {
+      const isLaunchCurrent = this.prepareLaunch?.();
+      try {
+        await this.#initializeProcess();
+      } catch (error) {
+        await this.stop();
+        throw error;
+      }
+      if (this.disposed) break;
+      if (isLaunchCurrent && !isLaunchCurrent()) {
+        // The child has not accepted any work yet. Apply newer launch options
+        // before resolving the shared start promise for waiting requests.
+        await this.stop();
+        continue;
+      }
+      this.notify("initialized");
+      this.initialized = true;
+      this.emit("availability", { available: true });
+      return;
+    }
+    throw new AppServerTransportError("app_server_unavailable", "Codex App Server is closed");
+  }
+
+  async #initializeProcess() {
     const generation = this.stopGeneration;
     const extra = this.extraLaunchArgs ? await this.extraLaunchArgs() : [];
     if (generation !== this.stopGeneration || this.disposed) {
@@ -246,9 +271,6 @@ export class CodexAppServerTransport extends EventEmitter {
         extensions: MCP_APP_EXTENSION
       }
     }, 30_000, { skipStart: true });
-    this.notify("initialized");
-    this.initialized = true;
-    this.emit("availability", { available: true });
   }
 
   async stop() {

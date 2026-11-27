@@ -103,6 +103,7 @@ export class OplCodexNative extends EventEmitter {
     this.computerUseActive = false;
     this.computerUseActiveConsentMode = null;
     this.computerUseError = null;
+    this.computerUseTransportLaunch = null;
     this.transportStarting = false;
     this.computerUseWriteChain = Promise.resolve();
     this.transport = transport ?? new CodexAppServerTransport({
@@ -115,6 +116,7 @@ export class OplCodexNative extends EventEmitter {
         command: env.OPL_CODEX_BIN ?? env.CODEX_APP_SERVER_COMMAND ?? "codex",
         cwd: workspaceRoot, env, stateDir
       }) : undefined,
+      prepareLaunch: () => this.#prepareTransportLaunch(),
       channelBindingStore,
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
@@ -155,18 +157,7 @@ export class OplCodexNative extends EventEmitter {
           }
         });
       } else if (availability.available === true && !this.transportStarting) {
-        this.computerUseActive = Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled);
-        this.computerUseActiveConsentMode = this.computerUseActive ? this.configuredComputerUseConsentMode : null;
-        this.appliedComputerUseRevision = this.configuredComputerUseRevision ?? this.computerUseConfigRevision;
-        this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
-        this.emit("event", {
-          method: "host/computer-use-changed",
-          params: {
-            active: this.computerUseActive,
-            activeConsentMode: this.computerUseActiveConsentMode,
-            restartPending: this.computerUseRestartPending
-          }
-        });
+        this.#recordComputerUseLaunch(this.computerUseTransportLaunch ?? this.#configuredComputerUseLaunch());
       }
       this.emit("event", { method: "host/availability", params: availability });
     });
@@ -284,18 +275,46 @@ export class OplCodexNative extends EventEmitter {
     this.transport.args = this.#buildCodexArgs();
   }
 
+  #configuredComputerUseLaunch() {
+    return {
+      revision: this.configuredComputerUseRevision ?? this.computerUseConfigRevision,
+      enabled: Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled),
+      consentMode: this.configuredComputerUseConsentMode
+    };
+  }
+
+  #prepareTransportLaunch() {
+    if (this.configuredComputerUseRevision !== this.computerUseConfigRevision) {
+      const useContextLauncher = this.contextLaunch !== null;
+      this.#applyCodexArgs();
+      if (useContextLauncher) this.#prepareContextLauncher();
+    }
+    const launch = this.#configuredComputerUseLaunch();
+    this.computerUseTransportLaunch = launch;
+    return () => launch.revision === this.computerUseConfigRevision;
+  }
+
+  #recordComputerUseLaunch(launch) {
+    this.computerUseActive = launch.enabled;
+    this.computerUseActiveConsentMode = launch.enabled ? launch.consentMode : null;
+    this.appliedComputerUseRevision = launch.revision;
+    this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
+    this.emit("event", {
+      method: "host/computer-use-changed",
+      params: {
+        active: this.computerUseActive,
+        activeConsentMode: this.computerUseActiveConsentMode,
+        restartPending: this.computerUseRestartPending
+      }
+    });
+  }
+
   async #startTransport() {
     if (this.configuredComputerUseRevision !== this.computerUseConfigRevision) {
       this.#applyCodexArgs();
     }
     this.#prepareContextLauncher();
-    const launch = {
-      revision: this.configuredComputerUseRevision ?? this.computerUseConfigRevision,
-      enabled: Boolean(!this.hasExplicitTransport && this.configuredComputerUseEnabled),
-      consentMode: !this.hasExplicitTransport && this.configuredComputerUseEnabled
-        ? this.configuredComputerUseConsentMode
-        : null
-    };
+    const launch = this.#configuredComputerUseLaunch();
     this.transportStarting = true;
     try {
       try {
@@ -308,19 +327,8 @@ export class OplCodexNative extends EventEmitter {
         this.contextError = true;
         await this.transport.start();
       }
-      this.computerUseActive = launch.enabled;
-      this.computerUseActiveConsentMode = launch.enabled ? launch.consentMode : null;
-      this.appliedComputerUseRevision = launch.revision;
-      this.computerUseRestartPending = this.appliedComputerUseRevision !== this.computerUseConfigRevision;
       this.appServerError = null;
-      this.emit("event", {
-        method: "host/computer-use-changed",
-        params: {
-          active: this.computerUseActive,
-          activeConsentMode: this.computerUseActiveConsentMode,
-          restartPending: this.computerUseRestartPending
-        }
-      });
+      this.#recordComputerUseLaunch(this.computerUseTransportLaunch ?? launch);
     } catch (error) {
       this.computerUseActive = false;
       this.computerUseActiveConsentMode = null;
@@ -511,7 +519,7 @@ export class OplCodexNative extends EventEmitter {
     const { changed, targetRevision } = await writeStep;
 
     if (changed) {
-      if (this.transportStarting || this.reloadPromise) {
+      if (this.transportStarting || this.transport.startPromise || this.reloadPromise) {
         this.computerUseRestartPending = true;
         this.emit("event", {
           method: "host/computer-use-changed",

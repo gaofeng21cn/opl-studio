@@ -32,88 +32,87 @@ export function ComputerUseSettingsSection({
 }) {
   const [state, setState] = useState<ComputerUseState | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"read" | "action" | null>(null);
   const requestSeqRef = useRef(0);
-  const activeRef = useRef(true);
+  const connectionRef = useRef<{
+    busy: boolean;
+    refreshPending: boolean;
+    refresh: (surfaceError: boolean) => void;
+  } | null>(null);
 
   useEffect(() => {
-    let active = true;
-    activeRef.current = true;
     setState(null);
-    setError(false);
+    setBusy(false);
+    setError(null);
 
     const refresh = (surfaceError: boolean) => {
       if (!bridge?.readComputerUse) return;
       const seq = ++requestSeqRef.current;
       void bridge.readComputerUse().then(
         (next) => {
-          if (active && seq === requestSeqRef.current) {
+          if (connectionRef.current === connection && seq === requestSeqRef.current) {
             setState(next);
-            setError(false);
+            setError((previous) => previous === "read" ? null : previous);
           }
         },
         () => {
-          if (active && surfaceError && seq === requestSeqRef.current) {
-            setError(true);
+          if (connectionRef.current === connection && surfaceError && seq === requestSeqRef.current) {
+            setError("read");
           }
         }
       );
     };
 
+    const connection = { busy: false, refreshPending: false, refresh };
+    connectionRef.current = connection;
     refresh(true);
     const unsubscribe = bridge?.subscribeEvents?.((event) => {
       if (event?.method === "host/computer-use-changed" || event?.method === "host/availability") {
-        refresh(false);
+        // The host may publish an event before the settings operation returns.
+        // Read again after handling its result so a failed refresh can't mask it.
+        if (connection.busy) connection.refreshPending = true;
+        else refresh(false);
       }
     });
 
     return () => {
-      active = false;
-      activeRef.current = false;
+      connectionRef.current = null;
       unsubscribe?.();
     };
   }, [bridge]);
 
-  async function updateSettings(patch: { enabled?: boolean; consentMode?: ComputerUseConsentMode }) {
-    if (!bridge?.setComputerUse || busy) return;
+  async function runRequest(request: () => Promise<ComputerUseState>) {
+    const connection = connectionRef.current;
+    if (!connection || connection.busy) return;
+    connection.busy = true;
+    ++requestSeqRef.current;
     setBusy(true);
-    setError(false);
-    const seq = ++requestSeqRef.current;
+    setError(null);
     try {
-      const next = await bridge.setComputerUse(patch);
-      if (activeRef.current && seq === requestSeqRef.current) {
-        setState(next);
-      }
+      const next = await request();
+      if (connectionRef.current === connection) setState(next);
     } catch {
-      if (activeRef.current && seq === requestSeqRef.current) {
-        setError(true);
-      }
+      if (connectionRef.current === connection) setError("action");
     } finally {
-      if (activeRef.current) {
+      if (connectionRef.current === connection) {
+        connection.busy = false;
         setBusy(false);
+        if (connection.refreshPending) {
+          connection.refreshPending = false;
+          connection.refresh(false);
+        }
       }
     }
   }
 
-  async function runAction(request: ComputerUseActionRequest) {
-    if (!bridge?.performComputerUseAction || busy) return;
-    setBusy(true);
-    setError(false);
-    const seq = ++requestSeqRef.current;
-    try {
-      const next = await bridge.performComputerUseAction({ ...request, locale });
-      if (activeRef.current && seq === requestSeqRef.current) {
-        setState(next);
-      }
-    } catch {
-      if (activeRef.current && seq === requestSeqRef.current) {
-        setError(true);
-      }
-    } finally {
-      if (activeRef.current) {
-        setBusy(false);
-      }
-    }
+  function updateSettings(patch: { enabled?: boolean; consentMode?: ComputerUseConsentMode }) {
+    const setComputerUse = bridge?.setComputerUse;
+    if (setComputerUse) void runRequest(() => setComputerUse(patch));
+  }
+
+  function runAction(request: ComputerUseActionRequest) {
+    const performComputerUseAction = bridge?.performComputerUseAction;
+    if (performComputerUseAction) void runRequest(() => performComputerUseAction({ ...request, locale }));
   }
 
   const label = zh ? "Computer Use（桌面操控）" : "Computer Use";
