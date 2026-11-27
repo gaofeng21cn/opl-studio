@@ -198,6 +198,12 @@ export class OplHostCore extends EventEmitter {
       }]
     ]);
     this.codex.on("event", (event) => this.emit("event", event));
+    this.onFrameworkEvent = (event) => {
+      if (event.method === "event.pack.catalog.changed") {
+        this.emit("event", { method: "host/app-state-changed", params: { source: "package_catalog" } });
+      }
+    };
+    this.framework.on?.("event", this.onFrameworkEvent);
   }
 
   async start() {
@@ -869,6 +875,7 @@ export class OplHostCore extends EventEmitter {
   async close() {
     if (!this.managedByDsh) this.mcpApps.dispose();
     this.closePromise ??= (async () => {
+      this.framework.off?.("event", this.onFrameworkEvent);
       this.disposeLinkRoutes?.();
       await this.linkInternet?.close();
       await this.linkCompanion?.close();

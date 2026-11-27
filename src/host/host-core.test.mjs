@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -29,6 +29,26 @@ function createStandaloneHostCore(options = {}) {
 
 test("Host Core requires the providers owned by its Cordis profile", () => {
   assert.throws(() => new OplHostCore(), /requires the Codex, Framework and MCP Apps services/);
+});
+
+test("a catalog refresh notifies the mounted workbench to read the new Framework state", { timeout: 5_000 }, async (t) => {
+  const entries = [];
+  const daemon = await startFakeOpld({ onCall(method) {
+    assert.equal(method, "app.state.get");
+    return { app_state: { agent_packages: { directory: { entries } } } };
+  } });
+  const core = createStandaloneHostCore({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(async () => { await core.close(); await daemon.close(); });
+  const readEntries = async () => (await core.invoke("readState", { profile: "fast" })).app_state.agent_packages.directory.entries;
+  assert.deepEqual(await readEntries(), []);
+  const changed = once(core, "event");
+  daemon.emitEvent("event.pack.progress", { package_id: "catalog-probe" });
+  entries.push({ package_id: "catalog-probe", installed: false });
+  daemon.emitEvent("event.pack.catalog.changed");
+  assert.deepEqual(await changed, [{ method: "host/app-state-changed", params: { source: "package_catalog" } }]);
+  assert.deepEqual(await readEntries(), entries);
+  await core.close();
+  assert.equal(core.framework.listenerCount("event"), 0);
 });
 
 test("the older desktop action channel can only disable Link with an explicit execute request", async () => {
