@@ -132,7 +132,7 @@ test("Full readiness waits for selected seeded Package installation", async () =
   assert.equal(result.status, "passed");
   assert.deepEqual(result.missingRootPackageIds, []);
 
-  const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0, evaluate: async () => ({ readback: { exitCode: 0 }, app_state: { agent_packages: { directory: { entries: [{ package_id: "mas", installed: false }] } } } }) });
+  const missing = await runFrameworkReadiness({ projection: incomplete, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0, evaluate: async () => { throw new Error("expired budget must not start a read"); } });
   assert.equal(missing.status, "failed");
   assert.deepEqual(missing.missingRootPackageIds, ["mas"]);
 
@@ -156,9 +156,9 @@ test("Full readiness stops on current first-install failure without waiting out 
   assert.equal(failed.status, "failed");
   assert.equal(failed.firstInstallStatus, "failed");
   assert.deepEqual(failed.missingRootPackageIds, ["mas"]);
-  for (const attempt of [null, { status: "running" }, { status: "completed" }]) {
+  for (const attempt of [null, { status: "completed" }]) {
     const ready = await runFrameworkReadiness({
-      projection, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 0,
+      projection, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 1500,
       readFirstInstallAttempt: async () => attempt,
       evaluate: async () => ({ readback: { exitCode: 0 }, app_state: {
         agent_packages: { directory: { entries: [{ package_id: "mas", installed: true }] } }
@@ -166,6 +166,26 @@ test("Full readiness stops on current first-install failure without waiting out 
     });
     assert.equal(ready.status, "passed");
   }
+});
+
+test("Full readiness waits for the active first-install attempt and verifies Framework v2 roots", async () => {
+  const projection = { initializeExitCode: 0, stateExitCode: 0, launchReady: true,
+    packageDirectoryPresent: true, packages: [] };
+  const statuses = ["running", "completed"];
+  const result = await runFrameworkReadiness({
+    projection, expectedRootPackageIds: ["mas"], requireRootPackages: true, timeoutMs: 900_000,
+    readFirstInstallAttempt: async () => ({ status: statuses.shift() ?? "completed" }),
+    evaluate: async (expression, timeoutMs) => {
+      assert.equal(statuses.length, 0, "must wait for the current owner attempt");
+      assert.match(expression, /readState\('fast'\)/);
+      assert.ok(timeoutMs > 120_000 && timeoutMs < 900_000, "must honor the remaining Full readiness budget");
+      return { readback: { exitCode: 0 }, app_state: { installed_packages: [{ package_id: "mas" }] } };
+    }
+  });
+  assert.equal(result.status, "passed");
+  assert.equal(result.packageSource, "app.state.get");
+  assert.equal(result.firstInstallStatus, "completed");
+  assert.deepEqual(result.missingRootPackageIds, []);
 });
 
 test("Codex readiness requests protocol catalogs only and rejects simulated or malformed responses", async () => {

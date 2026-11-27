@@ -69,8 +69,9 @@ export async function runRuntimeRefresh({ evaluate, timeoutMs }) {
 }
 
 export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt, projection = null, expectedRootPackageIds = [], requireRootPackages = false, timeoutMs = 120_000 }) {
-  let observed = projection ?? projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')"), expectedRootPackageIds);
-  let attempt = typeof readFirstInstallAttempt === "function" ? await readFirstInstallAttempt() : null;
+  const deadline = Date.now() + timeoutMs;
+  let observed = projection ?? projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')", timeoutMs), expectedRootPackageIds);
+  let attempt = await readFirstInstallAttempt?.() ?? null;
   const missingRoots = () => expectedRootPackageIds.filter((id) => !observed.packages?.some((entry) => entry.id === id && entry.present === true && entry.installed === true));
   const hostReady = () => observed.initializeExitCode === 0
     && observed.stateExitCode === 0
@@ -78,15 +79,21 @@ export async function runFrameworkReadiness({ evaluate, readFirstInstallAttempt,
     && observed.packageDirectoryPresent === true;
   // Standard is a host: optional Profile installation stays visible as
   // diagnostics, without delaying its readiness. Full verifies its selected seed.
-  if (requireRootPackages && hostReady() && missingRoots().length > 0 && attempt?.status !== "failed") {
-    const deadline = Date.now() + timeoutMs;
-    do {
-      observed = projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')"), expectedRootPackageIds);
-      attempt = typeof readFirstInstallAttempt === "function" ? await readFirstInstallAttempt() : null;
-      if (!hostReady() || missingRoots().length === 0 || attempt?.status === "failed") break;
-      const delay = Math.min(1000, deadline - Date.now());
-      if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
-    } while (Date.now() < deadline);
+  while (requireRootPackages && hostReady() && missingRoots().length > 0 && attempt?.status !== "failed") {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    // The owner helper uses this same state surface during Package installation.
+    // Let the current attempt settle before issuing another potentially slow read.
+    if (attempt?.status !== "running") {
+      observed = projectFrameworkReadiness(await evaluate("window.oplStudio.readState('fast')", remaining), expectedRootPackageIds);
+      if (!hostReady() || missingRoots().length === 0) {
+        attempt = await readFirstInstallAttempt?.() ?? attempt;
+        break;
+      }
+    }
+    const delay = Math.min(1000, deadline - Date.now());
+    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+    attempt = await readFirstInstallAttempt?.() ?? attempt;
   }
   const missingRootPackageIds = missingRoots();
   return {
@@ -118,14 +125,17 @@ export async function runStableSmoke(context) {
   const desktopHostReadiness = await runDesktopHostReadiness({ evaluate: context.evaluate, readFirstInstallAttempt: context.readFirstInstallAttempt, timeoutMs: bootstrapTimeoutMs });
   progress({ phase: "desktop-host-readiness", status: "passed", at: new Date().toISOString(), timeoutMs: bootstrapTimeoutMs });
   const preview = await runPreviewSmoke({ ...context, evaluate: evaluatePhase, options, turnRequest: null });
-  const frameworkReadinessTimeoutMs = Math.min(900_000, context.options?.timeoutMs ?? 900_000);
+  const requireRootPackages = Object.hasOwn(preview.checks.runtime ?? {}, "full");
+  const frameworkReadinessTimeoutMs = requireRootPackages
+    ? Math.min(900_000, context.options?.timeoutMs ?? 900_000)
+    : phaseTimeoutMs;
   progress({ phase: "framework-readiness", status: "started", at: new Date().toISOString(), phaseTimeoutMs: frameworkReadinessTimeoutMs });
   const frameworkReadiness = await runFrameworkReadiness({
-    evaluate: evaluatePhase,
+    evaluate: context.evaluate,
     readFirstInstallAttempt: context.readFirstInstallAttempt,
     projection: preview.checks.runtime?.standard?.frameworkProjection ?? preview.checks.runtime?.full?.frameworkProjection,
     expectedRootPackageIds: context.options?.expectedRootPackageIds,
-    requireRootPackages: Object.hasOwn(preview.checks.runtime ?? {}, "full"),
+    requireRootPackages,
     timeoutMs: frameworkReadinessTimeoutMs
   });
   progress({ phase: "framework-readiness", status: frameworkReadiness.status, at: new Date().toISOString(), missing: frameworkReadiness.missingRootPackageIds });

@@ -257,7 +257,9 @@ export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
   const outer = state?.app_state ?? state;
   const root = outer?.app_state ?? outer;
   const packages = root?.agent_packages;
-  const entries = packages?.directory?.entries;
+  const installed = root?.installed_packages;
+  const v2 = Array.isArray(installed);
+  const entries = v2 ? installed : packages?.directory?.entries;
   const result = {
     initializeExitCode: state?.readback?.exitCode ?? state?.readback?.status ?? null,
     stateExitCode: state?.readback?.exitCode ?? state?.readback?.status ?? null,
@@ -265,12 +267,12 @@ export function projectFrameworkReadiness(state, expectedRootPackageIds = []) {
       || state?.readback?.exitCode === 0
       || state?.readback?.status === 0,
     packageDirectoryPresent: Array.isArray(entries),
-    packageSource: packages?.source ?? null,
+    packageSource: v2 ? "app.state.get" : packages?.source ?? null,
     packages: Array.isArray(entries)
       ? entries.map((entry) => ({
         id: entry.package_id ?? null,
-        present: entry.installed === true || entry.presence?.present === true,
-        installed: entry.installed === true || entry.presence?.installed === true,
+        present: v2 || entry.installed === true || entry.presence?.present === true,
+        installed: v2 || entry.installed === true || entry.presence?.installed === true,
         role: entry.package_role ?? null
       }))
       : []
