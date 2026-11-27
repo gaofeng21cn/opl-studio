@@ -178,6 +178,13 @@ select {
   display: contents;
 }
 
+.opl-settings-slot-root button[aria-haspopup="dialog"] > span:not(.visually-hidden) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .opl-studio-dsh-root svg[viewBox="0 0 182 24"],
 .opl-studio-dsh-root svg[viewBox="0 0 23.16 17.04"],
 .opl-studio-dsh-root [data-slot="sidebar.brand.mark"],

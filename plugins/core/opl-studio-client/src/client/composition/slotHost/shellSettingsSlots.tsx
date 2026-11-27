@@ -278,13 +278,31 @@ export function SettingsSlot({ wide, renderSlot, renderFactorySlot, useStore, ac
     const primary = settingsDestinations(studio.locale).find(page => settingsSubDestinations(page.id, studio.locale).some(item => item.id === destination));
     if (primary) actions.select(settingsSectionId(primary.id));
   };
-  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate, mobileView, setMobileView }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} renderFactorySlot={renderFactorySlot} reconnect={studio.retryCodexConnection} useConnectionState={(selector: any) => selector(studio.codexConnectionStatus === "ready" ? "connected" : studio.codexConnectionStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={(slot: string, owner: { close?: () => void }, options?: { only?: string }) => slot === "settings.section" ? studio.renderSettingsContribution(options, owner) : renderSlot(slot, owner, options)} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
+  return <SettingsNavigationContext.Provider value={{ destination: navigatedDestination, navigate, mobileView, setMobileView }}><SettingsContributionSlotContext.Provider value={renderContribution}><div ref={rootRef} className="opl-settings-slot-root"><SettingsRoot wide={wide} renderFactorySlot={renderFactorySlot} reconnect={studio.retryCodexConnection} useConnectionState={(selector: any) => selector(studio.codexConnectionStatus === "ready" ? "connected" : studio.codexConnectionStatus === "error" ? "disconnected" : "connecting")} useDesktopUpdate={(selector: any) => selector({ failed: false, opening: false })} openDesktopUpdate={() => undefined} useShortcuts={useStudioShortcuts} useStore={useStore} actions={actions} t={(key: string) => key === "trigger" ? settingsTriggerPresentation(studio.locale, studio.gatewayAccount).tooltip : translate(studio.locale, key)} useSections={(selector: any) => selector(rows)} useOnboardingSteps={(selector: any) => selector(onboardingSteps)} useSessions={(selector: any) => selector(sessions)} renderSlot={(slot: string, owner: { close?: () => void }, options?: { only?: string }) => slot === "settings.section" ? studio.renderSettingsContribution(options, owner) : renderSlot(slot, owner, options)} /></div></SettingsContributionSlotContext.Provider></SettingsNavigationContext.Provider>;
+}
+
+export function settingsTriggerPresentation(
+  locale: "zh" | "en",
+  gatewayAccount?: { displayName: string; email?: string; status?: string }
+): { connected: boolean; label: string; tooltip: string } {
+  const displayName = gatewayAccount?.displayName?.trim();
+  const email = gatewayAccount?.email?.trim();
+  if (displayName) {
+    return {
+      connected: true,
+      label: displayName,
+      tooltip: email && email !== displayName ? `${displayName} (${email})` : displayName
+    };
+  }
+  const fallback = locale === "zh" ? "设置" : "Settings";
+  return { connected: false, label: fallback, tooltip: fallback };
 }
 
 export function SettingsTriggerSlot({ wide }: { wide: boolean }) {
   const studio = useStudio();
-  const label = studio.locale === "zh" ? "设置" : "Settings";
-  return <><SettingsIcon aria-hidden="true" size={16} /><span className={wide ? undefined : "visually-hidden"}>{label}</span></>;
+  const { connected, label } = settingsTriggerPresentation(studio.locale, studio.gatewayAccount);
+  const Icon = connected ? UserRound : SettingsIcon;
+  return <><Icon aria-hidden="true" size={16} /><span className={wide ? undefined : "visually-hidden"}>{label}</span></>;
 }
 
 export function SettingsHeaderSlot() { return <>One Person Lab</>; }
