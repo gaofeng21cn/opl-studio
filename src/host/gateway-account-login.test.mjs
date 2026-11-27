@@ -192,3 +192,53 @@ test("Gateway account login accepts a password that is a substring of the submit
     ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
   });
 });
+
+test("Gateway account login and Codex API key map low-level network and daemon start errors to network_unreachable", async () => {
+  for (const err of [
+    Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+    Object.assign(new Error("socket reset"), { code: "econnreset" }),
+    Object.assign(new Error("broken pipe"), { code: "EPIPE" }),
+    Object.assign(new Error("missing socket"), { code: "ENOENT" }),
+    Object.assign(new Error("spawn failed"), { data: { code: "DAEMON_START_FAILED" } }),
+    Object.assign(new Error("spawn timeout"), { data: { code: "daemon_start_timeout" } })
+  ]) {
+    const bridge = new OplFrameworkBridge({
+      client: { on() {}, off() {}, close: async () => {}, async call() { throw err; } }
+    });
+    assert.deepEqual(await bridge.gatewayAccountLogin({ email: "a@b.c", password: "pw" }), {
+      ok: false, errorCode: "network_unreachable", stateRefreshRequired: false
+    });
+    assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey: "sk-1" }), {
+      ok: false, errorCode: "network_unreachable", stateRefreshRequired: false
+    });
+  }
+});
+
+test("Gateway account login and Codex API key catch JSON-escaped secret echoes across leaf strings", async () => {
+  const password = 'pass"word\\here';
+  const apiKey = 'sk-"escaped"\\key';
+  let response = { ok: true, message: `leaked: ${password}` };
+  const bridge = new OplFrameworkBridge({
+    client: { on() {}, off() {}, close: async () => {}, async call() { return response; } }
+  });
+
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "a@b.c", password }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
+  response = { ok: true, detail: 'echo "pass"word"' };
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "a@b.c", password: 'pass"word' }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
+  response = { ok: true, nested: [{ detail: apiKey }] };
+  assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
+  response = { ok: true, email: "operator-token@example.com" };
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "operator-token@example.com", password: "operator-token" }), {
+    ok: true, stateRefreshRequired: true
+  });
+  response = { ok: true, email: "operator-token@example.com", detail: "operator-token" };
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "operator-token@example.com", password: "operator-token" }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
+});

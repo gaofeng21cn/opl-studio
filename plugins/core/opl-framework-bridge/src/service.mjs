@@ -4,16 +4,26 @@ const isObj = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v), n
 const onlyKeys = (o, allowed) => isObj(o) && Object.keys(o).every((k) => allowed.includes(k));
 const readback = (cmd, args = []) => ({ command: cmd, commandArgs: args, exitCode: 0, stdout: "", stderr: "", timedOut: false });
 const SAFE_CODE = /^[a-z][a-z0-9_]{0,79}$/, SECRET_KEYS = new Set("password token accesstoken refreshtoken apikey key keyvalue keyplaintext plaintextkey secret credentialhandle".split(" "));
-const hasSecret = (v) => Array.isArray(v) ? v.some(hasSecret) : Boolean(isObj(v) && Object.entries(v).some(([k, val]) => SECRET_KEYS.has(k.replace(/[^a-z0-9]/gi, "").toLowerCase()) || hasSecret(val)));
-const leakedSecret = (res, secrets, echoes = []) => {
-  if (hasSecret(res)) return true;
-  let s = JSON.stringify(res ?? "");
-  for (const e of echoes) if (e) s = s.split(e).join("");
-  return secrets.some((sec) => sec && s.includes(sec));
+const hasSecret = (v, seen = new Set()) => {
+  if (!v || typeof v !== "object" || seen.has(v)) return false;
+  seen.add(v);
+  return Array.isArray(v) ? v.some((x) => hasSecret(x, seen)) : Object.entries(v).some(([k, val]) => SECRET_KEYS.has(k.replace(/[^a-z0-9]/gi, "").toLowerCase()) || hasSecret(val, seen));
 };
+const hasSecretText = (v, secrets, echoes, seen = new Set()) => {
+  if (typeof v === "string") {
+    let s = v;
+    for (const e of echoes) if (e) s = s.split(e).join("");
+    return secrets.some((sec) => sec && s.includes(sec));
+  }
+  if (!v || typeof v !== "object" || seen.has(v)) return false;
+  seen.add(v);
+  return Array.isArray(v) ? v.some((x) => hasSecretText(x, secrets, echoes, seen)) : Object.values(v).some((x) => hasSecretText(x, secrets, echoes, seen));
+};
+const leakedSecret = (res, secrets, echoes = []) => hasSecret(res) || hasSecretText(res, secrets, echoes);
 const GW_CODES = new Set("invalid_credentials account_disabled mfa_or_challenge_required session_not_persistable group_selection_required auth_expired network_unreachable rate_limited managed_key_missing managed_key_conflict managed_key_identity_drift disconnect_pending account_switch_requires_disconnect gateway_busy gateway_codex_binding_failed gateway_configuration_invalid gateway_request_rejected gateway_response_invalid gateway_store_invalid credentials_stdin_too_large codex_configuration_failed invalid_request internal_contract_violation gateway_account_failed".split(" "));
-const GW_ALIASES = new Map([["UNAUTHORIZED", "auth_expired"], ["reauth_required", "auth_expired"], ["INVALID_INPUT", "invalid_request"], ["credentials_stdin_invalid", "invalid_request"], ["TRUSTED_HOST_REQUIRED", "internal_contract_violation"], ["gateway_account_dry_run_unsupported", "invalid_request"], ["gateway_account_payload_forbidden", "invalid_request"], ["network_timeout", "network_unreachable"], ["gateway_unavailable", "network_unreachable"], ["daemon_unavailable", "network_unreachable"], ["daemon_not_found", "network_unreachable"], ["connection_closed", "network_unreachable"], ["rpc_timeout", "network_unreachable"], ["gateway_account_busy", "gateway_busy"], ["gateway_conflict", "gateway_request_rejected"], ["gateway_request_failed", "gateway_request_rejected"], ["gateway_response_too_large", "gateway_response_invalid"], ["gateway_profile_invalid", "gateway_response_invalid"], ["gateway_control_url_invalid", "gateway_configuration_invalid"], ["gateway_group_required", "group_selection_required"], ["gateway_store_json_invalid", "gateway_store_invalid"], ["gateway_store_owner_invalid", "gateway_store_invalid"], ["gateway_store_permissions_invalid", "gateway_store_invalid"], ["gateway_store_symlink_forbidden", "gateway_store_invalid"], ["gateway_store_type_invalid", "gateway_store_invalid"]]);
-const mapGwErr = (err, fallback) => [err?.data?.reason_code, err?.data?.code, err?.code].map((c) => (GW_CODES.has(c) ? c : GW_ALIASES.get(c))).find(Boolean) ?? fallback;
+const GW_ALIASES = new Map([["UNAUTHORIZED", "auth_expired"], ["reauth_required", "auth_expired"], ["INVALID_INPUT", "invalid_request"], ["credentials_stdin_invalid", "invalid_request"], ["TRUSTED_HOST_REQUIRED", "internal_contract_violation"], ["gateway_account_dry_run_unsupported", "invalid_request"], ["gateway_account_payload_forbidden", "invalid_request"], ["network_timeout", "network_unreachable"], ["gateway_unavailable", "network_unreachable"], ["daemon_unavailable", "network_unreachable"], ["daemon_not_found", "network_unreachable"], ["connection_closed", "network_unreachable"], ["rpc_timeout", "network_unreachable"], ["ECONNREFUSED", "network_unreachable"], ["ECONNRESET", "network_unreachable"], ["EPIPE", "network_unreachable"], ["ENOENT", "network_unreachable"], ["DAEMON_START_FAILED", "network_unreachable"], ["DAEMON_START_TIMEOUT", "network_unreachable"], ["gateway_account_busy", "gateway_busy"], ["gateway_conflict", "gateway_request_rejected"], ["gateway_request_failed", "gateway_request_rejected"], ["gateway_response_too_large", "gateway_response_invalid"], ["gateway_profile_invalid", "gateway_response_invalid"], ["gateway_control_url_invalid", "gateway_configuration_invalid"], ["gateway_group_required", "group_selection_required"], ["gateway_store_json_invalid", "gateway_store_invalid"], ["gateway_store_owner_invalid", "gateway_store_invalid"], ["gateway_store_permissions_invalid", "gateway_store_invalid"], ["gateway_store_symlink_forbidden", "gateway_store_invalid"], ["gateway_store_type_invalid", "gateway_store_invalid"]]);
+const resolveGwCode = (c) => (typeof c !== "string" ? undefined : GW_CODES.has(c) ? c : (GW_ALIASES.get(c) ?? GW_ALIASES.get(c.toUpperCase()) ?? GW_ALIASES.get(c.toLowerCase())));
+const mapGwErr = (err, fallback) => [err?.data?.reason_code, err?.data?.code, err?.code].map(resolveGwCode).find(Boolean) ?? fallback;
 export function createOplPassthrough(options = {}) {
   const ownClient = !options.client, client = options.client ?? new OpldClient(options), env = options.env ?? process.env;
   const readOnly = () => env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1";
@@ -90,7 +100,7 @@ export class OplFrameworkBridge extends EventEmitter {
     this.opl = opl ?? createOplPassthrough({ client: this.client, env, cwd: workspaceRoot, candidateActionAllowlist, getWeixinHost: () => this.nativeWeixinHost });
     const defaultApproval = async (req = {}) => {
       const isStr = typeof req === "string", keys = isObj(req) ? Object.keys(req) : null, requestId = isStr ? req : req?.requestId ?? req?.request_id;
-      if ((!isStr && (!keys || keys.length !== 1 || (keys[0] !== "requestId" && keys[0] !== "request_id"))) || typeof requestId !== "string" || !/^[A-Za-z0-9._:-]+$/.test(requestId)) throw errReq("requestId is invalid");
+      if ((!isStr && (!keys || keys.length !== 1 || (keys[0] !== "requestId" && keys[0] !== "request_id"))) || typeof requestId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(requestId)) throw errReq("requestId is invalid");
       try {
         const res = await this.client.call("connect.approveRequest", { request_id: requestId });
         return hasSecret(res) ? { ok: false, errorCode: "internal_contract_violation" } : { ok: true, stateRefreshRequired: true };
@@ -133,8 +143,15 @@ export class OplFrameworkBridge extends EventEmitter {
         this.startError = err.code;
       }
     }
-    if (studioWeixin && typeof studioWeixin.connect === "function" && this.codex?.channelCallbackAdapter && !this.nativeWeixinHost) {
-      try { this.nativeWeixinHost = await studioWeixin.connect(this.codex.channelCallbackAdapter); } catch {}
+    if (!this.closePromise && studioWeixin && typeof studioWeixin.connect === "function" && this.codex?.channelCallbackAdapter && !this.nativeWeixinHost) {
+      try {
+        const host = await studioWeixin.connect(this.codex.channelCallbackAdapter);
+        if (this.closePromise) {
+          try { await host?.dispose?.(); } catch {}
+        } else {
+          this.nativeWeixinHost = host;
+        }
+      } catch {}
     }
     return this.capabilities();
   }

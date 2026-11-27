@@ -930,3 +930,26 @@ test("installation locations are revealed without executing files or accepting r
   }
   assert.equal(calls.length, 1);
 });
+
+test("OplFrameworkBridge.close() during in-flight studioWeixin.connect() disposes the resolved host without leaking", async () => {
+  let resolveConnect;
+  let disposed = false;
+  const bridge = new OplFrameworkBridge({
+    client: { on() {}, off() {}, connect: async () => {}, close: async () => {}, connected: true, serverApiVersion: "2.0" },
+    codex: { channelCallbackAdapter: {}, capabilities: () => ({ channelCallbackSchema: "v1" }) }
+  });
+  const studioWeixin = {
+    connect: () => new Promise((resolve) => { resolveConnect = resolve; })
+  };
+
+  const startPromise = bridge.start(studioWeixin);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const closePromise = bridge.close();
+  resolveConnect({
+    dispose: async () => { disposed = true; }
+  });
+  await Promise.all([startPromise, closePromise]);
+
+  assert.equal(disposed, true);
+  assert.equal(bridge.nativeWeixinHost, null);
+});
