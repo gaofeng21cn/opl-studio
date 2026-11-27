@@ -43,13 +43,24 @@ export async function createGuestCoreProxy({ child, initialize, platform = {}, n
   const disconnected = () => {
     if (!connected) return;
     connected = false;
-    core.hostFailure = { code: "guest_host_closed", exitCode: child.exitCode, signal: child.signalCode, diagnostic };
+    const failure = { code: "guest_host_closed", exitCode: child.exitCode, signal: child.signalCode, diagnostic };
+    core.hostFailure = failure;
     if (capabilities) capabilities.appServerAvailable = false;
     if (codexCapabilities) codexCapabilities.available = false;
     if (core.transport) core.transport.initialized = false;
     rpc.close();
     core.emit("event", { method: "host/availability", params: { available: false, code: "guest_host_closed" } });
-    if (!closing) onHostFailure(core.hostFailure);
+    if (!closing) {
+      const report = () => {
+        failure.exitCode = child.exitCode;
+        failure.signal = child.signalCode;
+        failure.diagnostic = diagnostic;
+        onHostFailure(failure);
+      };
+      // stdout can close before the last bytes of the independent stderr pipe.
+      if (child.stderr.readableEnded || child.stderr.destroyed) report();
+      else child.once("close", report);
+    }
     core.emit("disconnected", core.hostFailure);
   };
   rpc.events.once("close", disconnected);

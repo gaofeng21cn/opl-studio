@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -57,6 +58,14 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
     const resolution = await createRuntimeResolution({ installAnchor, profile: dshProfile, home: dshHome });
     const disabledAtBoot = readDisabledOptionalPluginIds(profileDir);
     const activeExternalPlugins = dshProfile.layers.map(layer => layer.packageName).filter(Boolean);
+    const activeExternalPluginVersions = Object.fromEntries(dshProfile.layers.flatMap(({ packageName, packageDir }) => {
+      try {
+        const { version } = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8"));
+        return typeof version === "string" ? [[packageName, version]] : [];
+      } catch {
+        return [];
+      }
+    }));
     const patches = [
       ...(web ? loadOverlayPatches(profileName, webPatchPath) : []),
       // This bundle also ships an agent-loop integration. Studio consumes its
@@ -92,6 +101,7 @@ export async function bootOplStudioHost(options = {}, { web = false } = {}) {
           dshProfileDir: profileDir,
           dshDisabledAtBoot: disabledAtBoot,
           dshActiveExternalPlugins: activeExternalPlugins,
+          dshActiveExternalPluginVersions: activeExternalPluginVersions,
           billionContextAdmitted: dshProfile.layers.some(layer => layer.packageName === "billion-context")
         }));
         await ctx.plugin(PluginPackages, { resolution });
