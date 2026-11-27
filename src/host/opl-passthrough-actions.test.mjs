@@ -139,6 +139,8 @@ test("the action bridge preserves owner rejections, required confirmation and id
   assert.equal(preview.status, "preview_ready");
   assert.equal(preview.confirmationRequired, true);
   assert.equal(preview.confirmationId, "owner-request");
+  value = { ok: true, status: "executed", dry_run: true };
+  await assert.rejects(() => opl.executeAction(request), { code: "invalid_owner_receipt" });
   value = { ok: true, status: "executed", action_id: "unrelated" };
   await assert.rejects(() => opl.executeAction(request), { code: "invalid_owner_receipt" });
 });

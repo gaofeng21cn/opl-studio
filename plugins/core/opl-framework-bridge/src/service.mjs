@@ -85,7 +85,7 @@ export function createOplPassthrough(options = {}) {
       const requestedMode = mode ?? (payload.rollbackRef ? "rollback" : dryRun === false ? "execute" : "preview");
       if (!["preview", "execute", "rollback"].includes(requestedMode)) throw errReq("Unknown action mode");
       const isDry = requestedMode === "preview";
-      const request = { actionId, payload, requestedMode, dryRun: isDry };
+      const request = { actionId, packageId, payload, requestedMode, dryRun: isDry };
       const command = readback("opld app.action.execute", [actionId]);
       if (!isDry && readOnly()) return actionOwnerReceipt(command, { status: "blocked_read_only", blocked_reason: "read_only_host" }, request);
       if (requestedMode === "rollback") return actionOwnerReceipt(command, { status: "unsupported", blocked_reason: "opld_rollback_unavailable" }, request);

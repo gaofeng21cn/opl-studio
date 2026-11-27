@@ -58,11 +58,15 @@ function actionStatus(value, owner, isDry) {
   return "error";
 }
 
-export function actionOwnerReceipt(readback, value, { actionId, payload, requestedMode, dryRun }) {
+export function actionOwnerReceipt(readback, value, { actionId, packageId, payload, requestedMode, dryRun }) {
   const envelope = value?.opl_app_contribution;
-  if (value?.action_id !== undefined && value.action_id !== actionId) throw invalidReceipt();
+  for (const result of [value, value?.app_action_execution]) {
+    if (result?.action_id !== undefined && result.action_id !== actionId) throw invalidReceipt();
+    const returnedDryRun = result?.dry_run ?? result?.dryRun;
+    if (returnedDryRun !== undefined && returnedDryRun !== dryRun) throw invalidReceipt();
+  }
   if (envelope !== undefined) {
-    const identity = { packageId: payload.package_id, ref: payload.ref, operation: "execute" };
+    const identity = { packageId: packageId ?? payload.package_id, ref: payload.ref, operation: "execute" };
     checkContributionIdentity(envelope, identity);
     checkContributionIdentity(envelope.response, identity);
     if (envelope.operation !== "execute" || envelope.ref !== identity.ref || envelope.package_id !== identity.packageId
