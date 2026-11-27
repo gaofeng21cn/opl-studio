@@ -21,8 +21,9 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.cohort.outputs.version }}
-      app_ref: ${{ steps.cohort.outputs.app_ref }}
-      framework_ref: ${{ steps.cohort.outputs.framework_ref }}
+      app_ref: ${{ steps.oci-inputs.outputs.app_ref }}
+      framework_ref: ${{ steps.oci-inputs.outputs.framework_ref }}
+      codex_npm_spec: ${{ steps.oci-inputs.outputs.codex_npm_spec }}
       dsh_ref: ${{ steps.cohort.outputs.dsh_ref }}
     steps:
       - name: Check out canonical Studio source
@@ -52,42 +53,15 @@ jobs:
             exit 1
           fi
 
-      - name: Read pinned release cohort
-        id: pinned-cohort
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          const evidence = JSON.parse(fs.readFileSync("src/candidateContractEvidence.json", "utf8"));
-          const cohort = evidence.candidate_runtime_qualification?.external_cohort ?? {};
-          for (const name of ["framework", "app"]) {
-            const commit = cohort[`${name}_commit`];
-            if (!/^[0-9a-f]{40}$/.test(commit ?? "")) throw new Error(`invalid ${name} cohort`);
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}_ref=${commit}\n`);
-          }
-          NODE
-
-      - name: Check out pinned Framework cohort
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: gaofeng21cn/one-person-lab
-          ref: ${{ steps.pinned-cohort.outputs.framework_ref }}
-          path: .cohort/framework
-          persist-credentials: false
-
-      - name: Check out pinned App cohort
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: gaofeng21cn/one-person-lab-app
-          ref: ${{ steps.pinned-cohort.outputs.app_ref }}
-          path: .cohort/app
-          persist-credentials: false
-
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
           cache: npm
+
+      - name: Resolve pinned OCI inputs
+        id: oci-inputs
+        uses: ./.github/actions/resolve-oci-inputs
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -111,11 +85,8 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           const evidence = JSON.parse(fs.readFileSync("src/candidateContractEvidence.json", "utf8"));
-          const cohort = evidence.candidate_runtime_qualification?.external_cohort ?? {};
           const output = {
             version: JSON.parse(fs.readFileSync("package.json", "utf8")).version,
-            app_ref: cohort.app_commit,
-            framework_ref: cohort.framework_commit,
             dsh_ref: evidence.application_host?.upstream_ref
           };
           for (const [key, value] of Object.entries(output)) {
@@ -173,6 +144,7 @@ jobs:
             OPL_SOURCE_REVISION=${{ github.sha }}
             OPL_FRAMEWORK_REF=${{ needs.source-gate.outputs.framework_ref }}
             OPL_APP_REF=${{ needs.source-gate.outputs.app_ref }}
+            OPL_CODEX_NPM_SPEC=${{ needs.source-gate.outputs.codex_npm_spec }}
 
       - name: Smoke exact pushed child
         id: child

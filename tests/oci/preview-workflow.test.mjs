@@ -10,7 +10,13 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
   assert.equal(workflow.permissions.packages, "write");
   assert.equal(workflow.permissions["id-token"], "write");
   const sourceGate = workflow.jobs["source-gate"];
-  const cohortCheckouts = sourceGate.steps.filter((step) => step.name?.startsWith("Check out pinned "));
+  const resolver = sourceGate.steps.find((step) => step.id === "oci-inputs");
+  assert.equal(resolver.uses, "./.github/actions/resolve-oci-inputs");
+  const action = YAML.parse(await readFile(new URL(`../../${resolver.uses}/action.yml`, import.meta.url), "utf8"));
+  assert.equal(action.outputs.app_ref.value, "${{ steps.pinned-cohort.outputs.app_ref }}");
+  assert.equal(action.outputs.framework_ref.value, "${{ steps.pinned-cohort.outputs.framework_ref }}");
+  assert.equal(action.outputs.codex_npm_spec.value, "${{ steps.codex.outputs.spec }}");
+  const cohortCheckouts = action.runs.steps.filter((step) => step.name?.startsWith("Check out pinned "));
   assert.deepEqual(cohortCheckouts.map((step) => ({
     repository: step.with.repository,
     ref: step.with.ref,
@@ -26,6 +32,16 @@ test("Preview OCI workflow publishes only signed native amd64/arm64 Preview tags
     OPL_APP_REPO: "${{ github.workspace }}/.cohort/app"
   });
   const build = workflow.jobs["build-child"];
+  assert.equal(build.needs, "source-gate");
+  const buildArguments = build.steps.find((step) => step.uses?.startsWith("docker/build-push-action@")).with["build-args"];
+  for (const [key, argument] of [
+    ["app_ref", "OPL_APP_REF"],
+    ["framework_ref", "OPL_FRAMEWORK_REF"],
+    ["codex_npm_spec", "OPL_CODEX_NPM_SPEC"]
+  ]) {
+    assert.equal(sourceGate.outputs[key], `\${{ steps.oci-inputs.outputs.${key} }}`);
+    assert.ok(buildArguments.trim().split("\n").includes(`${argument}=\${{ needs.source-gate.outputs.${key} }}`));
+  }
   assert.deepEqual(build.strategy.matrix.include, [
     { architecture: "amd64", platform: "linux/amd64", runner: "ubuntu-24.04" },
     { architecture: "arm64", platform: "linux/arm64", runner: "ubuntu-24.04-arm" }
