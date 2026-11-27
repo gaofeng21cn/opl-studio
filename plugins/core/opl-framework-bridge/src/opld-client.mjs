@@ -4,6 +4,15 @@ const replayableReads = new Set([
   "daemon.health", "daemon.info", "daemon.doctor", "app.state.get", "app.initialize.get",
   "app.domainDetail.get", "ledger.timeline", "runway.task.list", "pack.list", "pack.inspect", "connect.list",
 ]);
+const codexGatewayMethods = new Set(["login", "repair", "disconnect", "completeSetup", "useForModelAccess"]);
+const codexGatewayActions = new Set(["gateway_account_complete_setup", "gateway_account_repair", "gateway_account_disconnect", "gateway_account_use_for_model_access"]);
+
+function writesCodexProfile(method, params) {
+  if (method === "connect.configureCodexApiKey") return true;
+  if (method.startsWith("connect.gateway.")) return codexGatewayMethods.has(method.slice("connect.gateway.".length));
+  return method === "app.action.execute" && !params.dry_run && codexGatewayActions.has(params.action_id);
+}
+
 export class OpldRpcError extends Error {
   constructor(message, { rpcCode = -32000, code = "rpc_error", data } = {}) { super(message); Object.assign(this, { name: "OpldRpcError", rpcCode, code, data }); }
 }
@@ -53,6 +62,7 @@ export class OpldClient extends EventEmitter {
   constructor(options = {}) {
     super();
     const env = options.env ?? process.env;
+    this.codexHome = path.resolve(env.CODEX_HOME?.trim() || path.join(env.HOME?.trim() || os.homedir(), ".codex"));
     Object.assign(this, { env, paths: resolveOplStatePaths(env, options.stateDir), clientKind: options.clientKind ?? "opl_app", apiVersion: String(options.apiVersion ?? env.OPL_BRIDGE_API_VERSION ?? "2.0"), daemonBin: options.daemonBin, autoStart: options.autoStart !== false && env.OPL_DAEMON_AUTO_START !== "0", requestTimeoutMs: options.requestTimeoutMs ?? 30_000, connectTimeoutMs: options.connectTimeoutMs ?? 5_000, connected: false, serverApiVersion: null, sessionInfo: null });
   }
 
@@ -153,7 +163,8 @@ export class OpldClient extends EventEmitter {
           this.#rejectPending(new OpldRpcError("opld connection closed", { code: "connection_closed" }), sock);
           if (handshaked && !this.#closed) this.#scheduleReconnect();
         });
-        const hs = await this.#sendRaw(sock, "daemon.handshake", { token: sess.token, client_kind: this.clientKind, api_version: this.apiVersion }, Math.max(500, deadline - Date.now()));
+        const profile = this.clientKind === "opl_app" ? { codex_home: this.codexHome } : {};
+        const hs = await this.#sendRaw(sock, "daemon.handshake", { token: sess.token, client_kind: this.clientKind, api_version: this.apiVersion, ...profile }, Math.max(500, deadline - Date.now()));
         this.#guardOpen();
         const serverVer = String(hs?.api_version ?? sess.api_version ?? "2.0");
         if (serverVer.split(".")[0] !== this.apiVersion.split(".")[0]) throw new OpldRpcError(`Incompatible api_version '${this.apiVersion}'; base_upgrade_required`, { rpcCode: -32002, code: "base_upgrade_required", data: { code: "base_upgrade_required", expected_major: Number(serverVer.split(".")[0]) || 2, received_api_version: this.apiVersion } });
@@ -183,8 +194,19 @@ export class OpldClient extends EventEmitter {
   async call(method, params = {}, timeoutMs = this.requestTimeoutMs) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (this.#socket && (this.#socket.destroyed || this.#socket.writableEnded || !this.#socket.writable)) { this.#socket.destroy(); this.#socket = null; this.connected = false; }
-      await this.connect();
-      try { return await this.#sendRaw(this.#socket, method, params, timeoutMs); }
+      const session = await this.connect();
+      const socket = this.#socket;
+      try {
+        if (this.clientKind === "opl_app" && writesCodexProfile(method, params) && session.codex_home !== this.codexHome) {
+          // Older daemons report their effective config file through the trusted App projection.
+          const state = session.codex_home ? null : await this.#sendRaw(socket, "app.state.get", { profile: "fast" }, timeoutMs);
+          const policy = state?.app_state?.settings_control_center?.app_settings_read_model?.codex_model_policy;
+          if (policy?.config_path !== path.join(this.codexHome, "config.toml")) {
+            throw new OpldRpcError("The daemon does not serve the selected Codex profile.", { code: "gateway_configuration_invalid" });
+          }
+        }
+        return await this.#sendRaw(socket, method, params, timeoutMs);
+      }
       catch (err) {
         if (attempt > 0 || err?.code !== "connection_closed" || this.#closed || this.#fatalError || !this.autoStart || !replayableReads.has(method)) throw err;
         this.#socket?.destroy(); this.#socket = null; this.connected = false;

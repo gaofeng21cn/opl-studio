@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { OplFrameworkBridge } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
 import { startFakeOpld } from "./fixtures/fake-opld.mjs";
@@ -254,4 +255,31 @@ test("Gateway account login and Codex API key catch JSON-escaped secret echoes a
   assert.deepEqual(await bridge.gatewayAccountLogin({ email: "operator-token@example.com", password: "operator-token" }), {
     ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
   });
+});
+
+test("an older daemon must match the App Codex profile before a credential write", async (t) => {
+  const calls = [];
+  const selected = path.resolve("selected-codex-profile");
+  let configPath = path.resolve("other-codex-profile", "config.toml");
+  const daemon = await startFakeOpld({
+    onHandshake: async (params) => {
+      assert.equal(params.codex_home, selected);
+      return { api_version: "2.0" };
+    },
+    onCall: async (method) => {
+      calls.push(method);
+      return method === "app.state.get"
+        ? { app_state: { settings_control_center: { app_settings_read_model: { codex_model_policy: { config_path: configPath } } } } }
+        : { ok: true };
+    }
+  });
+  const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, env: { CODEX_HOME: selected }, autoStart: false });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  const blocked = await bridge.codexApiKeyConfiguration({ apiKey: "synthetic-key" });
+  assert.equal(blocked.ok, false);
+  assert.deepEqual(calls, ["app.state.get"]);
+  configPath = path.join(selected, "config.toml");
+  assert.equal((await bridge.codexApiKeyConfiguration({ apiKey: "synthetic-key" })).ok, true);
+  assert.deepEqual(calls, ["app.state.get", "app.state.get", "connect.configureCodexApiKey"]);
 });
