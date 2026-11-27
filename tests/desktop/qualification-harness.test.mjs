@@ -154,8 +154,10 @@ test("Full qualifies offline relaunch and online first install from independent 
   try {
     const options = { runtimeProfiles: ["full"], vmName: "full-smoke", dmg: "/tmp/full.dmg", keepVm: true, outPath: path.join(directory, "qualification.json") };
     const calls = [];
-    const offlineChecks = { vm: { clone: "full-smoke" }, codex: { offlineRelaunch: { status: "passed" } } };
-    const onlineChecks = { vm: { clone: "full-smoke" }, smoke: { status: "passed" } };
+    const offlineChecks = { vm: { clone: "full-smoke" }, codex: { offlineRelaunch: { status: "passed" } },
+      framework_daemon_proof: { full_package_manifest_sha256: "a".repeat(64) } };
+    const onlineChecks = { vm: { clone: "full-smoke" }, smoke: { status: "passed" },
+      framework_daemon_proof: { full_package_manifest_sha256: "b".repeat(64) } };
     const receipt = await qualifyCleanVm(options, async (guest, offline) => {
       calls.push({ guest, offline });
       return { status: "passed", checks: offline ? offlineChecks : onlineChecks, progressEvents: [] };
@@ -165,6 +167,7 @@ test("Full qualifies offline relaunch and online first install from independent 
     assert.equal(calls[1].guest, options);
     assert.equal(calls[1].offline, undefined);
     assert.equal(receipt.checks.offlineVm, offlineChecks.vm);
+    assert.equal(receipt.checks.framework_daemon_proof, offlineChecks.framework_daemon_proof);
     assert.equal(receipt.checks.codex, offlineChecks.codex);
     assert.equal(receipt.checks.smoke, onlineChecks.smoke);
 

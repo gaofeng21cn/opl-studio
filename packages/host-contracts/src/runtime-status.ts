@@ -96,7 +96,7 @@ export type WorkItemRuntimeItem = {
   telemetryState: string;
   telemetryMissingReason?: string;
   freshnessState?: string;
-  archived: boolean;
+  archived?: boolean;
   visibilityGeneration?: number;
   visibilityControlRef?: string;
   visibilitySource?: string;

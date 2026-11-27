@@ -198,7 +198,6 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     homeAgentShortcuts: appState.home_agent_shortcuts,
     moduleItems,
     fallback: {
-      packageLifecycle: fallback.packageLifecycle,
       deliverables: fallback.deliverables,
       receipts: fallback.receipts
     }

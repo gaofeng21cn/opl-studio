@@ -188,6 +188,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
         }
       : undefined;
     const actionMessageArgs = asRecord(action?.message_args);
+    const visibilityState = asString(visibility?.state);
     const visibilityGeneration = asFiniteNumber(visibility?.generation);
     return [{
       id,
@@ -251,7 +252,7 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
         ? { telemetryMissingReason: (asString(telemetry?.missing_reason) ?? asString(cumulativeTelemetry?.missing_reason)) as string }
         : {}),
       ...(asString(freshness?.state) ? { freshnessState: asString(freshness?.state) as string } : {}),
-      archived: asString(visibility?.state) === "archived",
+      ...(visibilityState === "visible" || visibilityState === "archived" ? { archived: visibilityState === "archived" } : {}),
       ...(visibilityGeneration !== null ? { visibilityGeneration } : {}),
       ...(asString(visibility?.control_ref) ? { visibilityControlRef: asString(visibility?.control_ref) as string } : {}),
       ...(asString(visibility?.source) ? { visibilitySource: asString(visibility?.source) as string } : {}),

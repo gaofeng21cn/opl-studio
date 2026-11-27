@@ -8,7 +8,8 @@ import tls from "node:tls";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseCliArgs } from "node:util";
 import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
-import { readPlistFile } from "./plist.mjs";
+import { collectFullDaemonProof } from "./full-daemon-proof.mjs";
+export { collectFullDaemonProof };
 import {
   PREVIEW_PRODUCT,
   loadPreviewSmokeInputs,
@@ -87,7 +88,7 @@ export async function collectTemporalServiceSupervisorProof({ runtime, hooks = {
   const domain = `gui/${uid}`;
   const plistPath = `${home}/Library/LaunchAgents/${label}.plist`;
   const databasePath = `${home}/Library/Application Support/OPL/state/family-runtime/temporal-server/temporal.sqlite`;
-  const readPlist = hooks.readPlist ?? (() => readPlistFile(plistPath));
+  const readPlist = () => JSON.parse(command("/usr/bin/plutil", ["-convert", "json", "-o", "-", plistPath]).stdout);
   const database = hooks.database ?? (async () => {
     const info = await fs.stat(databasePath);
     const file = await fs.open(databasePath, "r");
@@ -436,8 +437,7 @@ export async function waitForVmIp(vmName, { vmProcess, timeoutMs = 120_000, poll
 export async function qualifyCleanVm(options, qualifyGuest = qualifyCleanGuest) {
   let receipt;
   if (!options.attach && options.runtimeProfiles?.includes("full")) {
-    // Offline restarts can interrupt the one-shot Official Profile install.
-    // Qualify the online first install from the same clean base on a new clone.
+    // Exercise first install independently on the offline and connected guests.
     const offline = await qualifyGuest({
       ...options,
       vmName: options.skipClone ? `${options.vmName}-offline` : options.vmName,
@@ -456,6 +456,7 @@ export async function qualifyCleanVm(options, qualifyGuest = qualifyCleanGuest) 
           offlineInstall: offline.checks.install,
           offlineDistribution: offline.checks.distribution,
           offlineNetwork: offline.checks.offlineNetwork,
+          ...(offline.checks.framework_daemon_proof ? { framework_daemon_proof: offline.checks.framework_daemon_proof } : {}),
           offlineDmgAdmission: offline.checks.offlineDmgAdmission
         },
         progressEvents: [...offline.progressEvents, ...online.progressEvents]
@@ -496,6 +497,11 @@ async function qualifyCleanGuest(options, offline = false) {
   let tunnel;
   let ip = null;
   let guestAppProcessId = null;
+  const readFirstInstallAttempt = () => {
+    if (!ip || !guestAppProcessId) return null;
+    const output = guestRun(options, ip, 'cat "$HOME/Library/Application Support/OPL/state/.official-profile-first-install-attempt.json"', { allowFailure: true });
+    return parseCurrentFirstInstallAttempt(output.stdout, guestAppProcessId);
+  };
   let smokeInputs = { credentials: null, turnRequest: null };
   const phaseTimeoutMs = Math.min(
     Number.isFinite(options.phaseTimeoutMs) && options.phaseTimeoutMs > 0 ? options.phaseTimeoutMs : 120_000,
@@ -508,6 +514,21 @@ async function qualifyCleanGuest(options, offline = false) {
     try { options.progress?.(value); } catch {}
     process.stderr.write(`[opl-studio-clean-vm] ${JSON.stringify(value)}\n`);
   };
+  async function collectGuestProof(collector, proofKey, phase) {
+    const guestDriver = `/tmp/opl-framework-proof-${process.pid}.mjs`;
+    const localDriver = path.join(runRoot, "framework-proof.mjs");
+    const resource = `${guestApp}/Contents/Resources/opl-studio-full-runtime`;
+    const runtime = `${resource}/runtime/current`;
+    const args = { runtime, manifestPath: `${resource}/manifest/full-package-manifest.json`, expectedRootPackageIds: options.expectedRootPackageIds };
+    await writeFile(localDriver, `const collect = ${collector.toString()};\nprocess.stdout.write(JSON.stringify(await collect(${JSON.stringify(args)})));\n`);
+    scpToGuest(options, ip, localDriver, guestDriver);
+    progress({ phase, status: "started" });
+    const result = guestRun(options, ip, `${shellQuote(runtime + "/node/bin/node")} ${shellQuote(guestDriver)}`);
+    checks[proofKey] = JSON.parse(result.stdout);
+    invariant(checks[proofKey].status === "passed", "Full Framework lifecycle did not pass");
+    progress({ phase, status: "passed" });
+  }
+
   const checks = {
     codex: options.codexPlatformPackageTarball
       ? {
@@ -599,16 +620,20 @@ async function qualifyCleanGuest(options, offline = false) {
       if (fullRuntime) {
         const resource = `${guestApp}/Contents/Resources/opl-studio-full-runtime`;
         const manifest = `${resource}/manifest/full-package-manifest.json`;
-        const frameworkRef = guestRun(options, ip, [
+        const fullManifest = JSON.parse(guestRun(options, ip, [
           "set -eu",
           `test -x ${shellQuote(`${resource}/runtime/current/bin/opl`)}`,
           `test "$(plutil -extract carrier.carrier_id raw -o - ${shellQuote(manifest)})" = opl-studio`,
           `test "$(plutil -extract carrier.runtime_resource_dir raw -o - ${shellQuote(manifest)})" = opl-studio-full-runtime`,
-          `plutil -extract resolved_refs.opl_framework.resolved_commit raw -o - ${shellQuote(manifest)}`
-        ].join(" && ")).stdout.trim();
+          `cat ${shellQuote(manifest)}`
+        ].join(" && ")).stdout);
+        const frameworkRef = fullManifest.resolved_refs?.opl_framework?.resolved_commit;
+        invariant(/^[0-9a-f]{40}$/.test(frameworkRef), "Full Framework manifest is missing its source commit");
+        const api = fullManifest.components?.opl?.framework_api_version ?? "1.0";
+        invariant(["1.0", "2.0"].includes(api), "Unsupported Full Framework API version");
         invariant(!options.frameworkRef || frameworkRef === options.frameworkRef, "Packaged Full Framework differs from the frozen source");
         checks.framework = { ...checks.framework, status: "prepared", expectedRef: frameworkRef,
-          source: "packaged_full_runtime", guestInjection: null, bundleIncluded: true,
+          apiVersion: api, source: "packaged_full_runtime", guestInjection: null, bundleIncluded: true,
           packagedFullManifestValidated: true, archiveCopiedToGuest: false };
       } else if (options.frameworkSourceArchive) {
         scpToGuest(options, ip, options.frameworkSourceArchive, guestFrameworkArchive);
@@ -710,6 +735,17 @@ async function qualifyCleanGuest(options, offline = false) {
           offlineFirstLaunch: { status: "passed", networkPolicy: FULL_OFFLINE_NETWORK_POLICY,
             gatewayConfigured: false, automaticUpdatesEnabled: false, appVisible: true,
             protocolCalls: ["thread/list"], generationRequested: false } };
+        if (checks.framework.apiVersion === "2.0" && options.expectedRootPackageIds?.length) {
+          const deadline = Date.now() + options.timeoutMs;
+          let attempt = readFirstInstallAttempt();
+          while (attempt?.status !== "completed" && attempt?.status !== "failed" && Date.now() < deadline) {
+            await delay(Math.min(1000, deadline - Date.now()));
+            attempt = readFirstInstallAttempt();
+          }
+          invariant(attempt?.status === "completed", `Offline Official Profile installation did not complete: ${attempt?.status ?? "missing"}`);
+          await collectGuestProof(collectFullDaemonProof, "framework_daemon_proof", "full-offline-daemon-restart");
+          checks.framework_daemon_proof.network_mode = "offline";
+        }
         progress({ phase: "full-offline-first-launch", status: "passed", version });
         guestRun(options, ip, buildGuestProcessStopCommand(guestAppProcessId));
         guestAppProcessId = Number(guestRun(options, ip, buildGuestLaunchCommand(launchOptions)).stdout.trim());
@@ -746,11 +782,7 @@ async function qualifyCleanGuest(options, offline = false) {
           app: guestApp
         };
       const smoke = await (options.runSmoke ?? runPreviewSmoke)({
-        readFirstInstallAttempt: async () => {
-          if (!ip || !guestAppProcessId) return null;
-          const output = guestRun(options, ip, 'cat "$HOME/Library/Application Support/OPL/state/.official-profile-first-install-attempt.json"', { allowFailure: true });
-          return parseCurrentFirstInstallAttempt(output.stdout, guestAppProcessId);
-        },
+        readFirstInstallAttempt,
         evaluate: (expression, timeoutMs = phaseTimeoutMs) => evaluatePageStable({ port: options.cdpPort, expression, timeoutMs }),
         waitForReady: () => waitForPageReady({ port: options.cdpPort, timeoutMs: phaseTimeoutMs }),
         options: {
@@ -787,17 +819,8 @@ async function qualifyCleanGuest(options, offline = false) {
       if (fullRuntime && checks.framework.packagedFullManifestValidated && smoke.checks.runtime?.full?.status === 'passed') {
         checks.framework.status = 'passed';
       }
-      if (fullRuntime && ip && smoke.status === "passed") {
-        const guestDriver = `/tmp/opl-framework-temporal-driver-${process.pid}.mjs`;
-        const localDriver = path.join(runRoot, "temporal-driver.mjs");
-        const runtime = `${guestApp}/Contents/Resources/opl-studio-full-runtime/runtime/current`;
-        await writeFile(localDriver, `${collectTemporalServiceSupervisorProof.toString()}\nprocess.stdout.write(JSON.stringify(await collectTemporalServiceSupervisorProof({runtime:${JSON.stringify(runtime)}})));\n`);
-        scpToGuest(options, ip, localDriver, guestDriver);
-        progress({ phase: "full-temporal-lifecycle", status: "started" });
-        const result = guestRun(options, ip, `${shellQuote(runtime + "/node/bin/node")} ${shellQuote(guestDriver)}`);
-        checks.temporal_service_supervisor_proof = JSON.parse(result.stdout);
-        invariant(checks.temporal_service_supervisor_proof.status === "passed", "Full Temporal lifecycle did not pass");
-        progress({ phase: "full-temporal-lifecycle", status: "passed" });
+      if (fullRuntime && ip && smoke.status === "passed" && checks.framework.apiVersion !== "2.0") {
+        await collectGuestProof(collectTemporalServiceSupervisorProof, "temporal_service_supervisor_proof", "full-temporal-lifecycle");
       }
       checks.gateway = smoke.checks.gateway;
       checks.update = {

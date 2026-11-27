@@ -117,6 +117,8 @@ export type OplStateReadback = {
     schema: "opl_studio_update_maintenance.v1";
     status: string;
     lastCompletedAt: number | null;
+    packageRestartRequired?: boolean;
+    packageRendererReloadReady?: boolean;
     dshPluginRestartRequired?: boolean;
     dshPluginReloadReady?: boolean;
     dshPluginUpdateStatus?: string | null;

@@ -3,7 +3,6 @@ import { OPL_COMMANDS } from "./oplBridge-commands";
 import { asBoolean, asNumber, asRecord, asString, createCommandReadback, parseJsonValue } from "@gaofeng21cn/opl-host-contracts/bridge-primitives";
 import { unavailableCarrierDiagnostics, normalizeCarrierDiagnostics } from "./oplBridge-normalizers-platform";
 import type {
-  OplActionDescriptor,
   OplAppState,
   OplCommandReadback,
   OplFullDrilldownReadback,
@@ -93,73 +92,7 @@ export function stateCommand(profile: OplStateProfile): string {
   return profile === "full" ? OPL_COMMANDS.fullState : OPL_COMMANDS.fastState;
 }
 
-export function defaultStateActions(): OplActionDescriptor[] {
-  return [
-    {
-      action_id: "task_action_receipt_preview",
-      label: "Preview task action receipt",
-      route: "opl app action execute --action task_action_receipt_preview",
-      payload_fields: [],
-      mutates: "none",
-      dry_run_supported: true,
-      owner: "opl_app",
-      delegated_surface: "opl task action receipt preview",
-      can_submit_to_safe_action_shell: true,
-      route_requires_domain_or_app_payload: false
-    },
-    {
-      action_id: "task_export_bundle_preview",
-      label: "Preview export bundle",
-      route: "opl app action execute --action task_export_bundle_preview",
-      payload_fields: ["refs"],
-      mutates: "candidate_preview_only",
-      dry_run_supported: true,
-      owner: "opl_app",
-      delegated_surface: "opl export bundle preview",
-      can_submit_to_safe_action_shell: true,
-      route_requires_domain_or_app_payload: true
-    },
-    {
-      action_id: "workspace_ensure",
-      label: "Ensure workspace",
-      route: "opl app action execute --action workspace_ensure",
-      payload_fields: ["workspace"],
-      mutates: "workspace_context",
-      dry_run_supported: true,
-      owner: "opl_app",
-      delegated_surface: "opl workspace ensure",
-      can_submit_to_safe_action_shell: true,
-      route_requires_domain_or_app_payload: true
-    },
-    {
-      action_id: "settings_sync_capabilities",
-      label: "Sync settings capabilities",
-      route: "opl app action execute --action settings_sync_capabilities",
-      payload_fields: [],
-      mutates: "settings_capabilities_projection",
-      dry_run_supported: true,
-      owner: "opl_app",
-      delegated_surface: "opl settings capability sync",
-      can_submit_to_safe_action_shell: true,
-      route_requires_domain_or_app_payload: false
-    },
-    {
-      action_id: "provider_scheduler_status",
-      label: "Provider scheduler status",
-      route: "opl app action execute --action provider_scheduler_status",
-      payload_fields: [],
-      mutates: "none",
-      dry_run_supported: true,
-      owner: "opl_runtime",
-      delegated_surface: "opl provider scheduler status",
-      can_submit_to_safe_action_shell: true,
-      route_requires_domain_or_app_payload: false
-    }
-  ];
-}
-
-export function defaultStateReadback(profile: OplStateProfile): OplStateReadback {
-  const generatedAt = new Date().toISOString();
+function defaultStateReadback(profile: OplStateProfile): OplStateReadback {
   return {
     profile,
     app_state: {
@@ -171,36 +104,13 @@ export function defaultStateReadback(profile: OplStateProfile): OplStateReadback
         action_boundary_surface: "opl app action execute --action <action_id> [--payload json] [--dry-run] --json",
         full_drilldown_exception_surface: OPL_COMMANDS.fullDrilldown
       },
-      operator: {
-        summary: {
-          runtime_status: profile === "full" ? "full_profile_placeholder" : "fast_profile_placeholder",
-          provider_status: "candidate_preview_only"
-        },
-        refs: [{
-          label: "App state profile",
-          ref: `opl://state/${profile}`,
-          node_kind: "runtime_profile"
-        }]
-      },
+      operator: { summary: {}, refs: [] },
       modules: { items: [] },
-      actions: defaultStateActions(),
+      actions: [],
       managed_companions: [],
-      meta: {
-        profile,
-        generated_at: generatedAt
-      },
-      provider: {
-        status: "candidate_preview_only"
-      },
-      active_project_lines: [{
-        status: "candidate_preview_only",
-        active_run_id: `placeholder-${profile}`,
-        next_visible_step: "Read runtime refs before execution",
-        progress_delta_classification: "platform_or_observability_delta",
-        deliverable_progress_delta: "runtime refs available",
-        platform_repair_delta: "none",
-        next_forced_delta: "human_confirmation_gate"
-      }]
+      meta: { profile, generated_at: "" },
+      provider: { status: "unknown" },
+      active_project_lines: []
     },
     readback: createCommandReadback(
       stateCommand(profile),
@@ -345,6 +255,10 @@ export function normalizeStateReadback(value: unknown, profile = readRuntimeProf
   // it before normalization can replace the last successful model with defaults.
   if (readback.timedOut || readback.exitCode !== 0) {
     throw new Error(readback.timedOut ? "opl_state_read_timeout" : "opl_state_read_failed");
+  }
+  if (!stateSource || Array.isArray(stateSource)
+    || (stateSource === record && (record?.readback !== undefined || record?.stdout !== undefined))) {
+    throw new Error("opl_state_read_failed");
   }
   return {
     profile: normalizedProfile,

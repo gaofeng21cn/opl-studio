@@ -121,23 +121,35 @@ export class OplFrameworkBridge extends EventEmitter {
       if (typeof connectionAccessApproval.approve !== "function") connectionAccessApproval.approve = (requestId) => connectionAccessApproval({ requestId });
       this.connectionAccessApproval = connectionAccessApproval;
     } else this.connectionAccessApproval = defaultApproval;
-    const registerConnect = async (payload, fallback, secrets, echoes) => {
-      try {
-        const res = await this.client.call("connect.add", payload);
-        return leakedSecret(res, secrets, echoes) ? { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false } : { ok: true, stateRefreshRequired: true };
-      } catch (err) { return { ok: false, errorCode: mapGwErr(err, fallback), stateRefreshRequired: false }; }
-    };
     this.gatewayAccountLogin = gatewayAccountLogin ?? (async (req) => {
       if (!onlyKeys(req, ["email", "password"])) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
       const email = typeof req.email === "string" ? req.email.trim() : "", password = typeof req.password === "string" ? req.password : "";
       if (!email || !nonEmptyStr(password) || Buffer.byteLength(email + password) > 65_536) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
-      return registerConnect({ provider_type: "opl_gateway", display_name: email, account_label: email, secret: password }, "gateway_account_failed", [password], [email]);
+      try {
+        const result = await this.client.call("connect.gateway.login", { email, password });
+        const gateway = result?.gateway_account;
+        if (leakedSecret(result, [password], [email]) || gateway?.surface_kind !== "opl_gateway_account_read_model.v1"
+          || gateway.connection_mode !== "account" || gateway.account?.status !== "active"
+          || !["connected", "setup_required", "attention_needed"].includes(gateway.status)) {
+          return { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false };
+        }
+        return { ok: true, stateRefreshRequired: true };
+      } catch (err) {
+        return { ok: false, errorCode: mapGwErr(err, "gateway_account_failed"), stateRefreshRequired: false };
+      }
     });
     this.codexApiKeyConfiguration = codexApiKeyConfiguration ?? (async (req) => {
       if (!onlyKeys(req, ["apiKey"])) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
       const apiKey = typeof req.apiKey === "string" ? req.apiKey.trim() : "";
       if (!apiKey || Buffer.byteLength(apiKey, "utf8") > 65_536) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
-      return registerConnect({ provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }, "codex_configuration_failed", [apiKey]);
+      try {
+        const result = await this.client.call("connect.configureCodexApiKey", { api_key: apiKey });
+        if (leakedSecret(result, [apiKey])) return { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false };
+        if (result?.ok !== true) return { ok: false, errorCode: "codex_configuration_failed", stateRefreshRequired: false };
+        return { ok: true, stateRefreshRequired: true };
+      } catch (error) {
+        return { ok: false, errorCode: mapGwErr(error, "codex_configuration_failed"), stateRefreshRequired: false };
+      }
     });
   }
   async start(studioWeixin) {

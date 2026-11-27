@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { performDesktopRestart } from "./relaunch.mjs";
+import { EventEmitter } from "node:events";
+import { performDesktopRestart, scheduleRendererReload } from "./relaunch.mjs";
 
 test("performDesktopRestart delegates downloaded Electron shell updates to quitAndInstall", async () => {
   const calls = [];
@@ -63,4 +64,20 @@ test("performDesktopRestart refuses to quit when a task holds the Codex transpor
   assert.equal(result.reasonCode, "app_server_busy");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(lifecycle, []);
+});
+
+test("a successful main frame reload acknowledges staged updates, a failed load leaves them pending", async () => {
+  const target = new EventEmitter();
+  const calls = [];
+  target.isDestroyed = () => false;
+  target.reloadIgnoringCache = () => calls.push("reload");
+  const maintenance = { captureRendererUpdateAcknowledgement: () => () => calls.push("ack") };
+  for (const outcome of ["failed", "loaded"]) {
+    assert.equal(scheduleRendererReload(target, maintenance).accepted, true);
+    await new Promise(resolve => setImmediate(resolve));
+    target.emit("did-fail-load", {}, -1, "", "", outcome === "failed");
+    target.emit("did-finish-load");
+    assert.equal(target.listenerCount("destroyed"), 0);
+  }
+  assert.deepEqual(calls, ["reload", "reload", "ack"]);
 });

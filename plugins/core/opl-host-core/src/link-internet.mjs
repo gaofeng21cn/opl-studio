@@ -57,7 +57,7 @@ export async function authorizeLinkHost({ device, env }) {
         try { errorValue = JSON.parse(Buffer.concat(stderr).toString("utf8")); } catch {}
         if (code === 0) finish(undefined, value);
         else {
-          const reasonFrom = body => body?.details?.reason_code ?? body?.error?.details?.reason_code ?? body?.error?.code ?? body?.error_code ?? body?.code ?? body?.reason_code;
+          const reasonFrom = body => body?.error?.reason_code ?? body?.details?.reason_code ?? body?.error?.details?.reason_code ?? body?.reason_code ?? body?.error?.code ?? body?.error_code ?? body?.code;
           const reason = reasonFrom(errorValue) ?? reasonFrom(value);
           finish(fail(/login|sign.?in|auth.*(?:required|expired)|reauth_required|account.*required|credential.*missing|managed_key_missing/i.test(reason ?? "") ? "link_account_required" : "link_authorization_failed", "Open OPL Account in Settings, then enable phone access again.", 401));
         }

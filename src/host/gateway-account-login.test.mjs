@@ -42,13 +42,17 @@ const FRAMEWORK_GATEWAY_REASON_CODES = [
   "credentials_stdin_too_large"
 ];
 
+function signedInGateway(email, status = "connected") {
+  return { gateway_account: { surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", status, account: { email, status: "active" } } };
+}
+
 test("Gateway account login sends credentials over 0600 RPC socket and returns only typed status", async (t) => {
   const calls = [];
   const password = "gateway-secret-must-not-escape";
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
       calls.push({ method, params });
-      return { connection_id: "conn-1", provider_type: params.provider_type, status: "active" };
+      return signedInGateway(params.email, "setup_required");
     }
   });
   const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
@@ -62,15 +66,21 @@ test("Gateway account login sends credentials over 0600 RPC socket and returns o
   const result = await bridge.gatewayAccountLogin({ email: " user@example.com ", password });
   assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].method, "connect.add");
+  assert.equal(calls[0].method, "connect.gateway.login");
   assert.deepEqual(calls[0].params, {
-    provider_type: "opl_gateway",
-    display_name: "user@example.com",
-    account_label: "user@example.com",
-    secret: password
+    email: "user@example.com",
+    password
   });
   assert.equal(JSON.stringify(result).includes(password), false);
   assert.equal("stdout" in result || "stderr" in result, false);
+});
+
+test("Gateway login requires the authenticated account projection", async () => {
+  const genericConnection = { connection_id: "ref", provider_type: "opl_gateway", status: "active" };
+  const bridge = new OplFrameworkBridge({ client: { on() {}, close() {}, async call() { return genericConnection; } } });
+  assert.deepEqual(await bridge.gatewayAccountLogin({ email: "user@example.com", password: "sample" }), {
+    ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
+  });
 });
 
 test("Gateway account login and Codex API key reject unexpected request fields or oversized payloads before RPC", async () => {
@@ -127,11 +137,11 @@ test("Gateway account login and Codex API key reject secret-echoing RPC response
   assert.equal(JSON.stringify(r3).includes(apiKey), false);
 });
 
-test("Codex API key configuration dispatches connect.add for openai_codex and strips extra fields", async (t) => {
+test("Codex API key configuration requires the dedicated Codex configuration receipt", async (t) => {
   const calls = [];
   const apiKey = "sk-test-must-not-escape";
   const daemon = await startFakeOpld({
-    onCall: async (method, params) => { calls.push({ method, params }); return { connection_id: "conn-codex" }; }
+    onCall: async (method, params) => { calls.push({ method, params }); return calls.length === 1 ? { ok: true } : { connection_id: "conn-codex" }; }
   });
   const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
   t.after(async () => { await bridge.close(); await daemon.close(); });
@@ -139,10 +149,13 @@ test("Codex API key configuration dispatches connect.add for openai_codex and st
   const result = await bridge.codexApiKeyConfiguration({ apiKey: ` ${apiKey} ` });
   assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
   assert.deepEqual(calls, [{
-    method: "connect.add",
-    params: { provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }
+    method: "connect.configureCodexApiKey",
+    params: { api_key: apiKey }
   }]);
   assert.equal(JSON.stringify(result).includes(apiKey), false);
+  assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey }), {
+    ok: false, errorCode: "codex_configuration_failed", stateRefreshRequired: false
+  });
 });
 
 test("Gateway account login maps every framework reason code and RPC/network code cleanly", async (t) => {
@@ -180,8 +193,8 @@ test("Gateway account login accepts a password that is a substring of the submit
   let echoPassword = false;
   const daemon = await startFakeOpld({
     onCall: async () => (echoPassword
-      ? { gateway_account: { status: "connected", account: { email } }, echo: { password } }
-      : { gateway_account: { status: "connected", account: { email } } })
+      ? { ...signedInGateway(email), echo: { password } }
+      : signedInGateway(email))
   });
   const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
   t.after(async () => { await bridge.close(); await daemon.close(); });
@@ -233,7 +246,7 @@ test("Gateway account login and Codex API key catch JSON-escaped secret echoes a
   assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey }), {
     ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false
   });
-  response = { ok: true, email: "operator-token@example.com" };
+  response = signedInGateway("operator-token@example.com");
   assert.deepEqual(await bridge.gatewayAccountLogin({ email: "operator-token@example.com", password: "operator-token" }), {
     ok: true, stateRefreshRequired: true
   });

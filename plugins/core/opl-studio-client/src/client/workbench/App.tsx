@@ -338,6 +338,7 @@ export function App({
   const [nativeAppUpdate, setNativeAppUpdate] = useState<NativeAppUpdateResult | null>(null);
   const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
+  const [packageUpdateActivation, setPackageUpdateActivation] = useState<"restart" | "reload">();
   const [dshPluginRestartRequired, setDshPluginRestartRequired] = useState(false);
   const [dshPluginReloadReady, setDshPluginReloadReady] = useState(false);
   const [projectedManagedUpdateActions, setProjectedManagedUpdateActions] = useState<ProjectedManagedUpdateAction[]>([]);
@@ -840,6 +841,8 @@ export function App({
         setProjectedManifestInstallAction(readProjectedManifestInstallAction(state));
         setCarrierDiagnostics(state.carrierDiagnostics);
         setMaintenanceStatus(state.managedUpdateMaintenance?.status ?? null);
+        const maintenance = state.managedUpdateMaintenance;
+        if (maintenance) setPackageUpdateActivation(maintenance.packageRestartRequired ? "restart" : maintenance.packageRendererReloadReady ? "reload" : undefined);
         if (typeof state.managedUpdateMaintenance?.dshPluginRestartRequired === "boolean") {
           setDshPluginRestartRequired(state.managedUpdateMaintenance.dshPluginRestartRequired);
         }
@@ -896,7 +899,7 @@ export function App({
     settingsActionReceipt, settingsActionBusyKey, settingsActionFeedback, dockerDiagnostic,
     settingsActionConfirmation, workbenchActionResolver,
     setSettingsActionReceipt, setSettingsActionBusyKey, setSettingsActionFeedback,
-    runSettingsAction, runSettingsActionBatch, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback
+    runSettingsAction, runSettingsActionBatch, confirmSettingsAction, cancelSettingsAction, settingsReceiptFeedback, finishGatewaySetup
   } = useSettingsActions({
     bridge, settings, model, packageOperations, captureManagedUpdateReceipt, loadState, loadInitialize
   });
@@ -1147,29 +1150,7 @@ export function App({
     try {
       const result = await bridge.loginGatewayAccount(credentials);
       if (result.ok) {
-        let nextModel = await loadState(settings.runtimeProfile);
-        if (nextModel?.gatewayAccount && !nextModel.gatewayAccount.managedKey) {
-          const completeSetup = projectedGatewayActionsRef.current.find((action) => action.semantic === "complete_setup");
-          const group = nextModel.gatewayAccount.availableGroups?.find((item) => item.label.trim().toLowerCase() === "codex")
-            ?? nextModel.gatewayAccount.availableGroups?.[0];
-          if (!completeSetup || !group) {
-            setSettingsActionFeedback({
-              tone: "attention",
-              message: settings.locale === "zh" ? "账户已连接，但还需要选择可用组后才能完成本机设置。" : "The account is connected, but a group must be selected to finish device setup."
-            });
-            return false;
-          }
-          const setupReceipt = await bridge.executeAction({
-            actionId: completeSetup.action.id,
-            payload: { group_id: group.id, confirmed: true },
-            dryRun: false
-          });
-          if (setupReceipt.status !== "executed") {
-            setSettingsActionFeedback(settingsReceiptFeedback(setupReceipt, settings.locale === "zh" ? "账户设置" : "Account setup"));
-            return false;
-          }
-          nextModel = await loadState(settings.runtimeProfile);
-        }
+        const nextModel = await finishGatewaySetup();
         await loadInitialize();
         const modelAccessSource = nextModel?.settingsProjection?.codex.modelAccessSource?.trim().toLowerCase() ?? "";
         const needsModelSourceConfirmation = projectedGatewayActionsRef.current.some((action) => action.semantic === "use_for_model_access")
@@ -1188,7 +1169,7 @@ export function App({
       });
       return false;
     } catch (error) {
-      setSettingsActionFeedback({ tone: "attention", message: String(error) });
+      setSettingsActionFeedback({ tone: "attention", message: error instanceof Error ? error.message : String(error) });
       return false;
     } finally {
       setSettingsActionBusyKey(null);
@@ -1556,6 +1537,9 @@ export function App({
     if (method === "host/managed-update" && typeof params.status === "string") {
       setMaintenanceError(typeof params.errorCode === "string" ? params.errorCode : null);
       setMaintenanceStatus(params.status);
+      if (typeof params.packageRestartRequired === "boolean" || typeof params.packageRendererReloadReady === "boolean") {
+        setPackageUpdateActivation(params.packageRestartRequired === true ? "restart" : params.packageRendererReloadReady === true ? "reload" : undefined);
+      }
       if (typeof params.dshPluginRestartRequired === "boolean") {
         setDshPluginRestartRequired(params.dshPluginRestartRequired);
       }
@@ -2809,6 +2793,7 @@ export function App({
     teamBots: { read: bridge.readTeamBots, execute: bridge.executeTeamBot },
     packageActivity: packageActivity(packageOperations.operations, packageOperations.readError && packageOperations.supported),
     openPackageActivity: () => { setApplicationManagementTab('activity'); setPrimaryView('applications'); },
+    packageUpdateActivation,
     pendingUpdateRestart: dshPluginRestartRequired
       || nativeAppUpdate?.state === "downloaded"
       || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")

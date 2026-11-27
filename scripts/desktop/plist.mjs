@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createRequire } from "node:module";
 
 const BINARY_PLIST_MAGIC = "bplist00";
@@ -23,10 +25,9 @@ function loadPlistPackage() {
   }
 }
 
-function parseViaPlutil(input) {
-  const payload = Buffer.isBuffer(input) ? input : Buffer.from(String(input), "utf8");
-  const result = spawnSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", "-"], {
-    input: payload,
+function readViaPlutil(plistPath) {
+  const result = spawnSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", "--", path.resolve(plistPath)], {
+    stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024
   });
@@ -42,7 +43,17 @@ function parseViaPlutil(input) {
 
 export function parsePlistDocument(input) {
   const plistPackage = loadPlistPackage();
-  if (!plistPackage) return parseViaPlutil(input);
+  if (!plistPackage) {
+    // plutil can wait for EOF indefinitely on a child-process stdin pipe.
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "opl-studio-plist-"));
+    try {
+      const inputPath = path.join(tempDir, "input.plist");
+      writeFileSync(inputPath, Buffer.isBuffer(input) ? input : String(input));
+      return readViaPlutil(inputPath);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
   if (Buffer.isBuffer(input)) {
     if (input.subarray(0, BINARY_PLIST_MAGIC.length).toString("ascii") === BINARY_PLIST_MAGIC) {
       return plistPackage.parseBinary(input);
@@ -53,6 +64,7 @@ export function parsePlistDocument(input) {
 }
 
 export function readPlistFile(plistPath) {
+  if (!loadPlistPackage()) return readViaPlutil(plistPath);
   return parsePlistDocument(readFileSync(plistPath));
 }
 

@@ -279,6 +279,7 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
   let observations = 0;
   let unloading = 0;
   let bootstrapFailures = 0;
+  const plist = { Label: label, RunAtLoad: true, KeepAlive: true, ProgramArguments: ["temporal", "server", "start-dev", "--db-filename", databasePath] };
   const hooks = {
     home, uid: 501,
     opl(args) {
@@ -292,6 +293,7 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
     },
     command(executable, args) {
       calls.push([executable, ...args]);
+      if (executable === "/usr/bin/plutil") return { args, status: 0, stdout: JSON.stringify(plist) };
       if (args[0] === "bootout") unloading = 2;
       if (args[0] === "print" || args[0] === "-0") return { args, status: unloading > 0 ? (--unloading, 0) : 3 };
       if (args[0] === "bootstrap" && bootstrapFailures++ === 0) return { args, status: 5, stderr: "Bootstrap failed: 5" };
@@ -299,7 +301,6 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
       return { args, status: 0, signal: null, stdout: "", stderr: "" };
     },
     sleep: async () => {},
-    readPlist: () => ({ Label: label, RunAtLoad: true, KeepAlive: true, ProgramArguments: ["temporal", "server", "start-dev", "--db-filename", databasePath] }),
     database: async () => ({ identity: "1:42", size: 4096, valid: true }),
   };
   // Exercise the serialized guest entry, so no module-local helper is available.
@@ -307,6 +308,8 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
   const proof = await collect({ runtime: "/packaged runtime", hooks });
   assert.equal(proof.status, "passed");
   assert.equal(proof.start_action.action_id, "provider_service_start");
+  assert.ok(calls.some(([executable, ...args]) => executable === "/usr/bin/plutil"
+    && JSON.stringify(args) === JSON.stringify(["-convert", "json", "-o", "-", `${home}/Library/LaunchAgents/${label}.plist`])));
   assert.deepEqual([proof.initial_readback, proof.keep_alive_recovery.readback, proof.restart_readback, proof.session_reload.readback].map(x => x.supervisor.pid), [101, 102, 103, 104]);
   assert.ok(calls.some(x => x[0] === "/bin/kill" && x[2] === "101"));
   assert.ok(calls.some(x => x[1] === "bootout" && x[2] === `gui/501/${label}`));
@@ -314,8 +317,8 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
   assert.deepEqual(proof.session_reload.bootstrap_attempts.map(x => x.status), [5, 0]);
   await assert.rejects(collect({ runtime: "/runtime", hooks: { ...hooks,
     database: async () => ({ identity: ++observations === 1 ? "1:42" : "1:43", valid: true }) } }), /replaced its persistent database/);
-  await assert.rejects(collect({ runtime: "/runtime", hooks: { ...hooks,
-    readPlist: () => ({ Label: label, RunAtLoad: true, KeepAlive: false }) } }), /launchd configuration/);
+  plist.KeepAlive = false;
+  await assert.rejects(collect({ runtime: "/runtime", hooks }), /launchd configuration/);
 });
 
 function gatewayRecoveryFixture({ first = {}, reconciledSource = "missing", ready = true } = {}) {

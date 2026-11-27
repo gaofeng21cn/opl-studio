@@ -11,6 +11,7 @@ import type {
 } from "@gaofeng21cn/opl-host-contracts";
 import { OPL_STUDIO_SHELL_SERVICE } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
+import { readWorkItemRuntimeProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel-primitives";
 import { createStudioShellStore } from "../../plugins/core/opl-studio-client/src/client/composition/studioShellStore";
 import { runtimeStatusClientPlugin } from "../../plugins/extensions/opl-runtime-status/src/client/plugin";
 import { RuntimeStatusPanel, RuntimeStatusSlotPanel } from "../../plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel";
@@ -318,9 +319,7 @@ test("ArchiveConfirmDialog uses native <dialog>, sends payload.confirmed + expec
         autoRefresh={false}
         onRefresh={async () => {
           refreshCount += 1;
-          if (!conflictMode) {
-            projection = buildProjection([{ ...item, archived: true, visibilityGeneration: 8 }]);
-          }
+          projection = buildProjection([{ ...item, archived: executedRequests.length > 1, visibilityGeneration: 7 + executedRequests.length }]);
           setTick((v) => v + 1);
           return { workItemRuntime: projection };
         }}
@@ -417,8 +416,91 @@ test("ArchiveConfirmDialog uses native <dialog>, sends payload.confirmed + expec
     retryConfirmBtn?.click();
   });
 
+  expect(executedRequests[1]?.payload?.expected_generation).toBe(8);
   expect(refreshCount).toBe(2);
   expect(document.body.textContent).toContain("已归档「Study 1」");
+});
+
+test("archive confirmation requires a unique matching owner row, including visibility", async () => {
+  const item = buildWorkItem();
+  const readbacks = [
+    undefined,
+    buildProjection([]),
+    buildProjection([{ ...item, archived: true, agentId: "other" }]),
+    buildProjection([{ ...item, archived: true }, { ...item, archived: false }]),
+    buildProjection([{ ...item, archived: false }]),
+  ];
+  let actions = 0;
+  let refreshes = 0;
+  await act(async () => {
+    root.render(<RuntimeStatusPanel locale="en" projection={buildProjection([item])} stateStatus="ready"
+      snapshotSource="live" autoRefresh={false} onOpenMaintenance={() => {}}
+      onRefresh={async () => readbacks[refreshes++]}
+      onExecuteAction={async (request) => {
+        actions++;
+        return {
+          actionId: request.actionId, dryRun: false, confirmationRequired: false, canExecute: true,
+          receiptKind: "execute", authorityBoundary: "app_bridge_no_domain_authority", requestedMode: "execute",
+          status: "executed", command: "opl", commandArgs: [], exitCode: 0, stdout: "", stderr: "", timedOut: false
+        };
+      }} />);
+  });
+  for (let attempt = 0; attempt < readbacks.length; attempt++) {
+    await act(async () => document.querySelector<HTMLButtonElement>(".runtime-row-inline-actions button")!.click());
+    await act(async () => document.querySelector<HTMLButtonElement>("dialog .runtime-btn-primary")!.click());
+    expect(document.querySelector("dialog[open]")).toBeNull();
+    expect(document.querySelector(".runtime-action-notice")?.textContent).toContain("Refresh");
+    expect(document.body.textContent).not.toContain('Archived "Study 1"');
+    expect(actions).toBe(attempt + 1);
+    expect(refreshes).toBe(actions);
+  }
+});
+
+test("restore reconciles a lost receipt with a single read of the same work item", async () => {
+  const item = buildWorkItem({ archived: true });
+  let actions = 0;
+  let reads = 0;
+  await act(async () => {
+    root.render(<RuntimeStatusPanel locale="en" projection={buildProjection([item])} stateStatus="ready"
+      snapshotSource="live" autoRefresh={false} onOpenMaintenance={() => {}}
+      onRefresh={async () => {
+        reads++;
+        return { workItemRuntime: buildProjection([{ ...item, archived: reads === 1 ? undefined : false }]) };
+      }}
+      onExecuteAction={async () => {
+        actions++;
+        throw new Error("Owner response connection closed");
+      }} />);
+  });
+  const library = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+    .find((button) => button.textContent?.includes("Archive") && button.textContent.includes("(1)"));
+  expect(library).toBeTruthy();
+  await act(async () => library!.click());
+
+  const requestRestore = async () => {
+    await act(async () => document.querySelector<HTMLButtonElement>(".runtime-row-inline-actions button")!.click());
+    await act(async () => document.querySelector<HTMLButtonElement>("dialog .runtime-btn-primary")!.click());
+  };
+  await requestRestore();
+  expect(document.querySelector(".runtime-action-notice")?.textContent).toContain("unconfirmed");
+  expect(actions).toBe(1);
+  expect(reads).toBe(1);
+
+  await requestRestore();
+  expect(document.querySelector(".runtime-action-notice")?.textContent).toContain('Restored "Study 1"');
+  expect(actions).toBe(2);
+  expect(reads).toBe(2);
+});
+
+test("the work-item projection preserves missing and unknown visibility", () => {
+  const identity = { agent_id: "mas", project_id: "dm", work_item_id: "study", work_item_display_name: "Study" };
+  const states = [undefined, "unknown", "visible", "archived"];
+  const result = readWorkItemRuntimeProjection({
+    schema_version: "work-item-projection.v2",
+    items: states.map((state, index) => ({ item_id: String(index), identity, lifecycle: {},
+      ...(state === undefined ? {} : { visibility: { state } }) })),
+  });
+  expect(result?.items.map((item) => item.archived)).toEqual([undefined, undefined, false, true]);
 });
 
 test("Clicking a work item opens local WorkItemDetailDrawer without an active thread and jumps to Materials Space", async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { OplActionReceipt, OplBridge } from "../bridge/oplBridge";
 import { actionReceiptView, type ActionReceiptView } from "./actionReceiptView";
+import { gatewayAccountErrorMessage } from "./settings/gatewayAccountMessages";
 import { dockerDiagnosticFromReceipt } from "./appProjection";
 import { preparePackageOperationRequest } from "./packageOperations";
 import type { SettingsActionFeedback, SettingsDockerDiagnostic } from "./settings/types";
@@ -23,7 +24,7 @@ type SettingsActionDependencies = {
   model: Pick<WorkbenchModel, "managedCompanions">;
   packageOperations: Pick<ReturnType<typeof usePackageOperations>, "accept" | "supported">;
   captureManagedUpdateReceipt(receipt: OplActionReceipt): void;
-  loadState(profile: WorkbenchSettings["runtimeProfile"]): Promise<unknown>;
+  loadState(profile: WorkbenchSettings["runtimeProfile"]): Promise<WorkbenchModel | null>;
   loadInitialize(): Promise<unknown>;
 };
 
@@ -72,6 +73,31 @@ export function useSettingsActions({
       tone: "attention",
       message: receipt.blockedReason || receipt.stderr || (settings.locale === "zh" ? `${label}未完成。` : `${label} did not complete.`)
     };
+  }
+
+  async function finishGatewaySetup() {
+    let latest = await loadState("fast");
+    const account = latest?.gatewayAccount;
+    if (account && !account.managedKey && account.setupActionId) {
+      if (!account.resolvedGroupId) {
+        throw new Error(gatewayAccountErrorMessage("group_selection_required", settings.locale));
+      }
+      const receipt = await bridge.executeAction({
+        actionId: account.setupActionId,
+        payload: { group_id: account.resolvedGroupId, confirmed: true },
+        dryRun: false
+      });
+      if (receipt.status !== "executed") {
+        throw new Error(settingsReceiptFeedback(receipt, settings.locale === "zh" ? "账户设置" : "Account setup").message);
+      }
+      latest = await loadState("fast");
+      if (latest?.gatewayAccount?.managedKey) return latest;
+    } else if (account?.managedKey) {
+      return latest;
+    }
+    throw new Error(settings.locale === "zh"
+      ? "尚未确认账户设置，请刷新账户状态。"
+      : "Account setup could not be confirmed. Refresh the account status.");
   }
 
   function advanceBatchQueue() {
@@ -164,7 +190,11 @@ export function useSettingsActions({
           // for this check and does not require a second full App-state read.
         } else {
           const profile = model.managedCompanions.some((companion) => companion.actions.some((action) => action.actionId === request.actionId)) ? "full" : settings.runtimeProfile;
-          stateReadFailed = await loadState(profile) === null;
+          if (request.actionId === "gateway_account_refresh") {
+            await finishGatewaySetup();
+          } else {
+            stateReadFailed = await loadState(profile) === null;
+          }
         }
         if (initializationActionIds.has(request.actionId)) await loadInitialize();
       }
@@ -180,7 +210,7 @@ export function useSettingsActions({
           : `Diagnostics completed${diagnostic.attentionCount ? ` with ${diagnostic.attentionCount} item(s) requiring attention` : " with no items requiring attention"}.`
       } : settingsReceiptFeedback(receipt, request.label));
     } catch (error) {
-      setSettingsActionFeedback({ tone: "attention", message: String(error) });
+      setSettingsActionFeedback({ tone: "attention", message: error instanceof Error ? error.message : String(error) });
       settleWorkbenchAction(request.key, { status: "failed", error: String(error) });
     } finally {
       setSettingsActionBusyKey(null);
@@ -235,6 +265,7 @@ export function useSettingsActions({
   }
 
   return {
+    finishGatewaySetup,
     settingsActionReceipt, settingsActionBusyKey, settingsActionFeedback, dockerDiagnostic,
     settingsActionConfirmation, workbenchActionResolver,
     setSettingsActionReceipt, setSettingsActionBusyKey, setSettingsActionFeedback,

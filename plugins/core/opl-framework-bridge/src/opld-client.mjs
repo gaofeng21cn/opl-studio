@@ -1,4 +1,9 @@
 import { spawn } from "node:child_process"; import { EventEmitter } from "node:events"; import fs from "node:fs"; import net from "node:net"; import os from "node:os"; import path from "node:path";
+// A lost response does not tell us whether the daemon committed the request.
+const replayableReads = new Set([
+  "daemon.health", "daemon.info", "daemon.doctor", "app.state.get", "app.initialize.get",
+  "app.domainDetail.get", "ledger.timeline", "runway.task.list", "pack.list", "pack.inspect", "connect.list",
+]);
 export class OpldRpcError extends Error {
   constructor(message, { rpcCode = -32000, code = "rpc_error", data } = {}) { super(message); Object.assign(this, { name: "OpldRpcError", rpcCode, code, data }); }
 }
@@ -10,7 +15,7 @@ export function resolveOplStatePaths(env = process.env, explicitStateDir) {
     : process.platform === "win32" ? path.join(env.LOCALAPPDATA?.trim() || path.join(home, "AppData", "Local"), "OPL", "state")
     : path.join(env.XDG_STATE_HOME?.trim() || path.join(home, ".local", "state"), "opl");
   const runDir = path.join(stateDir, "run");
-  return { stateDir, runDir, logsDir: path.join(stateDir, "logs"), sessionFile: path.join(runDir, "opld.session.json"), fallbackSessionFile: path.join(home, ".opl", "run", "opld.session.json"), hasExplicitStateDir: Boolean(explicit || envState) };
+  return { stateDir, runDir, logsDir: path.join(stateDir, "logs"), sessionFile: path.join(runDir, "opld.session.json"), fallbackSessionFile: path.join(home, ".opl", "run", "opld.session.json"), hasExplicitStateDir: Boolean(explicit || envState || envData) };
 }
 
 function isExecutable(file) { try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; } }
@@ -181,7 +186,7 @@ export class OpldClient extends EventEmitter {
       await this.connect();
       try { return await this.#sendRaw(this.#socket, method, params, timeoutMs); }
       catch (err) {
-        if (attempt > 0 || err?.code !== "connection_closed" || this.#closed || this.#fatalError || !this.autoStart || method === "daemon.shutdown" || method === "daemon.handshake") throw err;
+        if (attempt > 0 || err?.code !== "connection_closed" || this.#closed || this.#fatalError || !this.autoStart || !replayableReads.has(method)) throw err;
         this.#socket?.destroy(); this.#socket = null; this.connected = false;
       }
     }

@@ -394,3 +394,83 @@ test("background maintenance marks reload_ready when only client DSH plugins ref
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("a partially applied Framework batch preserves its app restart until a cold start", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opl-maintenance-framework-restart-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let applyNeeded = true;
+  const options = {
+    stateFile: path.join(root, "state.json"),
+    opl: { runManagedUpdate: async (operation) => {
+      if (operation === "plan") return { managed_update: { components: applyNeeded ? [component("opl_packages")] : [] } };
+      if (operation === "apply") {
+        applyNeeded = false;
+        return { managed_update: {
+          execution: { status: "partial_failure" },
+          components: [{ component_id: "opl_packages", receipt: { reload_guidance: { reload_mode: "restart_required", restart_required: true } } }]
+        } };
+      }
+      return {};
+    } },
+    codex: { transport: new CodexAppServerTransport(), reloadConfiguration: () => assert.fail("restart needs the whole App") },
+    schedule: () => 1, unschedule: () => {}
+  };
+  const initial = createManagedUpdateMaintenance(options);
+  const partial = await initial.runNow();
+  assert.equal(partial.status, "failed");
+  assert.equal(partial.errorCode, "managed_update_incomplete");
+  assert.equal(partial.packageRestartRequired, true);
+  assert.equal(partial.dshPluginRestartRequired, false);
+  assert.equal((await initial.runNow()).packageRestartRequired, true);
+  await initial.close();
+  const relaunched = createManagedUpdateMaintenance(options);
+  await relaunched.start();
+  assert.equal(relaunched.snapshot().packageRestartRequired, false);
+  await relaunched.close();
+});
+
+test("an older Framework without update plans cannot block DSH package maintenance", async () => {
+  const maintenance = createManagedUpdateMaintenance({
+    opl: { runManagedUpdate: async () => { throw Object.assign(new Error("Unknown method"), { code: "METHOD_NOT_FOUND" }); } },
+    codex: { transport: new CodexAppServerTransport() },
+    syncDshPlugins: async () => ({ installed: { "test-plugin": "1.1.0" }, application: "restart-required" }),
+    now: () => 100
+  });
+  const result = await maintenance.runNow();
+  assert.equal(result.status, "failed");
+  assert.equal(result.errorCode, "METHOD_NOT_FOUND");
+  assert.equal(result.nextAttemptAt, 100 + 30 * 60_000);
+  assert.equal(result.dshPluginRestartRequired, true);
+  assert.equal(result.dshPluginUpdateStatus, "restart_required");
+  assert.deepEqual(result.updatedDshPlugins, { "test-plugin": "1.1.0" });
+  await maintenance.close();
+});
+
+test("a renderer reload acknowledges the loaded Framework and DSH updates while newer updates stay pending", async () => {
+  let dshUpdated = true;
+  const maintenance = createManagedUpdateMaintenance({
+    opl: { runManagedUpdate: async (operation) => {
+      if (operation === "plan") return { managed_update: { components: [component("opl_packages")] } };
+      if (operation === "apply") return { managed_update: {
+        execution: { status: "completed" },
+        components: [{ component_id: "opl_packages", receipt: { reload_guidance: { reload_mode: "renderer_reload", reload_recommended: true } } }]
+      } };
+      return {};
+    } },
+    codex: { transport: new CodexAppServerTransport(), reloadConfiguration: () => assert.fail("renderer reload needs the client") },
+    syncDshPlugins: async () => dshUpdated
+      ? { installed: { "test-plugin": "1.1.0" }, reloadMode: "renderer_reload" } : {}
+  });
+  const snapshot = await maintenance.runNow();
+  assert.equal(snapshot.packageRendererReloadReady, true);
+  assert.equal(snapshot.dshPluginReloadReady, true);
+  const loaded = maintenance.captureRendererUpdateAcknowledgement();
+  dshUpdated = false;
+  await maintenance.runNow();
+  loaded();
+  assert.equal(maintenance.snapshot().packageRendererReloadReady, true);
+  assert.equal(maintenance.snapshot().dshPluginReloadReady, false);
+  maintenance.captureRendererUpdateAcknowledgement()();
+  assert.equal(maintenance.snapshot().packageRendererReloadReady, false);
+  await maintenance.close();
+});

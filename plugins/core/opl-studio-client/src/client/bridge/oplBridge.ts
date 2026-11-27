@@ -3,7 +3,6 @@ import { OPL_COMMANDS, CODEX_APP_SERVER } from "./oplBridge-commands";
 import { asRecord, asString } from "@gaofeng21cn/opl-host-contracts/bridge-primitives";
 import {
   defaultFullDrilldown,
-  defaultStateReadback,
   normalizeProfile,
   normalizeFullDrilldownReadback,
   normalizeInitializeReadback,
@@ -71,22 +70,13 @@ export function createBrowserBridge(): OplBridge {
     },
     readState(profile = readRuntimeProfile()) {
       const normalizedProfile = normalizeProfile(profile);
-      const promise = candidate?.readState?.(normalizedProfile) ?? Promise.resolve(defaultStateReadback(normalizedProfile));
+      if (!candidate?.readState) return Promise.reject(new Error("opl_state_read_failed"));
+      const promise = candidate.readState(normalizedProfile);
       return Promise.resolve(promise).then((value) => normalizeStateReadback(value, normalizedProfile));
     },
     readInitialize() {
-      const promise = candidate?.readInitialize?.() ?? Promise.resolve({
-        system_initialize: { setup_flow: { is_first_run: false, ready_to_launch: true } },
-        readback: {
-          command: "opl system initialize --json",
-          commandArgs: ["system", "initialize", "--json"],
-          exitCode: 0,
-          stdout: "",
-          stderr: "",
-          timedOut: false
-        }
-      });
-      return Promise.resolve(promise).then(normalizeInitializeReadback);
+      if (!candidate?.readInitialize) return Promise.reject(new Error("OPL initialization is unavailable in this host"));
+      return Promise.resolve(candidate.readInitialize()).then(normalizeInitializeReadback);
     },
     readFullDrilldown() {
       const promise = candidate?.readFullDrilldown?.() ?? Promise.resolve(defaultFullDrilldown());

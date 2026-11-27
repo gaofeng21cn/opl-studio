@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { CodexAppServerTransport, threadPermissionOverrides, turnPermissionOverrides } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 import { ChannelBindingStore } from "@gaofeng21cn/opl-host-kit/channel-bindings";
@@ -11,7 +11,7 @@ import { OplHostCore } from "../../plugins/core/opl-host-core/src/service.mjs";
 import { createOplHostCore as createHostCore } from "./create-host.mjs";
 import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.mjs";
 import { OplFrameworkBridge, resolveOplStatePaths } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
-import { resolveDaemonBinary } from "../../plugins/core/opl-framework-bridge/src/opld-client.mjs";
+import { OpldClient, resolveDaemonBinary } from "../../plugins/core/opl-framework-bridge/src/opld-client.mjs";
 import { McpAppHost } from "../../plugins/core/opl-mcp-apps/src/service.mjs";
 
 const fixture = new URL("./fixtures/fake-app-server.mjs", import.meta.url).pathname;
@@ -106,6 +106,7 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
   const directory = await mkdtemp(path.join(os.tmpdir(), "opl-host-runtime-env-test-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const connectCalls = [];
+  const loginCalls = [];
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
       if (method === "app.state.get") {
@@ -125,6 +126,15 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
             }
           }
         };
+      }
+      if (method === "connect.configureCodexApiKey") {
+        assert.deepEqual(params, { api_key: "sk-test" });
+        connectCalls.push({ method });
+        return { ok: true };
+      }
+      if (method === "connect.gateway.login") {
+        loginCalls.push(params);
+        return { gateway_account: { surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", status: "connected", account: { email: params.email, status: "active" } } };
       }
       if (method === "connect.add") {
         connectCalls.push(params);
@@ -170,7 +180,8 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
   assert.deepEqual(await core.invoke("configureCodexApiKey", {
     apiKey: "sk-test"
   }), { ok: true, stateRefreshRequired: true });
-  assert.deepEqual(connectCalls.map((c) => c.provider_type), ["opl_gateway", "openai_codex"]);
+  assert.deepEqual(loginCalls, [{ email: "user@example.com", password: "secret" }]);
+  assert.deepEqual(connectCalls, [{ method: "connect.configureCodexApiKey" }]);
   assert.equal(reloadCount, 1);
 });
 
@@ -545,6 +556,33 @@ test("OpldClient binary and state path resolution honor explicit, env, and sibli
   assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_STATE_DIR: "/s", OPL_DATA_DIR: "/d" }, "/e").stateDir, path.resolve("/e"));
   assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_STATE_DIR: "/s", OPL_DATA_DIR: "/d" }).stateDir, path.resolve("/s"));
   assert.equal(resolveOplStatePaths({ HOME: "/h", OPL_DATA_DIR: "/d" }).stateDir, path.join(path.resolve("/d"), "opl", "state"));
+});
+
+test("an explicit data directory isolates the bridge from a running legacy home session", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opl-data-session-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const legacy = await startFakeOpld({ onCall: () => ({ instance: "legacy" }) });
+  t.after(() => legacy.close());
+  const homeRun = path.join(directory, ".opl", "run");
+  await mkdir(homeRun, { recursive: true });
+  await copyFile(legacy.sessionFile, path.join(homeRun, "opld.session.json"));
+
+  const regular = new OpldClient({ env: { HOME: directory }, autoStart: false });
+  t.after(() => regular.close());
+  assert.deepEqual(await regular.call("daemon.info"), { instance: "legacy" });
+
+  const isolated = new OpldClient({
+    env: { HOME: directory, OPL_DATA_DIR: path.join(directory, "data") },
+    autoStart: false,
+  });
+  t.after(() => isolated.close());
+  await assert.rejects(isolated.call("daemon.info"), { code: "daemon_unavailable" });
+
+  const selected = await startFakeOpld({ onCall: () => ({ instance: "selected" }) });
+  t.after(() => selected.close());
+  await mkdir(isolated.paths.runDir, { recursive: true });
+  await copyFile(selected.sessionFile, isolated.paths.sessionFile);
+  assert.deepEqual(await isolated.call("daemon.info"), { instance: "selected" });
 });
 
 test("OplFrameworkBridge connects studioWeixin, merges appStatePatch, routes opl-channel-weixin, and preserves disabled ownership", async (t) => {

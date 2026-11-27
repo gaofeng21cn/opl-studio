@@ -28,7 +28,32 @@ import {
   useHighestSupportedReasoningForUnknown: true
 };
 
-const { normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
+const { createBrowserBridge, normalizeContributionReadback, normalizeStateReadback, readStartupState } = await import("../../plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts");
+
+test("a real empty Framework snapshot only exposes owner-projected actions and packages", async () => {
+  const { deriveWorkbenchModelFromState } = await import("../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
+  for (const appState of [
+    { packages: [], tasks: [] },
+    { agent_packages: { directory: { entries: [] } }, actions: [], modules: { items: [{ module_id: "retired" }] } }
+  ]) {
+    const readback = normalizeStateReadback({ app_state: appState }, "fast");
+    const model = deriveWorkbenchModelFromState(readback);
+    expect(readback.app_state.actions).toEqual([]);
+    expect(readback.app_state.active_project_lines).toEqual([]);
+    expect(model.contextActions).toEqual([]);
+    expect(model.packageLifecycle).toEqual([]);
+    expect(model.sessions).toEqual([]);
+  }
+});
+
+test("unavailable state and initialization owners do not produce successful readbacks", async () => {
+  const bridge = createBrowserBridge();
+  await expect(bridge.readState("fast")).rejects.toThrow("opl_state_read_failed");
+  await expect(bridge.readInitialize()).rejects.toThrow("unavailable");
+  for (const receipt of [undefined, { readback: { exitCode: 0 } }, { exitCode: 0, stdout: "invalid JSON" }]) {
+    expect(() => normalizeStateReadback(receipt, "fast")).toThrow("opl_state_read_failed");
+  }
+});
 
 test("startup recovers a failed owner read into the real contribution projection", async () => {
   let attempts = 0;

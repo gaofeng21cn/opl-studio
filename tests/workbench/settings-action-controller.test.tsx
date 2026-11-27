@@ -1,6 +1,7 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel";
 import { useSettingsActions } from "../../plugins/core/opl-studio-client/src/client/workbench/useSettingsActions";
 
 let browser: Window;
@@ -27,7 +28,7 @@ beforeEach(async () => {
     settings: { locale: "en", runtimeProfile: "fast" }, model: { managedCompanions: [] },
     packageOperations: { supported: false, accept: () => false },
     captureManagedUpdateReceipt: () => { calls.push("capture"); },
-    loadState: async profile => { calls.push(["state", profile]); return {}; },
+    loadState: async profile => { calls.push(["state", profile]); return deriveWorkbenchModelFromState({}); },
     loadInitialize: async () => { calls.push("initialize"); return {}; }
   };
 });
@@ -75,4 +76,57 @@ test("an executed action with failed fresh readback reports attention and settle
   expect(controller.settingsActionFeedback?.tone).toBe("attention");
   expect(controller.settingsActionFeedback?.message).toContain("do not submit it again");
   expect((settled[0] as any).status).toBe("executed");
+});
+
+
+test("Gateway login and manual refresh only finish setup with a group resolved by the owner", async () => {
+  const first = { group_id: "team", label: "Research" };
+  const code = { group_id: "models", label: "Team Codex Premium" };
+  const setup = "gateway_account_complete_setup";
+  function pending(groups: typeof first[], resolution: { resolved_group_id?: string | null }, hasKey = false) {
+    return deriveWorkbenchModelFromState({ app_state: {
+      actions: [{ action_id: setup, payload_fields: ["group_id"] }],
+      settings_control_center: { app_settings_read_model: { opl_gateway_account: {
+        surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", account_card_visible: true,
+        account: { display_name: "OPL User" }, status: hasKey ? "connected" : "setup_required",
+        managed_key: hasKey ? { name: "Test key", status: "active" } : null,
+        available_groups: groups, ...resolution, actions: { complete_setup: setup }
+      } } }
+    } });
+  }
+  const ready = pending([first, code], { resolved_group_id: code.group_id }, true);
+  let model = pending([first, code], { resolved_group_id: null });
+  dependencies.loadState = async () => model;
+  await mount();
+  // Login has no authority to re-interpret the labels or arbitrarily choose the first group.
+  await expect(controller.finishGatewaySetup()).rejects.toThrow("Check the available groups");
+  expect(calls).toEqual([]);
+  // Earlier Framework projections omit the resolved ID. Duplicates remain ambiguous.
+  model = pending([code, { ...first, label: "Codex Test" }], {});
+  await expect(controller.finishGatewaySetup()).rejects.toThrow("Check the available groups");
+  expect(calls).toEqual([]);
+  expect(pending([first, code], {}).gatewayAccount?.resolvedGroupId).toBe(code.group_id);
+  expect(pending([first], {}).gatewayAccount?.resolvedGroupId).toBe(first.group_id);
+  expect(pending([first, code], { resolved_group_id: "removed" }).gatewayAccount?.resolvedGroupId).toBeUndefined();
+
+  model = pending([first, code], { resolved_group_id: code.group_id });
+  const reads: string[] = [];
+  dependencies.loadState = async profile => {
+    reads.push(profile);
+    return reads.length === 1 ? model : ready;
+  };
+  await mount();
+  await act(async () => controller.runSettingsAction({
+    key: "gateway:refresh", actionId: "gateway_account_refresh", label: "Refresh",
+    payload: {}, confirmationRequired: false
+  }));
+  expect(calls).toEqual([
+    { actionId: "gateway_account_refresh", payload: { confirmed: true }, dryRun: false },
+    "capture",
+    { actionId: setup, payload: { group_id: "models", confirmed: true }, dryRun: false }
+  ]);
+  expect(reads).toEqual(["fast", "fast"]);
+  expect(controller.settingsActionFeedback?.tone).toBe("success");
+  await controller.finishGatewaySetup();
+  expect(calls).toHaveLength(3);
 });

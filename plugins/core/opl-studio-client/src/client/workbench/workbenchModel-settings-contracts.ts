@@ -22,6 +22,8 @@ export type WorkbenchGatewayAccount = {
     name?: string;
     status?: string;
   };
+  resolvedGroupId?: string;
+  setupActionId?: string;
   availableGroups?: Array<{
     id: string;
     label: string;

@@ -91,6 +91,8 @@ export function buildStableSummary(options, receipt, error = null) {
     settings_smoke: { status: smoke?.status === "passed" ? "passed" : "failed", evidence: "artifacts/smoke-summary.json", runtime_refresh: smoke?.checks?.runtimeRefresh ?? null },
     distribution: distribution ?? null,
     generation_requested: false,
+    ...(receipt?.checks?.framework?.apiVersion ? { framework_api_version: receipt.checks.framework.apiVersion } : {}),
+    ...(receipt?.checks?.framework_daemon_proof ? { framework_daemon_proof: receipt.checks.framework_daemon_proof } : {}),
     temporal_service_supervisor_proof: receipt?.checks?.temporal_service_supervisor_proof ?? null,
     failure: passed ? null : { stage: "studio_clean_vm", message: error?.message ?? receipt?.checks?.failure?.detail ?? "Studio clean VM checks did not pass" },
     studio_qualification: "studio-clean-vm-qualification.json"
