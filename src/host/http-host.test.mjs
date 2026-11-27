@@ -677,12 +677,14 @@ test("trusted path entry keeps renderer boot, login, session and SSE in the same
   t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
   const prefix = "/w/workspace_0123456789abcdef0123456789abcdef";
   const headers = { "x-forwarded-prefix": prefix };
-  const redirect = await fetch(`${host.url}/settings`, { headers, redirect: "manual" });
-  assert.equal(redirect.status, 302);
-  assert.equal(redirect.headers.get("location"), `${prefix}/login`);
+  for (const entry of ["/settings", "/guid", "/first-run"]) {
+    const redirect = await fetch(`${host.url}${entry}`, { headers, redirect: "manual" });
+    assert.equal(redirect.status, 302);
+    assert.equal(redirect.headers.get("location"), `${prefix}/login`);
+  }
   const loginPage = await (await fetch(`${host.url}/login`, { headers })).text();
   assert.ok(loginPage.includes("fetch('./api/auth/login'"));
-  assert.ok(loginPage.includes("location.replace('./')"));
+  assert.ok(loginPage.includes("location.replace('./?postLoginSetupCheck=1')"));
   const login = await fetch(`${host.url}/api/auth/login`, {
     method: "POST", headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify({ username: "opl", password: "cloud-password" })
@@ -699,6 +701,17 @@ test("trusted path entry keeps renderer boot, login, session and SSE in the same
   const encodedIndex = await (await fetch(`${host.url}/%69ndex.html`, { headers: authenticated })).text();
   assert.ok(encodedIndex.includes(`<base href="${prefix}/">`));
   assert.equal(html.match(/__DSH_BOOT_READY__.*resolve/g)?.length, 1);
+  for (const entry of ["/guid", "/first-run"]) {
+    const page = await fetch(`${host.url}${entry}`, { headers: authenticated, redirect: "manual" });
+    assert.equal(page.status, 200, entry);
+    const pageHtml = await page.text();
+    assert.ok(pageHtml.includes(`<base href="${prefix}/">`));
+    assert.ok(pageHtml.includes("__DSH_BOOT_READY__"));
+    const head = await fetch(`${host.url}${entry}`, { method: "HEAD", headers: authenticated });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), "");
+  }
+  assert.equal((await fetch(`${host.url}/missing.js`, { headers: authenticated })).status, 404);
   const base = new URL(prefix + "/", host.url);
   assert.equal(new URL("./renderer.js", base).pathname, `${prefix}/renderer.js`);
   assert.equal(await (await fetch(`${host.url}/renderer.js`, { headers: authenticated })).text(), 'globalThis.rendererLoaded = true;');

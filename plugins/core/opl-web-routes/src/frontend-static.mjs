@@ -41,8 +41,15 @@ export async function registerOplFrontend(ctx, { webAuth, webRoot, webHost = "12
           // reader must explicitly use the page scope owned by this adapter.
           if (peer !== undefined && peer !== browserPeer) return new Response(null, { status: 403 });
           if (peer === undefined && !admission(request).ok) return redirect(request);
+          // These product entry points use the same upstream-rendered index.
+          // Keep navigation at the original URL so the client sees the intent.
+          const url = new URL(request.url);
+          if (url.pathname === "/guid" || url.pathname === "/first-run") {
+            url.pathname = "/";
+            request = new Request(url, { method: request.method, headers: request.headers, signal: request.signal });
+          }
           const response = await resource(request, browserPeer);
-          const pathname = decodeURIComponent(new URL(request.url).pathname);
+          const pathname = decodeURIComponent(url.pathname);
           const target = path.resolve(path.normalize(path.join(distRoot, pathname)));
           if (request.method === "HEAD" || response.status !== 200 || (target !== distRoot && target !== distIndex)) {
             return response;
