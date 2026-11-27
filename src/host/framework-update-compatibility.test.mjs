@@ -74,7 +74,7 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
       if (method === "pack.updateAll") {
         if (failApply) return { __rpcError: { code: -32003, message: "Trusted host required", data: { code: "TRUSTED_HOST_REQUIRED" } } };
         if (legacy) return { batch_id: "batch-1", results: [] };
-        assert.deepEqual(params, {});
+        assert.deepEqual(params, { background: true });
         return { batch_id: "batch-1", managed_update: { components: [], execution: { status: "partial_failure" } } };
       }
       if (method === "daemon.health") return { ok: true };

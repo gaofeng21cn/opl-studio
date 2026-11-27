@@ -80,7 +80,9 @@ export function createOplPassthrough(options = {}) {
       if (!["check", "plan", "apply", "status", "activate"].includes(operation)) throw errReq(`Unsupported managed update operation: ${operation}`);
       if (["apply", "activate"].includes(operation) && readOnly()) throw errReq("Managed update is blocked in read-only mode", "blocked_read_only");
       if (operation === "activate") return { runtime_activation: { status: "active" }, health: await client.call("daemon.health", {}) };
-      const result = await client.call(operation === "apply" ? "pack.updateAll" : "pack.updatePlan", {});
+      const result = operation === "apply"
+        ? await client.call("pack.updateAll", { background: true })
+        : await client.call("pack.updatePlan", {});
       if (!Array.isArray(result?.managed_update?.components) || !result.managed_update.execution?.status) {
         throw errReq("Framework does not provide managed Package update results", "base_upgrade_required");
       }
