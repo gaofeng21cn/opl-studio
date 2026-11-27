@@ -15,7 +15,7 @@ export function resolveOplStatePaths(env = process.env, explicitStateDir) {
     : process.platform === "win32" ? path.join(env.LOCALAPPDATA?.trim() || path.join(home, "AppData", "Local"), "OPL", "state")
     : path.join(env.XDG_STATE_HOME?.trim() || path.join(home, ".local", "state"), "opl");
   const runDir = path.join(stateDir, "run");
-  return { stateDir, runDir, logsDir: path.join(stateDir, "logs"), sessionFile: path.join(runDir, "opld.session.json"), fallbackSessionFile: path.join(home, ".opl", "run", "opld.session.json"), hasExplicitStateDir: Boolean(explicit || envState) };
+  return { stateDir, runDir, logsDir: path.join(stateDir, "logs"), sessionFile: path.join(runDir, "opld.session.json"), fallbackSessionFile: path.join(home, ".opl", "run", "opld.session.json"), hasExplicitStateDir: Boolean(explicit || envState || envData) };
 }
 
 function isExecutable(file) { try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; } }
