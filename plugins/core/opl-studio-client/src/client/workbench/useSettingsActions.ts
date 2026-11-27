@@ -22,7 +22,7 @@ type SettingsActionDependencies = {
   bridge: Pick<OplBridge, "executeAction">;
   settings: Pick<WorkbenchSettings, "locale" | "runtimeProfile">;
   model: Pick<WorkbenchModel, "managedCompanions">;
-  packageOperations: Pick<ReturnType<typeof usePackageOperations>, "accept" | "supported">;
+  packageOperations: Pick<ReturnType<typeof usePackageOperations>, "accept" | "supportsBackground">;
   captureManagedUpdateReceipt(receipt: OplActionReceipt): void;
   loadState(profile: WorkbenchSettings["runtimeProfile"]): Promise<WorkbenchModel | null>;
   loadInitialize(): Promise<unknown>;
@@ -150,7 +150,7 @@ export function useSettingsActions({
     setSettingsActionFeedback(null);
     setSettingsActionReceipt(null);
     try {
-      request = await preparePackageOperationRequest(request, packageOperations.supported, bridge.executeAction);
+      request = await preparePackageOperationRequest(request, packageOperations.supportsBackground, bridge.executeAction);
       if (request.previewOnly) {
         const preview = await bridge.executeAction({ actionId: request.actionId, payload: request.payload, dryRun: true });
         setSettingsActionReceipt(actionReceiptView(preview));

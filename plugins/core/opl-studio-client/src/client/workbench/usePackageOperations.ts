@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OplActionReceipt, OplBridge } from '../bridge/oplBridge';
-import { packageOperationResult, readPackageOperation, type PackageOperation } from './packageOperations';
+import { packageOperationResult, readPackageOperation, supportsBackgroundPackages, type PackageOperation } from './packageOperations';
 
 export function usePackageOperations(bridge: OplBridge, onCompleted: () => void, visible = true) {
   const [operations, setOperations] = useState<PackageOperation[]>([]);
   const [readError, setReadError] = useState(false);
   const [cancelError, setCancelError] = useState(false);
-  const [supported, setSupported] = useState(false);
+  const [supportsBackground, setSupportsBackground] = useState<boolean>();
   const [revision, setRevision] = useState(0);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const observed = useRef(new Map<string, string>());
@@ -29,7 +29,7 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
           observed.current.set(operation.operation_id, operation.status);
         }
         nextActive = next.some(operation => operation.status === 'running');
-        setOperations(next); setReadError(false); setSupported(true);
+        setOperations(next); setReadError(false); setSupportsBackground(supportsBackgroundPackages(receipt));
       } catch { if (!disposed) setReadError(true); }
       // Discover tasks after reload even when the user starts in a conversation.
       if (!disposed) timer = setTimeout(poll, nextActive ? 1500 : visible ? 15000 : 30000);
@@ -54,5 +54,5 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
     } catch { setCancelError(true); }
     finally { setCancelling(null); }
   };
-  return { operations, readError, cancelError, supported, cancelling, accept, cancel, refresh };
+  return { operations, readError, cancelError, supported: supportsBackground !== undefined, supportsBackground, cancelling, accept, cancel, refresh };
 }

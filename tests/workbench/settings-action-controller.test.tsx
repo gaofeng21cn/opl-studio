@@ -26,7 +26,7 @@ beforeEach(async () => {
       return { actionId: input.actionId, payload: input.payload, status: input.dryRun ? "preview_ready" : "executed", stdoutJson: {}, stderr: "", confirmationId: "confirmation-1", receiptId: "receipt-1" } as any;
     } },
     settings: { locale: "en", runtimeProfile: "fast" }, model: { managedCompanions: [] },
-    packageOperations: { supported: false, accept: () => false },
+    packageOperations: { supportsBackground: undefined, accept: () => false },
     captureManagedUpdateReceipt: () => { calls.push("capture"); },
     loadState: async profile => { calls.push(["state", profile]); return deriveWorkbenchModelFromState({}); },
     loadInitialize: async () => { calls.push("initialize"); return {}; }

@@ -55,8 +55,11 @@ test('only Package lifecycle requests use the background owner and acceptance is
 test('the first install waits for owner capability discovery instead of racing into a blocking download', async () => {
   const request = { key: 'install', label: 'Install', actionId: 'agent_package_install', payload: { package_id: 'mac-media-assets' }, confirmationRequired: true };
   const owner = async () => ({ stdoutJson: { app_action_execution: { result: { operations: [] } } } }) as any;
-  expect((await preparePackageOperationRequest(request, false, owner)).actionId).toBe('package_operation_start');
-  expect((await preparePackageOperationRequest(request, false, async () => ({ status: 'error' }) as any)).actionId).toBe('agent_package_install');
+  const synchronous = async () => ({ stdoutJson: { app_action_execution: { result: { supports_background: false, operations: [operation] } } } }) as any;
+  expect(await preparePackageOperationRequest(request, undefined, synchronous)).toBe(request);
+  expect(await preparePackageOperationRequest(request, false, () => { throw new Error('unexpected probe'); })).toBe(request);
+  expect((await preparePackageOperationRequest(request, undefined, owner)).actionId).toBe('package_operation_start');
+  expect((await preparePackageOperationRequest(request, undefined, async () => ({ status: 'error' }) as any)).actionId).toBe('agent_package_install');
 });
 
 

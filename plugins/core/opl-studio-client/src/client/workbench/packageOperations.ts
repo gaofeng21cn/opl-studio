@@ -90,10 +90,15 @@ export function operationErrorMessage(code: string | undefined, zh: boolean) {
   return zh ? '安装未完成。查看软件源与本机状态后重试，已有下载会复用。' : 'Installation did not complete. Check the source and local status, then retry using the existing download.';
 }
 
-export async function preparePackageOperationRequest(request: SettingsActionRequest, supported: boolean, execute: (request: OplActionRequest) => Promise<OplActionReceipt>) {
+export function supportsBackgroundPackages(status: OplActionReceipt) {
+  const { operations, supports_background } = packageOperationResult(status);
+  return Array.isArray(operations) && supports_background !== false;
+}
+
+export async function preparePackageOperationRequest(request: SettingsActionRequest, supportsBackground: boolean | undefined, execute: (request: OplActionRequest) => Promise<OplActionReceipt>) {
   if (!packageBackgroundActions.has(request.actionId)) return request;
-  if (supported) return packageOperationRequest(request);
+  if (supportsBackground !== undefined) return supportsBackground ? packageOperationRequest(request) : request;
   // The first click must not race the page's initial capability read.
   const status = await execute({ actionId: 'package_operation_status', payload: {}, dryRun: true });
-  return Array.isArray(packageOperationResult(status).operations) ? packageOperationRequest(request) : request;
+  return supportsBackgroundPackages(status) ? packageOperationRequest(request) : request;
 }
