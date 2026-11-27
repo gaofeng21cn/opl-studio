@@ -334,7 +334,7 @@ export type OplBridge = CodexThreadAdapterBridge & McpAppsBridge & {
   requestSettingsSearchLog(request: SettingsSearchLogRequest): Promise<SettingsSearchLogResponse>;
   beginWindowDrag(): void;
   retryDesktopHost(): Promise<void>;
-  readState(profile?: OplStateProfile): Promise<OplStateReadback>;
+  readState(profile?: OplStateProfile, includeSetup?: boolean): Promise<OplStateReadback>;
   readInitialize(): Promise<OplInitializeReadback>;
   readFullDrilldown(): Promise<OplFullDrilldownReadback>;
   readContribution(request: OplContributionReadRequest): Promise<OplContributionReadback>;

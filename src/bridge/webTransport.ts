@@ -217,7 +217,9 @@ export function installWebTransport(): void {
     readTeamBots: () => postJson("/api/teams/read", {}),
     executeTeamBot: request => postJson("/api/teams/action", request),
     beginWindowDrag: () => undefined,
-    readState: (profile = "fast") => requestJson<OplStateReadback>(`/api/opl/state?profile=${encodeURIComponent(profile)}`),
+    readState: (profile = "fast", includeSetup) => requestJson<OplStateReadback>(
+      `/api/opl/state?profile=${encodeURIComponent(profile)}${includeSetup === true ? "&includeSetup=1" : ""}`
+    ),
     readInitialize: () => requestJson("/api/opl/initialize"),
     readFullDrilldown: () => requestJson("/api/opl/drilldown"),
     readDomainDetailView: (request) => postJson("/api/opl/view/read", request),

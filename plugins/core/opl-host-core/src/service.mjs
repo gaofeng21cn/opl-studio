@@ -772,7 +772,7 @@ export class OplHostCore extends EventEmitter {
       case "readTeamBots": return this.hostContext.get("oplTeamBots").read();
       case "executeTeamBot": return this.hostContext.get("oplTeamBots").execute(payload);
       case "readState": {
-        const state = await this.opl.readState(payload.profile ?? "fast");
+        const state = await this.opl.readState(payload.profile ?? "fast", payload.includeSetup === true);
         let carrierDiagnostics;
         try {
           carrierDiagnostics = await this.carrierDiagnostics.read();

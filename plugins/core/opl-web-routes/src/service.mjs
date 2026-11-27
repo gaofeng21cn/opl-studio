@@ -110,7 +110,10 @@ async function dispatchApi(req, res, hostCore) {
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/opl/state") {
-    json(res, 200, await hostCore.invoke("readState", { profile: url.searchParams.get("profile") ?? "fast" }));
+    json(res, 200, await hostCore.invoke("readState", {
+      profile: url.searchParams.get("profile") ?? "fast",
+      includeSetup: url.searchParams.get("includeSetup") === "1"
+    }));
     return;
   }
   if (req.method === "GET" && url.pathname === "/api/opl/initialize") {

@@ -119,6 +119,9 @@ test("WebUI transport resolves API, upload, download, SSE and login against its 
       fetch: async (url: string, init?: RequestInit) => {
         calls.push({ url: String(url), init });
         if (unauthorized) return Response.json({}, { status: 401 });
+        if (url.includes("/opl/state")) {
+          return Response.json({ app_state: url.includes("includeSetup=1") ? { system_initialize: { readiness: { core_ready: false } } } : {} });
+        }
         if (url.includes("/auth/user")) return Response.json({ csrfToken: "test-csrf" });
         if (url.includes("/inputs") && init?.method === "POST" && !url.includes("complete")) return Response.json({ id: "input-1" });
         if (url.includes("/complete")) return Response.json({ inputs: [{ kind: "file", name: "note.txt", path: "/data/note.txt" }] });
@@ -131,7 +134,11 @@ test("WebUI transport resolves API, upload, download, SSE and login against its 
       document.baseURI = `https://workspace.example${prefix}`;
       installWebTransport();
       const surface = window.oplStudio!;
-      await surface.readState("fast");
+      const bridge = root.createBrowserBridge();
+      const ordinary = await bridge.readState("fast");
+      const withSetup = await bridge.readState("fast", true);
+      expect(ordinary.app_state.system_initialize).toBeUndefined();
+      expect(withSetup.app_state.system_initialize).toEqual({ readiness: { core_ready: false } });
       const logResult = await surface.requestSettingsSearchLog({ method: "POST", body: JSON.stringify({ action: "append", lines: ["fixture"] }) });
       expect(logResult.status).toBe(200);
       await surface.listThreads({});
@@ -141,7 +148,9 @@ test("WebUI transport resolves API, upload, download, SSE and login against its 
       await surface.accessThreadWorkspace({ threadId: "thread-1", relativePath: "note.txt", action: "download" });
       const urls = calls.splice(0);
       expect(urls.every(({ url }) => url.startsWith(`https://workspace.example${prefix}api/`))).toBe(true);
-      expect(urls.some(({ url }) => url.endsWith("api/opl/state?profile=fast"))).toBe(true);
+      expect(urls.filter(({ url }) => url.includes("/api/opl/state")).map(({ url }) => new URL(url).search)).toEqual([
+        "?profile=fast", "?profile=fast&includeSetup=1"
+      ]);
       expect(urls.some(({ url }) => url.includes("api/inputs/input-1/files?path=note.txt"))).toBe(true);
       expect(new Headers(urls.find(({ url }) => url.endsWith("/threads/list"))?.init?.headers).get("x-csrf-token")).toBe("test-csrf");
       expect(new Headers(urls.find(({ url }) => url.endsWith("/settings-search-log"))?.init?.headers).get("x-csrf-token")).toBe("test-csrf");

@@ -109,7 +109,7 @@ contextBridge.exposeInMainWorld("oplStudio", {
   requestSettingsSearchLog: request => invoke("requestSettingsSearchLog", request),
   beginWindowDrag: () => invoke("beginWindowDrag"),
   retryDesktopHost: () => invoke("retryDesktopHost"),
-  readState: (profile = "fast") => invoke("readState", { profile }),
+  readState: (profile = "fast", includeSetup) => invoke("readState", { profile, ...(includeSetup === true ? { includeSetup: true } : {}) }),
   readInitialize: () => invoke("readInitialize"),
   readFullDrilldown: () => invoke("readFullDrilldown"),
   readDomainDetailView: (request) => invoke("readDomainDetailView", request),

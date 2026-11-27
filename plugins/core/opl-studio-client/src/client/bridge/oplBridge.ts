@@ -68,10 +68,10 @@ export function createBrowserBridge(): OplBridge {
     retryDesktopHost() {
       return Promise.resolve(candidate?.retryDesktopHost?.()).then(() => undefined);
     },
-    readState(profile = readRuntimeProfile()) {
+    readState(profile = readRuntimeProfile(), includeSetup) {
       const normalizedProfile = normalizeProfile(profile);
       if (!candidate?.readState) return Promise.reject(new Error("opl_state_read_failed"));
-      const promise = candidate.readState(normalizedProfile);
+      const promise = candidate.readState(normalizedProfile, includeSetup);
       return Promise.resolve(promise).then((value) => normalizeStateReadback(value, normalizedProfile));
     },
     readInitialize() {

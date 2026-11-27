@@ -31,8 +31,10 @@ export function createOplPassthrough(options = {}) {
   const readOnly = () => env.OPL_STUDIO_READ_ONLY === "1" || env.OPL_NATIVE_WORKBENCH_READ_ONLY === "1";
   return {
     client, on: (ev, fn) => client.on(ev, fn), off: (ev, fn) => client.off(ev, fn), close: () => (ownClient ? client.close() : Promise.resolve()),
-    async readState(profile = "fast") {
-      const p = profile === "full" ? "full" : "fast", res = await client.call("app.state.get", { profile: p }), patch = options.getWeixinHost?.()?.appStatePatch?.();
+    async readState(profile = "fast", includeSetup = false) {
+      const p = profile === "full" ? "full" : "fast";
+      const res = await client.call("app.state.get", { profile: p, ...(includeSetup === true ? { include_setup: true } : {}) });
+      const patch = options.getWeixinHost?.()?.appStatePatch?.();
       const appState = withOfficialProfileAction(res?.app_state, env.OPL_OFFICIAL_PROFILE_RESOURCES);
       if (!patch) return { ...res, ...(appState ? { app_state: appState } : {}), profile: res?.profile ?? p, readback: readback("opld app.state.get", [p]) };
       const baseApp = appState ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin" && e?.view?.view_type !== "channel_access");

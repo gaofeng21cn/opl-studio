@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { createGuestRpc } from "./windows-guest-rpc.mjs";
 import { nativeHostOptions, startGuestHostCore } from "./guest-host-core.mjs";
 import { createGuestCoreProxy } from "./guest-core-proxy.mjs";
@@ -21,6 +23,31 @@ function fixture(managedUpdate = async () => ({})) {
   const worker = startGuestHostCore({ input: child.stdin, output: child.stdout, createCore: async () => core, prepare: async (_payload, native) => { core.nativeUpdater = nativeHostOptions(native).nativeUpdater; return { options: {} }; } });
   return { child, core, worker };
 }
+
+test("desktop preload requests the setup projection only on explicit state reads", async context => {
+  const fx = fixture();
+  const seen = [];
+  fx.core.opl.readState = async (profile, includeSetup = false) => {
+    seen.push([profile, includeSetup]);
+    return { app_state: includeSetup ? { system_initialize: { setup_flow: { ready_to_launch: false } } } : {} };
+  };
+  const proxy = await createGuestCoreProxy({ child: fx.child, initialize: {} });
+  context.after(async () => { await proxy.close(); await fx.worker.close(); });
+  let surface;
+  runInNewContext(readFileSync(new URL("./preload.cjs", import.meta.url), "utf8"), {
+    require: () => ({
+      contextBridge: { exposeInMainWorld(_name, value) { surface = value; } },
+      ipcRenderer: { invoke(channel, { method, payload }) {
+        assert.equal(channel, "opl:invoke");
+        return proxy.invoke(method, payload);
+      } }
+    })
+  });
+  assert.deepEqual((await surface.readState()).app_state, {});
+  assert.equal((await surface.readState("fast", true)).app_state.system_initialize?.setup_flow.ready_to_launch, false);
+  assert.deepEqual((await surface.readState("full", false)).app_state, {});
+  assert.deepEqual(seen, [["fast", false], ["fast", true], ["full", false]]);
+});
 
 test("readState preserves the one parent maintenance controller through the actual Core method", async context => {
   const fx = fixture();

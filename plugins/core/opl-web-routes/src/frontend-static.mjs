@@ -44,7 +44,7 @@ export async function registerOplFrontend(ctx, { webAuth, webRoot, webHost = "12
           // These product entry points use the same upstream-rendered index.
           // Keep navigation at the original URL so the client sees the intent.
           const url = new URL(request.url);
-          if (url.pathname === "/guid" || url.pathname === "/first-run") {
+          if (["/guid", "/first-run", "/startup-gate"].includes(url.pathname)) {
             url.pathname = "/";
             request = new Request(url, { method: request.method, headers: request.headers, signal: request.signal });
           }

@@ -16,7 +16,10 @@ test("readState forwards fast and full profiles to app.state.get and preserves d
         connections: [{ connection_id: "conn-1" }],
         tasks: [{ task_id: "task-1" }],
         schedules: [{ schedule_id: "sched-1" }],
-        app_state: { packages: [{ package_id: "med-autoscience" }] }
+        app_state: {
+          packages: [{ package_id: "med-autoscience" }],
+          ...(params.include_setup ? { system_initialize: { readiness: { core_ready: false } } } : {})
+        }
       };
     }
   });
@@ -33,10 +36,14 @@ test("readState forwards fast and full profiles to app.state.get and preserves d
   assert.equal(fast.tasks[0].task_id, "task-1");
   assert.equal(fast.schedules[0].schedule_id, "sched-1");
 
-  const full = await opl.readState("full");
+  assert.equal(fast.app_state.system_initialize, undefined);
+  const withSetup = await opl.readState("fast", true);
+  assert.equal(withSetup.app_state.system_initialize.readiness.core_ready, false);
+  const full = await opl.readState("full", false);
   assert.equal(full.profile, "full");
   assert.deepEqual(calls, [
     { method: "app.state.get", params: { profile: "fast" } },
+    { method: "app.state.get", params: { profile: "fast", include_setup: true } },
     { method: "app.state.get", params: { profile: "full" } }
   ]);
 });

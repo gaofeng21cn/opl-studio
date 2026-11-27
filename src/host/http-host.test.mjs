@@ -103,7 +103,11 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
     turnTimeoutMs: 2_000
   });
   const opl = {
-    readState: async (profile) => ({ profile, app_state: { meta: { profile } }, readback: { exitCode: 0 } }),
+    readState: async (profile, includeSetup) => ({
+      profile,
+      app_state: { meta: { profile }, ...(includeSetup ? { system_initialize: { readiness: { core_ready: false } } } : {}) },
+      readback: { exitCode: 0 }
+    }),
     readInitialize: async () => ({ system_initialize: { setup_flow: { is_first_run: false, ready_to_launch: true } } }),
     readFullDrilldown: async () => ({ detail: "full", drilldown: {}, readback: { exitCode: 0 } }),
     readDomainDetailView: async (request) => ({
@@ -312,6 +316,11 @@ test("loopback HTTP host exposes standard thread lifecycle, subagent projection,
 
   const state = await fetch(`${baseUrl}/api/opl/state?profile=full`).then((response) => response.json());
   assert.equal(state.profile, "full");
+  assert.equal(state.app_state.system_initialize, undefined);
+  const setup = await fetch(`${baseUrl}/api/opl/state?profile=fast&includeSetup=1`).then((response) => response.json());
+  assert.equal(setup.app_state.system_initialize.readiness.core_ready, false);
+  const ordinary = await fetch(`${baseUrl}/api/opl/state?profile=fast`).then((response) => response.json());
+  assert.equal(ordinary.app_state.system_initialize, undefined);
   const initialize = await fetch(`${baseUrl}/api/opl/initialize`).then((response) => response.json());
   assert.equal(initialize.system_initialize.setup_flow.ready_to_launch, true);
   const domainDetail = await post(baseUrl, "/api/opl/view/read", {
@@ -677,7 +686,7 @@ test("trusted path entry keeps renderer boot, login, session and SSE in the same
   t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }); });
   const prefix = "/w/workspace_0123456789abcdef0123456789abcdef";
   const headers = { "x-forwarded-prefix": prefix };
-  for (const entry of ["/settings", "/guid", "/first-run"]) {
+  for (const entry of ["/settings", "/guid", "/first-run", "/startup-gate"]) {
     const redirect = await fetch(`${host.url}${entry}`, { headers, redirect: "manual" });
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get("location"), `${prefix}/login`);
@@ -701,7 +710,7 @@ test("trusted path entry keeps renderer boot, login, session and SSE in the same
   const encodedIndex = await (await fetch(`${host.url}/%69ndex.html`, { headers: authenticated })).text();
   assert.ok(encodedIndex.includes(`<base href="${prefix}/">`));
   assert.equal(html.match(/__DSH_BOOT_READY__.*resolve/g)?.length, 1);
-  for (const entry of ["/guid", "/first-run"]) {
+  for (const entry of ["/guid", "/first-run", "/startup-gate"]) {
     const page = await fetch(`${host.url}${entry}`, { headers: authenticated, redirect: "manual" });
     assert.equal(page.status, 200, entry);
     const pageHtml = await page.text();
