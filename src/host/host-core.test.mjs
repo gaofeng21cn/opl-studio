@@ -617,7 +617,7 @@ test("OplFrameworkBridge connects studioWeixin, merges appStatePatch, routes opl
         appStatePatch: () => ({
           ui_contributions: {
             surface_kind: "opl_app_ui_contributions_projection.v1",
-            entries: [{ package_id: "opl-channel-weixin", view: { view_type: "channel_access" } }]
+            entries: [{ package_id: "opl-channel-weixin", view: { view_type: "channel_access" }, commands: [{ action_ref: "weixin.channel-access#connect", confirmation_required: false }] }]
           },
           transport_bindings: { status: "available", bindings: [{ binding_id: "b1", provider_id: "opl-channel-weixin", canonical_thread_id: "t1" }] }
         }),

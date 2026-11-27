@@ -1,3 +1,4 @@
+import { actionOwnerReceipt, readContributionEnvelope } from "./owner-receipts.mjs";
 import { EventEmitter } from "node:events"; import { OpldClient } from "./opld-client.mjs";
 const errReq = (msg, code = "invalid_request") => Object.assign(new Error(msg), { code });
 const isObj = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v), nonEmptyStr = (v) => typeof v === "string" && v.trim().length > 0;
@@ -61,20 +62,41 @@ export function createOplPassthrough(options = {}) {
       const wh = options.getWeixinHost?.();
       if (wh && packageId === "opl-channel-weixin") return { ...readback("opl-channel-weixin readChannelAccess", [ref]), stdoutJson: await wh.readChannelAccess({ package_id: packageId, ref, input: input ?? {} }) };
       const res = await client.call("app.contribution.read", { ...(packageId ? { package_id: packageId } : {}), ref, ...(input !== undefined ? { input } : {}), ...(ifRevision !== undefined ? { if_revision: ifRevision } : {}), ...(consumerBindToken ? { consumer_bind_token: consumerBindToken } : {}), ...(sessionId ? { session_id: sessionId } : {}) });
-      const stdoutJson = res?.opl_app_contribution ? res : { opl_app_contribution: { surface_kind: "opl_app_package_contribution.v1", ...(packageId !== undefined ? { package_id: packageId } : (res?.package_id ? { package_id: res.package_id } : {})), ref, operation: "read", response: { schema_version: "opl-package-app-contribution-response.v1", ok: res?.ok !== false, ref, operation: "read", result: res?.result ?? res?.data ?? res } } };
-      return { ...readback("opld app.contribution.read", [ref]), stdoutJson };
+      const stdoutJson = readContributionEnvelope(res, packageId, ref);
+      const failed = !stdoutJson.opl_app_contribution.response.ok;
+      return { ...readback("opld app.contribution.read", [ref]), stdoutJson,
+        ...(failed ? { exitCode: 1, stderr: String(stdoutJson.opl_app_contribution.response.error?.message ?? "Owner contribution read failed") } : {}) };
     },
     async executeAction({ actionId, payload = {}, dryRun = true, mode, packageId } = {}) {
-      if (!nonEmptyStr(actionId)) throw errReq("actionId is required");
-      const isDry = mode === "preview" || (dryRun !== false && mode !== "execute");
-      if (!isDry && readOnly()) return { actionId, dryRun: false, confirmationRequired: false, canExecute: false, receiptKind: "blocked_read_only", authorityBoundary: "app_bridge_no_domain_authority", requestedMode: mode ?? "execute", status: "blocked_read_only", ...readback("opld app.action.execute", [actionId]), exitCode: 1, blockedReason: "read_only_host", payload };
-      const pkg = packageId ?? payload?.package_id, wh = options.getWeixinHost?.();
-      if (wh && pkg === "opl-channel-weixin") {
-        const stdoutJson = isDry ? { status: "preview_ready", package_id: pkg, ref: payload?.ref } : await wh.executeChannelAccessAction({ package_id: pkg, ref: payload?.ref, input: isObj(payload?.input) ? payload.input : {}, confirmed: payload?.confirmed === true });
-        return { actionId, dryRun: isDry, confirmationRequired: Boolean(stdoutJson?.opl_app_contribution?.confirmation_required), canExecute: true, receiptKind: isDry ? "preview" : "execute", authorityBoundary: "app_bridge_no_domain_authority", requestedMode: mode ?? (isDry ? "preview" : "execute"), status: isDry ? "preview_ready" : "executed", ...readback("opl-channel-weixin executeChannelAccessAction", [payload?.ref ?? ""]), payload, stdoutJson };
+      if (!nonEmptyStr(actionId) || !isObj(payload)) throw errReq("actionId and an object payload are required");
+      if (packageId !== undefined && (!nonEmptyStr(packageId) || (payload.package_id !== undefined && payload.package_id !== packageId))) throw errReq("Conflicting or invalid package identity");
+      const requestedMode = mode ?? (payload.rollbackRef ? "rollback" : dryRun === false ? "execute" : "preview");
+      if (!["preview", "execute", "rollback"].includes(requestedMode)) throw errReq("Unknown action mode");
+      const isDry = requestedMode === "preview";
+      const request = { actionId, payload, requestedMode, dryRun: isDry };
+      const command = readback("opld app.action.execute", [actionId]);
+      if (!isDry && readOnly()) return actionOwnerReceipt(command, { status: "blocked_read_only", blocked_reason: "read_only_host" }, request);
+      if (requestedMode === "rollback") return actionOwnerReceipt(command, { status: "unsupported", blocked_reason: "opld_rollback_unavailable" }, request);
+      const pkg = packageId ?? payload.package_id;
+      const wh = options.getWeixinHost?.();
+      if (wh && pkg === "opl-channel-weixin" && actionId === "package_contribution_execute") {
+        const commandReadback = readback("opl-channel-weixin executeChannelAccessAction", [payload.ref ?? ""]);
+        const entry = wh.appStatePatch()?.ui_contributions?.entries?.filter(view => view.package_id === pkg)
+          .flatMap(view => view.commands ?? []).find(entry => entry.action_ref === payload.ref);
+        if (!entry) throw errReq("Unknown Weixin channel action");
+        let value;
+        if (isDry) value = { status: "preview", confirmation_required: entry.confirmation_required };
+        else if (entry.confirmation_required && payload.confirmed !== true) value = { status: "confirmation_required" };
+        else value = await wh.executeChannelAccessAction({ package_id: pkg, ref: payload.ref, input: payload.input ?? {}, confirmed: payload.confirmed === true });
+        return actionOwnerReceipt(commandReadback, value, request);
       }
-      const res = await client.call("app.action.execute", { action_id: actionId, payload, dry_run: isDry, ...(mode ? { mode } : {}), ...(packageId ? { package_id: packageId } : {}) }), rawStatus = res?.status === "preview" ? "preview_ready" : res?.status;
-      return { actionId, dryRun: res?.dryRun ?? isDry, confirmationRequired: false, canExecute: true, receiptKind: isDry ? "preview" : "execute", authorityBoundary: "app_bridge_no_domain_authority", requestedMode: mode ?? (isDry ? "preview" : "execute"), status: rawStatus ?? (isDry ? "preview_ready" : "executed"), ...readback("opld app.action.execute", [actionId]), payload, stdoutJson: res };
+      try {
+        const value = await client.call("app.action.execute", { action_id: actionId, payload, dry_run: isDry, ...(mode ? { mode } : {}), ...(packageId ? { package_id: packageId } : {}) });
+        return actionOwnerReceipt(command, value, request);
+      } catch (error) {
+        if (error?.code !== "CONFIRMATION_REQUIRED") throw error;
+        return actionOwnerReceipt(command, { status: "confirmation_required", blocked_reason: error.code }, request);
+      }
     },
     async runManagedUpdate(operation = "status") {
       if (!["check", "plan", "apply", "status", "activate"].includes(operation)) throw errReq(`Unsupported managed update operation: ${operation}`);
