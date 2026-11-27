@@ -17,7 +17,7 @@ const bridge = [
   read("plugins/core/opl-studio-client/src/client/bridge/oplBridge.ts"),
   read("packages/host-contracts/src/app-state.ts")
 ].join("\n");
-const passthrough = read("plugins/core/opl-framework-bridge/src/opl-passthrough.mjs");
+const passthrough = read("plugins/core/opl-framework-bridge/src/service.mjs");
 const webTransport = read("src/bridge/webTransport.ts");
 const model = read("plugins/core/opl-studio-client/src/client/workbench/workbenchModel.ts");
 const runtimePage = [
@@ -86,7 +86,7 @@ const workspaceFilesPanel = read("plugins/core/opl-studio-client/src/client/work
 const clientCordis = read("plugins/core/opl-studio-client/src/client/composition/clientCordis.ts");
 const settings = read("plugins/core/opl-studio-client/src/client/workbench/settingsModel.ts");
 const gatewayCache = read("plugins/core/opl-studio-client/src/client/workbench/gatewayAccountCache.ts");
-const gatewayLoginHost = read("plugins/core/opl-framework-bridge/src/gateway-account-login.mjs");
+const gatewayLoginHost = read("plugins/core/opl-framework-bridge/src/service.mjs");
 const contributionComponents = read("plugins/core/opl-studio-client/src/client/composition/contributionComponents.tsx");
 const contributionProjection = [
   "contributionProjection.ts",
@@ -1110,7 +1110,9 @@ test("capability surfaces project dynamic OPL packages and dependency checks", (
   assert.doesNotMatch(app, /item\.packageId\.startsWith\("opl-"\)/);
   assert.match(settingsPanel, /owner\.dependencies\.map\(\(dependency\)/);
   assert.match(settingsPanel, /packageDependencyPresentationStatus/);
-  assert.match(passthrough, /dependency_readiness/);
+  assert.match(passthrough, /client\.call\("app\.state\.get"/);
+  assert.match(passthrough, /readback: readback\("opld app\.state\.get"/);
+  assert.match(read("plugins/core/opl-studio-client/src/client/workbench/workbenchModel-package-lifecycle.ts"), /dependency_readiness/);
   assert.match(model, /function packageDependencies\(/);
   assert.match(styles, /\.opl-contribution :where\(h1, h2, h3, h4, h5, h6\)/);
 });

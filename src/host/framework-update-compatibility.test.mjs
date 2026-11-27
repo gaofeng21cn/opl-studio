@@ -1,81 +1,113 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import test from 'node:test';
-import { frameworkUpdateEnvironment } from '../../plugins/core/opl-framework-bridge/src/framework-update-compatibility.mjs';
-import { createOplPassthrough } from '../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs';
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { OplFrameworkBridge, OpldClient, OpldRpcError, createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
+import { startFakeOpld } from "./fixtures/fake-opld.mjs";
 
-async function fixture(t) {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'opl-update-compatibility-'));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const root = path.join(directory, 'framework');
-  await fs.mkdir(root);
-  await fs.writeFile(path.join(root, 'package.json'), JSON.stringify({ name: 'opl-framework', version: '0.3.5' }));
-  const env = { ...process.env, OPL_FRAMEWORK_PACKAGE_ROOT: root, OPL_FRAMEWORK_UPDATE_TARGET_ROOT: root };
-  const source = {
-    target_root: root, update_available: true, channel_version: '0.3.6',
-    channel_artifact: 'ghcr.io/gaofeng21cn/one-person-lab-framework:latest-stable',
-    channel_artifact_digest: `sha256:${'a'.repeat(64)}`
-  };
-  const plan = { managed_update: { components: [{ component_id: 'opl_base', current: { opl_framework_runtime: source } }] } };
-  return { directory, root, env, source, plan };
-}
+test("Handshake apiVersion major compatibility succeeds on minor bump and latches base_upgrade_required (-32002)", async (t) => {
+  const daemon = await startFakeOpld({ apiVersion: "2.0" });
+  t.after(() => daemon.close());
 
-test('automatic apply rejects stale channels, unknown versions and mismatched targets', async (t) => {
-  const f = await fixture(t);
-  for (const [change, code] of [
-    [{ channel_version: '0.3.4' }, 'framework_update_downgrade_blocked'],
-    [{ channel_version: '0.3.5-alpha.1' }, 'framework_update_downgrade_blocked'],
-    [{ channel_version: null }, 'framework_update_version_unverified'],
-    [{ source_archive_configured: true }, 'framework_update_version_unverified'],
-    [{ target_root: '/another-root' }, 'framework_update_target_unverified'],
-    [{ channel_artifact: `ghcr.io/gaofeng21cn/one-person-lab-framework@sha256:${'b'.repeat(64)}` }, 'framework_update_artifact_unverified']
-  ]) {
-    const original = { ...f.source };
-    Object.assign(f.source, change);
-    await assert.rejects(frameworkUpdateEnvironment(f.env, { operation: 'apply', plan: f.plan }), { code });
-    for (const key of Object.keys(f.source)) delete f.source[key];
-    Object.assign(f.source, original);
+  const okBridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, apiVersion: "2.3", autoStart: false });
+  t.after(() => okBridge.close());
+  const caps = await okBridge.start();
+  assert.equal(caps.connected, true);
+  assert.equal(caps.apiVersion, "2.0");
+
+  for (const incompatible of ["1.0", "99.0"]) {
+    const badBridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, apiVersion: incompatible, autoStart: false });
+    t.after(() => badBridge.close());
+    await assert.rejects(
+      () => badBridge.start(),
+      (err) => err instanceof OpldRpcError && err.code === "base_upgrade_required" && err.rpcCode === -32002 && err.data?.expected_major === 2
+    );
+    await assert.rejects(
+      () => badBridge.opl.readState("fast"),
+      (err) => err instanceof OpldRpcError && err.code === "base_upgrade_required" && err.rpcCode === -32002
+    );
   }
-  await assert.rejects(frameworkUpdateEnvironment({}, { operation: 'activate' }), { code: 'framework_update_target_unbound' });
 });
 
-test('eligible apply accepts digest-pinned channel_artifact refs emitted by Framework', async (t) => {
-  const f = await fixture(t);
-  f.source.channel_artifact = `ghcr.io/gaofeng21cn/one-person-lab-framework@${f.source.channel_artifact_digest}`;
-  const updated = await frameworkUpdateEnvironment(f.env, { operation: 'apply', plan: f.plan });
-  assert.equal(updated.OPL_FRAMEWORK_ARTIFACT_REF, `ghcr.io/gaofeng21cn/one-person-lab-framework@${f.source.channel_artifact_digest}`);
+test("runManagedUpdate validates operations pre-RPC and enforces read-only host blocking", async (t) => {
+  const calls = [];
+  const daemon = await startFakeOpld({
+    onCall: async (method) => {
+      calls.push(method);
+      if (method === "pack.list") return { packages: [{ package_id: "mas" }] };
+      if (method === "daemon.health") return { status: "ok" };
+      return {};
+    }
+  });
+  t.after(() => daemon.close());
+
+  const roClient = new OpldClient({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(() => roClient.close());
+  const ro = createOplPassthrough({ client: roClient, env: { OPL_STUDIO_READ_ONLY: "1" } });
+
+  await assert.rejects(() => ro.runManagedUpdate("rollback"), (err) => err?.code === "invalid_request");
+  for (const op of ["apply", "activate"]) {
+    await assert.rejects(() => ro.runManagedUpdate(op), (err) => err?.code === "blocked_read_only");
+  }
+  const roNative = createOplPassthrough({ client: roClient, env: { OPL_NATIVE_WORKBENCH_READ_ONLY: "1" } });
+  await assert.rejects(() => roNative.runManagedUpdate("apply"), (err) => err?.code === "blocked_read_only");
+  assert.equal(calls.length, 0);
+
+  const check = await ro.runManagedUpdate("check");
+  assert.equal(check.managed_update.packages[0].package_id, "mas");
+  const status = await ro.runManagedUpdate("status");
+  assert.equal(status.runtime_activation.status, "active");
+  assert.equal(status.health.status, "ok");
+  assert.deepEqual(calls, ["pack.list", "daemon.health"]);
 });
 
-test('eligible apply binds the owner command to the inspected immutable artifact without changing the current root', async (t) => {
-  const f = await fixture(t);
-  const command = path.join(f.directory, 'fake-opl');
-  const record = path.join(f.directory, 'calls.jsonl');
-  await fs.writeFile(command, `#!/usr/bin/env node\nimport fs from 'node:fs';
-fs.appendFileSync(${JSON.stringify(record)}, JSON.stringify({args:process.argv.slice(2),artifact:process.env.OPL_FRAMEWORK_ARTIFACT_REF})+'\\n');
-console.log(JSON.stringify(process.argv[3]==='plan'?${JSON.stringify(f.plan)}:{managed_update:{execution:{status:'completed'}}}));\n`, { mode: 0o755 });
-  const opl = createOplPassthrough({ command, env: f.env, cwd: f.directory });
-  await opl.runManagedUpdate('apply');
-  const calls = (await fs.readFile(record, 'utf8')).trim().split('\n').map(JSON.parse);
-  assert.deepEqual(calls.map(c => c.args), [['update', 'plan', '--json'], ['update', 'apply', '--json']]);
-  assert.equal(calls[1].artifact, `ghcr.io/gaofeng21cn/one-person-lab-framework@sha256:${'a'.repeat(64)}`);
-  assert.equal(JSON.parse(await fs.readFile(path.join(f.root, 'package.json'))).version, '0.3.5');
-  f.source.channel_version = '0.3.4';
-  await assert.rejects(frameworkUpdateEnvironment(f.env, { operation: 'apply', plan: f.plan }), { code: 'framework_update_downgrade_blocked' });
+test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trusted-host errors without synthesizing completion", async (t) => {
+  let failApply = false;
+  const calls = [];
+  const daemon = await startFakeOpld({
+    onCall: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "pack.updateAll") {
+        if (failApply) return { __rpcError: { code: -32003, message: "Trusted host required", data: { code: "TRUSTED_HOST_REQUIRED" } } };
+        return { batch_id: "batch-1", updated: [] };
+      }
+      if (method === "daemon.health") return { ok: true };
+      return { packages: [] };
+    }
+  });
+  t.after(() => daemon.close());
+
+  const opl = createOplPassthrough({ stateDir: daemon.stateDir, autoStart: false });
+  t.after(() => opl.close());
+
+  const applied = await opl.runManagedUpdate("apply");
+  assert.equal(applied.managed_update.batch_id, "batch-1");
+  assert.equal(applied.managed_update.execution.status, "completed");
+
+  const activated = await opl.runManagedUpdate("activate");
+  assert.equal(activated.runtime_activation.status, "active");
+  assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "daemon.health"]);
+
+  failApply = true;
+  await assert.rejects(
+    () => opl.runManagedUpdate("apply"),
+    (err) => err instanceof OpldRpcError && err.rpcCode === -32003 && err.code === "TRUSTED_HOST_REQUIRED"
+  );
 });
 
-test('cold-start activation rejects older pending generations and permits a forward generation without writing owner state', async (t) => {
-  const f = await fixture(t);
-  assert.equal(await frameworkUpdateEnvironment(f.env, { operation: 'activate' }), f.env);
-  await fs.mkdir(`${f.root}.pending`);
-  const pending = { surface_kind: 'opl_framework_pending_generation.v1', target_root: f.root, pending_root: `${f.root}.pending` };
-  const bytes = JSON.stringify(pending);
-  await fs.writeFile(`${f.root}.pending.json`, bytes);
-  await fs.writeFile(path.join(`${f.root}.pending`, 'package.json'), JSON.stringify({ name: 'opl-framework', version: '0.3.4' }));
-  // Repeated launches must not consume or rewrite the rejected generation.
-  for (let i = 0; i < 2; i++) await assert.rejects(frameworkUpdateEnvironment(f.env, { operation: 'activate' }), { code: 'framework_update_downgrade_blocked' });
-  assert.equal(await fs.readFile(`${f.root}.pending.json`, 'utf8'), bytes);
-  await fs.writeFile(path.join(`${f.root}.pending`, 'package.json'), JSON.stringify({ name: 'opl-framework', version: '0.3.6' }));
-  assert.equal(await frameworkUpdateEnvironment(f.env, { operation: 'activate' }), f.env);
+test("unavailable daemon and missing binary errors reject fail-closed when explicitly configured", async (t) => {
+  const emptyDir = await fs.mkdtemp(path.join(os.tmpdir(), "opl-update-compat-"));
+  t.after(() => fs.rm(emptyDir, { recursive: true, force: true }));
+
+  const noAuto = new OpldClient({ stateDir: emptyDir, autoStart: false });
+  t.after(() => noAuto.close());
+  await assert.rejects(() => noAuto.connect(), (err) => err instanceof OpldRpcError && err.code === "daemon_unavailable");
+
+  const explicitBadBin = new OplFrameworkBridge({
+    stateDir: emptyDir,
+    env: { ...process.env, OPL_DAEMON_BIN: path.join(emptyDir, "missing-opld") }
+  });
+  t.after(() => explicitBadBin.close());
+  await assert.rejects(() => explicitBadBin.start(), (err) => err instanceof OpldRpcError && err.code === "daemon_not_found");
 });

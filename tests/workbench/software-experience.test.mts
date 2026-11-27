@@ -9,7 +9,6 @@ import { DshPluginManagerOwner } from "../../plugins/core/opl-studio-client/src/
 import { McpAppWorkspace } from "../../plugins/core/opl-mcp-apps/src/client/McpAppWorkspace";
 import { KnowledgeSourcesSection } from "../../plugins/core/opl-studio-client/src/client/workbench/KnowledgeSourcesSection";
 import { readKnowledgeSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/knowledgeSources";
-import { compactPackageRows, compactSoftwareSources } from "../../plugins/core/opl-framework-bridge/src/opl-passthrough/contributions-packages.mjs";
 import { SoftwareSourcesPage } from "../../plugins/core/opl-studio-client/src/client/workbench/SoftwareSourcesPage";
 import { readSoftwareSourcesProjection } from "../../plugins/core/opl-studio-client/src/client/workbench/softwareSources";
 
@@ -21,11 +20,11 @@ Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
 const { settingsDefaults } = await import("../../plugins/core/opl-studio-client/src/client/workbench/settingsModel");
 
 function model() {
-  return deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([1, 2, 3].map(id => ({
+  return deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [1, 2, 3].map(id => ({
     package_id: `example-${id}`, display_name: `Example ${id}`, catalog_scope: "software", catalog_origin: "opl", installed: true, app_enabled: true,
     presence: { callable: true }, miniapp_entry: { resource_uri: "ui://example/app", arguments: { package_id: `example-${id}`, secret: "must-not-cross" } },
     package_access: { visibility: "authorized_only", status: "expired", source_ref: "registry:private", download_allowed: false },
-  }))) } } } });
+  })) } } } });
 }
 
 test("one source recovery covers its affected products without hiding an independent installation conflict", () => {
@@ -49,10 +48,10 @@ test("unknown source checks and unused resources do not become user failures", (
 });
 
 test("external software attention issues surface with the same priority as OPL software", () => {
-  const state = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: compactPackageRows([{
+  const state = deriveWorkbenchModelFromState({ app_state: { agent_packages: { directory: { entries: [{
     package_id: "external-pkg", display_name: "External Pkg", catalog_scope: "software", catalog_origin: "external",
     installed: true, app_enabled: true, presence: { callable: false }, readiness: { callable: false, reason: "hosted_agent_source_unavailable" }
-  }]) } } } });
+  }] } } } });
   const issues = softwareAttentionItems(state, "en");
   expect(issues.map(item => item.packageId)).toEqual(["external-pkg"]);
   expect(issues[0]?.title).toBe("External Pkg");
@@ -97,7 +96,7 @@ test("Start using navigates without dispatching a lifecycle or business action",
 
 test("product types group different delivery carriers and keep restricted software browseable", async () => {
   await withDom(async (container, render) => {
-    const entries = compactPackageRows([
+    const entries = [
       { package_id: "catalog-extension", display_name: "Catalog Extension", software_type: "extension", catalog_source: { manager: "opl_packages" } },
       { package_id: "codex-extension", display_name: "Codex Extension", software_type: "capability", catalog_origin: "external", catalog_source: { manager: "codex_plugin_manager" } },
       { package_id: "private-app", display_name: "Restricted app", description: "Published summary", software_type: "application",
@@ -105,7 +104,7 @@ test("product types group different delivery carriers and keep restricted softwa
         selection_status: "package_install_source_unavailable" },
       { package_id: "chat-channel", display_name: "Chat Channel", software_type: "channel" },
       { package_id: "runtime-helper", display_name: "Runtime Helper", software_type: "dependency" }
-    ].map(entry => ({ catalog_scope: "software", catalog_origin: "opl", installed: false, ...entry })));
+    ].map(entry => ({ catalog_scope: "software", catalog_origin: "opl", installed: false, ...entry }));
     const dsh = {
       pluginId: "bundled-extension", packageName: "@example/bundled-extension", tier: "optional_product", origin: "opl", intentCategory: "extension",
       installed: true, enabled: true, active: true, version: "1.0.0",
@@ -140,14 +139,14 @@ test("product types group different delivery carriers and keep restricted softwa
 
 test("software sources refresh the catalog without running Homebrew or an access check", async () => {
   const cache = { cached: true, stale: true, fetched_at: "2026-11-24T00:00:00Z", etag: "internal-value" };
-  const projection = readSoftwareSourcesProjection(compactSoftwareSources({
+  const projection = readSoftwareSourcesProjection({
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [
       { source_id: "public-registry:opl", display_name: "OPL Catalog", source_kind: "registry", provider_id: "public_registry", visibility: "public", status: "public",
         catalog_cache: cache, verified_at: "2026-11-25T00:00:00Z", available_actions: [
           { action_id: "source_check" }, { action_id: "source_refresh", payload_fields: ["source_id"] }, { action_id: "source_list" }
         ] }
     ]
-  }));
+  });
   expect(projection?.entries[0]?.catalogCache).toEqual({ cached: true, stale: true, fetchedAt: cache.fetched_at });
   await withDom(async (container, render) => {
     const requests: unknown[] = [];

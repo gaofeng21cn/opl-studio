@@ -2,17 +2,20 @@ import { customModelAccessFixture } from "../../scripts/model-policy-fixture.ts"
 import { expect, test } from 'bun:test';
 import { featureCompletenessFixture } from '../fixtures/feature-completeness.mjs';
 import { agentPackageSelectionIntent, deriveWorkbenchModelFromState } from '../../plugins/core/opl-studio-client/src/client/workbench/workbenchModel';
-import { compactFastState } from '../../plugins/core/opl-framework-bridge/src/opl-passthrough.mjs';
+import { createOplPassthrough } from '../../plugins/core/opl-framework-bridge/src/index.mjs';
 Object.assign(globalThis, { __OPL_CODEX_MODEL_POLICY__: {
   source: 'test-fixture', defaultModel: 'codex-fixture', defaultReasoningEffort: 'high', visibleModels: [{ id: 'codex-fixture' }], reasoningEfforts: ['high'],
   autoLabel: { zh: '自动（推荐）', en: 'Auto (recommended)' }, knownModelReasoningEffortOverrides: {}, acceptUnknownCatalogDefault: true, customModelAccess: customModelAccessFixture, useHighestSupportedReasoningForUnknown: true,
 } });
-const { normalizeActionReceipt } = await import('../../plugins/core/opl-studio-client/src/client/bridge/oplBridge');
+const { normalizeActionReceipt, normalizeStateReadback } = await import('../../plugins/core/opl-studio-client/src/client/bridge/oplBridge');
 import { actionReceiptView } from '../../plugins/core/opl-studio-client/src/client/workbench/actionReceiptView';
 import { readMemoryRefs } from '../../plugins/core/opl-studio-client/src/client/workbench/MemoryRefsPanel';
 
-test('MAS MAG RCA directory, selection, lifecycle actions and Runtime survive real fast projection', () => {
-  const model = deriveWorkbenchModelFromState(compactFastState({ app_state: featureCompletenessFixture() }));
+test('MAS MAG RCA directory, selection, lifecycle actions and Runtime survive real fast projection', async () => {
+  const bridged = await createOplPassthrough({
+    client: { call: async () => ({ app_state: featureCompletenessFixture() }), on() {}, off() {}, close: async () => {} }
+  }).readState('fast');
+  const model = deriveWorkbenchModelFromState(normalizeStateReadback(bridged, 'fast'));
   expect(model.packageLifecycle.map(item => item.packageId)).toEqual(['med-autoscience', 'med-autogrant', 'redcube-ai']);
   for (const item of model.packageLifecycle) {
     expect(item.readiness.selectionStatus).toBe('available');
