@@ -1,3 +1,4 @@
+import { restoreAction, runOfficialProfileAction, withOfficialProfileAction } from "./official-profile-action.mjs";
 import { actionOwnerReceipt, readContributionEnvelope } from "./owner-receipts.mjs";
 import { EventEmitter } from "node:events"; import { OpldClient } from "./opld-client.mjs";
 const errReq = (msg, code = "invalid_request") => Object.assign(new Error(msg), { code });
@@ -32,8 +33,9 @@ export function createOplPassthrough(options = {}) {
     client, on: (ev, fn) => client.on(ev, fn), off: (ev, fn) => client.off(ev, fn), close: () => (ownClient ? client.close() : Promise.resolve()),
     async readState(profile = "fast") {
       const p = profile === "full" ? "full" : "fast", res = await client.call("app.state.get", { profile: p }), patch = options.getWeixinHost?.()?.appStatePatch?.();
-      if (!patch) return { ...res, profile: res?.profile ?? p, readback: readback("opld app.state.get", [p]) };
-      const baseApp = res?.app_state ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin" && e?.view?.view_type !== "channel_access");
+      const appState = withOfficialProfileAction(res?.app_state, env.OPL_OFFICIAL_PROFILE_RESOURCES);
+      if (!patch) return { ...res, ...(appState ? { app_state: appState } : {}), profile: res?.profile ?? p, readback: readback("opld app.state.get", [p]) };
+      const baseApp = appState ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin" && e?.view?.view_type !== "channel_access");
       const ui = patch.ui_contributions ? { ...baseUi, ...patch.ui_contributions, entries: [...entries, ...(patch.ui_contributions.entries ?? [])], contribution_count: entries.length + (patch.ui_contributions.entries?.length ?? 0) } : baseUi;
       return { ...res, profile: res?.profile ?? p, app_state: { ...baseApp, ...patch, ...(ui ? { ui_contributions: ui } : {}) }, readback: readback("opld app.state.get", [p]) };
     },
@@ -77,6 +79,10 @@ export function createOplPassthrough(options = {}) {
       const command = readback("opld app.action.execute", [actionId]);
       if (!isDry && readOnly()) return actionOwnerReceipt(command, { status: "blocked_read_only", blocked_reason: "read_only_host" }, request);
       if (requestedMode === "rollback") return actionOwnerReceipt(command, { status: "unsupported", blocked_reason: "opld_rollback_unavailable" }, request);
+      if (actionId === restoreAction.action_id) {
+        const result = await runOfficialProfileAction(env, request);
+        return actionOwnerReceipt(readback(restoreAction.route), result, request);
+      }
       const pkg = packageId ?? payload.package_id;
       const wh = options.getWeixinHost?.();
       if (wh && pkg === "opl-channel-weixin" && actionId === "package_contribution_execute") {
