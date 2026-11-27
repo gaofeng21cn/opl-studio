@@ -9,6 +9,7 @@ import {
   read,
   readJson,
   readRendererSource,
+  readSourceMarkerTarget,
   readSlotHostSource,
   readSettingsSource,
   root,
@@ -372,9 +373,7 @@ function assertSourceMarkerRequirements(evidence) {
   for (const group of Object.keys(requirements)) {
     assert(Array.isArray(requirements[group]) && requirements[group].length > 0, `missing marker group ${group}`);
     for (const requirement of requirements[group]) {
-      const source = requirement.file === "plugins/core/opl-studio-client/src/client/composition/dshSlotHost.tsx"
-        ? readSlotHostSource()
-        : read(requirement.file);
+      const source = readSourceMarkerTarget(requirement.file);
       for (const marker of requirement.contains) {
         assert(source.includes(marker), `missing ${group} marker ${marker} in ${requirement.file}`);
       }

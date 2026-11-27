@@ -26,7 +26,9 @@ export const slotHostSourcePaths = [
 export const rendererSourcePaths = [
   ...slotHostSourcePaths,
   "plugins/core/opl-studio-client/src/client/workbench/App.tsx",
+  "plugins/core/opl-studio-client/src/client/workbench/appCopy.ts",
   "plugins/core/opl-studio-client/src/client/workbench/composerAttachments.ts",
+  "plugins/core/opl-studio-client/src/client/workbench/ComposerAccessory.tsx",
   "plugins/core/opl-studio-client/src/client/workbench/ProjectProgressPanel.tsx",
   "plugins/core/opl-studio-client/src/client/workbench/SettingsPanel.tsx",
   "plugins/core/opl-studio-client/src/client/workbench/WorkspaceFilesPanel.tsx",
@@ -66,6 +68,10 @@ export function readJson(relativePath) {
 
 export function readSlotHostSource() {
   return slotHostSourcePaths.map(read).join("\n");
+}
+
+export function readSourceMarkerTarget(relativePath) {
+  return relativePath === slotHostSourcePaths[0] ? readSlotHostSource() : read(relativePath);
 }
 
 export function readSettingsSource() {

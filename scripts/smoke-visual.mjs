@@ -8,6 +8,7 @@ import {
   read,
   readJson,
   readRendererSource,
+  readSourceMarkerTarget,
   rendererSourcePaths,
   validateNonLiveDeliveryEvidence
 } from "./opl-studio-gates.mjs";
@@ -31,7 +32,7 @@ function assertFunctionalMvpVisualMarkers(evidence) {
   assert(requirements, "missing source_marker_requirements");
   for (const group of Object.keys(requirements)) {
     for (const requirement of requirements[group] ?? []) {
-      const source = read(requirement.file);
+      const source = readSourceMarkerTarget(requirement.file);
       for (const marker of requirement.contains) {
         assert(source.includes(marker), `missing ${group} marker ${marker} in ${requirement.file}`);
       }
@@ -49,7 +50,7 @@ assertSourceMarkers(rendererSource, deliverySurfaceMarkers(evidence), "visual la
 for (const marker of [
   "opl-artifact-preview-card",
   "opl-action-receipt-summary",
-  "opl-settings-section",
+  "opl-settings-panel",
   "opl-composer-run-state"
 ]) {
   assert(rendererSource.includes(marker), `missing polished MVP visual marker ${marker}`);
