@@ -866,7 +866,7 @@ assert(
   "OPL Studio client plugin must provide and load the Host-derived Client Cordis composition"
 );
 assert(app.includes("onHostStateChange?.(state)"), "App state caller must feed fresh Host state into Client Cordis");
-assert(app.includes("createOplContributionActionRequest(entry, command, confirmed)"), "projected commands must use the typed canonical App action request");
+assert(app.includes("createOplContributionActionRequest(entry, command, confirmed, input)"), "projected commands must use the typed canonical App action request");
 assert(app.includes('receipt.status === "executed"') && app.includes("loadState(settings.runtimeProfile)"), "successful contribution actions must refresh App state");
 const qualification = evidence.candidate_runtime_qualification;
 assert(qualification?.status === "framework_app_studio_client_conformance_qualified", "missing Client runtime qualification status");

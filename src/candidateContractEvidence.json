@@ -560,7 +560,7 @@
         "file": "plugins/core/opl-studio-client/src/client/workbench/App.tsx",
         "contains": [
           "onHostStateChange",
-          "createOplContributionActionRequest(entry, command, confirmed)",
+          "createOplContributionActionRequest(entry, command, confirmed, input)",
           "receipt.status === \"executed\""
         ]
       },
