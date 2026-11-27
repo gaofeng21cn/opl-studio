@@ -1,43 +1,48 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowUpRight, Play, Plus, RefreshCw, ShieldAlert, Square } from "lucide-react";
-import type { OplStudioShellService } from "@gaofeng21cn/opl-host-contracts";
 import {
-  Button,
-  EmptyState,
-  PluginErrorBoundary,
-  StatusPill,
-  useOplLocale,
-  useOplStudioShellSnapshot
-} from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent
+} from "react";
+import type { OplStudioShellService } from "@gaofeng21cn/opl-host-contracts";
+import { Button, PluginErrorBoundary, useOplStudioShellSnapshot } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import {
   executeOplFlowAction,
   readOplFlowDashboard,
-  resolveStudioWindowBridge,
   type OplFlowCarrier,
   type OplFlowDashboardEnvelope,
   type OplFlowInboxEntry,
   type OplFlowSessionEntry,
-  type OplFlowTabId,
   type StudioWindowBridge
 } from "./oplFlowBridge";
+import {
+  carrierLabel,
+  chooseSmartTab,
+  extractDashboardOccupants,
+  extractDashboardSessions,
+  filterSessions,
+  formatBlockerText,
+  formatObjectiveStatus,
+  formatRelativeTime,
+  formatStatusLabel,
+  isSubagentSession,
+  summarizeWorkspaces,
+  type CarrierFilter,
+  type OplFlowViewTab,
+  type SessionScopeFilter
+} from "./oplFlowModel";
 import "./opl-flow-workbench.css";
 
-const TABS: readonly { id: OplFlowTabId; zh: string; en: string }[] = [
-  { id: "needs_action", zh: "需你拍板", en: "Needs action" },
-  { id: "safe_to_archive", zh: "待批归档", en: "Ready to archive" },
-  { id: "active_objectives", zh: "进行中", en: "Active" },
-  { id: "active_sessions", zh: "活跃对话", en: "Active sessions" },
-  { id: "blocked", zh: "外部阻塞", en: "Blocked" },
-  { id: "backlog", zh: "待排期", en: "Backlog" },
-  { id: "pending_events", zh: "待处理事件", en: "Pending events" }
+const VIEW_TABS: readonly { id: OplFlowViewTab; zh: string; en: string }[] = [
+  { id: "attention", zh: "待我处理", en: "Needs me" },
+  { id: "objectives", zh: "长期目标", en: "Objectives" },
+  { id: "sessions", zh: "本机对话", en: "Sessions" },
+  { id: "events", zh: "事件队列", en: "Events" }
 ];
-
-function carrierDisplayName(carrier: string | null | undefined, zh: boolean): string {
-  if (carrier === "codex") return "Codex";
-  if (carrier === "antigravity") return "AntiGravity";
-  if (carrier === "dsh") return "OPL DSH";
-  return zh ? "自动选择" : "Auto";
-}
 
 export type OplFlowWorkbenchPanelProps = {
   shell: Pick<
@@ -49,16 +54,20 @@ export type OplFlowWorkbenchPanelProps = {
 
 export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlowWorkbenchPanelProps) {
   const snapshot = useOplStudioShellSnapshot(shell as OplStudioShellService);
-  const locale = useOplLocale(snapshot.locale);
-  const zh = locale === "zh";
-  const bridge = explicitBridge ?? resolveStudioWindowBridge();
+  const zh = snapshot.locale === "zh";
+  const idBase = useId();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const [dashboard, setDashboard] = useState<OplFlowDashboardEnvelope | null>(null);
+  const [envelope, setEnvelope] = useState<OplFlowDashboardEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [activeTab, setActiveTab] = useState<OplFlowTabId>("needs_action");
+  const [activeTab, setActiveTab] = useState<OplFlowViewTab | null>(null);
+  const [sessionScope, setSessionScope] = useState<SessionScopeFilter>("running");
+  const [sessionCarrier, setSessionCarrier] = useState<CarrierFilter>("all");
+  const [showSubagents, setShowSubagents] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState("");
   const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [objectiveId, setObjectiveId] = useState("");
@@ -72,47 +81,100 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
     setLoading(true);
     setError("");
     try {
-      const next = await readOplFlowDashboard(bridge);
-      setDashboard(next);
+      const next = await readOplFlowDashboard(explicitBridge);
+      setEnvelope(next);
+      if (next.state === "ready" && next.data) {
+        const defaultTab = chooseSmartTab(next.data);
+        setActiveTab((prev) => prev ?? defaultTab);
+        const all = extractDashboardSessions(next.data);
+        const hasRunningPrimary = all.some(
+          (s) => (s.status === "active" || s.status === "busy") && !isSubagentSession(s)
+        );
+        if (!hasRunningPrimary) {
+          setSessionScope("all");
+        }
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setLoading(false);
     }
-  }, [bridge]);
+  }, [explicitBridge]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const data = dashboard?.state === "ready" ? dashboard.data : undefined;
+  const data = envelope?.state === "ready" ? envelope.data : undefined;
   const counts = data?.counts;
+  const effectiveTab: OplFlowViewTab = activeTab ?? (data ? chooseSmartTab(data) : "attention");
 
-  const firstNonEmptyTab = useMemo<OplFlowTabId>(() => {
-    if (!counts) return "needs_action";
-    for (const tab of TABS) {
-      if ((counts[tab.id] ?? 0) > 0) return tab.id;
-    }
-    return "needs_action";
-  }, [counts]);
+  const allSessions = useMemo(() => extractDashboardSessions(data), [data]);
+  const occupants = useMemo(() => extractDashboardOccupants(data), [data]);
+  const wsSummary = useMemo(() => summarizeWorkspaces(occupants), [occupants]);
 
-  useEffect(() => {
-    if (counts && (counts[activeTab] ?? 0) === 0 && (counts[firstNonEmptyTab] ?? 0) > 0) {
-      setActiveTab(firstNonEmptyTab);
-    }
-  }, [counts, activeTab, firstNonEmptyTab]);
+  const attentionCount = (counts?.needs_action ?? 0) + (counts?.safe_to_archive ?? 0);
+  const objectivesCount =
+    (counts?.active_objectives ?? 0) + (counts?.blocked ?? 0) + (counts?.backlog ?? 0);
+  const subagentCount = useMemo(
+    () => counts?.subagent_sessions ?? allSessions.filter((s) => isSubagentSession(s)).length,
+    [counts?.subagent_sessions, allSessions]
+  );
+  const runningPrimaryCount = useMemo(
+    () =>
+      counts?.running_sessions ??
+      allSessions.filter((s) => (s.status === "active" || s.status === "busy") && !isSubagentSession(s)).length,
+    [counts?.running_sessions, allSessions]
+  );
+  const primaryTotalCount = useMemo(
+    () => counts?.primary_sessions ?? allSessions.filter((s) => !isSubagentSession(s)).length,
+    [counts?.primary_sessions, allSessions]
+  );
+  const visibleSessions = useMemo(
+    () =>
+      filterSessions(allSessions, {
+        scope: sessionScope,
+        carrier: sessionCarrier,
+        includeSubagents: showSubagents,
+        query: sessionSearch
+      }),
+    [allSessions, sessionScope, sessionCarrier, showSubagents, sessionSearch]
+  );
+
+  const carrierRunningBreakdown = useMemo(() => {
+    const running = allSessions.filter((s) => (s.status === "active" || s.status === "busy") && !isSubagentSession(s));
+    const codexN = running.filter((s) => s.carrier === "codex").length;
+    const agyN = running.filter((s) => s.carrier === "antigravity").length;
+    const dshN = running.filter((s) => s.carrier === "dsh").length;
+    const parts: string[] = [];
+    if (codexN) parts.push(`Codex ${codexN}`);
+    if (agyN) parts.push(`AntiGravity ${agyN}`);
+    if (dshN) parts.push(`DSH ${dshN}`);
+    return parts.join(" · ") || (zh ? `最近 ${primaryTotalCount} 个主对话` : `${primaryTotalCount} recent`);
+  }, [allSessions, primaryTotalCount, zh]);
 
   async function runAction(
-    ref: "opl-flow.decision.v1#send" | "opl-flow.decision.v1#approve" | "opl-flow.decision.v1#tick" | "opl-flow.decision.v1#service",
+    ref:
+      | "opl-flow.decision.v1#approve"
+      | "opl-flow.decision.v1#send"
+      | "opl-flow.decision.v1#service"
+      | "opl-flow.decision.v1#tick",
     input: Record<string, unknown>,
-    fallbackMessage: string
-  ) {
+    fallbackNotice: string
+  ): Promise<boolean> {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const result = await executeOplFlowAction(shell, ref, input);
-      setNotice(typeof result.message === "string" && result.message ? result.message : fallbackMessage);
+      const result = (await executeOplFlowAction(shell, ref, input)) as {
+        ok?: boolean;
+        message?: string;
+      };
+      if (!result?.ok) {
+        setError(typeof result?.message === "string" && result.message ? result.message : fallbackNotice);
+        return false;
+      }
+      setNotice(typeof result.message === "string" && result.message ? result.message : fallbackNotice);
       await refresh();
       return true;
     } catch (reason) {
@@ -123,25 +185,23 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
     }
   }
 
-  async function handleSubmitSend(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const cleanMsg = message.trim();
-    if (!cleanMsg) {
-      setError(zh ? "请输入任务描述或回复指令。" : "Enter a task instruction or reply.");
+    const clean = message.trim();
+    if (!clean) {
+      setError(zh ? "请输入任务描述或拍板指令。" : "Enter a task instruction.");
       return;
     }
-    const payload: Record<string, unknown> = {
-      message: cleanMsg,
-      execution_mode: executionMode,
-      now: runNow
-    };
-    if (objectiveId.trim()) payload.objective_id = objectiveId.trim();
-    else if (title.trim()) payload.title = title.trim();
-    if (executor) payload.executor = executor;
     const ok = await runAction(
       "opl-flow.decision.v1#send",
-      payload,
-      zh ? "已投递至 OPL Flow 队列。" : "Submitted to OPL Flow."
+      {
+        message: clean,
+        execution_mode: executionMode,
+        now: runNow,
+        ...(objectiveId.trim() ? { objective_id: objectiveId.trim() } : title.trim() ? { title: title.trim() } : {}),
+        ...(executor ? { executor } : {})
+      },
+      zh ? "已投递至 OPL Flow 队列。" : "Dispatched to OPL Flow."
     );
     if (ok) {
       setMessage("");
@@ -151,192 +211,386 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
     }
   }
 
-  function handleNavigateObjective(entry: OplFlowInboxEntry) {
-    if (entry.jump_mode === "native_switch" && entry.thread_id) {
-      void shell.openThread(entry.thread_id);
-      return;
-    }
-    if (entry.workspace_path) {
-      shell.startConversationInWorkspace(entry.workspace_path);
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next = -1;
+    if (event.key === "ArrowRight") next = (index + 1) % VIEW_TABS.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + VIEW_TABS.length) % VIEW_TABS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = VIEW_TABS.length - 1;
+    if (next < 0) return;
+    event.preventDefault();
+    setActiveTab(VIEW_TABS[next]!.id);
+    tabRefs.current[next]?.focus();
+  }
+
+  function startStudioChat(workspacePath?: string | null) {
+    if (workspacePath) {
+      shell.startConversationInWorkspace(workspacePath);
       return;
     }
     shell.openPrimaryView("conversation");
   }
 
-  function handleNavigateSession(sess: OplFlowSessionEntry) {
-    if (sess.jump_mode === "native_switch" && sess.thread_id) {
-      void shell.openThread(sess.thread_id);
-      return;
-    }
-    if (sess.workspace_path) {
-      shell.startConversationInWorkspace(sess.workspace_path);
-    }
-  }
-
-  function renderObjectiveAction(entry: OplFlowInboxEntry) {
-    const mode = entry.jump_mode;
-    if (mode === "native_switch" && entry.thread_id) {
+  function renderObjectiveJump(entry: OplFlowInboxEntry) {
+    if (entry.jump_mode === "native_switch" && entry.thread_id) {
       return (
-        <Button size="sm" variant="outline" onClick={() => handleNavigateObjective(entry)}>
-          <ArrowUpRight size={13} aria-hidden="true" />
-          <span>{zh ? "切换原生会话" : "Open thread"}</span>
+        <Button size="sm" variant="outline" onClick={() => void shell.openThread(entry.thread_id!)}>
+          {zh ? "切换原生会话" : "Switch thread"}
         </Button>
       );
     }
-    if (mode === "external_focus_only") {
+    if (entry.jump_mode === "external_focus_only") {
       return (
         <>
-          <span className="opl-flow-badge" data-carrier={entry.execution_carrier ?? undefined}>
+          <span className="opl-flow-pill">
             {zh
-              ? `当前由 ${carrierDisplayName(entry.execution_carrier, zh)} 持有`
-              : `Held by ${carrierDisplayName(entry.execution_carrier, zh)}`}
+              ? `当前由 ${carrierLabel(entry.execution_carrier, zh)} 持有`
+              : `Held by ${carrierLabel(entry.execution_carrier, zh)}`}
           </span>
-          {entry.workspace_path ? (
-            <Button size="sm" variant="outline" onClick={() => shell.startConversationInWorkspace(entry.workspace_path!)}>
-              <ArrowUpRight size={13} aria-hidden="true" />
-              <span>{zh ? "在此工作区新建 Codex 会话" : "New Codex session here"}</span>
-            </Button>
-          ) : null}
+          <Button size="sm" variant="outline" onClick={() => startStudioChat(entry.workspace_path)}>
+            {zh ? "在此工作区新建 Codex 会话" : "New Codex chat"}
+          </Button>
         </>
       );
     }
     return (
-      <Button size="sm" variant="outline" onClick={() => handleNavigateObjective(entry)}>
-        <ArrowUpRight size={13} aria-hidden="true" />
-        <span>{zh ? "在原生会话继续" : "Continue in native chat"}</span>
+      <Button size="sm" variant="outline" onClick={() => startStudioChat(entry.workspace_path)}>
+        {entry.workspace_path ? (zh ? "在此工作区新建 Codex 会话" : "New Codex chat") : zh ? "前往对话" : "Open chats"}
       </Button>
+    );
+  }
+
+  function renderObjectiveRow(entry: OplFlowInboxEntry, isArchiveCandidate: boolean) {
+    const remaining = (entry as OplFlowInboxEntry & { remaining?: string[] }).remaining ?? [];
+    const blockerText = formatBlockerText(entry.first_blocker, zh);
+    return (
+      <div className="opl-flow-row" key={entry.bead_id}>
+        <div className="opl-flow-row-main">
+          <div className="opl-flow-row-title">
+            <strong>{entry.title}</strong>
+            <span className="opl-flow-pill">{formatObjectiveStatus(entry, zh)}</span>
+            {entry.execution_carrier ? (
+              <span className="opl-flow-pill">{carrierLabel(entry.execution_carrier, zh)}</span>
+            ) : null}
+          </div>
+          {blockerText || entry.next_action ? (
+            <div className="opl-flow-row-meta">
+              {blockerText ? <span>{`${zh ? "阻塞：" : "Blocker: "}${blockerText}`}</span> : null}
+              {blockerText && entry.next_action ? " · " : null}
+              {entry.next_action ? <span>{`${zh ? "下一步：" : "Next: "}${entry.next_action}`}</span> : null}
+            </div>
+          ) : null}
+          {remaining.length > 0 ? (
+            <details className="opl-flow-row-details">
+              <summary>{zh ? `剩余步骤（${remaining.length} 项）` : `Remaining steps (${remaining.length})`}</summary>
+              <ul>
+                {remaining.map((step, i) => (
+                  <li key={`${entry.bead_id}-rem-${i}`}>{step}</li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
+        <div className="opl-flow-actions">
+          {renderObjectiveJump(entry)}
+          {isArchiveCandidate ? (
+            confirmApproveId === entry.bead_id ? (
+              <>
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmApproveId(null);
+                    void runAction(
+                      "opl-flow.decision.v1#approve",
+                      { bead_id: entry.bead_id, approved_by: "owner", confirmed: true },
+                      zh ? `已批准归档 ${entry.bead_id}。` : `Approved archive for ${entry.bead_id}.`
+                    );
+                  }}
+                >
+                  {zh ? "确认归档" : "Confirm archive"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setConfirmApproveId(null)}>
+                  {zh ? "取消" : "Cancel"}
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setConfirmApproveId(entry.bead_id)}>
+                {zh ? "批准归档" : "Approve archive"}
+              </Button>
+            )
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setObjectiveId(entry.bead_id);
+                setComposeOpen(true);
+              }}
+            >
+              {zh ? "追加指令" : "Reply"}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderSessionRow(sess: OplFlowSessionEntry) {
+    const carrierName = carrierLabel(sess.carrier, zh);
+    const displayTitle =
+      sess.title ||
+      (sess.workspace_label ? `${sess.workspace_label} · ${sess.model_label || carrierName}` : sess.model_label || sess.session_ref);
+    const statusTone = sess.status === "active" || sess.status === "busy" ? "running" : sess.status === "error" ? "warn" : undefined;
+    return (
+      <div className="opl-flow-row" key={sess.session_ref}>
+        <div className="opl-flow-row-main">
+          <div className="opl-flow-row-title">
+            <span className="opl-flow-pill" data-tone={statusTone}>
+              <span className="opl-flow-dot" aria-hidden="true" />
+              <span>{formatStatusLabel(sess.status || "idle", zh)}</span>
+            </span>
+            <strong>{displayTitle}</strong>
+            {sess.workspace_label ? <span className="opl-flow-pill">{sess.workspace_label}</span> : null}
+            {sess.bound_bead_id ? <span className="opl-flow-pill">{`Bead: ${sess.bound_bead_id}`}</span> : null}
+          </div>
+          <div className="opl-flow-row-meta" title={sess.updated_at || undefined}>
+            {`${carrierName}${sess.model_label && sess.model_label !== carrierName ? ` · ${sess.model_label}` : ""} · ${formatRelativeTime(sess.updated_at, zh)} · ${sess.bound_bead_id ? (zh ? "已纳管" : "Managed") : zh ? "自由对话（防撞车）" : "Unbound · guarded"}`}
+          </div>
+        </div>
+        <div className="opl-flow-actions">
+          {sess.jump_mode === "native_switch" && sess.thread_id ? (
+            <Button size="sm" variant="outline" onClick={() => void shell.openThread(sess.thread_id!)}>
+              {zh ? "切换原生会话" : "Switch thread"}
+            </Button>
+          ) : (
+            <>
+              <span className="opl-flow-pill">
+                {zh ? `外部载体：${carrierName}` : `External: ${carrierName}`}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => startStudioChat(sess.workspace_path)}>
+                {zh ? "在此工作区新建 Codex 会话" : "New Codex chat"}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
     );
   }
 
   const serviceRunning = Boolean(data?.service?.running);
   const serviceBridge = data?.service?.bridge || "auto";
-  const currentEntries = (activeTab !== "active_sessions" && activeTab !== "pending_events"
-    ? data?.inbox?.[activeTab] ?? []
-    : []) as OplFlowInboxEntry[];
-  const activeSessions = ((data?.inbox?.active_sessions?.length ? data.inbox.active_sessions : data?.active_sessions?.sessions) ?? []) as OplFlowSessionEntry[];
+  const needsActionList = data?.inbox?.needs_action ?? [];
+  const archiveList = data?.inbox?.safe_to_archive ?? [];
+  const activeObjectivesList = data?.inbox?.active_objectives ?? [];
+  const blockedList = data?.inbox?.blocked ?? [];
+  const backlogList = data?.inbox?.backlog ?? [];
   const pendingEvents = data?.inbox?.pending_events ?? [];
-  const occupants = (data?.inbox?.active_workspace_occupants?.length ? data.inbox.active_workspace_occupants : data?.active_sessions?.active_workspace_occupants) ?? [];
+
+  const tabCountFor = (tab: OplFlowViewTab) => {
+    if (tab === "attention") return attentionCount;
+    if (tab === "objectives") return objectivesCount;
+    if (tab === "sessions") return runningPrimaryCount || primaryTotalCount;
+    return counts?.pending_events ?? 0;
+  };
 
   return (
-    <section className="opl-flow-workbench" data-testid="opl-flow-workbench">
+    <section className="opl-flow-workbench" data-testid="opl-flow-workbench-panel">
       <header className="opl-flow-header">
-        <div>
+        <div className="opl-flow-header-left">
           <div className="opl-flow-title-row">
             <h1>{zh ? "OPL Flow 总控" : "OPL Flow Control Tower"}</h1>
-            {data?.instance_name ? <span className="opl-flow-badge">{data.instance_name}</span> : null}
+            {data ? (
+              <span className="opl-flow-pill" data-tone={serviceRunning ? "running" : undefined}>
+                <span className="opl-flow-dot" aria-hidden="true" />
+                <span>
+                  {serviceRunning
+                    ? zh
+                      ? `自动路由 · ${serviceBridge}`
+                      : `Auto router · ${serviceBridge}`
+                    : zh
+                      ? "路由已停止"
+                      : "Router stopped"}
+                </span>
+              </span>
+            ) : null}
+            {data?.instance_name ? <span className="opl-flow-pill">{data.instance_name}</span> : null}
           </div>
-          <p className="opl-flow-boundary-note">
-            {zh
-              ? "个人跨 Codex / AntiGravity / OPL DSH 与多机器 Beads/Dolt 长期目标总账与自动路由控制塔（不自建第二套聊天框）。本机 Runway 阶段任务看「运行状态」，单会话组队看「智能体协作」，外部来单看「Superagent 工单台」。"
-              : "Personal cross-carrier Beads/Dolt ledger and zero-token auto-router control tower. Use Runtime for local Runway stages, Agent collaboration for in-thread teams, and Superagent Tickets for external intake."}
-          </p>
+          <details className="opl-flow-boundary-details">
+            <summary>{zh ? "定位与三端分工说明" : "Scope & boundary"}</summary>
+            <p>
+              {zh
+                ? "个人跨 Codex / AntiGravity / OPL DSH 的 Beads/Dolt 长期目标总账与零 Token 自动路由控制塔（不自建第二套聊天框）；交互统一跳转或新建原生会话。"
+                : "Personal cross-carrier Beads/Dolt ledger and zero-token auto-router control tower. Switches to or launches native threads."}
+            </p>
+          </details>
         </div>
-        <div className="opl-flow-header-actions">
+        <div className="opl-flow-actions">
+          <Button size="sm" onClick={() => setComposeOpen((prev) => !prev)}>
+            {zh ? "新建 / 投递任务" : "New task"}
+          </Button>
+          {data ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(
+                    "opl-flow.decision.v1#tick",
+                    { dry_run: false },
+                    zh ? "已完成一轮状态评估。" : "Tick completed."
+                  )
+                }
+              >
+                {zh ? "立即评估 (Tick)" : "Tick now"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(
+                    "opl-flow.decision.v1#service",
+                    { action: serviceRunning ? "down" : "up", bridge: "auto", confirmed: true },
+                    serviceRunning ? (zh ? "已停止后台路由。" : "Router stopped.") : zh ? "已启动后台路由。" : "Router started."
+                  )
+                }
+              >
+                {serviceRunning ? (zh ? "停止路由" : "Stop router") : zh ? "启动路由" : "Start router"}
+              </Button>
+            </>
+          ) : null}
           <Button size="sm" variant="outline" onClick={() => shell.openPrimaryView("runtime")}>
             {zh ? "运行状态" : "Runtime"}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setComposeOpen((prev) => !prev)}>
-            <Plus size={14} aria-hidden="true" />
-            <span>{zh ? "投递任务 / 指令" : "Dispatch"}</span>
-          </Button>
           <Button size="sm" variant="outline" disabled={loading || busy} onClick={() => void refresh()}>
-            <RefreshCw size={14} aria-hidden="true" />
-            <span>{zh ? "刷新" : "Refresh"}</span>
+            {zh ? "刷新" : "Refresh"}
           </Button>
         </div>
       </header>
 
-      {error ? <p className="opl-flow-alert" role="alert">{error}</p> : null}
-      {notice ? <p className="opl-flow-notice" role="status">{notice}</p> : null}
+      <div aria-live="polite">
+        {error ? (
+          <p className="opl-flow-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="opl-flow-notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+      </div>
 
-      {dashboard?.state === "unavailable" ? (
+      {envelope?.state === "unavailable" ? (
         <div className="opl-flow-card">
-          <EmptyState
-            title={zh ? "本机尚未绑定 OPL Flow 实例" : "OPL Flow instance not bound"}
-            detail={dashboard.reason || (zh ? "请先在原生会话执行 $opl-flow start 完成 Beads/Dolt 总账初始化。" : "Run $opl-flow start in a conversation to bind an instance.")}
-            action={(
-              <Button size="sm" onClick={() => shell.openPrimaryView("conversation")}>
-                {zh ? "前往对话初始化" : "Go to conversation"}
-              </Button>
-            )}
-          />
+          <p className="opl-flow-notice">
+            {envelope.reason || (zh ? "当前不可用，请确认 OPL Flow Package 与实例配置。" : "OPL Flow is unavailable.")}
+          </p>
         </div>
       ) : null}
 
       {data ? (
         <>
-          <div className="opl-flow-card opl-flow-router-bar">
-            <div className="opl-flow-router-meta">
-              <StatusPill
-                state={serviceRunning ? "done" : "idle"}
-                label={serviceRunning ? (zh ? "后台路由器运行中" : "Router running") : (zh ? "后台路由器未启动" : "Router stopped")}
-              />
-              <span className="opl-flow-badge">{`bridge: ${serviceBridge}`}</span>
-              {occupants.length > 0 ? (
-                <span className="opl-flow-badge">
-                  <ShieldAlert size={12} aria-hidden="true" />
-                  <span>{zh ? `防撞车保护 ${occupants.length} 个工作区` : `${occupants.length} workspace guards`}</span>
-                </span>
-              ) : null}
-            </div>
-            <div className="opl-flow-item-actions">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => void runAction(
-                  "opl-flow.decision.v1#service",
-                  { action: serviceRunning ? "down" : "up", bridge: "auto", confirmed: true },
-                  serviceRunning ? (zh ? "已停止后台路由。" : "Router stopped.") : (zh ? "已启动后台路由。" : "Router started.")
-                )}
-              >
-                {serviceRunning ? <Square size={12} aria-hidden="true" /> : <Play size={12} aria-hidden="true" />}
-                <span>{serviceRunning ? (zh ? "停止路由" : "Stop router") : (zh ? "启动自动路由" : "Start auto router")}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => void runAction(
-                  "opl-flow.decision.v1#tick",
-                  { dry_run: false },
-                  zh ? "已完成一轮状态推进。" : "Router tick completed."
-                )}
-              >
-                <span>{zh ? "立即评估 (Tick)" : "Tick now"}</span>
-              </Button>
-            </div>
+          <div className="opl-flow-summary-strip" role="region" aria-label={zh ? "总控关键指标" : "Control tower summary"}>
+            <button
+              type="button"
+              className="opl-flow-summary-tile"
+              onClick={() => setActiveTab("attention")}
+            >
+              <span className="opl-flow-summary-label">{zh ? "待我处理" : "Needs me"}</span>
+              <span className="opl-flow-summary-value">{attentionCount}</span>
+              <span className="opl-flow-summary-hint">
+                {attentionCount > 0
+                  ? zh
+                    ? `拍板 ${counts?.needs_action ?? 0} · 归档 ${counts?.safe_to_archive ?? 0}`
+                    : `${counts?.needs_action ?? 0} action`
+                  : zh
+                    ? "已清空"
+                    : "All clear"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="opl-flow-summary-tile"
+              onClick={() => setActiveTab("objectives")}
+            >
+              <span className="opl-flow-summary-label">{zh ? "长期目标" : "Objectives"}</span>
+              <span className="opl-flow-summary-value">{counts?.active_objectives ?? 0}</span>
+              <span className="opl-flow-summary-hint">
+                {zh
+                  ? `进行中 ${counts?.active_objectives ?? 0} · 阻塞 ${counts?.blocked ?? 0} · 待排期 ${counts?.backlog ?? 0}`
+                  : `${objectivesCount} tracked`}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="opl-flow-summary-tile"
+              onClick={() => {
+                setSessionScope("running");
+                setActiveTab("sessions");
+              }}
+            >
+              <span className="opl-flow-summary-label">{zh ? "运行中对话" : "Running chats"}</span>
+              <span className="opl-flow-summary-value">{runningPrimaryCount}</span>
+              <span className="opl-flow-summary-hint">{carrierRunningBreakdown}</span>
+            </button>
+            <button
+              type="button"
+              className="opl-flow-summary-tile"
+              onClick={() => {
+                setSessionScope("running");
+                setActiveTab("sessions");
+              }}
+            >
+              <span className="opl-flow-summary-label">{zh ? "工作区防撞车" : "Workspace guard"}</span>
+              <span className="opl-flow-summary-value">
+                {counts?.unique_occupied_workspaces ?? wsSummary.uniqueCount}
+              </span>
+              <span className="opl-flow-summary-hint">
+                {wsSummary.collisions.length > 0
+                  ? zh
+                    ? `并发目录：${wsSummary.collisions.map((c) => `${c.workspace}(${c.count})`).join("、")}`
+                    : `${wsSummary.collisions.length} concurrent`
+                  : zh
+                    ? "各工作区无冲突"
+                    : "No collisions"}
+              </span>
+            </button>
           </div>
 
           {composeOpen ? (
-            <form className="opl-flow-card" onSubmit={(event) => void handleSubmitSend(event)}>
+            <form className="opl-flow-card" onSubmit={(event) => void handleSubmit(event)}>
               <div className="opl-flow-form-grid">
-                <label className="opl-flow-field">
-                  <span>{zh ? "目标编号（留空则新建目标）" : "Objective ID (blank to create)"}</span>
+                <label className="opl-flow-field" htmlFor={`${idBase}-obj`}>
+                  <span>{zh ? "目标编号（留空则新建）" : "Objective ID"}</span>
                   <input
+                    id={`${idBase}-obj`}
                     className="opl-flow-input"
                     value={objectiveId}
-                    onChange={(event) => setObjectiveId(event.target.value)}
-                    placeholder={zh ? "例如 opl-123" : "e.g. opl-123"}
+                    onChange={(e) => setObjectiveId(e.target.value)}
+                    placeholder="opl-123"
                   />
                 </label>
                 {!objectiveId.trim() ? (
-                  <label className="opl-flow-field">
-                    <span>{zh ? "目标标题（新建可选）" : "Title (optional)"}</span>
+                  <label className="opl-flow-field" htmlFor={`${idBase}-title`}>
+                    <span>{zh ? "目标标题（可选）" : "Title"}</span>
                     <input
+                      id={`${idBase}-title`}
                       className="opl-flow-input"
                       value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder={zh ? "一句话描述目标" : "Short objective title"}
+                      onChange={(e) => setTitle(e.target.value)}
                     />
                   </label>
                 ) : null}
-                <label className="opl-flow-field">
+                <label className="opl-flow-field" htmlFor={`${idBase}-exec`}>
                   <span>{zh ? "执行载体" : "Executor"}</span>
                   <select
+                    id={`${idBase}-exec`}
                     className="opl-flow-select"
                     value={executor}
-                    onChange={(event) => setExecutor(event.target.value as "" | OplFlowCarrier)}
+                    onChange={(e) => setExecutor(e.target.value as "" | OplFlowCarrier)}
                   >
                     <option value="">{zh ? "自动路由 (auto)" : "Auto"}</option>
                     <option value="codex">Codex</option>
@@ -344,206 +598,226 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
                     <option value="dsh">OPL DSH</option>
                   </select>
                 </label>
-                <label className="opl-flow-field">
+                <label className="opl-flow-field" htmlFor={`${idBase}-mode`}>
                   <span>{zh ? "队列模式" : "Mode"}</span>
                   <select
+                    id={`${idBase}-mode`}
                     className="opl-flow-select"
                     value={executionMode}
-                    onChange={(event) => setExecutionMode(event.target.value as "active" | "backlog")}
+                    onChange={(e) => setExecutionMode(e.target.value as "active" | "backlog")}
                   >
-                    <option value="active">{zh ? "立即排入进行中 (active)" : "Active"}</option>
-                    <option value="backlog">{zh ? "暂存待排期 (backlog)" : "Backlog"}</option>
+                    <option value="active">{zh ? "立即排入进行中" : "Active"}</option>
+                    <option value="backlog">{zh ? "暂存待排期" : "Backlog"}</option>
                   </select>
                 </label>
               </div>
-              <label className="opl-flow-field">
+              <label className="opl-flow-field" htmlFor={`${idBase}-msg`}>
                 <span>{zh ? "任务内容或拍板指令" : "Instruction"}</span>
                 <textarea
+                  id={`${idBase}-msg`}
                   className="opl-flow-textarea"
                   value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  placeholder={zh ? "说明目标、验收要求或针对待拍板项的回复…" : "Describe goal, acceptance criteria, or decision…"}
+                  onChange={(e) => setMessage(e.target.value)}
                 />
               </label>
-              <div className="opl-flow-form-footer">
-                <label className="opl-flow-badge">
-                  <input type="checkbox" checked={runNow} onChange={(event) => setRunNow(event.target.checked)} />
-                  <span>{zh ? "投递后立即执行一轮状态评估" : "Run router tick immediately"}</span>
+              <div className="opl-flow-actions">
+                <label className="opl-flow-check-inline" htmlFor={`${idBase}-now`}>
+                  <input
+                    id={`${idBase}-now`}
+                    type="checkbox"
+                    checked={runNow}
+                    onChange={(e) => setRunNow(e.target.checked)}
+                  />
+                  <span>{zh ? "投递后立即执行一轮评估" : "Tick immediately"}</span>
                 </label>
-                <div className="opl-flow-item-actions">
-                  <Button size="sm" variant="outline" type="button" onClick={() => setComposeOpen(false)}>
-                    {zh ? "取消" : "Cancel"}
-                  </Button>
-                  <Button size="sm" type="submit" disabled={busy}>
-                    {zh ? "确认投递" : "Submit"}
-                  </Button>
-                </div>
+                <Button size="sm" variant="outline" type="button" onClick={() => setComposeOpen(false)}>
+                  {zh ? "取消" : "Cancel"}
+                </Button>
+                <Button size="sm" type="submit" disabled={busy}>
+                  {zh ? "确认投递" : "Submit"}
+                </Button>
               </div>
             </form>
           ) : null}
 
-          <div className="opl-flow-tablist" role="tablist" aria-label={zh ? "OPL Flow 控制塔分类" : "Control tower sections"}>
-            {TABS.map((tab) => {
-              const count = counts?.[tab.id] ?? 0;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  className="opl-flow-tab"
-                  aria-selected={activeTab === tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  <span>{zh ? tab.zh : tab.en}</span>
-                  <span className="opl-flow-tab-count">{count}</span>
-                </button>
-              );
-            })}
+          <div className="opl-flow-tablist" role="tablist" aria-label={zh ? "OPL Flow 视图切换" : "Control tower views"}>
+            {VIEW_TABS.map((tab, index) => (
+              <button
+                key={tab.id}
+                ref={(el) => {
+                  tabRefs.current[index] = el;
+                }}
+                id={`${idBase}-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                className="opl-flow-tab"
+                aria-selected={effectiveTab === tab.id}
+                onKeyDown={(e) => handleTabKeyDown(e, index)}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span>{zh ? tab.zh : tab.en}</span>
+                <span className="opl-flow-tab-count">{tabCountFor(tab.id)}</span>
+              </button>
+            ))}
           </div>
 
-          {activeTab === "active_sessions" ? (
-            <div className="opl-flow-list">
-              {activeSessions.length === 0 ? (
-                <div className="opl-flow-card">
-                  <EmptyState
-                    title={zh ? "当前无活跃或近期本地会话" : "No active local sessions"}
-                    detail={zh ? "在 Codex、AntiGravity 或 OPL DSH 开启对话后，此处会自动零 Token 感知并发防撞车。" : "Active chats across Codex, AntiGravity, and OPL DSH appear here."}
-                  />
+          <div role="tabpanel" aria-labelledby={`${idBase}-tab-${effectiveTab}`}>
+            {effectiveTab === "attention" ? (
+              attentionCount === 0 ? (
+                <div className="opl-flow-surface">
+                  <div className="opl-flow-empty">
+                    <strong>{zh ? "当前无需人工拍板或归档批准" : "Nothing awaiting your decision"}</strong>
+                    <p className="opl-flow-notice">
+                      {zh
+                        ? "有需要拍板的任务或完成待归档项时会自动汇总到这里。"
+                        : "Items needing input or archive confirmation appear here."}
+                    </p>
+                  </div>
                 </div>
-              ) : activeSessions.map((sess) => (
-                <article className="opl-flow-card" key={sess.session_ref}>
-                  <div className="opl-flow-item-head">
-                    <div className="opl-flow-item-title">
-                      <span className="opl-flow-badge" data-carrier={sess.carrier}>{carrierDisplayName(sess.carrier, zh)}</span>
-                      <strong>{sess.title || sess.model_label || sess.session_ref}</strong>
-                      <span className="opl-flow-badge">{sess.workspace_label || (zh ? "未标注目录" : "Unscoped")}</span>
-                      {sess.bound_bead_id ? (
-                        <span className="opl-flow-badge">{`Bead: ${sess.bound_bead_id}`}</span>
-                      ) : (
-                        <span className="opl-flow-badge">{zh ? "自由对话·仅防撞车" : "Unbound · guard only"}</span>
-                      )}
-                    </div>
-                    <div className="opl-flow-item-actions">
-                      {sess.jump_mode === "native_switch" && sess.thread_id ? (
-                        <Button size="sm" variant="outline" onClick={() => handleNavigateSession(sess)}>
-                          <ArrowUpRight size={13} aria-hidden="true" />
-                          <span>{zh ? "切换到此 Codex 会话" : "Switch to Codex thread"}</span>
-                        </Button>
-                      ) : (
-                        <>
-                          <span className="opl-flow-badge">
-                            {zh ? `外部载体：${carrierDisplayName(sess.carrier, zh)}` : `External: ${carrierDisplayName(sess.carrier, zh)}`}
-                          </span>
-                          {sess.workspace_path ? (
-                            <Button size="sm" variant="outline" onClick={() => shell.startConversationInWorkspace(sess.workspace_path!)}>
-                              <ArrowUpRight size={13} aria-hidden="true" />
-                              <span>{zh ? "在同目录新建 Codex 会话" : "New Codex chat here"}</span>
-                            </Button>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="opl-flow-item-meta">
-                    {`${sess.session_ref} · ${sess.status || "idle"}${sess.model_label ? ` · ${sess.model_label}` : ""}`}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : activeTab === "pending_events" ? (
-            <div className="opl-flow-list">
-              {pendingEvents.length === 0 ? (
-                <div className="opl-flow-card">
-                  <EmptyState
-                    title={zh ? "当前无待处理事件" : "No pending events"}
-                    detail={zh ? "新投递任务、人工拍板或 Worker 回调事件会在此排队等待 Router 处理。" : "Queued events appear here."}
-                  />
-                </div>
-              ) : pendingEvents.map((ev) => (
-                <article className="opl-flow-card" key={ev.event_id}>
-                  <div className="opl-flow-item-title">
-                    <span className="opl-flow-badge">{ev.event_type}</span>
-                    <strong>{ev.objective_id}</strong>
-                    <span className="opl-flow-badge">{ev.status || "pending"}</span>
-                  </div>
-                  {ev.summary ? <div className="opl-flow-item-meta">{ev.summary}</div> : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="opl-flow-list">
-              {currentEntries.length === 0 ? (
-                <div className="opl-flow-card">
-                  <EmptyState
-                    title={zh ? "该分类下暂无目标" : "No items in this view"}
-                    detail={zh ? "可以点击右上角「投递任务 / 指令」新建目标，或在原生对话继续已有工作。" : "Use Dispatch to submit a new objective."}
-                  />
-                </div>
-              ) : currentEntries.map((entry) => (
-                <article className="opl-flow-card" key={entry.bead_id}>
-                  <div className="opl-flow-item-head">
-                    <div className="opl-flow-item-title">
-                      <strong>{entry.title}</strong>
-                      <span className="opl-flow-badge">{entry.bead_id}</span>
-                      {entry.execution_carrier ? (
-                        <span className="opl-flow-badge" data-carrier={entry.execution_carrier}>
-                          {carrierDisplayName(entry.execution_carrier, zh)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="opl-flow-item-actions">
-                      {renderObjectiveAction(entry)}
-                      {activeTab === "safe_to_archive" ? (
-                        confirmApproveId === entry.bead_id ? (
-                          <>
-                            <Button
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => {
-                                setConfirmApproveId(null);
-                                void runAction(
-                                  "opl-flow.decision.v1#approve",
-                                  { bead_id: entry.bead_id, approved_by: "owner", confirmed: true },
-                                  zh ? `已批准归档 ${entry.bead_id}。` : `Approved archive for ${entry.bead_id}.`
-                                );
-                              }}
-                            >
-                              {zh ? "确认归档" : "Confirm archive"}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setConfirmApproveId(null)}>
-                              {zh ? "取消" : "Cancel"}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => setConfirmApproveId(entry.bead_id)}>
-                            {zh ? "批准归档" : "Approve archive"}
-                          </Button>
-                        )
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setObjectiveId(entry.bead_id);
-                            setComposeOpen(true);
-                          }}
-                        >
-                          {zh ? "追加指令" : "Reply"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {entry.first_blocker || entry.next_action ? (
-                    <div className="opl-flow-item-meta">
-                      {entry.first_blocker
-                        ? `${zh ? "阻塞" : "Blocker"}: ${entry.first_blocker}`
-                        : `${zh ? "下一步" : "Next"}: ${entry.next_action}`}
-                    </div>
+              ) : (
+                <div className="opl-flow-surface">
+                  {needsActionList.length > 0 ? (
+                    <>
+                      <div className="opl-flow-section-header">
+                        <span>{zh ? "需你拍板" : "Needs action"}</span>
+                        <span>{needsActionList.length}</span>
+                      </div>
+                      {needsActionList.map((e) => renderObjectiveRow(e, false))}
+                    </>
                   ) : null}
-                </article>
-              ))}
-            </div>
-          )}
+                  {archiveList.length > 0 ? (
+                    <>
+                      <div className="opl-flow-section-header">
+                        <span>{zh ? "待批归档" : "Ready to archive"}</span>
+                        <span>{archiveList.length}</span>
+                      </div>
+                      {archiveList.map((e) => renderObjectiveRow(e, true))}
+                    </>
+                  ) : null}
+                </div>
+              )
+            ) : effectiveTab === "objectives" ? (
+              objectivesCount === 0 ? (
+                <div className="opl-flow-surface">
+                  <div className="opl-flow-empty">
+                    <strong>{zh ? "暂无纳入总账的长期目标" : "No tracked objectives"}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="opl-flow-surface">
+                  {activeObjectivesList.length > 0 ? (
+                    <>
+                      <div className="opl-flow-section-header">
+                        <span>{zh ? "进行中" : "Active"}</span>
+                        <span>{activeObjectivesList.length}</span>
+                      </div>
+                      {activeObjectivesList.map((e) => renderObjectiveRow(e, false))}
+                    </>
+                  ) : null}
+                  {blockedList.length > 0 ? (
+                    <>
+                      <div className="opl-flow-section-header">
+                        <span>{zh ? "外部阻塞" : "Blocked"}</span>
+                        <span>{blockedList.length}</span>
+                      </div>
+                      {blockedList.map((e) => renderObjectiveRow(e, false))}
+                    </>
+                  ) : null}
+                  {backlogList.length > 0 ? (
+                    <>
+                      <div className="opl-flow-section-header">
+                        <span>{zh ? "待排期 / 冻结保留" : "Backlog / Frozen"}</span>
+                        <span>{backlogList.length}</span>
+                      </div>
+                      {backlogList.map((e) => renderObjectiveRow(e, false))}
+                    </>
+                  ) : null}
+                </div>
+              )
+            ) : effectiveTab === "sessions" ? (
+              <>
+                <div className="opl-flow-toolbar">
+                  <div className="opl-flow-segmented" role="group" aria-label={zh ? "活跃范围" : "Session status filter"}>
+                    <button
+                      type="button"
+                      className="opl-flow-seg-button"
+                      aria-pressed={sessionScope === "running"}
+                      onClick={() => setSessionScope("running")}
+                    >
+                      {zh ? `运行中 (${runningPrimaryCount})` : `Running (${runningPrimaryCount})`}
+                    </button>
+                    <button
+                      type="button"
+                      className="opl-flow-seg-button"
+                      aria-pressed={sessionScope === "all"}
+                      onClick={() => setSessionScope("all")}
+                    >
+                      {zh ? `全部近期 (${primaryTotalCount})` : `Recent (${primaryTotalCount})`}
+                    </button>
+                  </div>
+                  <select
+                    className="opl-flow-select"
+                    aria-label={zh ? "载体筛选" : "Filter carrier"}
+                    value={sessionCarrier}
+                    onChange={(e) => setSessionCarrier(e.target.value as CarrierFilter)}
+                  >
+                    <option value="all">{zh ? "全部载体" : "All carriers"}</option>
+                    <option value="codex">Codex</option>
+                    <option value="antigravity">AntiGravity</option>
+                    <option value="dsh">OPL DSH</option>
+                  </select>
+                  {subagentCount > 0 ? (
+                    <label className="opl-flow-check-inline">
+                      <input
+                        type="checkbox"
+                        checked={showSubagents}
+                        onChange={(e) => setShowSubagents(e.target.checked)}
+                      />
+                      <span>{zh ? `显示子代理 (${subagentCount})` : `Subagents (${subagentCount})`}</span>
+                    </label>
+                  ) : null}
+                  <input
+                    type="search"
+                    className="opl-flow-input opl-flow-search-input"
+                    aria-label={zh ? "搜索对话标题或工作区" : "Search sessions"}
+                    placeholder={zh ? "搜索标题、工作区或模型…" : "Search title, workspace, model…"}
+                    value={sessionSearch}
+                    onChange={(e) => setSessionSearch(e.target.value)}
+                  />
+                </div>
+                <div className="opl-flow-surface">
+                  {visibleSessions.length === 0 ? (
+                    <div className="opl-flow-empty">
+                      <strong>{zh ? "当前筛选下无匹配对话" : "No matching sessions"}</strong>
+                    </div>
+                  ) : (
+                    visibleSessions.map((sess) => renderSessionRow(sess))
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="opl-flow-surface">
+                {pendingEvents.length === 0 ? (
+                  <div className="opl-flow-empty">
+                    <strong>{zh ? "当前无待处理事件" : "No pending events"}</strong>
+                  </div>
+                ) : (
+                  pendingEvents.map((ev) => (
+                    <div className="opl-flow-row" key={ev.event_id}>
+                      <div className="opl-flow-row-main">
+                        <div className="opl-flow-row-title">
+                          <span className="opl-flow-pill">{ev.event_type}</span>
+                          <strong>{ev.objective_id}</strong>
+                          <span className="opl-flow-pill">{ev.status || "pending"}</span>
+                        </div>
+                        {ev.summary ? <div className="opl-flow-row-meta">{ev.summary}</div> : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </>
       ) : null}
     </section>
@@ -552,18 +826,14 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
 
 export function OplFlowWorkbenchPanel({ shell, bridge }: OplFlowWorkbenchPanelProps) {
   const snapshot = useOplStudioShellSnapshot(shell as OplStudioShellService);
-  const locale = useOplLocale(snapshot.locale);
-  const zh = locale === "zh";
-  const [reloadNonce, setReloadNonce] = useState(0);
   return (
     <PluginErrorBoundary
       pluginId="@gaofeng21cn/opl-flow-workbench"
-      pluginLabel={zh ? "OPL Flow 总控" : "OPL Flow"}
-      locale={locale}
+      pluginLabel={snapshot.locale === "zh" ? "OPL Flow 总控" : "OPL Flow"}
+      locale={snapshot.locale}
       onOpenSoftwareCenter={() => shell.openPrimaryView("applications")}
-      onReloadView={() => setReloadNonce((value) => value + 1)}
     >
-      <OplFlowWorkbenchInner key={reloadNonce} shell={shell} bridge={bridge} />
+      <OplFlowWorkbenchInner shell={shell} bridge={bridge} />
     </PluginErrorBoundary>
   );
 }

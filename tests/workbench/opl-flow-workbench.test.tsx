@@ -59,7 +59,12 @@ function makeDashboardEnvelope() {
               needs_action: 2,
               safe_to_archive: 1,
               active_objectives: 1,
-              active_sessions: 2,
+              active_sessions: 3,
+              running_sessions: 1,
+              primary_sessions: 2,
+              subagent_sessions: 1,
+              unique_occupied_workspaces: 2,
+              collision_workspaces: 0,
               blocked: 0,
               backlog: 1,
               pending_events: 0,
@@ -87,7 +92,9 @@ function makeDashboardEnvelope() {
                   workspace_path: "/tmp/ws-agy",
                   session_id: "agy-conv-102",
                   jump_mode: "external_focus_only",
-                  first_blocker: "Held in AntiGravity window"
+                  first_blocker: "Held in AntiGravity window",
+                  next_action: "Review test artifact before resuming",
+                  remaining: ["Inspect runtime readback", "Tag release candidate"]
                 }
               ],
               safe_to_archive: [
@@ -127,26 +134,44 @@ function makeDashboardEnvelope() {
                   session_ref: "codex:thread-codex-101",
                   carrier: "codex",
                   surface: "codex",
-                  model_label: "gpt-5.4",
-                  title: "Codex thread 101",
+                  model_label: "gpt-6.2-sol",
+                  title: "Fix release gate in opl-studio",
                   workspace_label: "ws-codex",
                   workspace_path: "/tmp/ws-codex",
                   thread_id: "thread-codex-101",
                   jump_mode: "native_switch",
                   status: "active",
-                  bound_bead_id: "opl-101"
+                  updated_at: "2026-11-27T09:59:00Z",
+                  bound_bead_id: "opl-101",
+                  is_subagent: false
+                },
+                {
+                  session_ref: "agy:conv-sub-1",
+                  carrier: "antigravity",
+                  surface: "subagent",
+                  model_label: "gemini-4-neon-xhigh",
+                  title: "Worker code reader helper",
+                  workspace_label: "ws-agy",
+                  workspace_path: "/tmp/ws-agy",
+                  session_id: "conv-sub-1",
+                  jump_mode: "external_focus_only",
+                  status: "active",
+                  updated_at: "2026-11-27T09:58:00Z",
+                  is_subagent: true
                 },
                 {
                   session_ref: "dsh:sess-202",
                   carrier: "dsh",
                   surface: "opl-dsh",
                   model_label: "deepseek-chat",
-                  title: "DSH session 202",
+                  title: "DSH release checklist",
                   workspace_label: "ws-dsh",
                   workspace_path: "/tmp/ws-dsh",
                   session_id: "sess-202",
                   jump_mode: "external_focus_only",
-                  status: "busy"
+                  status: "idle",
+                  updated_at: "2026-11-27T09:40:00Z",
+                  is_subagent: false
                 }
               ],
               active_workspace_occupants: [
@@ -156,6 +181,12 @@ function makeDashboardEnvelope() {
                   carrier: "codex",
                   session_ref: "codex:thread-codex-101",
                   bound_bead_id: "opl-101"
+                },
+                {
+                  workspace_label: "ws-dsh",
+                  workspace_path: "/tmp/ws-dsh",
+                  carrier: "dsh",
+                  session_ref: "dsh:sess-202"
                 }
               ]
             },
@@ -237,13 +268,18 @@ beforeEach(async () => {
   browser = new Window({ url: "http://127.0.0.1/" });
   originals = new Map(keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   for (const key of keys) {
-    const value = key === "IS_REACT_ACT_ENVIRONMENT"
-      ? true
-      : key === "window"
-        ? browser
-        : key === "ResizeObserver"
-          ? ((browser as unknown as { ResizeObserver?: unknown }).ResizeObserver ?? class { observe() {} disconnect() {} })
-          : (browser as unknown as Record<string, unknown>)[key];
+    const value =
+      key === "IS_REACT_ACT_ENVIRONMENT"
+        ? true
+        : key === "window"
+          ? browser
+          : key === "ResizeObserver"
+            ? ((browser as unknown as { ResizeObserver?: unknown }).ResizeObserver ??
+              class {
+                observe() {}
+                disconnect() {}
+              })
+            : (browser as unknown as Record<string, unknown>)[key];
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
   }
   prevOplStudio = (window as unknown as { oplStudio?: unknown }).oplStudio;
@@ -350,7 +386,7 @@ test("oplFlowWorkbenchClientPlugin stays zero-presence until opl-flow is enabled
   await ctx.fiber.dispose();
 });
 
-test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode without faking cross-app switch, and executes control actions", async () => {
+test("OplFlowWorkbenchPanel defaults to attention view, surfaces blocker + next_action + archive approval, and enforces jump_mode", async () => {
   const readCalls: Array<{ packageId: string; ref: string; input?: Record<string, unknown> }> = [];
   const bridge: StudioWindowBridge = {
     readContribution: async (req) => {
@@ -358,7 +394,7 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
       return makeDashboardEnvelope();
     }
   };
-  const { shell, executed, openedThreads, startedWorkspaces } = makeShellStub();
+  const { shell, executed, openedThreads, startedWorkspaces, openedViews } = makeShellStub();
 
   await act(async () => {
     root.render(<OplFlowWorkbenchPanel shell={shell} bridge={bridge} />);
@@ -374,8 +410,10 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
   expect(document.body.textContent).toContain("OPL Flow 总控");
   expect(document.body.textContent).toContain("Codex native task ready for continuation");
   expect(document.body.textContent).toContain("当前由 AntiGravity 持有");
+  expect(document.body.textContent).toContain("阻塞：Held in AntiGravity window");
+  expect(document.body.textContent).toContain("下一步：Review test artifact before resuming");
+  expect(document.body.textContent).toContain("剩余步骤（2 项）");
 
-  // Click "切换原生会话" (native_switch -> openThread)
   const buttons = Array.from(document.querySelectorAll("button"));
   const switchBtn = buttons.find((b) => b.textContent?.includes("切换原生会话"));
   expect(switchBtn).toBeDefined();
@@ -385,7 +423,6 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
   });
   expect(openedThreads).toEqual(["thread-codex-101"]);
 
-  // Click "在此工作区新建 Codex 会话" for AntiGravity-held item (external_focus_only)
   const newCodexBtn = buttons.find((b) => b.textContent?.includes("在此工作区新建 Codex 会话"));
   expect(newCodexBtn).toBeDefined();
   await act(async () => {
@@ -394,14 +431,20 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
   });
   expect(startedWorkspaces).toEqual(["/tmp/ws-agy"]);
 
-  // Dispatch router tick action
+  const runtimeBtn = buttons.find((b) => b.textContent?.includes("运行状态"));
+  expect(runtimeBtn).toBeDefined();
+  await act(async () => {
+    runtimeBtn!.click();
+    await flushAsync();
+  });
+  expect(openedViews).toEqual(["runtime"]);
+
   const tickBtn = buttons.find((b) => b.textContent?.includes("立即评估 (Tick)"));
   expect(tickBtn).toBeDefined();
   await act(async () => {
     tickBtn!.click();
     await flushAsync();
   });
-  expect(executed).toHaveLength(1);
   expect(executed[0]).toEqual({
     actionId: "package_contribution_execute",
     payload: {
@@ -413,7 +456,6 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
     dryRun: false
   });
 
-  // Dispatch service toggle action
   const stopBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("停止路由"));
   expect(stopBtn).toBeDefined();
   await act(async () => {
@@ -431,13 +473,7 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
     dryRun: false
   });
 
-  // Switch to safe_to_archive tab and approve with two-step confirmation
-  const archiveTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent?.includes("待批归档")) as HTMLButtonElement | undefined;
-  expect(archiveTab).toBeDefined();
-  await act(async () => {
-    archiveTab!.click();
-    await flushAsync();
-  });
+  // Archive candidate sits directly in the attention view for 1-place triage
   const approveBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("批准归档"));
   expect(approveBtn).toBeDefined();
   await act(async () => {
@@ -460,4 +496,54 @@ test("OplFlowWorkbenchPanel reads dashboard with local nav, enforces jump_mode w
     },
     dryRun: false
   });
+});
+
+test("OplFlowWorkbenchPanel sessions tab filters out internal subagents by default and lets user inspect idle or subagent sessions", async () => {
+  const envelope = makeDashboardEnvelope();
+  envelope.opl_app_contribution.response.result.data.counts.needs_action = 0;
+  envelope.opl_app_contribution.response.result.data.counts.safe_to_archive = 0;
+  envelope.opl_app_contribution.response.result.data.counts.active_objectives = 0;
+  envelope.opl_app_contribution.response.result.data.inbox.needs_action = [];
+  envelope.opl_app_contribution.response.result.data.inbox.safe_to_archive = [];
+  envelope.opl_app_contribution.response.result.data.inbox.active_objectives = [];
+
+  const bridge: StudioWindowBridge = {
+    readContribution: async () => envelope
+  };
+  const { shell } = makeShellStub();
+
+  await act(async () => {
+    root.render(<OplFlowWorkbenchPanel shell={shell} bridge={bridge} />);
+    await flushAsync();
+  });
+
+  // Smart default jumps straight to sessions when nothing needs attention
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  const sessionsTab = tabs.find((el) => el.textContent?.includes("本机对话"));
+  expect(sessionsTab?.getAttribute("aria-selected")).toBe("true");
+
+  // Running primary thread appears with real title and model; subagent and idle DSH chat are hidden by default
+  expect(document.body.textContent).toContain("Fix release gate in opl-studio");
+  expect(document.body.textContent).toContain("gpt-6.2-sol");
+  expect(document.body.textContent).not.toContain("Worker code reader helper");
+  expect(document.body.textContent).not.toContain("DSH release checklist");
+
+  // Switch to all recent chats
+  const recentBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("全部近期"));
+  expect(recentBtn).toBeDefined();
+  await act(async () => {
+    recentBtn!.click();
+    await flushAsync();
+  });
+  expect(document.body.textContent).toContain("DSH release checklist");
+  expect(document.body.textContent).not.toContain("Worker code reader helper");
+
+  // Toggle subagents checkbox to reveal subagents
+  const subagentToggle = document.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+  expect(subagentToggle).toBeDefined();
+  await act(async () => {
+    subagentToggle!.click();
+    await flushAsync();
+  });
+  expect(document.body.textContent).toContain("Worker code reader helper");
 });
