@@ -32,7 +32,7 @@ export function ComputerUseSettingsSection({
 }) {
   const [state, setState] = useState<ComputerUseState | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"read" | "action" | null>(null);
   const requestSeqRef = useRef(0);
   const connectionRef = useRef<{
     busy: boolean;
@@ -43,7 +43,7 @@ export function ComputerUseSettingsSection({
   useEffect(() => {
     setState(null);
     setBusy(false);
-    setError(false);
+    setError(null);
 
     const refresh = (surfaceError: boolean) => {
       if (!bridge?.readComputerUse) return;
@@ -52,11 +52,12 @@ export function ComputerUseSettingsSection({
         (next) => {
           if (connectionRef.current === connection && seq === requestSeqRef.current) {
             setState(next);
+            setError((previous) => previous === "read" ? null : previous);
           }
         },
         () => {
           if (connectionRef.current === connection && surfaceError && seq === requestSeqRef.current) {
-            setError(true);
+            setError("read");
           }
         }
       );
@@ -86,12 +87,12 @@ export function ComputerUseSettingsSection({
     connection.busy = true;
     ++requestSeqRef.current;
     setBusy(true);
-    setError(false);
+    setError(null);
     try {
       const next = await request();
       if (connectionRef.current === connection) setState(next);
     } catch {
-      if (connectionRef.current === connection) setError(true);
+      if (connectionRef.current === connection) setError("action");
     } finally {
       if (connectionRef.current === connection) {
         connection.busy = false;
