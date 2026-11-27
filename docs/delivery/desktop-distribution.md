@@ -81,8 +81,8 @@ while App owns the shared toolchain, signing/notarization stages, and public rea
   verifies Framework `credentials.json`/`account.json`/`installation.json` across
   cold start. Main process injects `OPL_CODEX_BIN` and `OPL_APP_OPL_BIN` before
   Host boot; `src/host/managed-update-maintenance.mjs` schedules background App
-  downloads (installed on idle exit) and `opl update activate` / `opl update apply`
-  Framework/Package maintenance (`OPL_STUDIO_MANAGED_UPDATES=0` disables it). Host
+  downloads (installed on idle exit) and `opld` `pack.updatePlan` / `pack.updateAll` /
+  `codex.install` maintenance via `opl.runManagedUpdate` (`OPL_STUDIO_MANAGED_UPDATES=0` disables it). Host
   failures never block native App update IPC recovery.
 - **Joint Full & OCI builds:** For joint OCI releases, follow
   [publication order](../oci-distribution.md#publication-order) before tagging

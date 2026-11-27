@@ -3,12 +3,7 @@ import { deriveWorkbenchModelFromState } from "../../plugins/core/opl-studio-cli
 export function runtimeOverviewFixture(locale: "zh" | "en" = "zh") {
   const zh = locale === "zh";
   return deriveWorkbenchModelFromState({ app_state: {
-    provider: { temporal: { details: { worker_readiness: {
-      service_ready: false, worker_ready: false,
-      temporal_service_lifecycle: { service_status: "supervisor_unready", supervisor: {
-        applicable: true, required: true, ready: false, configuration_current: false, status: "configuration_drift"
-      } }
-    } } } },
+    services: { runway: { status: "degraded", schedule_runner: { running: true, tick_interval_ms: 1000 } } },
     operator: { workbench: { work_item_projection_v2: {
       schema_version: "work-item-projection.v2", generated_at: "2026-11-13T01:30:00Z",
       summary: { running_count: 99, user_attention_count: 99 },

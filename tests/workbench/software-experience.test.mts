@@ -27,13 +27,13 @@ function model() {
   })) } } } });
 }
 
-test("one source recovery covers its affected products without hiding an independent installation conflict", () => {
+test("one source recovery covers its affected products without hiding an independent readiness issue", () => {
   const state = model();
   state.softwareSources = { status: "attention_required", entries: [{ sourceId: "private", displayName: "Private source", sourceKind: "registry", sourceRef: "registry:private", visibility: "authorized_only", status: "expired", enabled: true, credentialHandlePresent: true, availableActions: [] }] };
   const issues = softwareAttentionItems(state, "en");
   expect(issues).toHaveLength(1);
   expect(issues[0]?.products).toEqual(["Example 1", "Example 2", "Example 3"]);
-  state.packageLifecycle.find(item => item.packageId === "example-2")!.activeInstallationStatus = "conflict";
+  state.packageLifecycle.find(item => item.packageId === "example-2")!.readiness.callable = false;
   expect(softwareAttentionItems(state, "en").map(item => item.id)).toEqual(["source:private", "package:example-2"]);
   state.packageLifecycle.find(item => item.packageId === "example-3")!.readiness.callable = false;
   expect(softwareAttentionItems(state, "en").map(item => item.id)).toEqual(["source:private", "package:example-2", "package:example-3"]);
@@ -64,7 +64,7 @@ test("use entry survives the bridge and local use does not require download auth
   expect(softwareCanStart(item)).toBe(true);
   expect(softwareCanStart({ ...item, appEnabled: false })).toBe(false);
   expect(softwareCanStart({ ...item, readiness: { ...item.readiness, launchAllowed: false } })).toBe(false);
-  expect(softwareCanStart({ ...item, activeInstallationStatus: "conflict" })).toBe(false);
+  expect(softwareCanStart({ ...item, readiness: { ...item.readiness, callable: false } })).toBe(false);
 });
 
 async function withDom(run: (container: HTMLElement, render: (element: any) => void) => Promise<void>) {
@@ -141,7 +141,7 @@ test("software sources refresh the catalog without running Homebrew or an access
   const cache = { cached: true, stale: true, fetched_at: "2026-11-24T00:00:00Z", etag: "internal-value" };
   const projection = readSoftwareSourcesProjection({
     surface_kind: "opl_software_sources_projection.v1", status: "available", entries: [
-      { source_id: "public-registry:opl", display_name: "OPL Catalog", source_kind: "registry", provider_id: "public_registry", visibility: "public", status: "public",
+      { source_id: "public-registry:opl", display_name: "OPL Catalog", source_kind: "registry", provider_id: "opl_catalog", visibility: "public", status: "public",
         catalog_cache: cache, verified_at: "2026-11-25T00:00:00Z", available_actions: [
           { action_id: "source_check" }, { action_id: "source_refresh", payload_fields: ["source_id"] }, { action_id: "source_list" }
         ] }
@@ -155,9 +155,9 @@ test("software sources refresh the catalog without running Homebrew or an access
     expect(row.textContent).toContain("Using the last synchronized catalog");
     expect(row.textContent).toContain("Last synchronized");
     const buttons = [...row.querySelectorAll("button")];
-    expect(buttons.map(button => button.textContent)).toEqual(["Update catalog"]);
+    expect(buttons.map(button => button.textContent)).toEqual(["Refresh catalog"]);
     act(() => buttons[0]!.click());
-    expect(requests).toEqual([{ key: "source:public-registry:opl:source_refresh", actionId: "source_refresh", label: "Update catalog",
+    expect(requests).toEqual([{ key: "source:public-registry:opl:source_refresh", actionId: "source_refresh", label: "Refresh catalog",
       payload: { source_id: "public-registry:opl" }, confirmationRequired: false, dryRunSupported: false }]);
   });
 });

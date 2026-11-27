@@ -171,7 +171,7 @@ export class OplHostCore extends EventEmitter {
     this.linkInternetFactory = options.linkInternetFactory ?? createLinkInternet;
     this.readLinkAccount = options.readLinkAccount ?? (options.linkInternetFactory || env.NODE_TEST_CONTEXT
       ? undefined
-      : () => readLinkGatewayAccount(env));
+      : () => readLinkGatewayAccount(this.framework.client));
     this.closePromise = null;
     this.manualUpdateOperations = new Set();
     this.externalPluginAdapters = new Map([
@@ -217,6 +217,7 @@ export class OplHostCore extends EventEmitter {
     if (webServer) {
       this.linkInternet = await this.linkInternetFactory({
         env: this.linkOptions.env, handle: (...args) => this.linkCompanion.handleAuthenticatedPeer(...args),
+        gatewayClient: this.framework.client,
         readAccount: this.readLinkAccount,
         onAccountChanged: options => this.linkCompanion.clearRemoteDevices(options)
       });
@@ -251,11 +252,11 @@ export class OplHostCore extends EventEmitter {
         status: "executed", command: "", commandArgs: [], exitCode: 0, stdout: "", stderr: "", timedOut: false
       };
     }
-    const updateActions = ["settings_apply_opl_base_update", "settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "agent_package_uninstall", "agent_package_preferences_set", "install_from_manifest_url", "official_profile_restore"];
+    const updateActions = ["settings_apply_opl_packages", "agent_package_install", "agent_package_update", "agent_package_repair", "agent_package_uninstall", "agent_package_preferences_set", "install_from_manifest_url", "official_profile_restore"];
     if (payload?.dryRun === false && updateActions.includes(payload?.actionId) && this.transport.runWhenIdle) {
       const operation = this.transport.runWhenIdle(async () => {
         const receipt = await this.opl.executeAction(payload);
-        if (payload.actionId !== "settings_apply_opl_base_update" && receipt.status === "executed" && receipt.exitCode === 0) {
+        if (receipt.status === "executed" && receipt.exitCode === 0) {
           await this.codex.reloadConfiguration({ maintenanceHeld: true });
         }
         return receipt;

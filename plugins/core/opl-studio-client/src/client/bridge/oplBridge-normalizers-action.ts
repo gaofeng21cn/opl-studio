@@ -5,7 +5,6 @@ import type { OplActionMode, OplActionReceipt, OplActionReceiptKind, OplActionRe
 
 function actionMode(request: OplActionRequest): OplActionMode {
   if (request.mode) return request.mode;
-  if (request.payload?.rollbackRef) return "rollback";
   return request.dryRun === false ? "execute" : "preview";
 }
 
@@ -58,8 +57,7 @@ export function createPlaceholderActionReceipt(request: OplActionRequest): OplAc
     stdoutJson: undefined,
     stderrJson: parseJsonValue(stderr),
     confirmationId: request.payload?.confirmationId,
-    receiptId: request.payload?.receiptId,
-    rollbackRef: request.payload?.rollbackRef
+    receiptId: request.payload?.receiptId
   };
 }
 
@@ -112,7 +110,6 @@ export function normalizeActionReceipt(value: unknown, request: OplActionRequest
     stderrJson: parseJsonValue(readback.stderr),
     confirmationId: asString(record.confirmationId) ?? fallback.confirmationId,
     receiptId: asString(record.receiptId) ?? fallback.receiptId,
-    rollbackRef: asString(record.rollbackRef) ?? fallback.rollbackRef,
     blockedReason: asString(record.blockedReason) ?? fallback.blockedReason
   };
 }

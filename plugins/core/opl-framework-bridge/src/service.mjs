@@ -48,7 +48,7 @@ export function createOplPassthrough(options = {}) {
       const patch = options.getWeixinHost?.()?.appStatePatch?.();
       const appState = withOfficialProfileAction(res?.app_state, env.OPL_OFFICIAL_PROFILE_RESOURCES);
       if (!patch) return { ...res, ...(appState ? { app_state: appState } : {}), profile: res?.profile ?? p, readback: readback("opld app.state.get", [p]) };
-      const baseApp = appState ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin" && e?.view?.view_type !== "channel_access");
+      const baseApp = appState ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin");
       const ui = patch.ui_contributions ? { ...baseUi, ...patch.ui_contributions, entries: [...entries, ...(patch.ui_contributions.entries ?? [])], contribution_count: entries.length + (patch.ui_contributions.entries?.length ?? 0) } : baseUi;
       return { ...res, profile: res?.profile ?? p, app_state: { ...baseApp, ...patch, ...(ui ? { ui_contributions: ui } : {}) }, readback: readback("opld app.state.get", [p]) };
     },
@@ -95,13 +95,12 @@ export function createOplPassthrough(options = {}) {
     async executeAction({ actionId, payload = {}, dryRun = true, mode, packageId } = {}) {
       if (!nonEmptyStr(actionId) || !isObj(payload)) throw errReq("actionId and an object payload are required");
       if (packageId !== undefined && (!nonEmptyStr(packageId) || (payload.package_id !== undefined && payload.package_id !== packageId))) throw errReq("Conflicting or invalid package identity");
-      const requestedMode = mode ?? (payload.rollbackRef ? "rollback" : dryRun === false ? "execute" : "preview");
-      if (!["preview", "execute", "rollback"].includes(requestedMode)) throw errReq("Unknown action mode");
+      const requestedMode = mode ?? (dryRun === false ? "execute" : "preview");
+      if (!["preview", "execute"].includes(requestedMode)) throw errReq("Unknown action mode");
       const isDry = requestedMode === "preview";
       const request = { actionId, packageId, payload, requestedMode, dryRun: isDry };
       const command = readback("opld app.action.execute", [actionId]);
       if (!isDry && readOnly()) return actionOwnerReceipt(command, { status: "blocked_read_only", blocked_reason: "read_only_host" }, request);
-      if (requestedMode === "rollback") return actionOwnerReceipt(command, { status: "unsupported", blocked_reason: "opld_rollback_unavailable" }, request);
       if (actionId === restoreAction.action_id) {
         const result = await runOfficialProfileAction(env, request);
         return actionOwnerReceipt(readback(restoreAction.route), result, request);
@@ -133,13 +132,15 @@ export function createOplPassthrough(options = {}) {
         return actionOwnerReceipt(command, { status: "confirmation_required", blocked_reason: error.code }, request);
       }
     },
-    async runManagedUpdate(operation = "status") {
+    async runManagedUpdate(operation = "status", previousResult) {
       if (!["check", "plan", "apply", "status", "activate"].includes(operation)) throw errReq(`Unsupported managed update operation: ${operation}`);
       if (["apply", "activate"].includes(operation) && readOnly()) throw errReq("Managed update is blocked in read-only mode", "blocked_read_only");
       if (operation === "activate") return codexRuntime(true);
       const result = operation === "apply"
         ? await client.call("pack.updateAll", { background: true })
-        : await client.call("pack.updatePlan", {});
+        : operation === "status" && isObj(previousResult?.managed_update)
+          ? previousResult
+          : await client.call("pack.updatePlan", {});
       if (!Array.isArray(result?.managed_update?.components) || !result.managed_update.execution?.status) {
         throw errReq("Framework does not provide managed Package update results", "base_upgrade_required");
       }

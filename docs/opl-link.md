@@ -101,16 +101,21 @@ The same Link request journal continues to reject unknown mutation replay. Each 
 replacing a connection closes the old handles. Host and data WebSockets and
 REST calls attach `X-OPL-Account`; device tokens remain the authorization.
 
-Framework authorizes the Host with the desktop’s existing Gateway account:
+Framework authorizes the Host with the desktop’s existing Gateway account via
+the connected `opld` bridge RPC (`connect.gateway.status` and
+`connect.gateway.authorizeCompanion`, backed by Framework's Gateway companion
+authorization handler):
 
 ```text
-opl connect gateway authorize-companion --request-stdin --credential-file <new-private-file> --json
+gatewayClient.call("connect.gateway.authorizeCompanion", { request, credential_file })
 ```
 
-Studio sends a strict Host descriptor through stdin. The command writes its
-credential envelope into a new mode-0600 file inside a caller-owned mode-0700
-temporary directory. Studio verifies origin and exact local identity, imports
-the token pair into the upstream store and removes the temporary directory.
+Studio sends the strict Host descriptor over the connected bridge (with
+`opl connect gateway authorize-companion --request-stdin --credential-file <new-private-file> --json`
+as the CLI equivalent). Framework writes the credential envelope into a new
+mode-0600 file inside a caller-owned mode-0700 temporary directory. Studio
+verifies origin and exact local identity, imports the token pair into the
+upstream store and removes the temporary directory.
 Tokens, Gateway passwords and model keys never reach the renderer. The
 persistent public scope and identity binding live in `link-host.json` beside
 the upstream identity and credential store under `.opl-studio/link-remote/`.

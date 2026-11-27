@@ -5,11 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile, symlink, copyFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { createLinkCompanion } from "../../plugins/core/opl-host-core/src/link-companion.mjs";
 import { LinkLoopback, LINK_VIRTUAL_PORT } from "../../plugins/core/opl-host-core/src/link-loopback.mjs";
 import { createThreadWorkspaceService } from "../../plugins/core/opl-host-core/src/thread-workspace-service.mjs";
-import { createLinkInternet, authorizeLinkHost } from "../../plugins/core/opl-host-core/src/link-internet.mjs";
+import { createLinkInternet, authorizeLinkHost, readLinkGatewayAccount } from "../../plugins/core/opl-host-core/src/link-internet.mjs";
+import { OpldClient } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
 import { createLinkTransportEvidence } from "../../plugins/core/opl-host-core/src/link-transport-evidence.mjs";
 
 async function fixture(t, { now } = {}) {
@@ -267,44 +269,65 @@ test("upload digest and TTL failures discard receipts without dispatching a turn
   assert.equal((await http(loop, `/api/link/uploads/${expired.json.id}`, { token: claim.token })).status, 404); assert.equal(calls.length, 0);
 });
 
-test("Framework exchange uses only private temporary files and removes them on success or rejection", async t => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-cli-test-")); t.after(() => rm(root, { recursive: true, force: true }));
-  const worker = path.join(root, "opl.mjs"); const cli = path.join(root, "opl"); const receipt = path.join(root, "receipt.json");
-  await writeFile(worker, `import fs from 'node:fs';\nlet body='';for await (const part of process.stdin)body+=part;const request=JSON.parse(body);const file=process.argv[process.argv.indexOf('--credential-file')+1];fs.writeFileSync(process.env.TEST_RECEIPT,JSON.stringify({file,request,args:process.argv.slice(2)}));if(process.env.TEST_MODE==='login'||process.env.TEST_MODE==='login-stderr'){const output=process.env.TEST_MODE==='login-stderr'?console.error:console.log;output(JSON.stringify({ok:false,error:'Private backend detail',details:{reason_code:'auth_expired',accessToken:'private-error-secret'}}));process.exit(1)}if(process.env.TEST_MODE==='stderr-overflow'){process.stderr.write('x'.repeat(70000));process.exit(1)}fs.writeFileSync(file,JSON.stringify({schema:'opl_link_remote_credentials.v1',accessToken:'private-test-secret'}),{mode:process.env.TEST_MODE==='public'?0o644:0o600,flag:'wx'});console.log(JSON.stringify({ok:true,companion_authorization:{credential_written:true}}));\n`, { mode: 0o600 });
-  await writeFile(cli, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(worker)} "$@"\n`, { mode: 0o700 });
-  const env = { ...process.env, OPL_APP_OPL_BIN: cli, TEST_RECEIPT: receipt };
+test("Gateway status and companion authorization use connected bridge RPC with private temporary credentials", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-rpc-test-")); t.after(() => rm(root, { recursive: true, force: true }));
   const device = { deviceId: crypto.randomUUID(), role: "host", name: "Test", platform: "darwin", identityKey: crypto.randomBytes(32).toString("base64url"), clientVersion: "0.6.5" };
-  assert.equal((await authorizeLinkHost({ device, env })).accessToken, "private-test-secret");
-  const recorded = JSON.parse(await readFile(receipt, "utf8")); assert.deepEqual(recorded.request, { service: "opl_link", device }); assert.ok(recorded.args.includes("--request-stdin"));
-  await assert.rejects(readFile(recorded.file), error => error.code === "ENOENT");
-  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "public" } }), error => error.code === "link_credentials_invalid");
-  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "login" } }), error => error.code === "link_account_required");
-  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "login-stderr" } }), error => error.code === "link_account_required" && !JSON.stringify(error).includes("private-error-secret") && !error.message.includes("Private backend detail"));
-  await assert.rejects(authorizeLinkHost({ device, env: { ...env, TEST_MODE: "stderr-overflow" } }), error => error.code === "link_authorization_failed");
+  const calls = [];
+  const gatewayClient = {
+    async call(method, params, timeoutMs) {
+      calls.push({ method, params, timeoutMs });
+      if (method === "connect.gateway.status") return { gateway_account: {
+        surface_kind: "opl_gateway_account_read_model.v1", connection_mode: "account", status: "active",
+        account: { email: "owner@example.test", status: "active" }
+      } };
+      if (method !== "connect.gateway.authorizeCompanion") throw new Error(`Unexpected RPC ${method}`);
+      if (params.mode === "login" || params.mode === "login-stderr") {
+        throw Object.assign(new Error("Private backend detail"), { code: "gateway_account_failed", data: { reason_code: "auth_expired", accessToken: "private-error-secret" } });
+      }
+      if (params.mode === "timeout") throw Object.assign(new Error("Private backend detail"), { code: "rpc_timeout" });
+      await writeFile(params.credential_file, JSON.stringify({ schema: "opl_link_remote_credentials.v1", accessToken: "private-test-secret" }), { mode: params.mode === "public" ? 0o644 : 0o600, flag: "wx" });
+      return { ok: true, companion_authorization: { credential_written: true } };
+    }
+  };
+  assert.equal(await readLinkGatewayAccount(gatewayClient), crypto.createHash("sha256").update("owner@example.test").digest("hex"));
+  assert.equal((await authorizeLinkHost({ device, gatewayClient })).accessToken, "private-test-secret");
+  const authorizationCall = calls.find(call => call.method === "connect.gateway.authorizeCompanion");
+  assert.deepEqual(authorizationCall.params.request, { service: "opl_link", device });
+  assert.equal(authorizationCall.timeoutMs, 60_000);
+  await assert.rejects(readFile(authorizationCall.params.credential_file), error => error.code === "ENOENT");
+  for (const mode of ["public", "login", "login-stderr"]) {
+    const client = { call: (method, params, timeoutMs) => gatewayClient.call(method, { ...params, mode }, timeoutMs) };
+    await assert.rejects(authorizeLinkHost({ device, gatewayClient: client }), error => mode === "public"
+      ? error.code === "link_credentials_invalid"
+      : error.code === "link_account_required" && !JSON.stringify(error).includes("private-error-secret") && !error.message.includes("Private backend detail"));
+  }
+  const timeoutClient = { call: (method, params, timeoutMs) => gatewayClient.call(method, { ...params, mode: "timeout" }, timeoutMs) };
+  await assert.rejects(authorizeLinkHost({ device, gatewayClient: timeoutClient }), error => error.code === "link_authorization_timeout");
 });
 
-test("the actual Framework CLI maps an isolated signed-out account to the existing account entry", async t => {
+test("the actual Framework RPC reports that an isolated signed-out account needs a login", async t => {
   const frameworkRoot = process.env.OPL_LINK_FRAMEWORK_SOURCE;
   if (!frameworkRoot) { t.skip("Set OPL_LINK_FRAMEWORK_SOURCE to the matching Framework checkout"); return; }
-  const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-framework-cli-"));
+  const root = await mkdtemp(path.join(process.platform === "darwin" ? "/tmp" : os.tmpdir(), "opl-link-rpc-"));
   const frameworkCli = path.join(frameworkRoot, "bin/opl");
   const env = { ...process.env, NODE_ENV: "test", HOME: root, USERPROFILE: root, OPL_DATA_DIR: root,
     OPL_STATE_DIR: path.join(root, "framework-state"), CODEX_HOME: path.join(root, "codex"),
     OPL_APP_OPL_BIN: frameworkCli, OPL_GATEWAY_CONTROL_BASE_URL: "http://127.0.0.1:1/api/v1" };
-  const carrier = await createLinkInternet({ env, handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
+  const gatewayClient = new OpldClient({ env, daemonBin: path.join(frameworkRoot, "packages/daemon/bin/opld") });
+  const carrier = await createLinkInternet({ env, gatewayClient, readAccount: () => readLinkGatewayAccount(gatewayClient), handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
   t.after(async () => {
     try {
       await carrier.close();
     } finally {
       try {
-        execFileSync(frameworkCli, ["daemon", "stop", "--json"], { env, timeout: 15_000, stdio: "pipe" });
+        await promisify(execFile)(frameworkCli, ["daemon", "stop", "--json"], { env, timeout: 15_000 });
       } finally {
+        await gatewayClient.close();
         await rm(root, { recursive: true, force: true });
       }
     }
   });
-  await assert.rejects(carrier.enable(), error => error.code === "link_account_required");
-  assert.deepEqual(carrier.status(), { status: "account_required", enabled: false, reasonCode: "link_account_required" });
+  assert.deepEqual(await carrier.enable(), { status: "account_required", enabled: true, reasonCode: "link_account_required" });
 });
 
 test("RTC evidence requires an actual succeeded pair and data bytes and exposes only closed classifications", async () => {

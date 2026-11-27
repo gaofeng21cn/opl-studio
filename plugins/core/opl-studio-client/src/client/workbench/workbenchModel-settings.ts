@@ -195,13 +195,11 @@ function deriveStatusSummary(
   statusSummary: Record<string, unknown> | null,
   localEnvironment: Record<string, unknown> | null
 ): WorkbenchSettingsProjection["statusSummary"] {
-  const temporalProvider = firstString(statusSummary, ["temporal_provider"]) ?? firstString(localEnvironment, ["temporal_provider"]);
   const releaseChannel = firstString(statusSummary, ["release_channel"]) ?? firstString(localEnvironment, ["release_channel"]);
   const issueCount = asFiniteNumber(statusSummary?.issue_count);
   return {
     ...(asString(statusSummary?.runtime_source_carrier_health) ? { runtimeSourceHealth: asString(statusSummary?.runtime_source_carrier_health) as string } : {}),
     ...(asString(statusSummary?.agent_package_functional_health) ? { agentPackageHealth: asString(statusSummary?.agent_package_functional_health) as string } : {}),
-    ...(temporalProvider ? { temporalProvider } : {}),
     ...(releaseChannel ? { releaseChannel } : {}),
     ...(issueCount !== null ? { issueCount } : {})
   };
@@ -214,8 +212,7 @@ function deriveLocalEnvironment(
     ...(asString(localEnvironment?.state_dir) ? { stateDir: asString(localEnvironment?.state_dir) as string } : {}),
     ...(asString(localEnvironment?.runtime_sources_root) ? { runtimeSourcesRoot: asString(localEnvironment?.runtime_sources_root) as string } : {}),
     ...(asString(localEnvironment?.logs_dir) ? { logsDir: asString(localEnvironment?.logs_dir) as string } : {}),
-    ...(asString(localEnvironment?.release_channel) ? { releaseChannel: asString(localEnvironment?.release_channel) as string } : {}),
-    ...(asString(localEnvironment?.temporal_provider) ? { temporalProvider: asString(localEnvironment?.temporal_provider) as string } : {})
+    ...(asString(localEnvironment?.release_channel) ? { releaseChannel: asString(localEnvironment?.release_channel) as string } : {})
   };
 }
 

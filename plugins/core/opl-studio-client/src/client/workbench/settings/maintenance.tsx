@@ -160,7 +160,9 @@ export function ManagedUpdateGroup({
         ? (locale === "zh" ? "后台检查与下载，退出时安装；也可选择立即重启。" : "Checks and downloads in the background; installs on quit, or restart now.")
         : (locale === "zh" ? "手动检查与下载，准备就绪后重启安装。" : "Check and download manually, then restart to install.")
       : (locale === "zh" ? "插件、扩展与运行组件仍会在后台自动更新。" : "Plugins, extensions, and runtime components still update automatically.")
-    : formatUpdatePolicy(component?.autoApplyMode, component?.autoApplyEligible, locale);
+    : component?.componentId === "opl_base"
+      ? (locale === "zh" ? "仅显示当前版本" : "Current version only")
+      : formatUpdatePolicy(component?.autoApplyMode, component?.autoApplyEligible, locale);
   const nativeUpdateSource = nativeUpdate?.supported
     ? (locale === "zh" ? "已配置" : "Configured")
     : nativeUpdate?.buildKind === "local-development"

@@ -15,7 +15,7 @@ export const featureCatalog = [
   ['B0-09', '工具与环境', 'Tools and environment', 'workspace', 'codex', 'turn tool/process events'],
   ['B0-10', '项目与工作区', 'Projects and workspaces', 'workspace', 'codex', 'thread/start.cwd / thread/read.cwd'],
   ['B0-11', '子 Agent', 'Subagents', 'workspace', 'codex', 'collabAgentToolCall / thread/read'],
-  ['B0-12', '计划任务与后台', 'Scheduled tasks and background', 'services', 'framework', 'provider.temporal.details.scheduler'],
+  ['B0-12', '计划任务与后台', 'Scheduled tasks and background', 'services', 'framework', 'services.runway'],
   ['B0-13', '记忆与个性化', 'Memory and personalization', 'instructions', 'framework', "codex_personalization"],
   ['B0-14', '设置与无障碍', 'Settings and accessibility', 'preferences', 'studio', 'Studio/preferences'],
   ['R1-01', 'Gateway 账户', 'Gateway account', 'account', 'framework', `${settings}.opl_gateway_account`],
@@ -65,7 +65,7 @@ export function deriveFeatureRefs(state: unknown, actions: WorkbenchActionRef[] 
     const refs = referencedFeatureActions(source, actions);
     const feature: WorkbenchFeatureRef = {
       featureId, label, labelEn, destination, owner, sourceRef: pluginSource ? `workbench_services.${pluginKey}` : sourceRef, actions: refs,
-      state: authority === 'studio' ? 'available' : authority === 'codex' ? 'degraded' : ['available', 'ready', 'current', 'connected', 'healthy'].includes(status ?? '') ? 'available' : source !== undefined && source !== null ? 'degraded' : 'owner_action_required',
+      state: authority === 'studio' ? 'available' : authority === 'codex' ? 'degraded' : ['available', 'ready', 'current', 'connected', 'healthy', 'running'].includes(status ?? '') ? 'available' : source !== undefined && source !== null ? 'degraded' : 'owner_action_required',
       summary: authority === 'codex' ? '等待 Codex App Server 状态。' : source === undefined && authority === 'framework' ? 'Owner 尚未投影此功能，不能在此执行。' : '入口已提供；状态以当前 owner 回读为准。',
       nextStep: authority === 'codex' ? '新建或打开任务；连接失败时重试。' : authority === 'studio' ? '打开对应页面。' : '刷新状态；如仍未提供，请在所属 owner 配置此能力。',
       affectsCodex: authority === 'codex',
@@ -77,9 +77,13 @@ export function deriveFeatureRefs(state: unknown, actions: WorkbenchActionRef[] 
     else if (typeof projection?.reason_code === 'string') feature.summary = projection.reason_code;
     if (typeof projection?.next_visible_step === 'string') feature.nextStep = projection.next_visible_step;
     // A running scheduler service alone does not expose task CRUD or history.
-    if (featureId === 'B0-12' && !pluginSource && feature.state === 'available') {
-      feature.state = 'owner_action_required';
-      feature.summary = '后台服务状态已提供，但 owner 未提供计划任务操作。隐藏窗口后当前 turn 继续；退出 App 后不承诺继续。';
+    if (featureId === 'B0-12' && !pluginSource && status === 'running') {
+      if (record(projection?.schedule_runner)?.running === true) {
+        feature.state = 'owner_action_required';
+        feature.summary = 'Runway 已运行。计划任务操作以所属服务提供的入口为准。';
+      } else {
+        feature.state = 'degraded';
+      }
     }
     if (featureId === 'B0-13' && !pluginSource && projection && ['available', 'degraded'].includes(feature.state)) {
       feature.state = 'degraded';

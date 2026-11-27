@@ -154,6 +154,10 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
     const currentStageTelemetry = asRecord(telemetry?.current_stage);
     const cumulativeTelemetry = asRecord(telemetry?.cumulative);
     const action = asRecord(item.action);
+    const gate = action?.action_ref === "app_state.actions#runway_human_gate_resolve" && action.kind === "user_action"
+      ? asRecord(action.action_payload) : null;
+    const stageRunId = asString(gate?.stage_run_id);
+    const expectedRevision = asFiniteNumber(gate?.expected_revision);
     const freshness = asRecord(item.freshness);
     const id = asString(item.item_id);
     const agentId = asString(identity?.agent_id);
@@ -236,6 +240,8 @@ function readWorkItemRuntimeProjection(value: unknown): WorkItemRuntimeProjectio
       ...(asString(action?.summary_key) ? { actionSummaryKey: asString(action?.summary_key) as string } : {}),
       ...(actionMessageArgs ? { actionMessageArgs } : {}),
       ...(asString(action?.owner_kind) ? { actionOwnerKind: asString(action?.owner_kind) as string } : {}),
+      ...(stageRunId && expectedRevision !== null && Number.isSafeInteger(expectedRevision) && expectedRevision >= 0
+        ? { humanGate: { stageRunId, expectedRevision } } : {}),
       ...(asString(action?.action_ref) ? { actionRef: asString(action?.action_ref) as string } : {}),
       ...(asString(execution?.started_at) ? { startedAt: asString(execution?.started_at) as string } : {}),
       ...(asString(execution?.last_heartbeat_at) ? { lastHeartbeatAt: asString(execution?.last_heartbeat_at) as string } : {}),

@@ -142,7 +142,7 @@ export function RuntimeStatusPanel({
         noArchived: "当前范围没有归档工作",
         emptyHint: "智能体提供项目任务后，会显示在这里。",
         unavailableHint: "重新读取任务列表，或打开维护查看连接状态。",
-        serviceHint: "后台自动执行可能受影响。打开维护查看服务详情与恢复操作。",
+        serviceHint: "后台自动执行可能受影响。打开维护查看服务状态。",
         unknownHint: "刷新后确认服务状态，或在维护中查看详情。",
         cachedService: "上次服务检查",
         running: "运行中",
@@ -197,7 +197,7 @@ export function RuntimeStatusPanel({
         noArchived: "No archived work in this scope",
         emptyHint: "Project work will appear here when an agent provides it.",
         unavailableHint: "Read the task list again, or open maintenance to check the connection.",
-        serviceHint: "Background execution may be affected. Open maintenance for service details and recovery.",
+        serviceHint: "Background execution may be affected. Open maintenance for service details.",
         unknownHint: "Refresh to check service status, or view details in maintenance.",
         cachedService: "Last service check",
         running: "Running",
@@ -293,9 +293,10 @@ export function RuntimeStatusPanel({
     return projection.items.find((candidate) => candidate.id === activeDetailItemId);
   }, [activeDetailItemId, projection?.items]);
 
-  const recoveryNeedsAttention = serviceRecovery !== undefined && serviceRecovery.causalRoot.status !== "ready";
+  const recoveryNeedsAttention = serviceRecovery !== undefined && (serviceRecovery.status !== "running" || serviceRecovery.scheduleRunnerStatus !== "running");
   const serviceSnapshotIsCurrent = stateStatus === "ready" && snapshotSource === "live";
-  const serviceNoticeTone = !serviceSnapshotIsCurrent || serviceRecovery?.causalRoot.status === "unknown" ? "unknown" : "attention";
+  const runwayUnready = serviceRecovery?.status === "degraded" || serviceRecovery?.status === "stopped" || serviceRecovery?.scheduleRunnerStatus === "stopped";
+  const serviceNoticeTone = serviceSnapshotIsCurrent && runwayUnready ? "attention" : "unknown";
   const snapshotMessage =
     stateStatus === "error" && snapshotSource !== "none"
       ? copy.stale
@@ -394,6 +395,16 @@ export function RuntimeStatusPanel({
           mcpApps={mcpApps}
           TaskWorkbenchComponent={TaskWorkbenchComponent}
           archiveBusy={archiveBusy}
+          onResolveHumanGate={serviceSnapshotIsCurrent && onExecuteAction ? async (gate, decision) => {
+            let receipt: OplActionReceipt | undefined;
+            try {
+              receipt = await onExecuteAction({ actionId: "runway_human_gate_resolve", mode: "execute", dryRun: false,
+                payload: { stage_run_id: gate.stageRunId, expected_revision: gate.expectedRevision, decision } });
+            } finally {
+              await onRefresh();
+            }
+            if (receipt?.status !== "executed" || receipt.exitCode !== 0 || receipt.timedOut) throw new Error("Runway decision not confirmed");
+          } : undefined}
           onBack={() => setActiveDetailItemId(null)}
           onOpenMaterials={onOpenMaterials}
           onOpenThread={onOpenThread}
@@ -593,13 +604,13 @@ export function RuntimeStatusPanel({
 
       {archiveStatus}
 
-      {projection && recoveryNeedsAttention && serviceRecovery ? (
+      {snapshotSource !== "none" && recoveryNeedsAttention && serviceRecovery ? (
         <section className="runtime-service-notice" aria-labelledby="runtime-service-title" data-tone={serviceNoticeTone}>
           {serviceNoticeTone === "unknown" ? <Info aria-hidden="true" size={18} /> : <CircleAlert aria-hidden="true" size={18} />}
           <div>
             <h2 id="runtime-service-title">
               {!serviceSnapshotIsCurrent ? `${copy.cachedService} · ` : ""}
-              {serviceRecovery.causalRoot.detail[locale]}
+              {serviceRecovery.detail[locale]}
             </h2>
             <p>{serviceNoticeTone === "unknown" ? copy.unknownHint : copy.serviceHint}</p>
           </div>

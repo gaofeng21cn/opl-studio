@@ -44,7 +44,7 @@ export type SettingsHostActionIntent = {
   transport: "managed_update_host" | "native_app_updater";
   key: string;
   label: string;
-  operation: "status" | "check" | "plan" | "apply" | "repair" | "rollback" | "restart";
+  operation: "status" | "check" | "plan" | "apply" | "repair" | "restart";
   componentIds: ("opl_app" | "opl_base" | "opl_packages")[];
   confirmationRequired: boolean;
   availability: SettingsActionAvailability;
@@ -247,7 +247,9 @@ export function buildSettingsActionViewModel(
     managedComponentIds.map((componentId) => [componentId, []])
   );
   for (const intent of projection.managedUpdateActions ?? []) {
-    for (const componentId of intent.componentIds) managedActions.get(componentId)?.push(intent);
+    for (const componentId of intent.componentIds) {
+      if (componentId !== "opl_base") managedActions.get(componentId)?.push(intent);
+    }
   }
 
   return {

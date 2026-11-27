@@ -22,10 +22,7 @@ import {
   type ManagedCompanionViewModel
 } from "./managedCompanions";
 
-import {
-  deriveServiceRecoveryModel,
-  type ServiceRecoveryModel
-} from "./serviceRecoveryModel";
+import type { ServiceRecoverySummary } from "@gaofeng21cn/opl-host-contracts";
 
 export type WorkbenchModel = {
   features: WorkbenchFeatureRef[];
@@ -52,7 +49,7 @@ export type WorkbenchModel = {
   settingsProjection?: WorkbenchSettingsProjection;
   applicationManagement?: ApplicationManagementProjection;
   runtimeOverview?: RuntimeOverviewRef;
-  serviceRecovery?: ServiceRecoveryModel;
+  serviceRecovery?: ServiceRecoverySummary;
   workItemRuntime?: WorkItemRuntimeProjection;
   managedCompanions: ManagedCompanionViewModel[];
   uiContributions: OplUiContributionsProjection;

@@ -3,20 +3,6 @@ import type { SettingsDockerDiagnostic } from "./SettingsPanel";
 
 export const managedUpdateActionSpecs = [
   {
-    actionId: "settings_check_opl_base_update",
-    operation: "check",
-    componentIds: ["opl_base"],
-    confirmationRequired: false,
-    labels: ["检查 OPL Base 更新", "Check OPL Base update"]
-  },
-  {
-    actionId: "settings_apply_opl_base_update",
-    operation: "apply",
-    componentIds: ["opl_base"],
-    confirmationRequired: true,
-    labels: ["更新 OPL Base", "Update OPL Base"]
-  },
-  {
     actionId: "settings_apply_opl_packages",
     operation: "apply",
     componentIds: ["opl_packages"],

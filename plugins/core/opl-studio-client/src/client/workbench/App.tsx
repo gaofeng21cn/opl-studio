@@ -4,7 +4,6 @@ import { FirstInstallProgress, type FirstInstallSnapshot } from "./FirstInstallP
 import { usePackageOperations } from './usePackageOperations';
 import { packageActivity } from './packageOperations';
 import { softwareCanStart } from "./softwareExperience";
-import { nativeSoftwareProducts } from "./softwareSources";
 import { createComposerAttachmentController, disposeSelectionPreviews } from "./composerAttachments";
 import type { McpAppOpen } from "../bridge/mcpApps";
 import { useWorkbenchShortcuts } from "./shortcuts";
@@ -241,8 +240,7 @@ function contributionReceiptForDisplay(entry: OplUiContribution, receipt: OplAct
     exitCode: receipt.exitCode,
     timedOut: receipt.timedOut,
     ...(receipt.confirmationId ? { confirmationId: receipt.confirmationId } : {}),
-    ...(receipt.receiptId ? { receiptId: receipt.receiptId } : {}),
-    ...(receipt.rollbackRef ? { rollbackRef: receipt.rollbackRef } : {})
+    ...(receipt.receiptId ? { receiptId: receipt.receiptId } : {})
   };
 }
 
@@ -2840,8 +2838,7 @@ export function App({
     packageUpdateActivation,
     pendingUpdateRestart: dshPluginRestartRequired
       || nativeAppUpdate?.state === "downloaded"
-      || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart")
-      || nativeSoftwareProducts(model.softwareSources).some(product => product.item.updateStatus === "needs_restart"),
+      || model.packageLifecycle.some(item => item.installed === true && item.currentness === "needs_restart"),
     onRestartForUpdates: () => void restartForPendingUpdates(),
     pendingUpdateReload: dshPluginReloadReady,
     onReloadForUpdates: () => void reloadForPendingUpdates(),

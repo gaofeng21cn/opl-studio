@@ -184,7 +184,7 @@ export function useSettingsPageContext({
   }, [confirmationOpen]);
 
   const zh = settings.locale === "zh";
-  const issues: Array<{ id: string; title: string; detail: string; destination: SettingsDestinationId }> = mergeBackgroundTaskIssue(startupCheck.issues, runtime?.temporal, zh);
+  const issues: Array<{ id: string; title: string; detail: string; destination: SettingsDestinationId }> = mergeBackgroundTaskIssue(startupCheck.issues, runtime?.runway, zh);
   if (stateFailed) issues.push({ id: "state", title: zh ? "状态刷新失败" : "Status refresh failed", detail: zh ? "显示上次成功读取的结果，请重试。" : "Showing the last successful read. Please retry.", destination: "diagnostics" });
   if (projection?.codex.accessStatus && statusTone(projection.codex.accessStatus) === "attention") issues.push({ id: "access", title: zh ? "模型访问需要处理" : "Model access needs attention", detail: zh ? "检查账户连接与模型来源。" : "Check your account and model source.", destination: "account" });
   for (const carrier of runtime?.carriers.items ?? []) {

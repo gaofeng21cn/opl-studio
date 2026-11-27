@@ -7,7 +7,7 @@ import { formatDate } from "../presentation";
 
 import { SettingsIntentButton } from "../actions";
 import { formatUpdateChannel, ManagedUpdateGroup } from "../maintenance";
-import type { SettingsActionRequest, SettingsExecutableIntent, SettingsHostActionIntent } from "../../settingsActions";
+import type { SettingsActionRequest, SettingsHostActionIntent } from "../../settingsActions";
 
 import type { SettingsPageContext } from "../useSettingsPageContext";
 export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection, settings, nativeAppUpdate, model, actionBusyKey, onAction, onActionBatch, onHostAction, catalogOrigin, onManageSources, onRefresh, dshCatalog, dshRestartRequired, dshReloadReady, onDshRestartRequired, onDshReloadReady }: Pick<SettingsPageContext, "actionViewModel" | "managedUpdate" | "projection" | "settings" | "nativeAppUpdate" | "model" | "actionBusyKey" | "onAction" | "onHostAction"> & {
@@ -56,25 +56,9 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
       const appApplyIntent = component("opl_app")?.actions.find((intent): intent is SettingsHostActionIntent =>
         intent.transport === "native_app_updater" && intent.operation === "apply" && intent.availability === "ready"
       );
-      const baseComponent = component("opl_base");
-      const baseApplyIntent = softwareCenterMode
-        ? baseComponent?.actions.find((intent): intent is SettingsExecutableIntent =>
-          intent.availability === "ready"
-          && (
-            (intent.transport === "managed_update_host" && intent.operation === "apply")
-            || (intent.transport === "app_action" && intent.actionId === "settings_apply_opl_base_update")
-          )
-        )
-        : undefined;
-      const baseReadyToApply = Boolean(
-        baseApplyIntent
-        && ["update_available", "available"].includes((baseComponent?.component?.currentness ?? baseComponent?.component?.state ?? "").toLowerCase())
-        && (baseApplyIntent.transport !== "managed_update_host" || Boolean(onHostAction))
-      );
       const packageUpdates = softwareCenterMode ? packageUpdateRequests(model, settings.locale) : [];
       const desktopReadyToApply = Boolean(nativeAppUpdate?.supported && nativeAppUpdate.state === "available" && appApplyIntent && onHostAction);
       const totalAutoUpdatable = (desktopReadyToApply ? 1 : 0)
-        + (baseReadyToApply ? 1 : 0)
         + pluginSummary.dshUpdatesCount
         + pluginSummary.externalUpdatablePlugins.length
         + packageUpdates.length;
@@ -152,16 +136,7 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
             onHostAction(appApplyIntent);
             appliedCount += 1;
           }
-          const queuedRequests: SettingsActionRequest[] = [];
-          if (baseReadyToApply && baseApplyIntent) {
-            if (baseApplyIntent.transport === "managed_update_host" && onHostAction) {
-              onHostAction(baseApplyIntent);
-              appliedCount += 1;
-            } else if (baseApplyIntent.transport === "app_action") {
-              queuedRequests.push(baseApplyIntent);
-            }
-          }
-          queuedRequests.push(...packageUpdates);
+          const queuedRequests = packageUpdates;
           if (queuedRequests.length > 1 && onActionBatch) {
             onActionBatch(queuedRequests);
             appliedCount += queuedRequests.length;
@@ -211,8 +186,8 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
       />;
       const baseGroup = <ManagedUpdateGroup
         component={component("opl_base")?.component}
-        fallbackLabel={zh ? "基础服务" : "Base services"}
-        actions={component("opl_base")?.actions ?? []}
+        fallbackLabel="OPL Base"
+        actions={[]}
         locale={settings.locale}
         busyKey={actionBusyKey}
         onAction={onAction}
@@ -224,7 +199,7 @@ export function UpdatesSettingsPage({ actionViewModel, managedUpdate, projection
         <>
           <div className="settings-page-summary">
             <span>{softwareCenterMode ? (zh ? "统一检查与更新软件、应用扩展与运行环境；不同来源遵循一致的检查、安装与生效流程。" : "Check and update software, extensions, and runtime components together across all sources.") : (zh ? "检查应用、后台服务与智能体能力的更新状态" : "Check update status for the app, background services, and agent capabilities")}</span>
-            {!softwareCenterMode ? <span>{zh ? nativeAppUpdate?.buildKind === "local-development" ? "本地开发版：应用本身不接收公开更新，基础服务与能力按各自策略维护。" : `更新通道：${formatUpdateChannel(updateChannel, settings.locale)}。已安装的软件、扩展组件与基础运行环境默认自动（静默）更新；本地开发目录或需本机安装器确认的组件保留手动确认。` : nativeAppUpdate?.buildKind === "local-development" ? "Local development build: public app updates are disabled; services follow their own policies." : `Channel: ${formatUpdateChannel(updateChannel, settings.locale)}. Installed software, extensions, and base services update automatically (silent by default); developer checkouts and local-installer tools require manual confirmation.`}</span> : null}
+            {!softwareCenterMode ? <span>{zh ? nativeAppUpdate?.buildKind === "local-development" ? "本地开发版：应用本身不接收公开更新，软件包与扩展按各自策略维护。" : `更新通道：${formatUpdateChannel(updateChannel, settings.locale)}。软件包与扩展按各自策略更新。` : nativeAppUpdate?.buildKind === "local-development" ? "Local development build: public app updates are disabled; packages and extensions follow their own policies." : `Channel: ${formatUpdateChannel(updateChannel, settings.locale)}. Packages and extensions follow their own update policies.`}</span> : null}
             <span>{zh ? `状态刷新于 ${formatDate(model.stateGeneratedAt, settings.locale)}` : `Status refreshed ${formatDate(model.stateGeneratedAt, settings.locale)}`}</span>
             {softwareCenterMode && totalAutoUpdatable > 0 ? <button type="button" className="settings-action-button primary" data-testid="opl-update-all" disabled={updatingAll || checkingAll || actionBusyKey !== null} onClick={() => void updateAll()}>{updatingAll ? (zh ? "正在更新…" : "Updating…") : (zh ? "更新全部" : "Update all")}</button> : null}
             {softwareCenterMode ? <button type="button" className="settings-action-button" data-testid="opl-check-all-updates" disabled={checkingAll || updatingAll || actionBusyKey !== null} onClick={() => void checkAllUpdates()}><RefreshCw size={13} aria-hidden="true" />{checkingAll ? (zh ? "检查中…" : "Checking…") : (zh ? "检查全部更新" : "Check all updates")}</button> : null}

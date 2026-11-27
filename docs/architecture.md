@@ -171,13 +171,10 @@ ledger, or dynamic-tool coordination layer.
 ## Workbench services
 
 `opl-workbench-services` (imported from Framework `./cordis-profiles`) runs
-independently so missing exports, disconnected Temporal, or memory/inventory read
-failures never block Codex chat.
+independently so missing exports, stopped Runway scheduler health, or memory/inventory
+read failures never block Codex chat.
 
-- **Schedules:** Temporal alone owns schedule definitions and history, while
-  Studio provides bounded create/start/read/interrupt callbacks requiring explicit
-  `:read-only` or `:workspace` permission profiles and validated workspaces with
-  revision checks.
+- **Runway & schedules:** Framework's Runway engine and SQLite Ledger (`app_state.services.runway`) own background orchestration, schedule runner state, and human gates (`runway_human_gate_resolve`), while Studio renders runtime status and provides bounded create/start/read/interrupt callbacks requiring explicit `:read-only` or `:workspace` permission profiles and validated workspaces with revision checks.
 - **Executor memory & cleanup:** Reads `CODEX_HOME/memories` read-only, writes
   corrections as notes in `extensions/ad_hoc/notes`, and previews exact inactive
   log cleanup with expiration. `MemoryRefsPanel` displays only task-declared refs.

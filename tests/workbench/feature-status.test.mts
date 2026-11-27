@@ -27,12 +27,12 @@ describe('feature ownership and local degradation', () => {
     expect(rows.find(row => row.featureId === 'R1-01')?.state).toBe('degraded');
   });
   test('scheduler health alone does not imply task operations; unrelated catalog actions are not exposed', () => {
-    const state = { provider: { temporal: { details: { scheduler: { status: 'ready' } } } }, actions: [{ action_id: 'delete_everything', label: 'Delete' }] };
+    const state = { services: { runway: { status: "running", schedule_runner: { running: true } } }, actions: [{ action_id: 'delete_everything', label: 'Delete' }] };
     expect(feature(state, 'B0-12').state).toBe('owner_action_required');
     expect(feature(state, 'B0-12').actions).toEqual([]);
   });
   test('only explicit owner refs bind catalog actions, invalid runtime remains unavailable', () => {
-    const state = { provider: { temporal: { details: { scheduler: { status: 'ready', actions: ['run_task'] } } } }, actions: [{ action_id: 'run_task', label: 'Run task', payload_fields: ['task_id'], confirmation_required: true, dry_run_supported: true }] };
+    const state = { workbench_services: { tasks: { status: "available", read_ref: "runway.task.list", action_refs: ["app_state.actions#run_task"] } }, actions: [{ action_id: 'run_task', label: 'Run task', payload_fields: ['task_id'], confirmation_required: true, dry_run_supported: true }] };
     expect(feature(state, 'B0-12').actions.map(row => row.id)).toEqual(['run_task']);
     expect(feature({ operator: { workbench: { work_item_projection_v2: { schema_version: 'unknown' } } } }, 'U1-03').state).toBe('unavailable');
   });

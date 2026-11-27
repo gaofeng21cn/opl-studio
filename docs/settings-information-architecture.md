@@ -22,52 +22,13 @@ Package 安装状态、原生载体与 App 使用偏好。Studio 通过既有 st
 正式 Package 使用不可变 OCI 制品；原生应用与 CLI 复用正式安装器。
 源码 checkout 仅作为用户显式接入的开发实例，不是普通安装、修复或更新来源。
 
-Package 来自 Framework 目录，原生分发选项来自软件源 `native_items`；本机基座安装由
-根 `installed_products` 独立投影，未安装 Homebrew 时仍可读取。产品按 `product_id`
-去重；Stable/Nightly 是发布轨道，Standard/Full 是安装规格，均不是额外的软件或安装。
-`selected_for_product` 由 Framework 指定当前更新来源，`recommended_for_product` 标明
-发布者默认推荐。Studio 不按名称长度、版本大小或配方顺序选择更新目标；主列表显示
-一个精确可用版本，目标缺失时用“—”，具体原因在详情解释。外部 Codex 插件未公开版本
-目标时，详情明确由 Codex 维护。
+Package 与软件来源目录均来自 Framework v2 目录（`agent_packages` / `package_currentness` 与 `public-registry:opl` / `github-packages:<owner>`）；原生 Homebrew Tap `native_items`、`source_setup`、跨源多实例切换（`SoftwareInstallations` / `SoftwareReleaseOptions`）及通用 Action 回滚已在 v2 收敛中退役。产品按 `package_id` 与目录作用域区分软件和宿主组件；Studio 不按名称长度或版本大小猜测更新目标，主列表显示 owner 提供的精确已装与可用版本，版本缺失时显示“—”，具体原因在详情解释。外部 Codex 插件未公开版本目标时，详情明确由 Codex 维护。
 
-详情依次展示“当前使用”“本机安装”和“获取其他版本”。`installations` 是实际安装
-投影，每份包含稳定安装身份、版本、发布或开发模式、管理器和真实绝对路径。
-`active_installation_id` 与 `active_installation_status` 决定当前使用的唯一实例；
-未激活、未知和冲突分别显示，不选择最高版本冒充激活状态。OPL 软件中心不会扫描
-源码目录并自动启用开发版。开发实例只提供 owner 声明的检查、激活、停用和解除接入；
-源码更新继续由开发工具负责，解除接入保留源码和数据。
+软件详情集中展示“当前状态”、`available_actions`、来源与权限信息。源码 checkout 不再作为可切换的多安装列表或普通安装、修复、更新来源。所有目录动作均消费 owner 投影的可用动作与必需 payload，并通过 `opld` App state/action 链路回读最新状态。
 
-实例动作只能消费 owner 投影，执行前核对精确 `installation_id`、`expected_revision`
-及必需 payload，之后沿既有 App state/action 链路回读。安装选项和已装实例分别显示；
-缺少 Homebrew 收据不能将有效 Framework runtime 或 App bundle 显示为未安装。
-旧版 `local_installations` 只作为兼容读面，不能反推完整路径或激活选择。
-尚无本机安装时，`installation_actions` 可提供“安装发布版”，绑定软件 ID、版本和
-当前修订号；创建安装时不伪造实例 ID。集成组件已经安装也不会隐藏此入口。
+更新清单由 Framework Managed Package 目录与 DSH/Codex 扩展状态组成。`opl_base` 在“更新”页仅保留只读的当前运行版本投影（`managed_update.components`），不暴露宿主驱动的通用升级或回滚动作。公共源支持按 owner 投影执行 `source_refresh` 后单次回读，不执行 `brew update`。是否来自正式发布制品以及安装来源均由 Framework 目录 `pack_install_sources` 与来源证据说明。开发宿主版本不作为 OPL App 安装版本并列展示；Settings 中的维护页继续保留宿主维护与诊断入口。
 
-原生受管安装与 Package 共用“更新”清单。安装 owner 提供的更新目标、状态和精确
-实例动作优先于安装渠道；Homebrew 收据仍由 Homebrew 维护。Framework 受管安装
-不转入合并的 OPL Base 操作。更新暂存后显示“需要重启”，当前使用版本在实际激活
-前保持不变。公共源的 `catalog_refresh_required` 与访问、目录刷新要求共用现有 Host
-检查链路：仅执行 owner 允许且不需确认的 `source_check`，随后回读一次，不递归重试。
-安装模式分别显示“安装版”和“开发版”；是否来自正式发布制品由来源证据说明。
-软件中心的更新页默认呈现这份软件清单；当前桌面宿主和 OPL Base 综合维护收进
-“桌面宿主与运行组件维护”，保留原有动作。开发宿主版本不作为 OPL App 安装版本
-并列展示。Settings 中的维护页继续保留完整控制视图。
-未打包的 Electron 宿主不投影 App 版本，维护详情和“关于”显示“开发预览／未发布”；
-已打包的签名本地构建继续显示真实 App 版本及开发构建身份。
-
-原生软件优先显示 owner 提供的 `installed_display_version` 和
-`available_display_version`；机器版本、构建 ID、配方版本和收据放在对应详情，保留
-原更新器的判断。开发类型采用明确 `mode=development` 或
-`installed_build_kind=local-development`，不从版本大小推断。
-
-搜索与状态筛选共用目录；软件源页展示渠道级记录。“更新”页复用当前管理者的
-动作，Framework 的受管安装从详情进入既有更新页。普通刷新按 owner 的
-`access_refresh_required` / `inventory_refresh_required` 调用 `source_check` 后回读，
-不会把本机清单检查变成 `brew update`。
-只有已回读的条目进入统计；缺少目录、首次加载或读取失败不显示虚假的零条目或
-健康状态。共享资源过期或授权失效计入页眉，并保留最近一次回读时间。读取失败时
-保留已有信息，用户可重试；变更按钮等当前状态重新确认后恢复。
+只有已回读的条目进入统计；缺少目录、首次加载或读取失败不显示虚假的零条目或健康状态。共享资源过期、授权失效或公共源未完成检查计入页眉与总览提示，并保留最近一次回读时间。读取失败时保留已有信息，用户可重试；变更按钮等当前状态重新确认后恢复。
 
 每项展示版本、发布者、安装状态及来源。可用动作来自该包投影的
 `available_actions`，通过 App action 执行。自定义安装仍消费作者提供的
@@ -101,10 +62,7 @@ Framework action 与版本校验，成功后重新读取。正文与资料位置
 连接安全版本兼容 UUID。软件源账号从此处跳转到软件中心的“软件源”，不重复建立凭据页；
 模型访问继续复用既有账户与模型设置。
 
-软件源“账户已连接”仅表示身份已连接，安装权限逐项判断。Homebrew 版本来自
-本机配方，界面区分已安装版本与来源版本；未由 Homebrew 管理不否定其他方式的
-安装。检查本机、启用 tap、刷新目录、安装、更新与卸载由对应 owner 执行；版本
-未知不伪称最新。失败或部分完成仍回读清单，避免退出码为零被误报为完成。
+软件源“账户已连接”仅表示身份已连接，安装权限与来源可达性逐项判断。公共源通过 `public-registry:opl` 与 `source_refresh` 刷新目录；私有包源继续使用 `github-packages:<owner>` 访问验证与目录投影，版本未知不伪称最新。失败或部分完成仍回读清单，避免退出码为零被误报为完成。
 
 ## 状态按包归属
 
@@ -115,7 +73,7 @@ Framework action 与版本校验，成功后重新读取。正文与资料位置
 | 绑定微信、消息通道或远端设备 | 设置 → 连接与部署 → 资料与连接 → 远程访问 | 动态 `channel_access`、`remote_companion_access` 与原生 OPL Link |
 | 查看插件状态和配置 | 设置 → 能力配置 → 扩展设置 | 当前启用插件的 `settings.section` typed contribution |
 | 查看 Skills、原生插件及连接能力 | 软件中心的其他来源；能力设置保留配置 | Codex App Server capability catalog |
-| 查看任务服务、执行进程和定时服务 | 服务状态 | Framework runtime projection |
+| 查看 Runway 与定时执行器状态 | 服务状态 | Framework `app_state.services.runway` 投影 |
 | 查看磁盘用量及清理动作 | 数据与存储 | Framework storage lifecycle |
 
 远程通道和伴侣连接按功能语义放在设置，不以安装器或软件分类决定可见性。设置页打开且 `app_enabled=true` 时读取远程贡献；无提供者时保留配置引导。其他配置统一按插件分组呈现在能力设置，折叠时不挂载、不读取；软件和运行组件使用同一路径。`activity_log` 只在用户启用技术详情后于相应扩展设置组呈现。软件中心只提供同一设置页的直达入口。新包依 descriptor 接入，不增加固定包名单或专用状态页。
@@ -141,7 +99,7 @@ Steward 的 contribution 只展示领域 owner 明确提供的事实，不能替
 
 软件中心的资料与账户授权入口跳转到设置；ConnectionsSection 仅在“设置 → 资料与连接”实例化。知识接入复用桌面目录选择器，WebUI 只接受服务端资料库位置，不把上传目录当资料源。Framework 提供知识范围选项与明确默认值，授权仍经原 revision/confirmation 合同。
 
-需要用户介入的事项按明确 source/resource identity 合并并列出受影响的软件；独立安装冲突单独保留。未检查、未使用的可选资源和普通更新不制造失败告警。当前安装首先显示，其他安装与发行选项折叠；位置回读与操作仍来自 owner。
+需要用户介入的事项按明确 source/resource identity 合并并列出受影响的软件；版本冲突或校验异常保留真实原因与 owner 动作。未检查、未使用的可选资源和普通更新不制造失败告警。位置回读与安装/更新操作仍完全来自 Framework owner。
 
 图标来自 App 的 `contracts/software-artwork-assets.json` 资产清单，由 renderer build 校验 PNG 与 digest 并生成 `softwareArtwork.generated.ts`。该文件只投影离线资产，不参与软件纳管、版本或授权判定。缺图不使用首字母或 SVG 字母拼接。
 

@@ -107,7 +107,7 @@ test("eligible updates refresh Codex only inside the idle lease and read back Fr
   const result = await maintenance.runNow();
   assert.equal(result.status, "completed");
   assert.equal(result.lastCompletedAt, 1234);
-  assert.deepEqual(calls, ["check", "plan", "apply", "reload", "status"]);
+  assert.deepEqual(calls, ["plan", "apply", "reload", "status"]);
   await maintenance.close();
 });
 
@@ -155,7 +155,7 @@ test("App updater feed failure does not block Framework package maintenance", as
   assert.equal(result.retryExhausted, false);
   assert.equal(result.nextAttemptAt, 100_000 + 30 * 60_000);
   assert.equal(appChecks, 1);
-  assert.deepEqual(calls, ["check", "plan", "apply", "status"]);
+  assert.deepEqual(calls, ["plan", "apply", "status"]);
   await maintenance.close();
 });
 

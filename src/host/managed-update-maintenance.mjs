@@ -97,7 +97,6 @@ export function createManagedUpdateMaintenance({
       emit({ appUpdateStatus: "failed" });
     }
     try {
-      await opl.runManagedUpdate("check");
       const plan = await opl.runManagedUpdate("plan");
       const eligible = eligibleBackgroundComponents(plan);
       if (eligible.length > 0 || state.reloadPending) {
@@ -128,7 +127,7 @@ export function createManagedUpdateMaintenance({
           if (result && !["completed", "skipped"].includes(executionStatus)) {
             throw Object.assign(new Error("Framework update did not complete"), { code: "managed_update_incomplete" });
           }
-          await opl.runManagedUpdate("status");
+          await opl.runManagedUpdate("status", result ?? plan);
           return { reloaded: reload };
         });
         if (lease.status === "deferred") {

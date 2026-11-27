@@ -160,6 +160,46 @@ async function withKnowledgeForm(run: (surface: { container: HTMLElement; browse
   }
 }
 
+test("Framework v2 resource_sources dispatches source-bound knowledge actions", async () => {
+  const actions = [
+    { action_id: "knowledge_source_list", payload_fields: ["workspace_id"] },
+    { action_id: "knowledge_source_check", payload_fields: ["source_id"] },
+    { action_id: "knowledge_source_connect", payload_fields: ["source_id", "workspace_id", "root_path", "scope", "adapter_kind", "accepted_revision"] },
+    { action_id: "knowledge_source_configure", payload_fields: ["source_id", "workspace_id", "root_path", "scope", "adapter_kind", "accepted_revision"] },
+    { action_id: "knowledge_source_disconnect", payload_fields: ["source_id", "workspace_id", "revoke"], confirmation_required: true }
+  ];
+  const model = deriveWorkbenchModelFromState({ app_state: { settings_control_center: { app_settings_read_model: {
+    resource_sources: {
+      surface_kind: "opl_knowledge_sources_projection.v1", status: "available", available_actions: actions,
+      entries: [{
+        source_id: "ksrc-test", root_path: "/fixture/Notes", scope: "project_local", adapter_kind: "local_dir",
+        accepted_revision: "1", status: "active", available_actions: actions.slice(1)
+          .map(action => ({ ...action, payload: { source_id: "ksrc-test" } }))
+      }]
+    }
+  } } } });
+  await withKnowledgeForm(({ container, browser, actions: requests, render, button }) => {
+    render(model.knowledgeSources!);
+    expect(container.textContent).toContain("Notes");
+    flushSync(() => button("Reload libraries").click());
+    flushSync(() => button("Check").click());
+    flushSync(() => button("Configure").click());
+    const scope = container.querySelector<HTMLSelectElement>("form select")!;
+    flushSync(() => {
+      scope.value = "long_term_topic";
+      scope.dispatchEvent(new browser.Event("change", { bubbles: true }) as unknown as Event);
+    });
+    flushSync(() => container.querySelector("form")!.dispatchEvent(new browser.Event("submit", { bubbles: true, cancelable: true }) as unknown as Event));
+    flushSync(() => button("Disconnect").click());
+    expect(requests.map(({ actionId, payload, confirmationRequired }) => ({ actionId, payload, confirmationRequired }))).toEqual([
+      { actionId: "knowledge_source_list", payload: {}, confirmationRequired: false },
+      { actionId: "knowledge_source_check", payload: { source_id: "ksrc-test" }, confirmationRequired: false },
+      { actionId: "knowledge_source_configure", payload: { source_id: "ksrc-test", scope: "long_term_topic" }, confirmationRequired: false },
+      { actionId: "knowledge_source_disconnect", payload: { source_id: "ksrc-test" }, confirmationRequired: true }
+    ]);
+  });
+});
+
 test("knowledge access form dispatches the bound revision and selected reader writer scopes", async () => {
   await withKnowledgeForm(({ container, browser, actions, render, button }) => {
     render(projection());

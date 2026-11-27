@@ -106,7 +106,7 @@ export type AgentPackageAccessRef = {
 
 /** Framework-owned software source refs. Values are display metadata only; credential values never cross this boundary. */
 export type SoftwareSourceActionRef = {
-  actionId: "source_list" | "source_check" | "source_configure" | "source_disconnect" | string;
+  actionId: string;
   label: string;
   labelI18n?: AgentPackageLocalizedText;
   delegatedSurface?: string;
@@ -143,96 +143,27 @@ export type CatalogProvenanceRef = {
 export type SoftwareSourceRef = CatalogProvenanceRef & {
   sourceId: string;
   displayName: string;
-  sourceKind: "registry" | "tap" | string;
+  sourceKind: string;
   sourceRef: string;
   visibility: "public" | "authorized_only" | "unknown";
   providerId?: string;
-  status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "unknown";
+  status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "loading" | "ready" | "stale" | "unavailable" | "unknown";
   enabled: boolean | null;
   credentialHandlePresent: boolean;
   accessRefreshRequired?: boolean;
   catalogCache?: { cached: boolean; stale: boolean; fetchedAt?: string };
   verifiedAt?: string;
   entryCount?: number;
-  inventoryStatus?: "available" | "not_checked" | "unavailable" | "unknown";
-  inventoryReason?: string;
-  inventoryCheckedAt?: string;
-  versionAuthority?: string;
-  installationOwner?: string;
-  nativeItems?: NativeSoftwareItemRef[];
-  availableActions: SoftwareSourceActionRef[];
-};
-
-export type NativeSoftwareItemRef = CatalogProvenanceRef & {
-  iconUrl?: string;
-  itemId: string;
-  productId?: string;
-  productDisplayName?: string;
-  homebrewInstalled?: boolean | null;
-  homebrewInstalledVersion?: string;
-  installationOwner?: string;
-  installationKind?: string;
-  installationEvidence?: string;
-  ownerSettingsRoute?: string;
-  installationId?: string;
-  installationMode?: "installed" | "development";
-  location?: string;
-  active?: boolean;
-  activeInstallationId?: string;
-  activeInstallationStatus?: SoftwareActivationStatus;
-  installations?: SoftwareInstallationRef[];
-  releaseChannel?: "stable" | "nightly";
-  installationVariant?: "standard" | "full" | "default";
-  recommendedForProduct?: boolean;
-  selectedForProduct?: boolean;
-  selectionBasis?: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  displayNameI18n?: AgentPackageLocalizedText;
-  descriptionI18n?: AgentPackageLocalizedText;
-  kind: "formula" | "cask" | "managed_runtime";
-  installed: boolean | null;
-  installedVersion?: string;
-  installedDisplayVersion?: string;
-  installedBuildKind?: "local-development";
-  installedBuildId?: string;
-  availableVersion?: string;
-  availableDisplayVersion?: string;
-  pendingVersion?: string;
-  updateStatus: "available" | "current" | "needs_restart" | "not_installed" | "unknown";
-  revision?: string;
   availableActions: SoftwareSourceActionRef[];
 };
 
 export type SoftwareSourcesProjection = {
-  installedProducts?: NativeSoftwareItemRef[];
   status: "available" | "attention_required" | "unknown";
   entries: SoftwareSourceRef[];
   authorityBoundary?: {
     owner?: string;
     credentialValuesExposed?: boolean;
   };
-};
-
-export type SoftwareActivationStatus = "active" | "inactive" | "unknown" | "conflict";
-
-/** A physical installation observed by its lifecycle owner; never a distribution recipe. */
-export type SoftwareInstallationRef = {
-  installationId: string;
-  kind: string;
-  version: string;
-  displayVersion?: string;
-  mode: "installed" | "development";
-  manager: string;
-  location: string;
-  locationRef?: string;
-  evidenceRef?: string;
-  active: boolean;
-  revision?: string;
-  availableVersion?: string;
-  ownerSettingsRoute?: string;
-  availableActions: SoftwareSourceActionRef[];
 };
 
 export type PackageLocalInstallation = {
@@ -256,16 +187,11 @@ export type AgentPackageLifecycleRef = CatalogProvenanceRef & {
   packageRole: string;
   /** Catalog admission and distribution are independent of product maturity. */
   softwareType?: SoftwareProductType | "unknown";
-  catalogScope?: "software" | "host_component" | "unknown";
+  catalogScope?: "software" | "dependency" | "unknown";
   localInstallations?: PackageLocalInstallation[];
-  installations?: SoftwareInstallationRef[];
-  activeInstallationId?: string;
-  activeInstallationStatus?: SoftwareActivationStatus;
-  installationManagementReason?: string;
-  installationActions?: SoftwareSourceActionRef[];
   distributionChannel?: "release" | "development" | "unknown";
-  managementScope?: "local_product" | "local_component" | "deployment_target" | "external_carrier";
-  deploymentTarget?: "cloud" | "mobile" | "device" | "remote_service" | "unknown";
+  managementScope?: "local_product" | "local_component" | "deployment_target" | "external_carrier" | "opl_packages" | "codex_plugin_manager";
+  deploymentTarget?: "cloud" | "mobile" | "device" | "remote_service" | "local" | "unknown";
   iconRef?: string;
   iconUrl?: string;
   miniAppEntry?: { resourceUri: string; arguments: Record<string, string> };

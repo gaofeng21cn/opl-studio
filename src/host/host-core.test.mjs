@@ -56,7 +56,7 @@ test("the older desktop action channel can only disable Link with an explicit ex
   let disables = 0;
   core.linkInternet = { disable: async () => { disables++; return { status: "disabled", enabled: false }; } };
   const action = { actionId: "link_disable_internet", mode: "execute", dryRun: false, payload: { confirmed: true } };
-  for (const invalid of [{ mode: "preview" }, { dryRun: true }, { payload: {} }, { mode: "rollback" }]) {
+  for (const invalid of [{ mode: "preview" }, { dryRun: true }, { payload: {} }, { mode: "unknown" }]) {
     await assert.rejects(core.invoke("executeAction", { ...action, ...invalid }), { code: "invalid_request" });
   }
   assert.equal(disables, 0);
@@ -613,7 +613,11 @@ test("OplFrameworkBridge connects studioWeixin, merges appStatePatch, routes opl
         return {
           profile: "fast",
           app_state: {
-            ui_contributions: { entries: [{ package_id: "legacy", view: { view_type: "channel_access" } }, { package_id: "opl-fleet-agent", view: { view_type: "list_detail" } }] }
+            ui_contributions: { entries: [
+              { package_id: "legacy", view: { view_type: "channel_access" } },
+              { package_id: "opl-fleet-agent", view: { view_type: "list_detail" } },
+              { package_id: "opl-channel-weixin", view: { view_type: "channel_access", title: "Framework copy" } }
+            ] }
           }
         };
       }
@@ -659,7 +663,9 @@ test("OplFrameworkBridge connects studioWeixin, merges appStatePatch, routes opl
   assert.equal(caps.channelCallback.status, "dormant");
 
   const st = await bridge.opl.readState("fast");
-  assert.deepEqual(st.app_state.ui_contributions.entries.map((e) => e.package_id), ["opl-fleet-agent", "opl-channel-weixin"]);
+  assert.deepEqual(st.app_state.ui_contributions.entries.map((e) => e.package_id), ["legacy", "opl-fleet-agent", "opl-channel-weixin"]);
+  assert.equal(st.app_state.ui_contributions.entries.filter((e) => e.package_id === "opl-channel-weixin").length, 1);
+  assert.equal(st.app_state.ui_contributions.entries[0].view.view_type, "channel_access");
   assert.equal(st.app_state.transport_bindings.bindings[0].canonical_thread_id, "t1");
 
   const read = await bridge.opl.readContribution({ packageId: "opl-channel-weixin", ref: "weixin.channel-access#state" });

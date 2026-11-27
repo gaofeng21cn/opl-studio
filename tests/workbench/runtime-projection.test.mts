@@ -24,15 +24,6 @@ test("runtime projection keeps component health, carriers, and only App-projecte
           confirmation_required: false
         },
         {
-          action_id: "provider_scheduler_status",
-          label: "Read Temporal scheduler status",
-          route: "opl app action execute --action provider_scheduler_status",
-          payload_fields: [],
-          mutates: "none_read_only",
-          dry_run_supported: true,
-          confirmation_required: false
-        },
-        {
           action_id: "unrelated_action",
           label: "Unrelated",
           route: "opl app action execute --action unrelated_action",
@@ -48,29 +39,7 @@ test("runtime projection keeps component health, carriers, and only App-projecte
           }
         }
       },
-      provider: {
-        status: "ready",
-        temporal: {
-          status: "ready",
-          ready: true,
-          management: { actions: ["provider_scheduler_status", "missing_action"] },
-          details: {
-            address: "127.0.0.1:7233",
-            namespace: "opl-foundry",
-            task_queue: "opl-stage-attempts",
-            worker_readiness: {
-              readiness_status: "ready",
-              service_ready: true,
-              worker_ready: true,
-              temporal_service_lifecycle: {
-                service_status: "running",
-                supervisor: { status: "loaded_running", ready: true }
-              }
-            },
-            scheduler: { status: "attention_needed", ready: false, observed_at: "2026-08-10T00:00:00Z" }
-          }
-        }
-      },
+      services: { runway: { status: "degraded", schedule_runner: { running: true, tick_interval_ms: 5000 } } },
       runtime_source_carriers: {
         summary: {
           default_carriers_count: 2,
@@ -85,16 +54,13 @@ test("runtime projection keeps component health, carriers, and only App-projecte
     }
   });
 
-  assert.equal(model.runtimeOverview?.temporal.serviceStatus, "loaded_running");
-  assert.equal(model.runtimeOverview?.temporal.workerStatus, "ready");
-  assert.equal(model.runtimeOverview?.temporal.schedulerStatus, "attention_needed");
+  assert.deepEqual(model.runtimeOverview?.runway, { status: "degraded", scheduleRunner: { running: true, tickIntervalMs: 5000 } });
   assert.equal(model.runtimeOverview?.carriers.healthy, 1);
   assert.equal(model.runtimeOverview?.carriers.items[1]?.syncStatus, "behind");
   assert.deepEqual(model.runtimeOverview?.maintenanceActions.map((action) => action.actionId), [
-    "settings_check_app_update",
-    "provider_scheduler_status"
+    "settings_check_app_update"
   ]);
-  assert.equal(model.runtimeOverview?.recommendedActionId, "provider_scheduler_status");
+  assert.equal(model.runtimeOverview?.recommendedActionId, "settings_check_app_update");
 });
 
 test("work-item projection parses typed domain detail view locators without agent-specific branching", () => {
@@ -216,7 +182,9 @@ test("work-item runtime projection preserves user status semantics and unknown t
                 current_stage: { state: "missing", total_tokens: null },
                 cumulative: { state: "missing", total_tokens: null, missing_reason: "not_observed" }
               },
-              action: { title: "等待明确后续方向", owner_display_name: "你" },
+              action: { title: "等待明确后续方向", owner_display_name: "你", kind: "user_action",
+                action_ref: "app_state.actions#runway_human_gate_resolve",
+                action_payload: { stage_run_id: "stage-1", expected_revision: 2, notes: "not part of the binding" } },
               stage_map: [{
                 stage_id: "analysis",
                 display_name: "Analysis",
@@ -243,6 +211,7 @@ test("work-item runtime projection preserves user status semantics and unknown t
     }
   });
 
+  assert.deepEqual(model.workItemRuntime?.items[0]?.humanGate, { stageRunId: "stage-1", expectedRevision: 2 });
   assert.equal(model.workItemRuntime?.summary.telemetryMissingCount, 2);
   assert.equal(model.workItemRuntime?.items[0]?.statusLabel, "已暂停");
   assert.equal(model.workItemRuntime?.items[0]?.domainWorkItemId, "study-one");
@@ -708,7 +677,7 @@ test("managed update projects installed Agent and capability package carrier sta
   assert.equal(projection.components[0]?.packageStates?.[0]?.carrierStatus, "installed");
 });
 
-test("browser bridge normalization preserves App-projected Temporal runtime details", async () => {
+test("browser bridge normalization preserves App-projected Runway health", async () => {
   Object.assign(globalThis, {
     __OPL_CODEX_MODEL_POLICY__: {
       source: "test App policy",
@@ -750,24 +719,7 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
             }
           }
         },
-        provider: {
-          selected_provider: "temporal",
-          temporal: {
-            status: "ready",
-            ready: true,
-            details: {
-              worker_readiness: {
-                readiness_status: "ready",
-                worker_ready: true,
-                temporal_service_lifecycle: {
-                  service_status: "running",
-                  supervisor: { status: "loaded_running", ready: true }
-                }
-              },
-              scheduler: { status: "attention_needed", ready: false }
-            }
-          }
-        },
+        services: { runway: { status: "degraded", schedule_runner: { running: true, tick_interval_ms: 5000 } } },
         managed_companions: [{
           surface_kind: "opl_managed_browser_automation_projection",
           provider_id: "playwright-mcp",
@@ -803,9 +755,7 @@ test("browser bridge normalization preserves App-projected Temporal runtime deta
   }, "fast");
 
   const model = deriveWorkbenchModelFromState(readback);
-  assert.equal(model.runtimeOverview?.temporal.serviceStatus, "loaded_running");
-  assert.equal(model.runtimeOverview?.temporal.workerStatus, "ready");
-  assert.equal(model.runtimeOverview?.temporal.schedulerStatus, "attention_needed");
+  assert.deepEqual(model.runtimeOverview?.runway, { status: "degraded", scheduleRunner: { running: true, tickIntervalMs: 5000 } });
   assert.equal(model.managedCompanions[0]?.providerId, "playwright-mcp");
   assert.equal(model.workItemRuntime?.items[0]?.title, "Study one");
   assert.deepEqual(readback.app_state.managed_companions.map((item) => item.provider_id), ["playwright-mcp"]);
@@ -854,7 +804,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RuntimeStatusPanel } from "../../plugins/extensions/opl-runtime-status/src/client/RuntimeStatusPanel";
 import { StageProgressStepper } from "../../plugins/extensions/opl-runtime-status/src/client/StageProgressStepper";
-import { deriveServiceRecoveryModel } from "../../plugins/core/opl-studio-client/src/client/workbench/serviceRecoveryModel";
+import { deriveServiceRecoveryModel, readRunwayHealth } from "../../plugins/core/opl-studio-client/src/client/workbench/serviceRecoveryModel";
 import { runtimeOverviewFixture } from "../fixtures/runtime-overview";
 
 function renderOverview(overrides: Record<string, unknown> = {}) {
@@ -867,7 +817,7 @@ function renderOverview(overrides: Record<string, unknown> = {}) {
 
 test("overview reports a concrete service cause without degrading the task list or counting service issues as tasks", () => {
   const html = renderOverview();
-  assert.match(html, /后台服务配置已变化，需要重新加载/);
+  assert.match(html, /Runway 运行异常/);
   assert.match(html, /打开维护/);
   assert.doesNotMatch(html, /部分可用|整体状态|确认执行/);
   const summary = html.match(/<div class="runtime-list-summary">(.*?)<\/div>/)?.[1] ?? "";
@@ -876,9 +826,9 @@ test("overview reports a concrete service cause without degrading the task list 
 });
 
 test("unknown and cached service observations are neutral instead of confirmed failures", () => {
-  const html = renderOverview({ serviceRecovery: deriveServiceRecoveryModel({}) });
+  const html = renderOverview({ serviceRecovery: deriveServiceRecoveryModel(readRunwayHealth(undefined, undefined)) });
   assert.match(html, /data-tone="unknown"/);
-  assert.match(html, /后台服务状态尚未读取/);
+  assert.match(html, /Runway 状态待确认/);
   assert.doesNotMatch(html, /尚未就绪/);
   const cached = renderOverview({ stateStatus: "error", snapshotSource: "cached" });
   assert.match(cached, /上次服务检查/);
@@ -889,11 +839,11 @@ test("unknown and cached service observations are neutral instead of confirmed f
 test("initial loading and a failed read without a snapshot have distinct recovery states", () => {
   const loading = renderOverview({ projection: undefined, stateStatus: "loading", snapshotSource: "none" });
   assert.match(loading, /正在读取任务/);
-  assert.doesNotMatch(loading, /当前范围没有工作|后台服务配置已变化/);
+  assert.doesNotMatch(loading, /当前范围没有工作|Runway 运行异常/);
   const failed = renderOverview({ projection: undefined, stateStatus: "error", snapshotSource: "none" });
   assert.match(failed, /重试/);
   assert.match(failed, /打开维护/);
-  assert.doesNotMatch(failed, /当前范围没有工作|后台服务配置已变化/);
+  assert.doesNotMatch(failed, /当前范围没有工作|Runway 运行异常/);
 });
 
 test("work item projection preserves control generation, root, package status, heartbeat, action keys, and does not fall back to diagnostic stage", async () => {

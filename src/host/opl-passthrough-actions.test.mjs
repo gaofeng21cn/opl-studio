@@ -48,7 +48,7 @@ test("readState forwards fast and full profiles to app.state.get and preserves d
   ]);
 });
 
-test("executeAction enforces pre-RPC validation, read-only preview vs mutating block, and native inventory preservation", async (t) => {
+test("executeAction enforces pre-RPC validation, read-only preview vs mutating block, and Package operation preservation", async (t) => {
   const calls = [];
   const daemon = await startFakeOpld({
     onCall: async (method, params) => {
@@ -58,8 +58,7 @@ test("executeAction enforces pre-RPC validation, read-only preview vs mutating b
         app_action_execution: {
           status: "completed",
           result: {
-            native_action: { action_id: params.action_id, status: "completed" },
-            native_inventory: { inventory_status: "available", native_items: [{ item_id: "cask:publisher/tap/native-app", installed: true }] }
+            operation: { operation_id: "op-1", package_id: "opl-pkg", status: "running", stage: "downloading", downloaded_bytes: 10, total_bytes: 40, eta_seconds: 3, can_cancel: true }
           }
         }
       };
@@ -71,22 +70,23 @@ test("executeAction enforces pre-RPC validation, read-only preview vs mutating b
   const ro = createOplPassthrough({ client, env: { OPL_STUDIO_READ_ONLY: "1" } });
   await assert.rejects(() => ro.executeAction({ actionId: "   " }), (err) => err?.code === "invalid_request");
 
-  const blocked = await ro.executeAction({ actionId: "source_install", dryRun: false, mode: "execute", payload: { confirmed: true } });
+  const blocked = await ro.executeAction({ actionId: "package_operation_start", dryRun: false, mode: "execute", payload: { confirmed: true } });
   assert.equal(blocked.status, "blocked_read_only");
   assert.equal(blocked.receiptKind, "blocked_read_only");
   assert.equal(blocked.canExecute, false);
   assert.equal(blocked.exitCode, 1);
   assert.equal(blocked.blockedReason, "read_only_host");
+  await assert.rejects(() => ro.executeAction({ actionId: "package_operation_start", mode: "rollback" }), { code: "invalid_request" });
   assert.equal(calls.length, 0);
 
-  const preview = await ro.executeAction({ actionId: "source_install", dryRun: false, mode: "preview", payload: { item_id: "cask:x" } });
+  const preview = await ro.executeAction({ actionId: "package_operation_start", dryRun: false, mode: "preview", payload: { action_id: "agent_package_update", package_id: "opl-pkg" } });
   assert.equal(preview.dryRun, true);
   assert.equal(preview.receiptKind, "preview");
   assert.equal(preview.status, "preview_ready");
 
   const writable = createOplPassthrough({ client, env: {} });
   const receipt = await writable.executeAction({
-    actionId: "source_install",
+    actionId: "package_operation_start",
     dryRun: false,
     mode: "execute",
     packageId: "opl-pkg",
@@ -94,10 +94,10 @@ test("executeAction enforces pre-RPC validation, read-only preview vs mutating b
   });
   assert.equal(receipt.exitCode, 0);
   assert.equal(receipt.status, "executed");
-  assert.equal(receipt.stdoutJson.app_action_execution.result.native_inventory.native_items[0].installed, true);
+  assert.equal(receipt.stdoutJson.app_action_execution.result.operation.eta_seconds, 3);
   assert.deepEqual(calls.at(-1), {
     method: "app.action.execute",
-    params: { action_id: "source_install", payload: { confirmed: true }, dry_run: false, mode: "execute", package_id: "opl-pkg" }
+    params: { action_id: "package_operation_start", payload: { confirmed: true }, dry_run: false, mode: "execute", package_id: "opl-pkg" }
   });
 });
 

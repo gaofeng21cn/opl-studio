@@ -1,6 +1,6 @@
 export type OplStateProfile = "fast" | "full";
 
-export type OplActionMode = "preview" | "execute" | "rollback";
+export type OplActionMode = "preview" | "execute";
 export type OplActionReceiptKind = OplActionMode | "confirmation_required" | "blocked_read_only";
 export type OplActionReceiptStatus =
   | "preview_ready"
@@ -17,7 +17,6 @@ export type OplActionPayload = Record<string, unknown> & {
   confirmed?: boolean;
   confirmationId?: string;
   receiptId?: string;
-  rollbackRef?: string;
 };
 
 export type OplCommandReadback = {
@@ -286,6 +285,5 @@ export type OplActionReceipt = {
   stderrJson?: unknown;
   confirmationId?: string;
   receiptId?: string;
-  rollbackRef?: string;
   blockedReason?: string;
 };

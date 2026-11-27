@@ -82,6 +82,19 @@ export function readPackageOperation(value: unknown): PackageOperation | null {
     || !['running', 'completed', 'failed', 'cancelled', 'interrupted'].includes(String(item.status))) return null;
   return item as PackageOperation;
 }
+export function readStartedPackageOperation(receipt: OplActionReceipt): PackageOperation | null {
+  if (receipt.actionId !== "package_operation_start" || receipt.status !== "executed") return null;
+  const result = packageOperationResult(receipt);
+  const operation = readPackageOperation(result.operation);
+  if (operation) return operation;
+  const { operation_id, status } = result;
+  const { action_id, package_id } = receipt.payload ?? {};
+  if (status !== "running" || typeof operation_id !== "string" || !operation_id
+    || typeof action_id !== "string" || !packageBackgroundActions.has(action_id)
+    || typeof package_id !== "string" || !package_id) return null;
+  return { operation_id, package_id, action_id, status, stage: "preparing", can_cancel: false };
+}
+
 export function operationErrorMessage(code: string | undefined, zh: boolean) {
   if (code === 'package_download_insufficient_space') return zh ? '磁盘空间不足。释放空间后重试，已下载内容会保留。' : 'Not enough disk space. Free space and retry; downloaded bytes are retained.';
   if (code === 'package_download_integrity_failed') return zh ? '下载内容校验失败。重试将重新下载。' : 'Download verification failed. Retry to download a fresh copy.';

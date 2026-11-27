@@ -25,10 +25,12 @@ import {
   firstString
 } from "./workbenchModel-primitives";
 import { firstStringField, uniqueStrings } from "./workbenchModel-presentation";
-import { readCatalogProvenance, readSoftwareActivationStatus, readSoftwareInstallationActions, readSoftwareInstallations } from "./softwareSources";
+import { readCatalogProvenance } from "./softwareSources";
 
 function readPackageSoftwareType(value: unknown): AgentPackageLifecycleRef["softwareType"] {
   switch (value) {
+    case "app":
+      return "application";
     case "agent":
     case "application":
     case "extension":
@@ -121,7 +123,7 @@ function packageStatusAxes(
         ?? "unknown",
       source
     },
-    { label: "Update", value: firstStringField(record, ["update_state", "update_status", "recommended_action"]) ?? asString(git?.sync_status) ?? "unknown", source },
+    { label: "Update", value: asString(record.package_currentness) ?? asString(asRecord(record.package_currentness)?.status) ?? firstStringField(record, ["update_state", "update_status", "recommended_action"]) ?? asString(git?.sync_status) ?? "unknown", source },
     { label: "Source", value: packageSourceKind(record), source },
     { label: "Trust", value: firstStringField(record, ["trust_state", "trust_tier", "health_status"]) ?? "unknown", source },
     { label: "Codex surface", value: packageCodexSurface(record), source }
@@ -209,7 +211,7 @@ function packageCapabilityMetadata(record: Record<string, unknown>): {
 
 function packageDependencies(record: Record<string, unknown>): AgentPackageDependencyRef[] {
   const readiness = asRecord(record.dependency_readiness);
-  return asRecordArray(readiness?.checks).flatMap((check) => {
+  const checks = asRecordArray(readiness?.checks).flatMap((check) => {
     const packageId = asString(check.package_id);
     if (!packageId) return [];
     return [{
@@ -221,6 +223,10 @@ function packageDependencies(record: Record<string, unknown>): AgentPackageDepen
       reasons: asStringArray(check.reasons)
     } satisfies AgentPackageDependencyRef];
   });
+  const checked = new Set(checks.map(check => check.packageId));
+  return [...checks, ...asStringArray(readiness?.missing_package_ids).filter(packageId => !checked.has(packageId)).map(packageId => ({
+    packageId, required: true, present: null, callable: false, status: "missing", reasons: []
+  }))];
 }
 
 function packageReadiness(record: Record<string, unknown>, installed: boolean | null): AgentPackageReadinessRef {
@@ -536,7 +542,7 @@ function packageLifecycleItem(
   const capabilityMetadata = packageCapabilityMetadata(record);
   const dependencies = packageDependencies(record);
   const requiredByPackageIds = asStringArray(record.required_by_package_ids ?? record.requiredByPackageIds);
-  const packageCurrentness = asRecord(record.package_currentness);
+  const packageCurrentness = asString(record.package_currentness) ?? asString(asRecord(record.package_currentness)?.status);
   const sourceRef = source === "canonical_agent_packages"
     ? "opl app state --profile fast --json#app_state.agent_packages.directory + app_state.agent_packages.status_index"
     : source === "legacy_modules_fallback"
@@ -563,11 +569,11 @@ function packageLifecycleItem(
     ...provenance,
     packageRole,
     softwareType: readPackageSoftwareType(record.software_type),
-    catalogScope: record.catalog_scope === "software" || record.catalog_scope === "host_component" ? record.catalog_scope : "unknown",
+    catalogScope: record.catalog_scope === "software" ? "software" : record.catalog_scope === "dependency" || record.catalog_scope === "host_component" ? "dependency" : "unknown",
     ...(["release", "development", "unknown"].includes(String(record.distribution_channel)) ? { distributionChannel: record.distribution_channel as "release" | "development" | "unknown" } : {}),
-    ...(record.management_scope === "local_product" || record.management_scope === "local_component" || record.management_scope === "deployment_target" || record.management_scope === "external_carrier"
+    ...(record.management_scope === "local_product" || record.management_scope === "local_component" || record.management_scope === "deployment_target" || record.management_scope === "external_carrier" || record.management_scope === "opl_packages" || record.management_scope === "codex_plugin_manager"
       ? { managementScope: record.management_scope } : {}),
-    ...(record.deployment_target === "cloud" || record.deployment_target === "mobile" || record.deployment_target === "device" || record.deployment_target === "remote_service" || record.deployment_target === "unknown"
+    ...(record.deployment_target === "cloud" || record.deployment_target === "mobile" || record.deployment_target === "device" || record.deployment_target === "remote_service" || record.deployment_target === "unknown" || record.deployment_target === "local"
       ? { deploymentTarget: record.deployment_target } : {}),
     ...(typeof record.icon_url === "string" ? { iconUrl: record.icon_url } : {}),
     ...(asRecord(record.miniapp_entry) && /^ui:\/\/[^#]+$/.test(String(asRecord(record.miniapp_entry)?.resource_uri)) ? { miniAppEntry: {
@@ -578,11 +584,6 @@ function packageLifecycleItem(
     ...(typeof record.carrier_source_commit === "string" ? { iconSourceCommit: record.carrier_source_commit } : {}),
     ...(record.release_channel === "preview" || record.release_channel === "stable"
       ? { releaseChannel: record.release_channel } : {}),
-    activeInstallationId: asString(record.active_installation_id) ?? undefined,
-    installationManagementReason: asString(record.installation_management_reason) ?? undefined,
-    installationActions: readSoftwareInstallationActions(record.installation_actions),
-    activeInstallationStatus: readSoftwareActivationStatus(record.active_installation_status),
-    ...(Array.isArray(record.installations) ? { installations: readSoftwareInstallations(record.installations) } : {}),
     localInstallations: asRecordArray(record.local_installations).flatMap(installation => {
       const id = asString(installation.installation_id), version = asString(installation.version);
       const locationRef = asString(installation.location_ref), evidenceRef = asString(installation.evidence_ref);
@@ -610,7 +611,7 @@ function packageLifecycleItem(
     ...(installedVersion ? { installedVersion } : {}),
     ...(availableVersion ? { availableVersion } : {}),
     ...(version ? { version, versionKind: installedVersion ? "installed" as const : "available" as const } : {}),
-    currentness: asString(packageCurrentness?.status) ?? "unknown",
+    currentness: packageCurrentness ?? "unknown",
     sourceMode: packageSourceMode(record),
     access: packageAccess(record),
     installable: asOptionalBoolean(asRecord(record.installability)?.installable),

@@ -33,7 +33,7 @@ import { deriveWorkbenchTaskProjection } from "./workbenchModel-task-projection"
 import { deriveFeatureRefs } from "./featureModel";
 import { readUiContributionsProjection } from "../composition/contributionProjection";
 import { readManagedCompanions } from "./managedCompanions";
-import { deriveServiceRecoveryModel } from "./serviceRecoveryModel";
+import { deriveServiceRecoveryModel, readRunwayHealth } from "./serviceRecoveryModel";
 import { readSoftwareSourcesProjection } from "./softwareSources";
 import { readKnowledgeSourcesProjection } from "./knowledgeSources";
 
@@ -127,14 +127,6 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
   const operator = asRecord(appState.operator);
   const workbench = asRecord(operator?.workbench);
   const modules = asRecord(appState.modules);
-  const provider = asRecord(appState.provider);
-  const temporal = asRecord(provider?.temporal);
-  const temporalDetails = asRecord(temporal?.details);
-  const temporalWorkerReadiness = asRecord(temporalDetails?.worker_readiness);
-  const temporalServiceLifecycle = asRecord(temporalWorkerReadiness?.temporal_service_lifecycle);
-  const temporalSupervisor = asRecord(temporalServiceLifecycle?.supervisor);
-  const temporalScheduler = asRecord(temporalDetails?.scheduler);
-  const temporalManagement = asRecord(temporal?.management);
   const runtimeSourceCarriers = asRecord(appState.runtime_source_carriers);
   const runtimeCarrierSummary = asRecord(runtimeSourceCarriers?.summary);
   const actions = asRecordArray(appState.actions);
@@ -143,6 +135,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     return actionId ? [[actionId, action]] : [];
   }));
   const settingsControlCenter = asRecord(appState.settings_control_center);
+  const runway = readRunwayHealth(asRecord(appState.services)?.runway, asRecord(settingsControlCenter?.status_summary)?.runway);
   const codexPersonalization = asRecord(appState.codex_personalization);
   const { gatewayAccount, settingsProjection } = deriveWorkbenchSettingsProjection({
     coreCodex,
@@ -174,14 +167,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
   });
   const localEnvironment = asRecord(asRecord(settingsControlCenter?.app_settings_read_model)?.local_environment);
   const runtimeOverview = deriveWorkbenchRuntimeOverview({
-    provider,
-    temporal,
-    temporalDetails,
-    temporalWorkerReadiness,
-    temporalServiceLifecycle,
-    temporalSupervisor,
-    temporalScheduler,
-    temporalManagement,
+    runway,
     runtimeSourceCarriers,
     runtimeCarrierSummary,
     localEnvironment,
@@ -334,7 +320,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     softwareSources: readSoftwareSourcesProjection(canonicalPackageProjection?.sources),
     knowledgeSources: readKnowledgeSourcesProjection(asRecord(settingsControlCenter?.app_settings_read_model)?.resource_sources),
     runtimeOverview,
-    serviceRecovery: deriveServiceRecoveryModel({ temporal, actions, stateFresh: true }),
+    serviceRecovery: deriveServiceRecoveryModel(runway),
     workItemRuntime,
     managedCompanions: readManagedCompanions(appState),
     uiContributions: readUiContributionsProjection(state),

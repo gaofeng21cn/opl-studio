@@ -104,7 +104,8 @@ export function statusTone(status: string | undefined): "ready" | "attention" | 
   // Currentness is a separate axis from callability. Handle compound states
   // before the broad "current"/"available" matches below.
   if (["currentness_not_checked", "unknown", "not_checked", "staged", "pending", "idle", "downloading", "installing", "restart_scheduled"].includes(normalized)) return "neutral";
-  if (["update_available", "downloaded", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(normalized)) return "attention";
+  if (normalized === "running") return "ready";
+  if (["degraded", "stopped", "update_available", "downloaded", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(normalized)) return "attention";
   const healthRatio = normalized.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (healthRatio) {
     const available = Number(healthRatio[1]);
@@ -146,6 +147,9 @@ export function formatStatus(status: string | undefined, locale: WorkbenchSettin
     return locale === "zh" ? "待确认" : "Not available";
   }
   const labels: Record<string, [string, string]> = {
+    running: ["运行中", "Running"],
+    degraded: ["运行异常", "Degraded"],
+    stopped: ["已停止", "Stopped"],
     connected: ["已连接", "Connected"],
     launch_route_missing: ["入口未就绪", "Launch entry unavailable"],
     not_ready: ["尚未就绪", "Not ready"],

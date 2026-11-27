@@ -92,18 +92,6 @@ test("managed update host actions come only from the App-projected action catalo
   });
 
   assert.deepEqual(actions, [{
-    actionId: "settings_check_opl_base_update",
-    label: "Check OPL Base update",
-    payloadFields: [],
-    confirmationRequired: false,
-    dryRunSupported: true
-  }, {
-    actionId: "settings_apply_opl_base_update",
-    label: "Apply OPL Base update",
-    payloadFields: [],
-    confirmationRequired: true,
-    dryRunSupported: true
-  }, {
     actionId: "settings_apply_opl_packages",
     label: "Apply OPL packages",
     payloadFields: [],
@@ -297,7 +285,7 @@ test("managed update actions bind to the software objects declared by each proje
 
   const byId = Object.fromEntries(viewModel.managedUpdates.map((item) => [item.componentId, item]));
   assert.deepEqual(byId.opl_app.actions.map((action) => [action.transport, action.operation]), [["native_app_updater", "check"]]);
-  assert.deepEqual(byId.opl_base.actions.map((action) => [action.transport, action.operation]), [["managed_update_host", "apply"]]);
+  assert.deepEqual(byId.opl_base.actions, []);
   assert.deepEqual(byId.opl_packages.actions.map((action) => [action.transport, action.operation]), [["managed_update_host", "apply"]]);
   assert.equal(byId.opl_base.component?.lifecycleOwner, "one-person-lab");
 });

@@ -18,6 +18,11 @@ const fakeAppServer = path.join(repositoryRoot, "src", "host", "fixtures", "fake
 const fixturePath = path.join(repositoryRoot, "tests", "fixtures", "studio-vm-fixture", "state.json");
 const outputRoot = path.join(repositoryRoot, "out", "acceptance", "plugin-manager-ui");
 const session = `opl-plugin-manager-${process.pid}`;
+const panelNavigation = 'nav[aria-label="主页面"], nav[aria-label="App pages"]';
+const moreNavigation = 'button[aria-label="更多"], button[aria-label="More"]';
+const softwareNavigation = 'button[aria-label="软件中心"], button[aria-label="Software Center"]';
+const packageCards = ["acceptance-installed", "acceptance-private"];
+const softwareTabs = ["installed", "updates", "activity"];
 
 function run(executable, args, { cwd = repositoryRoot, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
@@ -63,18 +68,31 @@ async function digestFile(file) {
 async function openApplicationManagement(cliRoot) {
   const state = await evaluate(`async () => {
     const deadline = Date.now() + 10000;
-    const find = () => document.querySelector('nav[aria-label="主页面"] button[aria-label="应用管理"], nav[aria-label="Primary pages"] button[aria-label="Application management"]');
-    let button = find();
-    while (!button && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 25));
-      button = find();
+    const nav = () => document.querySelector(${JSON.stringify(panelNavigation)});
+    const find = () => nav()?.querySelector(${JSON.stringify(softwareNavigation)});
+    const more = () => nav()?.querySelector(${JSON.stringify(moreNavigation)});
+    const waitFor = async (findElement) => {
+      let value = findElement();
+      while (!value && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+        value = findElement();
+      }
+      return value;
+    };
+    if (!await waitFor(() => find() ?? more())) return { button: false, app: false };
+    if (!find()) {
+      more()?.click();
+      const pin = await waitFor(() => document.querySelector('[role="menuitem"][aria-label="固定软件中心"], [role="menuitem"][aria-label="Pin Software Center"]'));
+      pin?.click();
     }
-    if (!button) return { button: false, app: false };
+    const button = await waitFor(find);
+    if (!button) return { button: false, app: false, sidebar: nav()?.textContent.trim() };
     button.click();
-    while (!document.querySelector('[data-testid="opl-app-management"]') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
-    return { button: true, app: Boolean(document.querySelector('[data-testid="opl-app-management"]')) };
+    const findApp = () => document.querySelector('[data-testid="opl-app-management"] [data-plugin-owner-package="acceptance-installed"]');
+    while (!findApp() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    return { button: true, app: Boolean(findApp()) };
   }`, cliRoot);
-  assert.deepEqual(state, { button: true, app: true }, "primary navigation should open application management");
+  assert.deepEqual(state, { button: true, app: true }, "global navigation should open Software Center and load its package cards");
 }
 
 function packageEntry({ id, label, installed, access = "public", actions = [] }) {
@@ -86,6 +104,7 @@ function packageEntry({ id, label, installed, access = "public", actions = [] })
     description_i18n: { "zh-CN": `${label} 验收条目`, "en-US": `${label} acceptance entry` },
     publisher: installed ? "One Person Lab" : "Synthetic publisher",
     package_role: "standard_agent",
+    catalog_scope: "software", software_type: "agent", management_scope: "opl_packages", catalog_origin: "opl",
     official: installed,
     presence: { registered: installed, installed, present: installed, callable: installed, status: installed ? "present" : "not_installed" },
     installed,
@@ -100,8 +119,9 @@ function packageEntry({ id, label, installed, access = "public", actions = [] })
       discover_allowed: true,
       download_allowed: access === "authorized"
     },
-    version: installed ? "1.0.0-fixture" : undefined,
-    package_currentness: installed ? { status: "update_available", available_version: "2.0.0-fixture" } : undefined,
+    installed_version: installed ? "1.0.0-fixture" : undefined,
+    selected_version: installed ? "2.0.0-fixture" : undefined,
+    package_currentness: installed ? "update_available" : "unknown",
     recommended_action: installed ? "agent_package_update" : undefined,
     home_shortcuts: [],
     available_actions: actions
@@ -138,8 +158,8 @@ async function syntheticState() {
   source.meta = { ...(source.meta ?? {}), profile: "fast", generated_at: new Date().toISOString() };
   source.actions = [
     ...(source.actions ?? []),
-    { action_id: "agent_package_update", label: "Update package", route: "opl app action execute", payload_fields: ["package_id"], owner: "OPL Framework", dry_run_supported: true, confirmation_required: true },
-    { action_id: "agent_package_install", label: "Install package", route: "opl app action execute", payload_fields: ["package_id"], owner: "OPL Framework", dry_run_supported: true, confirmation_required: true },
+    { action_id: "agent_package_update", label: "Update package", route: "opld app.action.execute", payload_fields: ["package_id"], owner: "OPL Framework", dry_run_supported: true, confirmation_required: true },
+    { action_id: "agent_package_install", label: "Install package", route: "opld app.action.execute", payload_fields: ["package_id"], owner: "OPL Framework", dry_run_supported: true, confirmation_required: true },
     { action_id: "official_profile_restore", label: "Restore official combination", route: "opl-studio:official-profile-restore", payload_fields: ["intent"], owner: "one-person-lab-app", dry_run_supported: true, confirmation_required: true }
   ];
   source.agent_packages = {
@@ -153,22 +173,14 @@ async function syntheticState() {
     sources: {
       surface_kind: "opl_software_sources_projection.v1", status: "available",
       entries: [{
-        source_id: "acceptance-homebrew", display_name: "Homebrew 验收源", source_kind: "tap",
-        source_ref: "https://example.com/acceptance-homebrew", visibility: "public", status: "public", enabled: true,
-        inventory_status: "available", entry_count: 2, version_authority: "homebrew", installation_owner: "homebrew",
-        native_items: [
-          {
-            item_id: "fixture-tool", name: "fixture-tool", display_name: "原生更新工具", kind: "formula",
-            installed: true, installed_version: "1.0.0", available_version: "2.0.0", update_status: "available", revision: "fixture-tool-r1",
-            available_actions: [{ action_id: "source_update", label: "Update", payload_fields: ["source_id", "item_id", "expected_revision"],
-              payload: { source_id: "acceptance-homebrew", item_id: "fixture-tool", expected_revision: "fixture-tool-r1" }, status: "available", dry_run_supported: true, confirmation_required: true }]
-          },
-          {
-            item_id: "fixture-unknown", name: "fixture-unknown", display_name: "未知安装工具", kind: "formula",
-            installed: null, update_status: "unknown", revision: "fixture-unknown-r1", available_actions: []
-          }
-        ], available_actions: []
-      }], authority_boundary: { owner: "one-person-lab", credential_values_exposed: false }
+        source_id: "public-registry:opl", provider_id: "opl_catalog", display_name: "OPL 软件目录",
+        catalog_origin: "opl", status: "ready", enabled: true,
+        available_actions: [{ action_id: "source_refresh", payload_fields: ["source_id"], dry_run_supported: false }]
+      }, {
+        source_id: "github-packages:acceptance", provider_id: "github_packages", display_name: "Acceptance GitHub",
+        visibility: "authorized_only", status: "signed_out", enabled: true,
+        available_actions: [{ action_id: "source_check", payload_fields: ["source_id"], dry_run_supported: false }]
+      }], authority_boundary: { owner: "opl_framework", credential_values_exposed: false }
     }
   };
   source.application_management = { surface_kind: "opl_application_management_projection.v1", shared_resources: [] };
@@ -183,6 +195,7 @@ let stateReads = 0;
 await mkdir(cliRoot, { recursive: true });
 await mkdir(outputRoot, { recursive: true });
 let host;
+let browserOpened = false;
 
 try {
   const state = await syntheticState();
@@ -206,7 +219,7 @@ try {
         actionLog.push(request);
         if (!request.dryRun && request.payload?.confirmed === true) {
           const entry = state.agent_packages.directory.entries.find(item => item.package_id === request.payload.package_id);
-          if (entry) entry.package_currentness = { status: "current" };
+          if (entry) entry.package_currentness = "current";
           return { actionId: request.actionId, status: "executed" };
         }
         return { actionId: request.actionId, status: "preview_ready" };
@@ -217,6 +230,7 @@ try {
   });
 
   await cli(["open", "about:blank"], cliRoot);
+  browserOpened = true;
   await cli(["goto", host.url], cliRoot);
   await cli(["resize", "1440", "900"], cliRoot);
   const ready = await evaluate(`async () => {
@@ -231,20 +245,21 @@ try {
     const app = document.querySelector('[data-testid="opl-app-management"]');
     const official = app?.querySelector('[data-plugin-panel]');
     const tablist = official?.querySelector('[data-plugin-header-part="tabs"]') ?? app?.querySelector('[data-testid="opl-app-management-tabs"]');
-    const tabs = tablist ? Array.from(tablist.querySelectorAll('[role="tab"]')).map(item => item.textContent.trim()) : [];
+    const tabs = tablist ? Array.from(tablist.querySelectorAll('[role="tab"]')).map(item => item.id.replace('opl-plugin-owner-', '')) : [];
     const groups = official ? Array.from(official.querySelectorAll('[data-plugin-owner-group]')).map(group => group.getAttribute('data-plugin-owner-group')) : [];
     const cards = official ? Array.from(official.querySelectorAll('[data-plugin-owner-package]')).map(card => card.getAttribute('data-plugin-owner-package')) : [];
     return { mounted: Boolean(app), officialPage: Boolean(official), tabs, groups, cards, overflow: document.documentElement.scrollWidth > innerWidth };
   }`, cliRoot);
   assert.equal(page.mounted, true);
   assert.equal(page.officialPage, true);
-  assert.deepEqual(page.tabs, ["我的应用", "更新", "共享资源", "软件源"]);
+  assert.deepEqual(page.tabs, softwareTabs);
   assert.ok(page.groups.length > 0, "official grouped card sections should render");
   assert.ok(page.cards.includes("acceptance-installed"), "installed Framework package should render in official card shell");
   assert.equal(page.overflow, false);
 
   const restore = await evaluate(`async () => {
-    const button = document.querySelector('[data-testid="settings-agents-restore-official-profile"]');
+    document.querySelector('details.opl-catalog-more > summary')?.click();
+    const button = document.querySelector('details.opl-catalog-more[open] [data-testid="settings-agents-restore-official-profile"]');
     button?.click();
     const deadline = Date.now() + 5000;
     let dialog;
@@ -261,26 +276,9 @@ try {
   assert.ok(actionLog.some(request => request.actionId === "official_profile_restore" && request.dryRun === true && request.payload?.intent === "explicit_restore"), "restore entry must preview the App-owned restore action");
   assert.equal(actionLog.some(request => request.actionId === "official_profile_restore" && request.dryRun === false), false, "canceling restore must not execute it");
 
-  const unknownState = await evaluate(`async () => {
-    const card = document.querySelector('[data-plugin-owner-package="acceptance-homebrew:fixture-unknown"]');
-    const summary = card?.textContent ?? '';
-    card?.querySelector('button[aria-label], button')?.click();
-    await new Promise(requestAnimationFrame);
-    const detail = document.querySelector('[data-plugin-owner-detail="acceptance-homebrew:fixture-unknown"]');
-    const facts = Array.from(detail?.querySelectorAll('dl > div') ?? []).map(row => ({ name: row.querySelector('dt')?.textContent?.trim(), value: row.querySelector('dd')?.textContent?.trim() }));
-    const result = { present: Boolean(card), summary, localVersion: facts.find(row => row.name === '本机版本')?.value };
-    detail?.querySelector('button[aria-label*="返回"]')?.click();
-    await new Promise(requestAnimationFrame);
-    return result;
-  }`, cliRoot);
-  assert.equal(unknownState.present, true);
-  assert.ok(unknownState.summary.includes("待确认"));
-  assert.equal(/已安装|未安装/.test(unknownState.summary), false, "unknown native installation must stay unknown");
-  assert.equal(unknownState.localVersion, "待确认");
-
   const detail = await evaluate(`async () => {
     const card = document.querySelector('[data-plugin-owner-package="acceptance-installed"]');
-    const open = card?.querySelector('button[aria-label], button');
+    const open = card?.querySelector('button[aria-describedby]');
     open?.click();
     await new Promise(requestAnimationFrame);
     const panel = document.querySelector('[data-plugin-panel]');
@@ -316,7 +314,7 @@ try {
   const accessGate = await evaluate(`async () => {
     const card = document.querySelector('[data-plugin-owner-package="acceptance-private"]');
     if (!card) return { present: false, gate: false };
-    card.querySelector('button[aria-label], button')?.click();
+    card.querySelector('button[aria-describedby]')?.click();
     await new Promise(requestAnimationFrame);
     const detail = document.querySelector('[data-plugin-owner-detail="acceptance-private"]');
     return { present: true, gate: Boolean(detail?.querySelector('[data-testid="opl-package-access-gate"]')) };
@@ -326,41 +324,48 @@ try {
   await evaluate(`() => { document.querySelector('[data-plugin-owner-detail="acceptance-private"] button[aria-label*="返回"]')?.click(); return true; }`, cliRoot);
 
   const tabsInteraction = await evaluate(`async () => {
-    const app = document.querySelector('[data-testid="opl-app-management"]');
-    const list = () => app?.querySelector('[data-plugin-header-part="tabs"]') ?? app?.querySelector('[data-testid="opl-app-management-tabs"]');
-    const labels = ['我的应用', '更新', '共享资源', '软件源'];
     const states = [];
-    for (const label of labels) {
-      const button = Array.from(list()?.querySelectorAll('[role="tab"]') ?? []).find(item => item.textContent.trim() === label);
+    for (const id of ['updates', 'activity', 'installed']) {
+      const button = document.getElementById('opl-plugin-owner-' + id);
       button?.click();
       await new Promise(requestAnimationFrame);
-      states.push({ label, present: Boolean(button), selected: button?.getAttribute('aria-selected') === 'true' });
+      states.push({ id, selected: button?.getAttribute('aria-selected') === 'true' });
     }
-    Array.from(list()?.querySelectorAll('[role="tab"]') ?? []).find(item => item.textContent.trim() === labels[0])?.click();
     return states;
   }`, cliRoot);
-  assert.deepEqual(tabsInteraction, ["我的应用", "更新", "共享资源", "软件源"].map(label => ({ label, present: true, selected: true })));
+  assert.deepEqual(tabsInteraction, ["updates", "activity", "installed"].map(id => ({ id, selected: true })));
 
-  const updates = await evaluate(`async () => {
+  const sources = await evaluate(`async () => {
     const app = document.querySelector('[data-testid="opl-app-management"]');
-    const tabs = () => Array.from(app?.querySelectorAll('[data-plugin-header-part="tabs"] [role="tab"]') ?? []);
-    tabs().find(tab => tab.textContent.trim() === '更新')?.click();
+    Array.from(app?.querySelectorAll('[data-plugin-toolbar] button') ?? []).find(button => button.textContent.trim() === '管理软件源')?.click();
     await new Promise(requestAnimationFrame);
-    const row = app?.querySelector('[data-testid="opl-native-software-row"][data-item-id="fixture-tool"]');
-    const unknown = app?.querySelector('[data-testid="opl-native-software-row"][data-item-id="fixture-unknown"]');
-    const result = { nativeUpdate: Boolean(row), updateAction: Boolean(Array.from(row?.querySelectorAll('button') ?? []).find(button => button.textContent.trim() === '更新')), text: row?.textContent, unknownListedAsUpdate: Boolean(unknown) };
-    tabs().find(tab => tab.textContent.trim() === '我的应用')?.click();
+    const catalog = app?.querySelector('[data-source-id="public-registry:opl"]');
+    const github = app?.querySelector('[data-source-id="github-packages:acceptance"]');
+    const refresh = Array.from(catalog?.querySelectorAll('button') ?? []).find(button => button.textContent.trim() === '更新目录');
+    const check = Array.from(github?.querySelectorAll('button') ?? []).find(button => button.textContent.trim() === '检查访问');
+    const selected = document.getElementById('opl-plugin-owner-sources')?.getAttribute('aria-selected') === 'true';
+    const clickAndWait = async (button, row) => {
+      button?.click();
+      await new Promise(requestAnimationFrame);
+      const deadline = Date.now() + 5000;
+      while (row?.getAttribute('aria-busy') === 'true' && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    };
+    await clickAndWait(refresh, catalog);
+    await clickAndWait(check, github);
+    document.getElementById('opl-plugin-owner-installed')?.click();
     await new Promise(requestAnimationFrame);
-    return result;
+    return { selected, catalog: Boolean(catalog), refresh: Boolean(refresh), github: Boolean(github), check: Boolean(check) };
   }`, cliRoot);
-  assert.equal(updates.nativeUpdate, true, "Homebrew updates must remain in the shared Updates tab");
-  assert.equal(updates.updateAction, true);
-  assert.ok(updates.text.includes("1.0.0") && updates.text.includes("2.0.0"));
-  assert.equal(updates.unknownListedAsUpdate, false);
+  assert.deepEqual(sources, { selected: true, catalog: true, refresh: true, github: true, check: true });
+  for (const [actionId, sourceId] of [["source_refresh", "public-registry:opl"], ["source_check", "github-packages:acceptance"]]) {
+    assert.ok(actionLog.some(request => request.actionId === actionId && request.dryRun === false && request.payload?.source_id === sourceId), `${actionId} must reach the App action bridge for ${sourceId}`);
+  }
 
   const moreMenu = await evaluate(`async () => {
-    const nav = document.querySelector('nav[aria-label="主页面"], nav[aria-label="Primary pages"]');
-    const more = nav?.querySelector('button[aria-label="更多"], button[aria-label="More"]');
+    const nav = document.querySelector(${JSON.stringify(panelNavigation)});
+    const more = nav?.querySelector(${JSON.stringify(moreNavigation)});
     more?.click();
     const deadline = Date.now() + 3000;
     while (more?.getAttribute('aria-expanded') !== 'true' && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
@@ -369,7 +374,7 @@ try {
   }`, cliRoot);
   assert.equal(moreMenu.present, true);
   assert.equal(moreMenu.open, true);
-  assert.equal(moreMenu.items.some(label => /应用管理|管理应用与扩展|Application management|Manage apps and extensions/.test(label)), false, "pinned app management must not be duplicated in More");
+  assert.equal(moreMenu.items.some(label => /软件中心|Software Center/.test(label)), false, "pinned Software Center must not be duplicated in More");
 
   await cli(["press", "Escape"], cliRoot);
   const themeScreenshots = [];
@@ -392,12 +397,12 @@ try {
     assert.equal(themed.theme, theme);
     assert.equal(themed.locale, "zh");
     assert.deepEqual(await evaluate(`() => ({
-      tabs: Array.from(document.querySelectorAll('[data-plugin-owner-panel] [data-plugin-header-part="tabs"] [role="tab"]')).map(item => item.textContent.trim()),
-      cards: Array.from(document.querySelectorAll('[data-plugin-owner-package]')).map(item => item.getAttribute('data-plugin-owner-package')),
+      tabs: Array.from(document.querySelectorAll('[data-plugin-owner-panel] [data-plugin-header-part="tabs"] [role="tab"]')).map(item => item.id.replace('opl-plugin-owner-', '')),
+      cards: Array.from(document.querySelectorAll('[data-plugin-owner-package]')).map(item => item.getAttribute('data-plugin-owner-package')).filter(id => id.startsWith('acceptance-')).sort(),
       overflow: document.documentElement.scrollWidth > innerWidth || document.body.scrollWidth > innerWidth
     })`, cliRoot), {
-      tabs: ["我的应用", "更新", "共享资源", "软件源"],
-      cards: ["acceptance-installed", "acceptance-private", "acceptance-homebrew:fixture-tool", "acceptance-homebrew:fixture-unknown"],
+      tabs: softwareTabs,
+      cards: packageCards,
       overflow: false
     });
     await cli(["resize", "1440", "900"], cliRoot);
@@ -434,12 +439,13 @@ try {
   const receipt = {
     schema: "opl_studio_plugin_manager_ui_acceptance.v1", status: "passed", evidenceLayer: "local_rendered_candidate", installed: false,
     cohort: { rendererSha256: await digestFile(path.join(repositoryRoot, "dist", "webui", "renderer.js")), dshManifestSha256: await digestFile(manifestPath), dshUpstreamRef: manifest.upstream.ref },
-    page, restore, unknownState, detail, ownerAction, accessGate, tabsInteraction, updates, moreMenu, themes, narrow, actionCount: actionLog.length, stateReads,
+    page, restore, detail, ownerAction, accessGate, tabsInteraction, sources, moreMenu, themes, narrow, actionCount: actionLog.length, stateReads,
     screenshots: await Promise.all([...themeScreenshots, narrowScreenshot].map(async file => ({ path: path.relative(repositoryRoot, file), sha256: await digestFile(file) })))
   };
   await writeFile(path.join(outputRoot, "acceptance.json"), JSON.stringify(receipt, null, 2) + "\n");
   process.stdout.write(JSON.stringify(receipt, null, 2) + "\n");
 } finally {
+  if (browserOpened) await cli(["close"], cliRoot).catch(() => {});
   await host?.close?.();
   await rm(tempRoot, { recursive: true, force: true });
 }

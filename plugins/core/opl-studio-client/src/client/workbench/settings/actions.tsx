@@ -30,15 +30,6 @@ export function RuntimeActionButton({
     settings_apply_opl_packages: ["更新能力包", "Update packages"],
     settings_sync_capabilities: ["同步能力", "Sync capabilities"],
     settings_prune_runtime_roots_dry_run: ["检查可清理内容", "Check reclaimable data"],
-    provider_service_status: ["检查服务", "Check service"],
-    provider_service_start: ["启动服务", "Start service"],
-    provider_service_restart: ["重启服务", "Restart service"],
-    provider_worker_status: ["检查任务处理", "Check task processing"],
-    provider_worker_start: ["启动任务处理", "Start task processing"],
-    provider_worker_restart: ["重启任务处理", "Restart task processing"],
-    provider_scheduler_status: ["检查定时任务", "Check scheduled tasks"],
-    provider_scheduler_install: ["启用定时任务", "Enable scheduled tasks"],
-    provider_scheduler_trigger: ["立即运行", "Run now"],
     settings_install_docker_webui: ["安装网页端", "Install WebUI"],
     settings_configure_webui_api_key: ["配置访问密钥", "Configure access key"],
     settings_run_webui_startup_maintenance: ["运行启动维护", "Run startup maintenance"],
@@ -53,9 +44,6 @@ export function RuntimeActionButton({
     "settings_sync_capabilities",
     "settings_inventory_agent_package_store",
     "settings_inventory_webui_data_volume",
-    "provider_service_status",
-    "provider_worker_status",
-    "provider_scheduler_status"
   ].includes(action.actionId);
   return (
     <button
