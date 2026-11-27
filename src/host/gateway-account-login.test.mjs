@@ -127,11 +127,11 @@ test("Gateway account login and Codex API key reject secret-echoing RPC response
   assert.equal(JSON.stringify(r3).includes(apiKey), false);
 });
 
-test("Codex API key configuration dispatches connect.add for openai_codex and strips extra fields", async (t) => {
+test("Codex API key configuration requires the dedicated Codex configuration receipt", async (t) => {
   const calls = [];
   const apiKey = "sk-test-must-not-escape";
   const daemon = await startFakeOpld({
-    onCall: async (method, params) => { calls.push({ method, params }); return { connection_id: "conn-codex" }; }
+    onCall: async (method, params) => { calls.push({ method, params }); return calls.length === 1 ? { ok: true } : { connection_id: "conn-codex" }; }
   });
   const bridge = new OplFrameworkBridge({ stateDir: daemon.stateDir, autoStart: false });
   t.after(async () => { await bridge.close(); await daemon.close(); });
@@ -139,10 +139,13 @@ test("Codex API key configuration dispatches connect.add for openai_codex and st
   const result = await bridge.codexApiKeyConfiguration({ apiKey: ` ${apiKey} ` });
   assert.deepEqual(result, { ok: true, stateRefreshRequired: true });
   assert.deepEqual(calls, [{
-    method: "connect.add",
-    params: { provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }
+    method: "connect.configureCodexApiKey",
+    params: { api_key: apiKey }
   }]);
   assert.equal(JSON.stringify(result).includes(apiKey), false);
+  assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey }), {
+    ok: false, errorCode: "codex_configuration_failed", stateRefreshRequired: false
+  });
 });
 
 test("Gateway account login maps every framework reason code and RPC/network code cleanly", async (t) => {

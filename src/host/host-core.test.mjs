@@ -126,6 +126,11 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
           }
         };
       }
+      if (method === "connect.configureCodexApiKey") {
+        assert.deepEqual(params, { api_key: "sk-test" });
+        connectCalls.push({ method });
+        return { ok: true };
+      }
       if (method === "connect.add") {
         connectCalls.push(params);
         return { connection_id: `conn-${connectCalls.length}` };
@@ -170,7 +175,7 @@ test("desktop runtime environment drives Codex and Gateway RPC calls from one ho
   assert.deepEqual(await core.invoke("configureCodexApiKey", {
     apiKey: "sk-test"
   }), { ok: true, stateRefreshRequired: true });
-  assert.deepEqual(connectCalls.map((c) => c.provider_type), ["opl_gateway", "openai_codex"]);
+  assert.deepEqual(connectCalls.map((c) => c.method ?? c.provider_type), ["opl_gateway", "connect.configureCodexApiKey"]);
   assert.equal(reloadCount, 1);
 });
 

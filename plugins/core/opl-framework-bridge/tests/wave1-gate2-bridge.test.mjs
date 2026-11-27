@@ -450,7 +450,12 @@ test("Wave 1 Gate 2G: readDomainDetailView envelope & auth input validation", as
   assert.deepEqual(await bridge.gatewayAccountLogin({ email: "alice@opl.dev", password: "pw-secret-1" }), { ok: true, stateRefreshRequired: true });
   assert.deepEqual(await bridge.codexApiKeyConfiguration({ apiKey: "sk-valid-key" }), { ok: true, stateRefreshRequired: true });
   const listedAfter = await bridge.client.call("connect.list", {});
-  assert.deepEqual(listedAfter.connections.map((c) => c.provider_type).sort(), ["openai_codex", "opl_gateway"]);
+  assert.equal(listedAfter.connections.some((connection) => connection.provider_type === "openai_codex"), false);
+  const codexConfig = fs.readFileSync(path.join(env.CODEX_HOME, "config.toml"), "utf8");
+  assert.match(codexConfig, /experimental_bearer_token = "sk-valid-key"/);
+  const keyState = await bridge.opl.readState("fast");
+  assert.equal(keyState.app_state.settings_control_center.app_settings_read_model.codex_model_policy.api_key_present, true);
+  assert.equal(JSON.stringify(keyState).includes("sk-valid-key"), false);
 
   const noRpcClient = { on() {}, off() {}, close: async () => {}, async call(method) { throw new Error(`unexpected RPC call: ${method}`); } };
   const preRpcBridge = new OplFrameworkBridge({ env, client: noRpcClient });

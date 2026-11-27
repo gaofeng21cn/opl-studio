@@ -131,7 +131,14 @@ export class OplFrameworkBridge extends EventEmitter {
       if (!onlyKeys(req, ["apiKey"])) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
       const apiKey = typeof req.apiKey === "string" ? req.apiKey.trim() : "";
       if (!apiKey || Buffer.byteLength(apiKey, "utf8") > 65_536) return { ok: false, errorCode: "invalid_request", stateRefreshRequired: false };
-      return registerConnect({ provider_type: "openai_codex", display_name: "Codex API Key", secret: apiKey }, "codex_configuration_failed", [apiKey]);
+      try {
+        const result = await this.client.call("connect.configureCodexApiKey", { api_key: apiKey });
+        if (leakedSecret(result, [apiKey])) return { ok: false, errorCode: "internal_contract_violation", stateRefreshRequired: false };
+        if (result?.ok !== true) return { ok: false, errorCode: "codex_configuration_failed", stateRefreshRequired: false };
+        return { ok: true, stateRefreshRequired: true };
+      } catch (error) {
+        return { ok: false, errorCode: mapGwErr(error, "codex_configuration_failed"), stateRefreshRequired: false };
+      }
     });
   }
   async start(studioWeixin) {
