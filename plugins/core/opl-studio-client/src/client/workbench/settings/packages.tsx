@@ -61,7 +61,6 @@ export function agentPackagePresentationStatus(item: AgentPackageLifecycleRef): 
 }
 
 const packageUpdateAttentionStatuses = new Set([
-  "update_available",
   "staged",
   "needs_restart",
   "needs_reload",
@@ -88,9 +87,8 @@ export function agentPackageNeedsAttention(item: Pick<AgentPackageLifecycleRef, 
   if (item.installed === false) return false;
   const updateStatus = agentPackageUpdateStatus(item);
   return packageUpdateAttentionStatuses.has(updateStatus)
-    || item.readiness.operationalReady === false
-    || item.readiness.callable === false
-    || item.readiness.launchAllowed === false;
+    || (item.readiness.status !== "disabled" && (item.readiness.operationalReady === false
+      || item.readiness.callable === false || item.readiness.launchAllowed === false));
 }
 
 export function agentPackageHasHomeShortcutRoute(item: Pick<AgentPackageLifecycleRef, "homeShortcuts">): boolean {
@@ -190,8 +188,8 @@ export function PackageCatalog(props: import("../../composition/dshPluginManager
 }
 
 
-export function packagePresentLocally(item: Pick<AgentPackageLifecycleRef, "installed" | "localInstallations" | "installations">): boolean {
-  return item.installed === true || Boolean(item.installations?.length || item.localInstallations?.length);
+export function packagePresentLocally(item: Pick<AgentPackageLifecycleRef, "installed" | "localInstallations" | "readiness">): boolean {
+  return item.installed === true || Boolean(item.readiness.present === true || item.localInstallations?.length);
 }
 
 export function packageLocalVersion(item: Pick<AgentPackageLifecycleRef, "installedVersion" | "localInstallations">): string | undefined {
@@ -203,6 +201,6 @@ export function packageInstalledLocally(item: Pick<AgentPackageLifecycleRef, "in
   return item.installed === true || Boolean(item.localInstallations?.some(installation => installation.mode === "installed"));
 }
 
-export function packageDevelopmentLinked(item: Pick<AgentPackageLifecycleRef, "localInstallations" | "installations">): boolean {
-  return Boolean((item.installations ?? item.localInstallations)?.some(installation => installation.mode === "development"));
+export function packageDevelopmentLinked(item: Pick<AgentPackageLifecycleRef, "localInstallations" | "distributionChannel">): boolean {
+  return item.distributionChannel === "development" || Boolean(item.localInstallations?.some(installation => installation.mode === "development"));
 }

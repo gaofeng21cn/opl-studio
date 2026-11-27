@@ -31,11 +31,9 @@ import type {
 import type { SettingsDestinationId } from "../workbench/settings/types";
 import { actionPayloadComplete, type SettingsActionRequest } from "../workbench/settingsActions";
 import type { ResourceSettingsFocus, SettingsPanelProps } from "../workbench/settings/types";
-import { SoftwareInstallations, SoftwareReleaseOptions, availableInstallationActions, installationActionLabel, installationActionRequest } from "../workbench/SoftwareInstallations";
 import { knowledgeLibraryLabel } from "../workbench/knowledgeSources";
 import { catalogDisplayName } from "../workbench/SoftwareCatalogMetadata";
-import { nativeSoftwareProducts, nativeSoftwareMatches, softwareSourceActionLabel, nativeInstallationLabel, nativeCarrierInstalled, nativeInstalledDisplayVersion, nativeUpdateStatusLabel } from "../workbench/softwareSources";
-import { catalogInstalledVersion, catalogManagerLabel, activeSoftwareInstallation, softwareActivationLabel, catalogStateLabel, catalogTypeLabel, dshIntentCategory, intentCategoryLabel, packageDownloadAuthorizationRequired, packageIntentCategory, packagePermissionsSummary, visibleSoftwareTypes, nativeCatalogState, nativeCatalogStatusLabel, nativeCatalogAvailableVersion, packageCatalogScope, packageCatalogState, packageCatalogStatusLabel, softwareCatalogPackages, softwareCatalogNativeProducts, runtimeDependencyStatus, type SoftwareCatalogScope, type SoftwareCatalogState } from "../workbench/softwareCatalog";
+import { catalogInstalledVersion, catalogManagerLabel, catalogStateLabel, catalogTypeLabel, dshIntentCategory, intentCategoryLabel, packageDownloadAuthorizationRequired, packageIntentCategory, packagePermissionsSummary, visibleSoftwareTypes, packageCatalogScope, packageCatalogState, packageCatalogStatusLabel, softwareCatalogPackages, runtimeDependencyStatus, type SoftwareCatalogScope, type SoftwareCatalogState } from "../workbench/softwareCatalog";
 import { formatStatus } from "../workbench/settings/presentation";
 import { agentAvailabilityDetail, agentPackageUpdateStatus, isAgentCatalogPackage, localizedPackageDescription, packageAccessStatusLabel, packageInstallAllowed, packageActionLabel, packagePresentLocally, packageAccessNeedsAttention, agentPackageNeedsAttention, packageDevelopmentLinked } from "../workbench/settings/packages";
 
@@ -63,7 +61,6 @@ export type DshPluginManagerOwnerProps = {
   onRefreshCapabilities?: () => void;
   onUseSoftware?: (packageId: string) => void;
   onConfigureSoftware?: (packageId: string) => void;
-  onOpenInstallationLocation?: (path: string) => void;
   focus?: { packageId: string; revision: number };
   onOpenSettings?: (destination: SettingsDestinationId, focus?: ResourceSettingsFocus) => void;
   statusFilter?: string;
@@ -249,18 +246,14 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     if (scope === "external" && props.capabilityStatus === "idle") props.onRefreshCapabilities?.();
   }, [scope, props.capabilityStatus, props.onRefreshCapabilities]);
   const packages = softwareCatalogPackages(model, scope).filter(item => kind === "all" || isAgentCatalogPackage(item));
-  const native = kind === "all" ? softwareCatalogNativeProducts(model, scope) : [];
   const matchesState = (state: SoftwareCatalogState) => statusFilter === "all" || (statusFilter === "installed" ? ["installed", "update_available", "attention"].includes(state) : state === statusFilter);
   const visible = packages.filter(item => matchesState(packageCatalogState(item))
     && (typeFilter === "all" || packageIntentCategory(item) === typeFilter)
     && (!query.trim() || `${item.searchMetadata.query} ${item.displayNameI18n[locale] ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())));
-  const visibleNative = native.filter(({ productId, channels, source, item }) => matchesState(nativeCatalogState(item))
-    && (typeFilter === "all" || typeFilter === "application")
-    && (productId === query.trim().toLowerCase() || nativeSoftwareMatches(item, source, query, "all") || channels.some(channel => nativeSoftwareMatches(channel.item, channel.source, query, "all"))));
   const run = (item: AgentPackageLifecycleRef, action: PackageLifecycleActionRef, payload = action.payload, key = `${item.packageId}:${action.actionId}`) => onAction({ key, actionId: action.actionId, label: `${packageActionLabel(action, locale)} ${catalogDisplayName(item.label, item.displayNameI18n, locale)}`, payload, confirmationRequired: action.confirmationRequired, dryRunSupported: action.dryRunSupported });
   const activeOperations = latestPackageOperations(props.packageOperations ?? []).filter(operation => operation.status === 'running');
   const operationFor = (item: AgentPackageLifecycleRef) => activeOperations.find(operation => operation.package_id === item.packageId || operation.active_package_id === item.packageId);
-  const actionsFor = (item: AgentPackageLifecycleRef) => item.actions.filter(action => (item.catalogScope === "software" || (item.catalogScope === "host_component" && action.kind === "install")) && action.actionId !== "package_app_set_enabled" && action.kind !== "preferences" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)) && (action.kind !== "update" || item.currentness === "update_available") && (!["update", "repair"].includes(action.kind) || !packageAccessNeedsAttention(item)));
+  const actionsFor = (item: AgentPackageLifecycleRef) => item.actions.filter(action => (item.catalogScope === "software" || (item.catalogScope === "dependency" && action.kind === "install")) && action.actionId !== "package_app_set_enabled" && action.kind !== "preferences" && action.status === "available" && actionPayloadComplete(action.payload, action.requiredPayloadFields) && (action.kind !== "install" || packageInstallAllowed(item)) && (action.kind !== "update" || item.currentness === "update_available") && (!["update", "repair"].includes(action.kind) || !packageAccessNeedsAttention(item)));
   const settingsDestinationsFor = (item: AgentPackageLifecycleRef) => item.appEnabled && props.onOpenSettings
     ? (["resources", "services"] as const).filter(destination => settingsEntriesForNativeAppSurface(model.uiContributions.entries.filter(entry => entry.packageId === item.packageId), destination, settings.developerDetails).length > 0)
     : [];
@@ -309,16 +302,13 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
   };
   const packageItem = (item: AgentPackageLifecycleRef): PluginManagerOwnerItem => {
     const update = agentPackageUpdateStatus(item), state = packageCatalogState(item), name = catalogDisplayName(item.label, item.displayNameI18n, locale);
-    const current = activeSoftwareInstallation(item.installations, item.activeInstallationId, item.activeInstallationStatus);
-    const development = item.installations ? current?.mode === "development" : packageDevelopmentLinked(item);
-    const instanceCount = item.installations?.length ?? ((item.installed === true ? 1 : 0) + (item.localInstallations?.length ?? 0));
-    const hasPerInstallationActions = Boolean(item.installations?.some(inst => availableInstallationActions(inst).length > 0)) || Boolean(item.installationActions?.length);
+    const development = packageDevelopmentLinked(item);
     const currentVersion = catalogInstalledVersion(item, locale);
     const installAuthorizationRequired = !packagePresentLocally(item) && packageDownloadAuthorizationRequired(item);
     const missingInstallSource = !installAuthorizationRequired && state === "not_installed" && item.installabilityReason === "package_install_source_unavailable";
     const availableVersion = missingInstallSource ? undefined : item.availableVersion;
     const typeLabel = catalogTypeLabel(packageIntentCategory(item), locale);
-    const tags = <>{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}{instanceCount > 1 ? <Tag tone="quiet">{isZh ? `${instanceCount} 份安装` : `${instanceCount} installations`}</Tag> : null}<CatalogRowFacts type={typeLabel} installedVersion={currentVersion} availableVersion={availableVersion} state={state} locale={locale} /></>;
+    const tags = <>{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}<CatalogRowFacts type={typeLabel} installedVersion={currentVersion} availableVersion={availableVersion} state={state} locale={locale} /></>;
     const rowConfigure = !softwareCanStart(item) && state === "update_available" ? configureAction(item) : null;
     return { id: item.packageId, title: name, icon: <SoftwareArtwork identity={item.packageId} label={name} kind={item.softwareType} iconUrl={item.iconUrl} privateAsset={item.access?.visibility === "authorized_only"} />,
       description: <span className="opl-catalog-row-description">{localizedPackageDescription(item, locale)}</span>, tags,
@@ -327,20 +317,18 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
       actions: <span className="opl-catalog-row-actions">{props.onUseSoftware && softwareCanStart(item) && !operationFor(item) ? <>{useAction(item)}{state === "update_available" ? buttons(item) : null}</> : rowConfigure ? <>{rowConfigure}{buttons(item)}</> : buttons(item)}</span>, detailActions: <>{useAction(item)}{toggle(item)}{installAuthorizationRequired ? manageSourcesAction() : null}</>,
       detail: <>
         <section className="opl-dsh-owner-section"><h4>{isZh ? "当前使用" : "Currently in use"}</h4>
-          <dl><div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div><div><dt>{isZh ? "类型" : "Type"}</dt><dd>{typeLabel}</dd></div><div><dt>{isZh ? "当前版本" : "Current version"}</dt><dd>{currentVersion}{development ? ` · ${isZh ? "开发版" : "Development"}` : ""}</dd></div>{item.activeInstallationStatus ? <div><dt>{isZh ? "激活状态" : "Activation"}</dt><dd>{softwareActivationLabel(item.activeInstallationStatus, locale)}</dd></div> : null}<div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{availableVersion ?? "—"}</dd></div><div><dt>{isZh ? "更新状态" : "Update status"}</dt><dd>{formatStatus(update, locale)}</dd></div></dl>
+          <dl><div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{item.packageId}</code></dd></div><div><dt>{isZh ? "类型" : "Type"}</dt><dd>{typeLabel}</dd></div><div><dt>{isZh ? "当前版本" : "Current version"}</dt><dd>{currentVersion}{development ? ` · ${isZh ? "开发版" : "Development"}` : ""}</dd></div><div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{availableVersion ?? "—"}</dd></div><div><dt>{isZh ? "更新状态" : "Update status"}</dt><dd>{formatStatus(update, locale)}</dd></div></dl>
           {missingInstallSource ? <p>{isZh
             ? "软件源暂未提供可验证的安装文件。"
             : "The software source has not provided verified installation files."}</p> : null}
           {!availableVersion && !missingInstallSource && !installAuthorizationRequired ? <p>{item.catalogOrigin === "external" && item.catalogSource?.manager === "codex_plugin_manager" ? (isZh ? "此扩展由 Codex 维护；平台未提供单独的可用版本。" : "Codex maintains this extension and has not provided a separate available version.") : (isZh ? "软件源尚未提供可验证的安装目标，可在软件源中检查。" : "The source has not provided a verified installation target. Check its software source.")}</p> : null}
-          {item.catalogScope !== "software" && !missingInstallSource && !installAuthorizationRequired ? <p>{item.catalogScope === "host_component" ? (isZh ? "此组件随所属软件维护。" : "This component is maintained with its parent software.") : (isZh ? "所属服务尚未提供软件分类。" : "The owner has not provided a software classification.")}</p> : null}
+          {item.catalogScope === "dependency" && !missingInstallSource && !installAuthorizationRequired ? <p>{isZh ? "此组件作为软件依赖管理。" : "This component is managed as a software dependency."}</p> : null}
           {installAuthorizationRequired ? <p data-testid="opl-package-access-gate">{isZh ? "连接有安装权限的软件源账号后即可安装。" : "Connect a source account with installation access to install this software."}</p> : null}
           {item.access?.visibility === "authorized_only" && packageAccessNeedsAttention(item) ? <p data-testid="opl-package-access-gate">{item.access.status === "signed_out" ? (isZh ? "连接软件源账号以检查更新。" : "Connect the source account to check for updates.") : item.access.reason ?? packageAccessStatusLabel(item.access, locale)}</p> : null}
           {item.requiredByPackageIds?.length ? <p>{isZh ? `此能力仍被 ${item.requiredByPackageIds.join("、")} 使用；卸载或停用前请先处理这些依赖。` : `Required by ${item.requiredByPackageIds.join(", ")}; resolve dependents before uninstalling or disabling it.`}</p> : null}
         </section>
-        {item.installations !== undefined ? <SoftwareInstallations installations={item.installations} packageId={item.packageId} productActions={item.installationActions} activeId={item.activeInstallationId} activationStatus={item.activeInstallationStatus} locale={locale} actionBusyKey={operationFor(item) ? "package-operation:running" : actionBusyKey} onAction={onAction} onOpenLocation={props.onOpenInstallationLocation} onUpdates={props.onTabChange ? () => props.onTabChange?.("updates") : undefined} /> : item.localInstallations?.length ? <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Installations on this device"}</h4>{item.localInstallations.map(installation => <dl key={installation.installationId} data-testid="opl-local-installation"><div><dt>{isZh ? "版本" : "Version"}</dt><dd>{installation.version} · {installation.mode === "development" ? (isZh ? "开发版" : "Development") : (isZh ? "发布版" : "Release")}</dd></div><div><dt>{isZh ? "位置引用" : "Location reference"}</dt><dd><code>{installation.locationRef}</code></dd></div><div><dt>{isZh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(installation.manager, locale)}</dd></div></dl>)}<p>{isZh ? "安装器尚未提供激活状态和完整路径，请更新基座后重新读取。" : "The installer has not provided active state and the full path. Update the foundation and refresh."}</p></section> : null}
-        {item.installationManagementReason === "installation_helper_update_required" ? <section className="opl-dsh-owner-section"><p>{isZh ? "更新此软件的 OPL 集成后，可在这里管理桌面安装。现有安装位置与版本仍可查看。" : "Update this software's OPL integration to manage desktop installations here. Existing locations and versions remain visible."}{buttons(item)}</p></section> : null}
-        <section className="opl-dsh-owner-section"><h4>{isZh ? "软件来源" : "Software source"}</h4><dl><div><dt>{isZh ? "维护者" : "Publisher"}</dt><dd>{item.publisher}</dd></div><div><dt>{isZh ? "软件源" : "Source"}</dt><dd>{item.catalogSource?.marketplaceId ?? (item.catalogOrigin === "opl" ? "OPL" : "—")}{item.catalogSource?.delivery === "host_bundled" ? (isZh ? " · Codex 随附" : " · Bundled with Codex") : ""}</dd></div><div><dt>{isZh ? "安装器" : "Installer"}</dt><dd>{catalogManagerLabel(item.catalogSource?.manager, locale)}</dd></div></dl>{installAuthorizationRequired ? null : item.installations === undefined ? buttons(item, true) : item.installed === false ? buttons(item) : !hasPerInstallationActions ? buttons(item, true) : null}</section>
-        {item.catalogScope !== "host_component" ? <section className="opl-dsh-owner-section"><h4>{isZh ? "资料与账户授权" : "Libraries & account access"}</h4>
+        <section className="opl-dsh-owner-section"><h4>{isZh ? "软件来源" : "Software source"}</h4><dl><div><dt>{isZh ? "维护者" : "Publisher"}</dt><dd>{item.publisher}</dd></div><div><dt>{isZh ? "软件源" : "Source"}</dt><dd>{item.catalogSource?.marketplaceId ?? (item.catalogOrigin === "opl" ? "OPL" : "—")}{item.catalogSource?.delivery === "host_bundled" ? (isZh ? " · Codex 随附" : " · Bundled with Codex") : ""}</dd></div><div><dt>{isZh ? "安装器" : "Managed by"}</dt><dd>{catalogManagerLabel(item.catalogSource?.manager, locale)}</dd></div></dl>{installAuthorizationRequired ? null : buttons(item, true)}</section>
+        {item.catalogScope !== "dependency" ? <section className="opl-dsh-owner-section"><h4>{isZh ? "资料与账户授权" : "Libraries & account access"}</h4>
           {model.applicationManagement?.sharedResources.filter(resource => resource.resourceKind === "connection" && resource.consumerPackageIds.includes(item.packageId)).map(resource => <p key={resource.resourceId}>{resource.labelI18n?.[locale] ?? resource.label}</p>)}
           {model.knowledgeSources?.entries.filter(source => source.connected !== false && source.consumerPackageIds.includes(item.packageId)).map(source => <p key={source.resourceId}>{model.knowledgeSources ? knowledgeLibraryLabel(source, model.knowledgeSources, locale) : source.label} · {model.knowledgeSources?.consumers.some(consumer => consumer.packageId === item.packageId && source.writeDomainIds.includes(consumer.domainId)) ? (isZh ? "可提议修改" : "Can propose changes") : (isZh ? "只读" : "Read only")}</p>)}
           <p>{isZh ? "复用已有资料库与账户，并为此软件单独授权。" : "Reuse existing libraries and accounts with access granted to this software."}</p>
@@ -352,35 +340,6 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
         {shortcuts(item)}
         {item.appEnabled && props.onOpenSettings ? (["models", "resources", "workspace", "capabilities", "services", "preferences"] as const).filter(destination => settingsEntriesForNativeAppSurface(model.uiContributions.entries.filter(entry => entry.packageId === item.packageId), destination, settings.developerDetails).length > 0).map(destination => <section key={destination} className="opl-dsh-owner-section"><Button size="sm" variant="outline" onClick={() => props.onOpenSettings?.(destination, { packageId: item.packageId, ...(destination === "resources" ? { section: "remote" } : {}) })}>{destination === 'resources' ? (isZh ? '配置远程连接' : 'Configure remote connection') : destination === 'services' ? (isZh ? '打开服务状态' : 'Open service status') : (isZh ? '配置扩展参数' : 'Configure extension')}</Button></section>) : null}
         {settings.developerDetails ? <section className="opl-dsh-owner-section"><h4>{isZh ? "技术详情" : "Technical details"}</h4><p>{agentAvailabilityDetail(item, locale)}</p><dl>{item.details.map(detail => <div key={detail.label}><dt>{detail.label}</dt><dd>{detail.value}</dd></div>)}</dl></section> : null}
-      </>,
-    };
-  };
-  const nativeItem = (product: ReturnType<typeof nativeSoftwareProducts>[number]): PluginManagerOwnerItem => {
-    const { source, item, productId, installations } = product;
-    const current = activeSoftwareInstallation(installations, item.activeInstallationId, item.activeInstallationStatus);
-    const version = installations.length || item.activeInstallationStatus ? current?.displayVersion ?? current?.version : nativeInstalledDisplayVersion(item);
-    const development = current ? current.mode === "development" : item.installedBuildKind === "local-development";
-    const name = item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale);
-    const ownerUpdate = item.updateStatus === "available" && current ? availableInstallationActions(current).find(action => action.payload.operation === "update") : undefined;
-    const executable = item.availableActions.filter(action => source && action.status === "available" && Boolean(item.revision) && actionPayloadComplete(action.payload, [...action.payloadFields, "source_id", "item_id", "expected_revision"]) && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId && action.payload.expected_revision === item.revision && (action.actionId === "source_install" ? nativeCarrierInstalled(item) === false : action.actionId === "source_update" ? nativeCarrierInstalled(item) === true && item.updateStatus === "available" : nativeCarrierInstalled(item) === true));
-    const nativeButtons = (all = false) => (all ? executable : executable.filter(action => action.actionId === (item.installed === false ? "source_install" : "source_update"))).map(action => <Button key={action.actionId} size="sm" variant={action.actionId === "source_uninstall" ? "outline" : "primary"} disabled={busy} onClick={() => onAction({ key: `source:${source?.sourceId}:${item.itemId}:${action.actionId}`, actionId: action.actionId, label: `${softwareSourceActionLabel(action.actionId, locale, action.label)} ${name}`, payload: action.payload, confirmationRequired: true, dryRunSupported: action.dryRunSupported })}>{softwareSourceActionLabel(action.actionId, locale, action.label)}</Button>);
-    return { id: productId, title: name, icon: <SoftwareArtwork identity={productId} label={name} kind={item.kind === "formula" ? "cli" : "application"} iconUrl={item.iconUrl} />,
-      description: <span className="opl-catalog-row-description">{item.descriptionI18n?.[locale] || item.description || (isZh ? "尚未提供软件说明。" : "No software description provided.")}</span>,
-      tags: <><CatalogRowFacts type={isZh ? "应用" : "Application"} installedVersion={version ?? "—"} availableVersion={nativeCatalogAvailableVersion(product, locale)} state={nativeCatalogState(item)} locale={locale} />{development ? <Tag tone="quiet">{isZh ? "开发版" : "Development"}</Tag> : null}{installations.length > 1 ? <Tag tone="quiet">{isZh ? `${installations.length} 份安装` : `${installations.length} installations`}</Tag> : null}</>,
-      actions: <span className="opl-catalog-row-actions">{ownerUpdate && current ? <Button size="sm" variant="primary" disabled={busy} onClick={() => onAction(installationActionRequest(current, ownerUpdate, locale))}>{installationActionLabel(ownerUpdate, locale)}</Button> : nativeButtons()}</span>,
-      status: <CatalogState state={nativeCatalogState(item)} locale={locale} label={nativeCatalogStatusLabel(item, locale)} />,
-      detail: <>
-        <section className="opl-dsh-owner-section"><h4>{isZh ? "当前使用" : "Currently in use"}</h4><dl>
-          <div><dt>{isZh ? "软件 ID" : "Software ID"}</dt><dd><code>{productId}</code></dd></div>
-          <div><dt>{isZh ? "当前版本" : "Current version"}</dt><dd>{version ?? "—"}{development ? ` · ${isZh ? "开发版" : "Development"}` : ""}</dd></div>
-          {item.activeInstallationStatus ? <div><dt>{isZh ? "激活状态" : "Activation"}</dt><dd>{softwareActivationLabel(item.activeInstallationStatus, locale)}</dd></div> : null}
-          <div><dt>{isZh ? "可用版本" : "Available version"}</dt><dd>{nativeCatalogAvailableVersion(product, locale) ?? "—"}</dd></div>
-          <div><dt>{isZh ? "更新状态" : "Update status"}</dt><dd>{nativeUpdateStatusLabel(item.updateStatus, locale)}</dd></div>
-          {item.updateStatus === "needs_restart" && item.pendingVersion ? <div><dt>{isZh ? "待启用版本" : "Staged version"}</dt><dd>{item.pendingVersion}</dd></div> : null}
-        </dl>{item.updateStatus === "needs_restart" ? <p>{isZh ? "更新已暂存，重启应用后生效。" : "The update is staged and will take effect after restarting the app."}</p> : !nativeCatalogAvailableVersion(product, locale) ? <p>{isZh ? "软件源尚未提供推荐的安装目标，请检查软件源。" : "The source has not provided a recommended installation target. Check its software source."}</p> : null}</section>
-        {installations.length ? <SoftwareInstallations installations={installations} activeId={item.activeInstallationId} activationStatus={item.activeInstallationStatus} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} onOpenLocation={props.onOpenInstallationLocation} onUpdates={props.onTabChange ? () => props.onTabChange?.("updates") : undefined} /> : item.installed ? <section className="opl-dsh-owner-section"><h4>{isZh ? "本机安装" : "Installations on this device"}</h4><dl><div><dt>{isZh ? "安装方式" : "Installation method"}</dt><dd>{nativeInstallationLabel(item, locale)}</dd></div><div><dt>{isZh ? "管理方式" : "Managed by"}</dt><dd>{catalogManagerLabel(item.installationOwner, locale)}</dd></div>{item.location ? <div><dt>{isZh ? "安装位置" : "Location"}</dt><dd><code>{item.location}</code></dd></div> : null}</dl>{nativeButtons(true)}{item.ownerSettingsRoute === "updates" && props.onTabChange ? <Button size="sm" variant="outline" onClick={() => props.onTabChange?.("updates")}>{isZh ? "管理此安装" : "Manage installation"}</Button> : null}</section> : null}
-        <SoftwareReleaseOptions product={product} locale={locale} actionBusyKey={actionBusyKey} onAction={onAction} />
-        {settings.developerDetails ? <section className="opl-dsh-owner-section"><h4>{isZh ? "技术详情" : "Technical details"}</h4><dl>{item.installedDisplayVersion && item.installedVersion !== item.installedDisplayVersion ? <div><dt>{isZh ? "机器版本" : "Machine version"}</dt><dd>{item.installedVersion}</dd></div> : null}{item.installedBuildId ? <div><dt>{isZh ? "构建 ID" : "Build ID"}</dt><dd><code>{item.installedBuildId}</code></dd></div> : null}</dl></section> : null}
       </>,
     };
   };
@@ -543,7 +502,6 @@ export function DshPluginManagerOwner(props: DshPluginManagerOwnerProps) {
     : [];
   const softwareItems: Array<{ category: SoftwareProductType; item: PluginManagerOwnerItem }> = [
     ...(scope === "components" ? [] : visible.map(entry => ({ category: packageIntentCategory(entry), item: packageItem(entry) }))),
-    ...visibleNative.map(entry => ({ category: "application" as const, item: nativeItem(entry) })),
     ...visibleOptionalAndExternalDsh.map(entry => ({ category: dshIntentCategory(entry.intentCategory), item: dshPluginItem(entry) }))
   ];
   const groups = scope === "components"

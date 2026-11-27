@@ -2,10 +2,8 @@ import type { WorkbenchModel } from "./workbenchModel";
 import type { SettingsActionRequest } from "./settingsActions";
 import { actionPayloadComplete } from "./settingsActions";
 import { catalogDisplayName } from "./SoftwareCatalogMetadata";
-import { activeSoftwareInstallation, catalogInstalledVersion, nativeCatalogAvailableVersion, nativeCatalogState, nativeCatalogStatusLabel, packageCatalogState, packageCatalogStatusLabel, softwareCatalogPackages, softwareCatalogNativeProducts } from "./softwareCatalog";
+import { catalogInstalledVersion, packageCatalogState, packageCatalogStatusLabel, softwareCatalogPackages } from "./softwareCatalog";
 import { packageAccessNeedsAttention, packageActionLabel } from "./settings/packages";
-import { nativeCarrierInstalled, nativeInstalledDisplayVersion, softwareSourceActionLabel } from "./softwareSources";
-import { availableInstallationActions, installationActionLabel, installationActionRequest } from "./SoftwareInstallations";
 import { useEffect, useMemo, useState } from "react";
 import type { DshPluginCatalogEntry, DshPluginCatalogProjection, DshPluginUpdateProjection, NativeAppUpdateResult } from "../bridge/oplBridge";
 
@@ -59,54 +57,13 @@ function resolvePackageLifecycleUpdateRequest(item: ReturnType<typeof softwareCa
   };
 }
 
-function resolveNativeUpdateRequest(product: ReturnType<typeof softwareCatalogNativeProducts>[number], locale: "zh" | "en"): {
-  request?: SettingsActionRequest;
-  label?: string;
-} {
-  const { item, source, installations } = product;
-  const state = nativeCatalogState(item);
-  const name = item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale);
-  const current = activeSoftwareInstallation(installations, item.activeInstallationId, item.activeInstallationStatus);
-  const ownerAction = state === "update_available" && current ? availableInstallationActions(current).find(action => action.payload.operation === "update") : undefined;
-  const sourceAction = !ownerAction && state === "update_available" && (!installations.length || current?.manager === "homebrew") && nativeCarrierInstalled(item) === true
-    ? item.availableActions.find(action => action.actionId === "source_update" && action.status === "available"
-      && source && action.payload.source_id === source.sourceId && action.payload.item_id === item.itemId
-      && Boolean(item.revision) && action.payload.expected_revision === item.revision
-      && actionPayloadComplete(action.payload, action.payloadFields)) : undefined;
-  if (ownerAction && current) {
-    return { request: installationActionRequest(current, ownerAction, locale), label: installationActionLabel(ownerAction, locale) };
-  }
-  if (sourceAction) {
-    const label = softwareSourceActionLabel(sourceAction.actionId, locale, sourceAction.label);
-    return {
-      request: {
-        key: `source:${source?.sourceId}:${item.itemId}:${sourceAction.actionId}`,
-        actionId: sourceAction.actionId,
-        label: `${label} ${name}`,
-        payload: sourceAction.payload,
-        confirmationRequired: sourceAction.confirmationRequired,
-        dryRunSupported: sourceAction.dryRunSupported
-      },
-      label
-    };
-  }
-  return {};
-}
-
 export function packageUpdateRequests(model: WorkbenchModel, locale: "zh" | "en"): SettingsActionRequest[] {
-  const packageRequests = softwareCatalogPackages(model, "all")
+  return softwareCatalogPackages(model, "all")
     .filter(item => packageCatalogState(item) === "update_available")
     .flatMap(item => {
       const request = resolvePackageLifecycleUpdateRequest(item, locale, false);
       return request ? [request] : [];
     });
-  const nativeRequests = softwareCatalogNativeProducts(model, "all")
-    .filter(({ item }) => nativeCatalogState(item) === "update_available")
-    .flatMap(product => {
-      const { request } = resolveNativeUpdateRequest(product, locale);
-      return request ? [request] : [];
-    });
-  return [...packageRequests, ...nativeRequests];
 }
 
 export type SoftwareUpdatesSummary = {
@@ -279,8 +236,6 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
 }) {
   const zh = locale === "zh";
   const bridge = typeof window === "undefined" ? undefined : window.oplStudio;
-  const [restartError, setRestartError] = useState("");
-  const [restarting, setRestarting] = useState(false);
   const [dshUpdatesCount, setDshUpdatesCount] = useState(0);
   const [localDshCatalog, setLocalDshCatalog] = useState<DshPluginCatalogProjection | null>(null);
   const [externalBusyId, setExternalBusyId] = useState<string | null>(null);
@@ -364,24 +319,7 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
 
   const packages = softwareCatalogPackages(model, "all");
   const actionable = packages.filter(item => ["update_available", "attention"].includes(packageCatalogState(item)));
-  const native = softwareCatalogNativeProducts(model, "all").filter(({ item }) => ["update_available", "attention"].includes(nativeCatalogState(item)));
-  const count = actionable.length + native.length + externalActionable.length;
-
-  const triggerRestart = async () => {
-    if (!bridge?.restartNativeApp || restarting) return;
-    setRestarting(true);
-    setRestartError("");
-    try {
-      const outcome = await bridge.restartNativeApp();
-      if (outcome && outcome.accepted === false) {
-        setRestartError(restartOutcomeMessage(outcome, zh));
-      }
-    } catch (reason) {
-      setRestartError(reason instanceof Error ? reason.message : String(reason));
-    } finally {
-      setRestarting(false);
-    }
-  };
+  const count = actionable.length + externalActionable.length;
 
   const runExternalAction = async (entry: DshPluginCatalogEntry) => {
     if (!bridge || externalBusyId) return;
@@ -432,27 +370,11 @@ export function OplSoftwareUpdates({ model, locale, actionBusyKey, onAction, onM
 
   return <><section className="opl-package-updates" data-testid="opl-package-update-summary"><h2>{zh ? "软件与插件更新" : "Software & plugin updates"}</h2>
     <p>{count ? (zh ? `${count} 项软件或插件可更新或需确认状态` : `${count} software item(s) can be updated or need review`) : (zh ? "所有已检查的软件和插件均为当前最新。" : "All checked software and plugins are up to date.")}</p>
-    {restartError ? <p role="alert">{restartError}</p> : null}
     {actionable.map(item => {
       const state = packageCatalogState(item), name = catalogDisplayName(item.label, item.displayNameI18n, locale);
       const accessBlocked = packageAccessNeedsAttention(item);
       const request = resolvePackageLifecycleUpdateRequest(item, locale, true);
       return <div className="opl-package-update-row" key={item.packageId}><div><strong>{name}</strong><span>{catalogInstalledVersion(item, locale)}{state === "update_available" && item.availableVersion ? ` → ${item.availableVersion}` : ""}</span></div><span>{packageCatalogStatusLabel(item, locale)}</span>{accessBlocked && onManageSources ? <button type="button" className="settings-action-button" onClick={onManageSources}>{zh ? "检查软件源" : "Check source"}</button> : request ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction(request)}>{request.label.replace(` ${name}`, "")}</button> : <span className="opl-update-owner-note">{zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details"}</span>}</div>;
-    })}
-    {native.map(product => {
-      const { item, productId, installations } = product;
-      const state = nativeCatalogState(item);
-      const targetVersion = item.updateStatus === "needs_restart" ? item.pendingVersion : nativeCatalogAvailableVersion(product, locale);
-      const current = activeSoftwareInstallation(installations, item.activeInstallationId, item.activeInstallationStatus);
-      const version = installations.length || item.activeInstallationStatus ? current?.displayVersion ?? current?.version : nativeInstalledDisplayVersion(item);
-      const { request, label } = resolveNativeUpdateRequest(product, locale);
-      return <div className="opl-package-update-row" key={productId} data-product-id={productId}>
-        <div><strong>{item.productDisplayName ?? catalogDisplayName(item.displayName, item.displayNameI18n, locale)}</strong><span>{version ?? "—"}{(state === "update_available" || item.updateStatus === "needs_restart") && targetVersion ? ` → ${targetVersion}` : ""}</span></div>
-        <span>{nativeCatalogStatusLabel(item, locale)}</span>
-        {request ? <button type="button" className="settings-action-button" disabled={actionBusyKey !== null} onClick={() => onAction(request)}>{label}</button>
-          : item.updateStatus === "needs_restart" && typeof bridge?.restartNativeApp === "function" ? <button type="button" className="settings-action-button primary" disabled={actionBusyKey !== null || restarting} onClick={() => void triggerRestart()}>{restarting ? (zh ? "正在重启…" : "Restarting…") : (zh ? "重启应用生效" : "Restart to apply")}</button>
-          : <span className="opl-update-owner-note">{item.updateStatus === "needs_restart" ? (zh ? "更新已暂存，重启应用后生效。" : "The update is staged and will take effect after restarting the app.") : (zh ? "请在软件详情中检查来源或安装状态" : "Check the source or installation in software details")}</span>}
-      </div>;
     })}
     {externalActionable.map(entry => {
       const label = entry.labelI18n[locale] ?? entry.pluginId;

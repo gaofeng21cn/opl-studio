@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PackageOperations, PackageDownloadPreview, PackageActivityButton } from '../../plugins/core/opl-studio-client/src/client/workbench/PackageInstallationProgress';
-import { packageActivity, packageRemainingTime, packageOperationRequest, preparePackageOperationRequest, readPackageOperation } from '../../plugins/core/opl-studio-client/src/client/workbench/packageOperations';
+import { packageActivity, packageRemainingTime, packageOperationRequest, preparePackageOperationRequest, readPackageOperation, readStartedPackageOperation } from '../../plugins/core/opl-studio-client/src/client/workbench/packageOperations';
 import { SoftwareCenterOverview } from '../../plugins/core/opl-studio-client/src/client/workbench/SoftwareCenterOverview';
 import { runtimeDependencyStatus } from "../../plugins/core/opl-studio-client/src/client/workbench/softwareCatalog";
 import { actionReceiptView } from '../../plugins/core/opl-studio-client/src/client/workbench/actionReceiptView';
@@ -50,6 +50,17 @@ test('only Package lifecycle requests use the background owner and acceptance is
   expect(packageOperationRequest(request).payload).toEqual({ action_id: 'agent_package_install', package_id: 'mac-media-assets' });
   expect(packageOperationRequest({ ...request, actionId: 'source_install' }).actionId).toBe('source_install');
   expect(readPackageOperation(operation)?.status).toBe('running');
+  const receipt = {
+    status: 'executed', actionId: 'package_operation_start',
+    payload: { action_id: 'agent_package_repair', package_id: 'mac-media-assets' },
+    stdoutJson: { app_action_execution: { result: { operation_id: 'opl-op-42', status: 'running' } } }
+  } as any;
+  expect(readStartedPackageOperation(receipt)).toEqual({
+    operation_id: 'opl-op-42', package_id: 'mac-media-assets', action_id: 'agent_package_repair',
+    status: 'running', stage: 'preparing', can_cancel: false
+  });
+  expect(readStartedPackageOperation({ ...receipt, payload: {} })).toBeNull();
+  expect(readStartedPackageOperation({ ...receipt, status: 'preview_ready' })).toBeNull();
 });
 
 test('the first install waits for owner capability discovery instead of racing into a blocking download', async () => {

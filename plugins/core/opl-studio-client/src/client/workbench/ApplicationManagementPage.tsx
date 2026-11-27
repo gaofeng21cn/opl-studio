@@ -16,7 +16,7 @@ import type { SettingsActionRequest, SettingsActionViewModel, SettingsHostAction
 import { DshPluginManagerOwner } from "../composition/dshPluginManagerOwner";
 import { UpdatesSettingsPage } from "./settings/pages/UpdatesSettingsPage";
 import { SoftwareSourcesPage } from "./SoftwareSourcesPage";
-import { nativeSoftwareInventory, pendingSoftwareSourceAccessCheck, softwareSourceActionLabel } from "./softwareSources";
+import { pendingSoftwareSourceAccessCheck, softwareSourceActionLabel } from "./softwareSources";
 import { softwareCatalogInventory } from "./softwareCatalog";
 
 export type ApplicationManagementTab = "applications" | "updates" | "activity" | "resources" | "sources";
@@ -110,10 +110,9 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
   const inventory = softwareCatalogInventory(model);
   const catalogAvailable = model.packageLifecycle.some(item => item.packageId === "agent_packages_directory" || item.statusAxes.some(axis => axis.source === "canonical_agent_packages"));
   const effectiveBusyKey = actionBusyKey ?? (stateStatus !== "ready" ? "application-management:state" : null);
-  const nativeInventory = nativeSoftwareInventory(model.softwareSources);
   const activity = packageActivity(packageOperations?.operations ?? [], packageOperations?.readError ?? false);
   const resources = (model.applicationManagement?.sharedResources ?? []).filter(resource => ["knowledge_source", "connection"].includes(resource.resourceKind) && resource.consumerPackageIds.some(id => model.packageLifecycle.some(item => item.packageId === id && item.installed === true)));
-  const stateUnknown = inventory.total > inventory.installed + inventory.notInstalled || !catalogAvailable || !model.softwareSources || !nativeInventory.complete
+  const stateUnknown = inventory.total > inventory.installed + inventory.notInstalled || !catalogAvailable || !model.softwareSources
     || resources.some(resource => resource.status === "unknown");
   const observedAt = model.stateGeneratedAt && Number.isFinite(Date.parse(model.stateGeneratedAt))
     ? new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(Date.parse(model.stateGeneratedAt)) : null;
@@ -180,7 +179,7 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     </div> : null}
     {tab === "applications" ? <>
       <SoftwareCenterOverview locale={settings.locale} stateStatus={stateStatus} stateUnknown={stateUnknown}
-        inventory={inventory} catalogAvailable={catalogAvailable} complete={nativeInventory.complete}
+        inventory={inventory} catalogAvailable={catalogAvailable} complete={catalogAvailable && model.softwareSources?.entries.some(source => source.sourceId === "public-registry:opl" && source.status === "ready") === true}
         activity={activity} observedAt={observedAt} statusFilter={statusFilter} onSelectStatus={setStatusFilter}
         onUpdates={() => navigate("updates")} onActivity={() => navigate("activity")} onRefresh={refreshAll} />
       {stateStatus === "error" && stateError ? <details className="opl-app-management-receipt" data-testid="opl-app-management-state">
@@ -209,5 +208,5 @@ export function ApplicationManagementPage({ packageOperations, model, stateStatu
     </> : null}
     {actionFeedback ? <div className="opl-app-management-feedback" data-tone={actionFeedback.tone} role="status">{actionFeedback.message}</div> : null}
     {actionReceipt ? <details className="opl-app-management-receipt" data-testid="opl-app-management-receipt"><summary>{zh ? "操作结果" : "Action result"}</summary><p>{actionReceipt.summary}</p>{actionReceipt.nextStep ? <p>{actionReceipt.nextStep}</p> : null}{actionReceipt.receiptId ? <small>{zh ? `技术回执：${actionReceipt.receiptId}` : `Technical receipt: ${actionReceipt.receiptId}`}</small> : null}</details> : null}</div>;
-  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} onOpenInstallationLocation={onOpenInstallationLocation} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "按需安装、组合与更新软件和插件。" : "Install, compose, and update software and plugins."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} dshCatalogRevision={dshCatalogRevision} onDshRestartRequired={onDshRestartRequired} onDshPluginActivityChange={catalog => { setDshCatalog(catalog); if (catalog.restartRequired) onDshRestartRequired?.(); }} /></div>;
+  return <div className="opl-app-management" data-testid="opl-app-management"><DshPluginManagerOwner packageOperations={packageOperations?.operations} operationsReadError={packageOperations?.readError} kind="all" managedUpdate={managedUpdate} model={model} settings={settings} actionBusyKey={effectiveBusyKey} onAction={runAction} onUseSoftware={onUseSoftware} onConfigureSoftware={configureSoftware} focus={focus} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} manifestInstallAction={manifestInstallAction} capabilityCatalog={capabilityCatalog} capabilityStatus={capabilityStatus} capabilityError={capabilityError} onRefreshCapabilities={onRefreshCapabilities} onOpenSettings={onOpenSettings} contributedTabs={pageTabs} selectedTab={tab === "applications" ? "installed" : tab} onTabChange={(next) => { const value = next === "installed" ? "applications" : next as ApplicationManagementTab; setTab(value); onTabChange?.(value); }} pageTitle={zh ? "软件中心" : "Software Center"} pageIntro={zh ? "按需安装、组合与更新软件和插件。" : "Install, compose, and update software and plugins."} onRefresh={refreshAll} stateStatus={stateStatus} headerStatus={headerStatus} dshCatalogRevision={dshCatalogRevision} onDshRestartRequired={onDshRestartRequired} onDshPluginActivityChange={catalog => { setDshCatalog(catalog); if (catalog.restartRequired) onDshRestartRequired?.(); }} /></div>;
 }

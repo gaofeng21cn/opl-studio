@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OplActionReceipt, OplBridge } from '../bridge/oplBridge';
-import { packageOperationResult, readPackageOperation, supportsBackgroundPackages, type PackageOperation } from './packageOperations';
+import { packageOperationResult, readPackageOperation, readStartedPackageOperation, supportsBackgroundPackages, type PackageOperation } from './packageOperations';
 
 export function usePackageOperations(bridge: OplBridge, onCompleted: () => void, visible = true) {
   const [operations, setOperations] = useState<PackageOperation[]>([]);
@@ -38,8 +38,8 @@ export function usePackageOperations(bridge: OplBridge, onCompleted: () => void,
     return () => { disposed = true; clearTimeout(timer); };
   }, [bridge, revision, visible, active]);
   const accept = (receipt: OplActionReceipt) => {
-    const operation = readPackageOperation(packageOperationResult(receipt).operation);
-    if (!operation || receipt.status !== 'executed') return false;
+    const operation = readStartedPackageOperation(receipt);
+    if (!operation) return false;
     observed.current.set(operation.operation_id, operation.status);
     setOperations(current => [operation, ...current.filter(item => item.operation_id !== operation.operation_id)]);
     refresh(); return true;

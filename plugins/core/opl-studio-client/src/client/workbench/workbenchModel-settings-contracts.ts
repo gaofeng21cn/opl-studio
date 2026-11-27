@@ -61,7 +61,6 @@ export type WorkbenchSettingsProjection = {
   statusSummary: {
     runtimeSourceHealth?: string;
     agentPackageHealth?: string;
-    temporalProvider?: string;
     releaseChannel?: string;
     issueCount?: number;
   };
@@ -70,7 +69,6 @@ export type WorkbenchSettingsProjection = {
     runtimeSourcesRoot?: string;
     logsDir?: string;
     releaseChannel?: string;
-    temporalProvider?: string;
   };
   workspace: {
     selectedPath?: string;

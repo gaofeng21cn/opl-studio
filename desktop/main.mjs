@@ -374,7 +374,7 @@ async function createDesktopHost(appLogDirectory) {
     workspaceRoot: desktopCodexWorkspaceRoot(),
     env: hostEnvironment,
     candidateActionAllowlist: [
-      "workspace_root_set", "codex_install", "settings_check_opl_base_update", "settings_apply_opl_base_update",
+      "workspace_root_set", "codex_install",
       "settings_apply_opl_packages", "agent_package_update", "agent_package_repair"
     ],
     channelBindingFile: path.join(app.getPath("userData"), "channel-transport-bindings.json"),
@@ -700,15 +700,9 @@ app.whenReady().then(async () => {
           ? stateResult.value?.app_state?.app_state?.agent_packages ?? stateResult.value?.app_state?.agent_packages ?? {}
           : {};
         const entries = Array.isArray(agentPackages?.directory?.entries) ? agentPackages.directory.entries : [];
-        const nativeItems = Array.isArray(agentPackages?.sources?.entries)
-          ? agentPackages.sources.entries.flatMap((source) => Array.isArray(source?.native_items) ? source.native_items : [])
-          : [];
-        const softwareUpdatesCount = entries.filter((entry) => entry?.installed === true && (entry?.update_status === "update_available" || entry?.update_state === "update_available")).length
-          + nativeItems.filter((item) => item?.installed === true && item?.update_status === "available").length;
-        const softwareRestartRequired = entries.some((entry) => entry?.installed === true && (entry?.update_status === "needs_restart" || entry?.update_state === "needs_restart"))
-          || nativeItems.some((item) => item?.installed === true && item?.update_status === "needs_restart");
+        const softwareUpdatesCount = entries.filter((entry) => entry?.installed === true && entry?.package_currentness === "update_available").length;
         const maintenanceSnapshot = activeHost.core.updateMaintenance?.snapshot?.();
-        const restartRequired = Boolean(desktop.restartRequired || maintenanceSnapshot?.packageRestartRequired || maintenanceSnapshot?.dshPluginRestartRequired || softwareRestartRequired);
+        const restartRequired = Boolean(desktop.restartRequired || maintenanceSnapshot?.packageRestartRequired || maintenanceSnapshot?.dshPluginRestartRequired);
         if (pluginUpdatesCount > 0 && activeHost.core.updateMaintenance) {
           void activeHost.core.updateMaintenance.runNow().catch(() => undefined);
         }

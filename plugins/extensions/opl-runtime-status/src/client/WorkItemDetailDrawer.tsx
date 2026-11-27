@@ -41,6 +41,7 @@ export type WorkItemDetailDrawerProps = {
   onOpenMaterials?(item: WorkItemRuntimeItem): void;
   onOpenThread?(threadId: string): Promise<string | null>;
   onRequestArchive?(item: WorkItemRuntimeItem, archived: boolean): void;
+  onResolveHumanGate?(gate: NonNullable<WorkItemRuntimeItem["humanGate"]>, decision: "approve" | "pause"): Promise<void>;
 };
 
 export function WorkItemDetailDrawer({
@@ -53,7 +54,8 @@ export function WorkItemDetailDrawer({
   onBack,
   onOpenMaterials,
   onOpenThread,
-  onRequestArchive
+  onRequestArchive,
+  onResolveHumanGate
 }: WorkItemDetailDrawerProps) {
   const zh = locale === "zh";
   const [selectedViewId, setSelectedViewId] = useState<string | undefined>(initialViewId);
@@ -297,6 +299,7 @@ export function WorkItemDetailDrawer({
 
         <article className="runtime-detail-card">
           <h2>{zh ? "5. 下一步与责任说明" : "5. Next Action & Owner"}</h2>
+          {item.humanGate && onResolveHumanGate ? <RunwayDecisionControls key={item.humanGate.stageRunId} gate={item.humanGate} locale={locale} resolve={onResolveHumanGate} /> : null}
           <dl className="runtime-detail-kv">
             <div>
               <dt>{zh ? "下一步" : "Next action"}</dt>
@@ -343,4 +346,34 @@ export function WorkItemDetailDrawer({
       </div>
     </section>
   );
+}
+
+function RunwayDecisionControls({ gate, locale, resolve }: {
+  gate: NonNullable<WorkItemRuntimeItem["humanGate"]>;
+  locale: RuntimeLocale;
+  resolve: NonNullable<WorkItemDetailDrawerProps["onResolveHumanGate"]>;
+}) {
+  const zh = locale === "zh";
+  const [busy, setBusy] = useState(false);
+  const [submittedRevision, setSubmittedRevision] = useState<number | null>(null);
+  const [error, setError] = useState(false);
+  const submit = async (decision: "approve" | "pause") => {
+    if (busy) return;
+    setBusy(true);
+    setError(false);
+    try {
+      await resolve(gate, decision);
+      setSubmittedRevision(gate.expectedRevision);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disabled = busy || submittedRevision === gate.expectedRevision;
+  return <div className="runtime-setting-control">
+    <button className="runtime-btn-secondary" type="button" disabled={disabled} onClick={() => void submit("approve")}>{zh ? "批准继续" : "Approve and continue"}</button>
+    <button className="runtime-btn-secondary" type="button" disabled={disabled} onClick={() => void submit("pause")}>{zh ? "暂停任务" : "Pause task"}</button>
+    {error ? <p role="alert">{zh ? "决定结果待确认，请检查刷新后的任务状态。" : "Decision unconfirmed. Check the refreshed task status."}</p> : null}
+  </div>;
 }

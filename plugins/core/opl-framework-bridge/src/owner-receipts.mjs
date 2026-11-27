@@ -44,6 +44,7 @@ function actionStatus(value, owner, isDry) {
   if (!isRecord(value)) return "error";
   const execution = value.app_action_execution;
   const result = execution?.result ?? value.result;
+  if (execution?.action_id === "source_refresh" && result?.refreshed === false) return "error";
   if (value.ok === false || owner?.ok === false || result?.ok === false
     || execution?.success === false || result?.success === false) return "error";
   const failures = ["failed", "error", "blocked", "unavailable", "not_configured", "owner_action_required"];
@@ -89,6 +90,5 @@ export function actionOwnerReceipt(readback, value, { actionId, packageId, paylo
     ...(failed ? { stderr: String(reason ?? value?.error?.message ?? owner?.error?.message ?? "Owner action failed") } : {}),
     ...(metadata?.confirmationId ?? metadata?.confirmation_id ? { confirmationId: metadata.confirmationId ?? metadata.confirmation_id } : {}),
     ...(metadata?.receiptId ?? metadata?.receipt_id ? { receiptId: metadata.receiptId ?? metadata.receipt_id } : {}),
-    ...(metadata?.rollbackRef ?? metadata?.rollback_ref ? { rollbackRef: metadata.rollbackRef ?? metadata.rollback_ref } : {}),
   };
 }

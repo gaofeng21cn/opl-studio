@@ -1,13 +1,12 @@
 import { formatStatus } from "./settings/presentation";
 import type { AgentPackageLifecycleRef, WorkbenchModel } from "./workbenchModel";
 import { agentPackageNeedsAttention, packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
-import { nativeCatalogState, packageCatalogState, softwareCatalogPackages, softwareCatalogNativeProducts } from "./softwareCatalog";
+import { packageCatalogState, softwareCatalogPackages } from "./softwareCatalog";
 import { knowledgeLibraryLabel, knowledgeSourceNeedsAttention } from "./knowledgeSources";
 
 /** Navigation only. Installation, permissions and task execution retain their owners. */
 export function softwareCanStart(item: AgentPackageLifecycleRef): boolean {
   return packagePresentLocally(item) && item.appEnabled
-    && item.activeInstallationStatus !== "conflict" && item.activeInstallationStatus !== "inactive"
     && item.readiness.launchAllowed !== false && item.readiness.callable !== false
     && (item.homeShortcuts.some(shortcut => Boolean(shortcut.route)) || Boolean(item.miniAppEntry));
 }
@@ -51,21 +50,14 @@ export function softwareAttentionItems(model: WorkbenchModel, locale: "zh" | "en
       detail: zh ? "资料或授权需要复核；在原资料库中处理后重新检查。" : "Review the source or its access, then check again.", products: products.map(name), productIds: products, destination: "resources" });
   }
   for (const item of packages) {
-    const independentFailure = item.activeInstallationStatus === "conflict" || agentPackageNeedsAttention(item);
+    const independentFailure = agentPackageNeedsAttention(item);
     if (packageCatalogState(item) !== "attention" || (covered.has(item.packageId) && !independentFailure)) continue;
-    const detail = item.activeInstallationStatus === "conflict" ? (zh ? "有多份安装被标记为当前使用。" : "Multiple installations are marked as in use.")
-      : packageAccessNeedsAttention(item) ? (zh ? "软件源访问受限。" : "Software source access is restricted.")
+    const detail = packageAccessNeedsAttention(item) ? (zh ? "软件源访问受限。" : "Software source access is restricted.")
       : ["staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(item.currentness)
         ? formatStatus(item.currentness, locale)
         : (zh ? "软件可用性检查未通过。" : "The software did not pass its availability check.");
     issues.push({ id: `package:${item.packageId}`, title: name(item.packageId), detail,
       products: [], productIds: [item.packageId], destination: "applications", packageId: item.packageId });
-  }
-  for (const { productId, item } of softwareCatalogNativeProducts(model, "all")) {
-    if (nativeCatalogState(item) !== "attention") continue;
-    issues.push({ id: `native:${productId}`, title: item.productDisplayName ?? item.displayName,
-      detail: item.updateStatus === "needs_restart" ? (zh ? "更新已准备好，需要重新启动应用。" : "An update is ready. Restart the application to finish.") : (zh ? "需要确认当前使用的安装。" : "Confirm which installation should be used."),
-      products: [], productIds: [productId], destination: "applications", packageId: productId });
   }
   return issues;
 }

@@ -50,7 +50,7 @@ Sources: [sandbox contract](https://github.com/deepseek-ai/deepseek-harness/tree
 | 任务知识引用 | 同页按需读取领域 owner 提供的 refs，不读取或缓存业务正文 |
 | 数据管理 | Settings → 工作区 → 数据与存储：只读用量与带过期校验的可预览清理 |
 
-官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/schedule/schedule)、[`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/client/ui-schedule) 及 `cofy-x/dsh-cron` 等均依赖 DSH root Agent/session，故不采用其后端；调度定义、Temporal 补跑/重叠策略与清理归 Framework 公开插件（见 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)、[Architecture](architecture.md#workbench-services) 与[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)）。
+官方 [`dsh-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/schedule/schedule)、[`ui-schedule`](https://github.com/deepseek-ai/deepseek-harness/tree/4b399c39a6d1479cd84ca591b4d7c88e24d38a96/packages/client/ui-schedule) 及 `cofy-x/dsh-cron` 等均依赖 DSH root Agent/session，故不采用其后端；调度定义、Runway 执行与人工审批门禁归 Framework（见 [工作台服务接口](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/specs/workbench-services.md)、[Architecture](architecture.md#workbench-services) 与[知识来源与记忆政策](https://github.com/gaofeng21cn/one-person-lab/blob/main/docs/policies/knowledge-source-and-memory-policy.md)）。
 
 ## 能力工作台与标准 MCP Apps
 

@@ -182,10 +182,10 @@ test("Studio exposes an App-projected first-level runtime overview", () => {
   assert.match(app, /writeRuntimeOverviewCache/);
   assert.match(app, /runtimeSnapshotSource/);
   assert.match(runtimePage, /runtime-snapshot-note/);
-  assert.match(runtimeCache, /opl_studio_runtime_overview_cache\.v1/);
-  assert.match(runtimeCache, /cached_snapshot_requires_fresh_state/);
+  assert.match(runtimeCache, /opl_studio_runtime_overview_cache\.v2/);
   assert.match(runtimeCache, /maintenanceActions: \[\]/);
-  assert.match(runtimePage, /causalRoot\.detail\[locale\]/);
+  assert.match(runtimePage, /serviceRecovery\.detail\[locale\]/);
+  assert.match(runtimePage, /serviceSnapshotIsCurrent && onExecuteAction/);
 });
 
 test("Studio exposes a first-party Tier 2 Materials Space plugin with Desktop and WebUI parity", () => {

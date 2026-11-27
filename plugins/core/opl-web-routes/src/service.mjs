@@ -136,7 +136,7 @@ async function dispatchApi(req, res, hostCore) {
     const action = await body(req);
     if (action?.actionId === "workspace_root_set") {
       const packageId = action.packageId ?? action.payload?.package_id;
-      const preview = action.mode === "preview" || (action.mode == null && action.dryRun !== false && !action.payload?.rollbackRef);
+      const preview = action.mode === "preview" || (action.mode == null && action.dryRun !== false);
       if (!preview && !(typeof packageId === "string" && packageId.trim())) {
         throw new ThreadAdapterError("workspace_root_read_only", "The working directory is read-only in WebUI.", {}, 403);
       }

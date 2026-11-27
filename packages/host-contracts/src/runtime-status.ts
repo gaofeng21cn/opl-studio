@@ -85,6 +85,7 @@ export type WorkItemRuntimeItem = {
   actionMessageArgs?: Record<string, unknown>;
   actionOwnerKind?: string;
   actionRef?: string;
+  humanGate?: { stageRunId: string; expectedRevision: number };
   startedAt?: string;
   lastHeartbeatAt?: string;
   updatedAt?: string;
@@ -125,33 +126,13 @@ export type WorkItemRuntimeProjection = {
   items: WorkItemRuntimeItem[];
 };
 
+export type RunwayHealth = {
+  status: "running" | "degraded" | "stopped" | "unknown";
+  scheduleRunner: { running: boolean | null; tickIntervalMs: number | null };
+};
+
 export type ServiceRecoverySummary = {
-  causalRoot: {
-    component: string;
-    status: string;
-    reasonCode: string;
-    rawStatus: string;
-    detail: { zh: string; en: string };
-    sourceRef: string;
-  };
-  components: {
-    service: { ready: boolean | null; status: string };
-    worker: { ready: boolean | null; status: string };
-    scheduler: { ready: boolean | null; status: string };
-  };
-  mutationGuard: {
-    status: string;
-    allowed: boolean | null;
-    blockedReason?: string;
-    sourceRef: string;
-  };
-  primaryAction: {
-    actionId: string;
-    kind: string;
-    label: string;
-    mutates: boolean;
-    confirmationRequired: boolean;
-    sourceRef: string;
-  } | null;
-  primaryActionBlockedReason?: string;
+  status: RunwayHealth["status"];
+  scheduleRunnerStatus: "running" | "stopped" | "unknown";
+  detail: WorkItemLocalizedText;
 };

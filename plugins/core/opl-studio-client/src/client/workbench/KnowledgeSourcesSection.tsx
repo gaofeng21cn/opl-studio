@@ -1,8 +1,8 @@
 import { Check, FolderPlus, RefreshCw, Settings2, Unplug } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { actionPayloadComplete, type SettingsActionRequest } from "./settingsActions";
 import type { KnowledgeSourceHealth, KnowledgeSourceRef, KnowledgeSourcesProjection } from "./knowledgeSources";
-import { knowledgeConsumerGroups, knowledgeLibraryLabel, knowledgeSourceStatus } from "./knowledgeSources";
+import { knowledgeConsumerGroups, knowledgeLibraryLabel, knowledgeSourceStatus, runwayKnowledgeScopes, type RunwayKnowledgeScope } from "./knowledgeSources";
 import { SettingsGroup, StatusValue } from "./settings/primitives";
 
 const splitIds = (value: string) => [...new Set(value.split(/[,，\n]/).map(item => item.trim()).filter(Boolean))];
@@ -28,11 +28,86 @@ function KnowledgeHealthDetails({ health, zh }: { health: KnowledgeSourceHealth;
   </>;
 }
 
-export function KnowledgeSourcesSection({ projection, locale, actionBusyKey, onAction, onRefresh, onPickDirectory, selectedPackageId, focusedResourceId }: {
+type KnowledgeSourcesSectionProps = {
   projection?: KnowledgeSourcesProjection; locale: "zh" | "en"; actionBusyKey: string | null;
   onAction: (request: SettingsActionRequest) => void; onRefresh: () => void;
   onPickDirectory?: () => Promise<string | undefined>; selectedPackageId?: string; focusedResourceId?: string;
-}) {
+};
+
+export function KnowledgeSourcesSection(props: KnowledgeSourcesSectionProps) {
+  return props.projection?.bindingModel === "runway"
+    ? <RunwayKnowledgeSources {...props} />
+    : <LegacyKnowledgeSources {...props} />;
+}
+
+function RunwayKnowledgeSources({ projection, locale, actionBusyKey, onAction, onPickDirectory, focusedResourceId }: KnowledgeSourcesSectionProps) {
+  const zh = locale === "zh";
+  const [editing, setEditing] = useState<KnowledgeSourceRef | "new" | null>(null);
+  const [rootPath, setRootPath] = useState("");
+  const [scope, setScope] = useState<RunwayKnowledgeScope>("project_local");
+  const [error, setError] = useState("");
+  const formId = useId();
+  const busy = actionBusyKey !== null;
+  const labels = { project_local: zh ? "项目" : "Project", personal_profile: zh ? "个人资料" : "Personal profile", long_term_topic: zh ? "长期主题" : "Long-term topic" };
+  const action = (id: string) => projection?.actions.find(candidate => candidate.actionId === id && candidate.status === "available");
+  const run = (id: string, payload: Record<string, unknown>, label: string) => {
+    const selected = action(id);
+    if (!selected || !actionPayloadComplete(payload, selected.payloadFields)) return;
+    onAction({ key: `knowledge:${String(payload.source_id ?? "all")}:${id}`, actionId: id, payload, label,
+      confirmationRequired: selected.confirmationRequired, dryRunSupported: selected.dryRunSupported });
+  };
+  const open = (entry: KnowledgeSourceRef | "new") => {
+    setEditing(entry);
+    setRootPath(entry === "new" ? "" : entry.runwayBinding?.rootPath ?? "");
+    setScope(entry === "new" ? "project_local" : entry.runwayBinding?.scope ?? "project_local");
+    setError("");
+  };
+  useEffect(() => {
+    if (!focusedResourceId) return;
+    const row = document.getElementById(`knowledge-${focusedResourceId}`);
+    row?.scrollIntoView?.({ block: "center" });
+    row?.focus({ preventScroll: true });
+  }, [focusedResourceId]);
+  return <SettingsGroup title={zh ? "资料库" : "Libraries"}>
+    <div className="runtime-setting-control">
+      {action("knowledge_source_list") ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => run("knowledge_source_list", {}, zh ? "读取资料库" : "List libraries")}>{zh ? "重新读取" : "Reload libraries"}</button> : null}
+      {action("knowledge_source_connect") ? <button type="button" className="settings-action-button primary" disabled={busy} onClick={() => open("new")}>{zh ? "连接资料库" : "Connect library"}</button> : null}
+    </div>
+    {projection?.entries.length ? <div className="opl-shared-resource-list">{projection.entries.map(source => <article key={source.sourceId} id={`knowledge-${source.sourceId}`} tabIndex={-1} data-testid="opl-knowledge-source" className="opl-shared-resource-row">
+      <div className="opl-shared-resource-heading"><div><h3>{source.label}</h3><p>{source.runwayBinding?.rootPath}{source.runwayBinding ? ` · ${labels[source.runwayBinding.scope]}` : ""}</p></div><StatusValue status={source.status === "revoked" ? "revoked" : knowledgeSourceStatus(source)} locale={locale} /></div>
+      {source.revisionIdentity ? <p>{zh ? "资料版本 " : "Source revision "}{source.revisionIdentity}</p> : null}
+      <div className="runtime-setting-control">
+        {source.actionIds.includes("knowledge_source_check") && action("knowledge_source_check") ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => run("knowledge_source_check", { source_id: source.sourceId }, zh ? "检查资料库" : "Check library")}>{zh ? "检查" : "Check"}</button> : null}
+        {source.connected && source.actionIds.includes("knowledge_source_configure") && action("knowledge_source_configure") ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => open(source)}>{zh ? "配置" : "Configure"}</button> : null}
+        {source.connected && source.actionIds.includes("knowledge_source_disconnect") && action("knowledge_source_disconnect") ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => run("knowledge_source_disconnect", { source_id: source.sourceId }, zh ? "断开资料库" : "Disconnect library")}>{zh ? "断开" : "Disconnect"}</button> : null}
+      </div>
+    </article>)}</div> : <p className="settings-inline-note">{zh ? "尚无已连接的资料库。" : "No libraries are connected."}</p>}
+    {editing ? <form className="opl-resource-form" aria-labelledby={`${formId}-title`} onSubmit={event => {
+      event.preventDefault();
+      if (editing === "new") {
+        if (!rootPath.trim()) return;
+        run("knowledge_source_connect", { root_path: rootPath.trim(), scope }, zh ? "连接资料库" : "Connect library");
+      } else {
+        run("knowledge_source_configure", { source_id: editing.sourceId, scope }, zh ? "保存资料库设置" : "Save library settings");
+      }
+    }}>
+      <h3 id={`${formId}-title`}>{editing === "new" ? (zh ? "连接资料库" : "Connect library") : (zh ? "配置资料库" : "Configure library")}</h3>
+      {editing === "new" ? <label htmlFor={`${formId}-folder`}>{zh ? "资料夹位置（必填）" : "Library folder (required)"}<input id={`${formId}-folder`} value={rootPath} onChange={event => setRootPath(event.currentTarget.value)} required /></label> : null}
+      {editing === "new" && onPickDirectory ? <button type="button" className="settings-action-button" disabled={busy} onClick={() => {
+        setError("");
+        void onPickDirectory().then(path => { if (path) setRootPath(path); }, () => setError(zh ? "未能选择资料夹。" : "Could not select a folder."));
+      }}>{zh ? "选择文件夹" : "Choose folder"}</button> : null}
+      <label htmlFor={`${formId}-scope`}>{zh ? "知识归属" : "Knowledge scope"}<select id={`${formId}-scope`} value={scope} onChange={event => {
+        const value = runwayKnowledgeScopes.find(candidate => candidate === event.currentTarget.value);
+        if (value) setScope(value);
+      }}>{runwayKnowledgeScopes.map(value => <option key={value} value={value}>{labels[value]}</option>)}</select></label>
+      {error ? <p role="alert">{error}</p> : null}
+      <div className="opl-resource-form-actions"><button type="button" className="settings-action-button" onClick={() => setEditing(null)}>{zh ? "取消" : "Cancel"}</button><button type="submit" className="settings-action-button primary" disabled={busy}>{zh ? "保存" : "Save"}</button></div>
+    </form> : null}
+  </SettingsGroup>;
+}
+
+function LegacyKnowledgeSources({ projection, locale, actionBusyKey, onAction, onRefresh, onPickDirectory, selectedPackageId, focusedResourceId }: KnowledgeSourcesSectionProps) {
   const zh = locale === "zh";
   const consumerGroups = knowledgeConsumerGroups(projection?.consumers ?? [], locale);
   const libraryLabel = (source: KnowledgeSourceRef) => projection ? knowledgeLibraryLabel(source, projection, locale) : source.label;

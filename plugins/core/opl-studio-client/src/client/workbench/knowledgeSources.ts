@@ -7,7 +7,11 @@ export type KnowledgeSourceHealth = {
   currentCount: number; reviewDueCount: number; inactiveCount: number; unavailableCount: number; checkedCount: number; truncated: boolean;
   issues: Array<{ knowledgeId: string; status: "review_due" | "unavailable"; reason: string }>;
 };
+export const runwayKnowledgeScopes = ["project_local", "personal_profile", "long_term_topic"] as const;
+export type RunwayKnowledgeScope = typeof runwayKnowledgeScopes[number];
+
 export type KnowledgeSourceRef = {
+  runwayBinding?: { rootPath: string; scope: RunwayKnowledgeScope };
   resourceId: string; sourceId: string; label: string; contextId: string;
   status: string; connected: boolean | null; scopeIds: string[]; consumerDomainIds: string[]; consumerPackageIds: string[];
   writeDomainIds: string[]; sourceWritable: boolean | null; revisionIdentity?: string;
@@ -19,8 +23,14 @@ export type KnowledgeSourceRef = {
 export type KnowledgeSourcesProjection = {
   status: "available" | "not_configured" | "attention_required" | "unknown";
   renameSupported?: boolean;
+  bindingModel?: "runway";
   contexts: KnowledgeSourceContext[]; entries: KnowledgeSourceRef[];
   consumers: KnowledgeSourceConsumer[]; actions: SoftwareSourceActionRef[];
+};
+
+const runwayKnowledgeRequiredFields: Record<string, string[]> = {
+  knowledge_source_list: [], knowledge_source_check: ["source_id"], knowledge_source_connect: ["root_path", "scope"],
+  knowledge_source_configure: ["source_id", "scope"], knowledge_source_disconnect: ["source_id"]
 };
 
 const safePayloadFields = new Set(["resource_id", "context_id", "source_id", "label", "scope_ids", "consumer_domain_ids", "write_domain_ids", "expected_revision"]);
@@ -49,7 +59,27 @@ function readKnowledgeHealth(value: unknown): KnowledgeSourceHealth | undefined 
 export function readKnowledgeSourcesProjection(value: unknown): KnowledgeSourcesProjection | undefined {
   const input = asRecord(value);
   if (input?.surface_kind !== "opl_knowledge_sources_projection.v1") return undefined;
+  const runwayBindingModel = Array.isArray(input.entries);
+  const bindings = asRecordArray(input.entries).flatMap((entry): KnowledgeSourceRef[] => {
+    const sourceId = asString(entry.source_id);
+    const rootPath = asString(entry.root_path);
+    const scope = runwayKnowledgeScopes.find(value => value === entry.scope);
+    if (!sourceId || !rootPath || !scope) return [];
+    const status = asString(entry.status) ?? "unknown";
+    return [{
+      resourceId: sourceId, sourceId, contextId: "", label: rootPath.split(/[\\/]/).filter(Boolean).at(-1) ?? sourceId,
+      status, connected: status !== "revoked", scopeIds: [scope], consumerDomainIds: [], consumerPackageIds: [],
+      writeDomainIds: [], sourceWritable: null, revisionIdentity: asString(entry.accepted_revision) ?? undefined,
+      authorizationStatus: "unknown", revisionStatus: "unknown", freshnessStatus: "unknown", readinessStatus: status,
+      actionIds: asRecordArray(entry.available_actions).flatMap(action => {
+        const id = asString(action.action_id);
+        return id && action.status !== "unavailable" && asRecord(action.payload)?.source_id === sourceId ? [id] : [];
+      }),
+      runwayBinding: { rootPath, scope }, accessEditable: null, scopeExpansionAllowed: null, availableScopeIds: []
+    }];
+  });
   return {
+    ...(runwayBindingModel ? { bindingModel: "runway" } : {}),
     renameSupported: asRecordArray(input.available_actions).some(action => action.action_id === "knowledge_source_configure" && asStringArray(action.payload_fields).includes("label")),
     status: ["available", "not_configured", "attention_required"].includes(String(input.status)) ? input.status as KnowledgeSourcesProjection["status"] : "unknown",
     contexts: asRecordArray(input.contexts).flatMap(context => {
@@ -59,7 +89,7 @@ export function readKnowledgeSourcesProjection(value: unknown): KnowledgeSources
         scopeOptions: asRecordArray(context.scope_options).flatMap(option => { const id = asString(option.id); return id ? [{ id, label: asString(option.label) ?? id }] : []; }),
         defaultScopeIds: asStringArray(context.default_scope_ids) }];
     }),
-    entries: asRecordArray(input.items).flatMap(item => {
+    entries: runwayBindingModel ? bindings : asRecordArray(input.items).flatMap(item => {
       const resourceId = asString(item.resource_id); const sourceId = asString(item.source_id); const contextId = asString(item.context_id);
       if (!resourceId || !sourceId || !contextId) return [];
       const authorization = asRecord(item.authorization); const revision = asRecord(item.revision);
@@ -80,7 +110,7 @@ export function readKnowledgeSourcesProjection(value: unknown): KnowledgeSources
       const actionId = asString(action.action_id); if (!actionId?.startsWith("knowledge_source_")) return [];
       const payload = { ...asRecord(action.default_payload), ...asRecord(action.payload) };
       return [{ actionId, label: asString(action.label) ?? actionId, payload: Object.fromEntries(Object.entries(payload).filter(([key, value]) => safePayloadFields.has(key) && (typeof value === "string" || Array.isArray(value) && value.every(item => typeof item === "string")))),
-        payloadFields: knowledgeRequiredFields[actionId] ?? asStringArray(action.payload_fields), status: action.status === "unavailable" ? "unavailable" as const : "available" as const,
+        payloadFields: (runwayBindingModel ? runwayKnowledgeRequiredFields : knowledgeRequiredFields)[actionId] ?? asStringArray(action.payload_fields), status: action.status === "unavailable" ? "unavailable" as const : "available" as const,
         dryRunSupported: action.dry_run_supported === true, confirmationRequired: action.confirmation_required === true,
         followUpActionIds: asStringArray(action.follow_up_action_ids), reason: asString(action.reason) ?? undefined }];
     })
@@ -95,7 +125,7 @@ export function knowledgeSourceNeedsAttention(source: KnowledgeSourceRef): boole
 
 export function knowledgeSourceStatus(source: KnowledgeSourceRef): string {
   if (knowledgeSourceNeedsAttention(source)) return "attention_needed";
-  return source.status === "ready" || source.status === "available" ? "ready" : "unknown";
+  return ["active", "ready", "available"].includes(source.status) ? "ready" : "unknown";
 }
 
 /** Group display only; each declared domain keeps its own access selection. */

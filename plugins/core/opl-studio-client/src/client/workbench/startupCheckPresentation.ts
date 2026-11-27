@@ -4,18 +4,12 @@ import type { RuntimeOverviewRef } from './workbenchModel-runtime-contracts';
 type Destination = 'account' | 'workspace' | 'services' | 'agents' | 'updates' | 'diagnostics';
 export type StartupIssue = { id: string; title: string; detail: string; destination: Destination };
 
-/**
- * The initialize checklist and fast runtime projection describe the same
- * family-runtime provider. Keep one actionable overview item when both reads
- * report that provider, while retaining the runtime impact in its detail.
- */
 export function mergeBackgroundTaskIssue(
   startupIssues: StartupIssue[],
-  temporal: Pick<RuntimeOverviewRef['temporal'], 'serviceReady' | 'workerReady' | 'schedulerReady'> | undefined,
+  runway: RuntimeOverviewRef['runway'] | undefined,
   zh: boolean,
 ): StartupIssue[] {
-  const runtimeUnready = temporal !== undefined
-    && [temporal.serviceReady, temporal.workerReady, temporal.schedulerReady].some((value) => value === false);
+  const runtimeUnready = runway?.status === "stopped" || runway?.status === "degraded" || runway?.scheduleRunner.running === false;
   if (!runtimeUnready) return [...startupIssues];
 
   const providerIssue = startupIssues.find((issue) => issue.id === 'startup:family_runtime_provider');
@@ -48,16 +42,14 @@ export function startupCheckPresentation(initialization: OplInitializeReadback |
     workspace_root: ['工作目录', 'Workspace', 'workspace', '检查目录是否存在且可写，或选择其他目录。', 'Check that the directory exists and is writable, or choose another directory.'],
     codex: ['本机助手', 'Local assistant', 'updates', '检查本机助手的安装状态并完成更新或修复。', 'Check the local assistant installation and update or repair it.'],
     codex_config: ['模型访问', 'Model access', 'account', '连接账户或配置模型服务密钥。', 'Connect your account or configure a model API key.'],
-    family_runtime_provider: ['后台任务服务', 'Background task service', 'services', '检查后台服务与工作进程，按页面提示恢复后重新检查。', 'Check the background service and worker, recover them, then check again.'],
+    family_runtime_provider: ['后台任务服务', 'Background task service', 'services', '在服务状态中检查 Runway 和定时任务。', 'Check Runway and scheduled tasks in Service status.'],
     domain_modules: ['智能体', 'Agents', 'agents', '检查智能体的依赖和可用性，安装或修复缺失能力。', 'Check agent dependencies and availability; install or repair missing capabilities.'],
     gui_shell: ['应用安装', 'App installation', 'updates', '检查应用版本与安装状态。', 'Check the app version and installation.'],
   };
   const issues: StartupIssue[] = (system?.checklist ?? []).filter(item => item.blocking || item.userActionRequired || flow?.blockingItems.includes(item.itemId)).map(item => {
     const route = routes[item.itemId];
     const title = route?.[zh ? 0 : 1] ?? item.label ?? item.itemId;
-    const detail = item.reasonCode === 'temporal_worker_source_stale'
-      ? (zh ? '后台工作进程仍使用旧版本。请在服务状态中重启后台工作进程，再重新检查。' : 'The background worker is using an older version. Restart it in Service status, then check again.')
-      : route?.[zh ? 3 : 4] ?? item.nextVisibleStep ?? (zh ? '打开诊断查看此检查项，然后重新检查。' : 'Open diagnostics to inspect this check, then retry.');
+    const detail = route?.[zh ? 3 : 4] ?? item.nextVisibleStep ?? (zh ? '打开诊断查看此检查项，然后重新检查。' : 'Open diagnostics to inspect this check, then retry.');
     return { id: `startup:${item.itemId}`, title, detail, destination: route?.[2] ?? 'diagnostics' };
   });
   if (readStatus === 'loading') return { status: 'checking', detail: zh ? '正在读取启动检查结果…' : 'Reading startup checks…', issues: [] };

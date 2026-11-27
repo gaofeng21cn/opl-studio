@@ -1,7 +1,7 @@
 import type { WorkbenchModel } from "./workbenchModel";
 
-export const RUNTIME_OVERVIEW_CACHE_KEY = "opl.studio.runtime-overview.lkg.v1";
-const RUNTIME_OVERVIEW_CACHE_SCHEMA = "opl_studio_runtime_overview_cache.v1";
+export const RUNTIME_OVERVIEW_CACHE_KEY = "opl.studio.runtime-overview.lkg.v2";
+const RUNTIME_OVERVIEW_CACHE_SCHEMA = "opl_studio_runtime_overview_cache.v2";
 
 type StorageLike = {
   getItem(key: string): string | null;
@@ -51,14 +51,6 @@ function readOnlySnapshot(model: RuntimeOverviewCacheEntry["model"]): RuntimeOve
         ...model.runtimeOverview,
         maintenanceActions: [],
         recommendedActionId: undefined
-      }
-    } : {}),
-    ...(model.serviceRecovery ? {
-      serviceRecovery: {
-        ...model.serviceRecovery,
-        primaryAction: null,
-        primaryActionBlockedReason: "cached_snapshot_requires_fresh_state",
-        freshRecheck: { ...model.serviceRecovery.freshRecheck, beforeMutation: true }
       }
     } : {})
   };

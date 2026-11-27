@@ -78,6 +78,7 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
         assert.deepEqual(params, { background: true });
         return { batch_id: "batch-1", managed_update: { components: [], execution: { status: "partial_failure" } } };
       }
+      if (method === "app.codexRuntime.get") return { runtime_activation: { status: "active" } };
       if (method === "app.codexRuntime.activate") return { runtime_activation: { status: "active", codex: { runtime_binary_path: "/managed/bin/codex" } } };
       return { packages: [] };
     }
@@ -90,11 +91,14 @@ test("writable runManagedUpdate routes pack.updateAll and propagates daemon/trus
   const applied = await opl.runManagedUpdate("apply");
   assert.equal(applied.managed_update.batch_id, "batch-1");
   assert.equal(applied.managed_update.execution.status, "partial_failure");
+  const statusAfterApply = await opl.runManagedUpdate("status", applied);
+  assert.equal(statusAfterApply.runtime_activation.status, "active");
+  assert.equal(statusAfterApply.managed_update.execution.status, "partial_failure");
 
   const activated = await opl.runManagedUpdate("activate");
   assert.equal(activated.runtime_activation.status, "active");
   assert.equal(activated.runtime_activation.codex.runtime_binary_path, "/managed/bin/codex");
-  assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "app.codexRuntime.activate"]);
+  assert.deepEqual(calls.map((c) => c.method), ["pack.updateAll", "app.codexRuntime.get", "app.codexRuntime.activate"]);
 
   legacy = true;
   await assert.rejects(() => opl.runManagedUpdate("apply"), { code: "base_upgrade_required" });
@@ -115,7 +119,7 @@ test("unavailable daemon and missing binary errors reject fail-closed when expli
 
   const explicitBadBin = new OplFrameworkBridge({
     stateDir: emptyDir,
-    env: { ...process.env, OPL_DAEMON_BIN: path.join(emptyDir, "missing-opld") }
+    env: { HOME: emptyDir, PATH: "", OPL_DAEMON_BIN: path.join(emptyDir, "missing-opld") }
   });
   t.after(() => explicitBadBin.close());
   await assert.rejects(() => explicitBadBin.start(), (err) => err instanceof OpldRpcError && err.code === "daemon_not_found");

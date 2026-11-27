@@ -18,8 +18,8 @@ function storage() {
 }
 
 const model = {
-  runtimeOverview: { temporal: { status: "ready" }, maintenanceActions: [{ actionId: "provider_worker_restart" }], recommendedActionId: "provider_worker_restart" },
-  serviceRecovery: { causalRoot: { component: "worker", status: "attention" }, primaryAction: { actionId: "provider_worker_restart" }, freshRecheck: { beforeMutation: false } },
+  runtimeOverview: { runway: { status: "degraded", scheduleRunner: { running: true, tickIntervalMs: 5000 } }, maintenanceActions: [{ actionId: "settings_check_app_update" }], recommendedActionId: "settings_check_app_update" },
+  serviceRecovery: { status: "degraded", scheduleRunnerStatus: "running", detail: { en: "Runway is degraded" } },
   workItemRuntime: { schemaVersion: "work-item-projection.v2", summary: { runningCount: 0 } },
   stateGeneratedAt: "2026-08-18T06:00:00.000Z"
 } as never;
@@ -33,15 +33,15 @@ test("runtime overview cache round-trips the derived model snapshot", () => {
   const cached = runtimeOverviewModelFromCache(entry);
   assert.equal(cached?.runtimeOverview?.maintenanceActions.length, 0);
   assert.equal(cached?.runtimeOverview?.recommendedActionId, undefined);
-  assert.equal(cached?.serviceRecovery?.primaryAction, null);
-  assert.equal(cached?.serviceRecovery?.freshRecheck.beforeMutation, true);
-  assert.match(store.getItem(RUNTIME_OVERVIEW_CACHE_KEY) ?? "", /opl_studio_runtime_overview_cache\.v1/);
+  assert.equal(cached?.serviceRecovery?.status, "degraded");
+  assert.equal(cached?.serviceRecovery?.scheduleRunnerStatus, "running");
+  assert.match(store.getItem(RUNTIME_OVERVIEW_CACHE_KEY) ?? "", /opl_studio_runtime_overview_cache\.v2/);
 });
 
 test("runtime overview cache rejects malformed or empty snapshots", () => {
   const store = storage();
   store.setItem(RUNTIME_OVERVIEW_CACHE_KEY, JSON.stringify({ schema: "wrong", cachedAt: new Date().toISOString(), model }));
   assert.equal(readRuntimeOverviewCache(store), undefined);
-  store.setItem(RUNTIME_OVERVIEW_CACHE_KEY, JSON.stringify({ schema: "opl_studio_runtime_overview_cache.v1", cachedAt: new Date().toISOString(), model: {} }));
+  store.setItem(RUNTIME_OVERVIEW_CACHE_KEY, JSON.stringify({ schema: "opl_studio_runtime_overview_cache.v2", cachedAt: new Date().toISOString(), model: {} }));
   assert.equal(readRuntimeOverviewCache(store), undefined);
 });

@@ -10,8 +10,7 @@ import {
   asRecord,
   asRecordArray,
   asString,
-  asStringArray,
-  firstString
+  asStringArray
 } from "./workbenchModel-primitives";
 import {
   buildTaskSourceRefs,
@@ -40,14 +39,7 @@ export type WorkbenchActionProjectionResult = {
 };
 
 export type WorkbenchRuntimeOverviewInput = {
-  provider: Record<string, unknown> | null;
-  temporal: Record<string, unknown> | null;
-  temporalDetails: Record<string, unknown> | null;
-  temporalWorkerReadiness: Record<string, unknown> | null;
-  temporalServiceLifecycle: Record<string, unknown> | null;
-  temporalSupervisor: Record<string, unknown> | null;
-  temporalScheduler: Record<string, unknown> | null;
-  temporalManagement: Record<string, unknown> | null;
+  runway: RuntimeOverviewRef["runway"];
   runtimeSourceCarriers: Record<string, unknown> | null;
   runtimeCarrierSummary: Record<string, unknown> | null;
   localEnvironment: Record<string, unknown> | null;
@@ -166,14 +158,7 @@ export function deriveWorkbenchActionProjection({
 }
 
 export function deriveWorkbenchRuntimeOverview({
-  provider,
-  temporal,
-  temporalDetails,
-  temporalWorkerReadiness,
-  temporalServiceLifecycle,
-  temporalSupervisor,
-  temporalScheduler,
-  temporalManagement,
+  runway,
   runtimeSourceCarriers,
   runtimeCarrierSummary,
   localEnvironment,
@@ -185,8 +170,7 @@ export function deriveWorkbenchRuntimeOverview({
     "settings_apply_opl_packages",
     "settings_sync_capabilities",
     asString(localEnvironment?.runtime_roots_cleanup_action_id),
-    asString(localEnvironment?.runtime_substrate_rollback_action_id),
-    ...asStringArray(temporalManagement?.actions)
+    asString(localEnvironment?.runtime_substrate_rollback_action_id)
   ]);
   const runtimeMaintenanceActions = runtimeMaintenanceActionIds.flatMap((actionId) => {
     const action = actionMap.get(actionId);
@@ -202,32 +186,9 @@ export function deriveWorkbenchRuntimeOverview({
       ...(action.dangerLevel ? { dangerLevel: action.dangerLevel } : {})
     }];
   });
-  const temporalSchedulerStatus = firstString(temporalScheduler, ["status", "health_status"]) ?? "unknown";
-  const temporalSchedulerReady = asOptionalBoolean(temporalScheduler?.ready);
-  const recommendedRuntimeAction = (
-    temporalSchedulerReady === false || /attention|error|failed|stale/.test(temporalSchedulerStatus.toLowerCase())
-      ? runtimeMaintenanceActions.find((action) => action.actionId === "provider_scheduler_status")
-      : null
-  ) ?? runtimeMaintenanceActions.find((action) => action.actionId === asString(localEnvironment?.app_update_action_id));
+  const recommendedRuntimeAction = runtimeMaintenanceActions.find(action => action.actionId === asString(localEnvironment?.app_update_action_id));
   return {
-    temporal: {
-      status: firstString(temporal, ["health_status", "status"]) ?? firstString(provider, ["status"]) ?? "unknown",
-      ready: asOptionalBoolean(temporal?.ready),
-      serviceStatus: firstString(temporalSupervisor, ["status", "process_state"])
-        ?? firstString(temporalServiceLifecycle, ["service_status"])
-        ?? "unknown",
-      serviceReady: asOptionalBoolean(temporalSupervisor?.ready ?? temporalWorkerReadiness?.service_ready),
-      workerStatus: firstString(temporalWorkerReadiness, ["readiness_status", "lifecycle_status"]) ?? "unknown",
-      workerReady: asOptionalBoolean(temporalWorkerReadiness?.worker_ready),
-      schedulerStatus: temporalSchedulerStatus,
-      schedulerReady: temporalSchedulerReady,
-      ...(asString(temporalDetails?.address) ? { address: asString(temporalDetails?.address) as string } : {}),
-      ...(asString(temporalDetails?.namespace) ? { namespace: asString(temporalDetails?.namespace) as string } : {}),
-      ...(asString(temporalDetails?.task_queue) ? { taskQueue: asString(temporalDetails?.task_queue) as string } : {}),
-      ...(firstString(temporalScheduler, ["observed_at"]) ?? firstString(temporalSupervisor, ["observed_at"])
-        ? { observedAt: (firstString(temporalScheduler, ["observed_at"]) ?? firstString(temporalSupervisor, ["observed_at"])) as string }
-        : {})
-    },
+    runway,
     carriers: {
       total: asFiniteNumber(runtimeCarrierSummary?.default_carriers_count) ?? 0,
       present: asFiniteNumber(runtimeCarrierSummary?.present_default_carriers_count) ?? 0,

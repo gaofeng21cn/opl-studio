@@ -57,7 +57,7 @@ async (page) => {
   await page.screenshot({ path: 'output/playwright/runtime-status/stage-popover.png', fullPage: true });
   await page.getByRole('button', { name: '关闭阶段进度', exact: true }).click();
   for (const [scenario, text] of [
-    ['unknown', '后台服务状态尚未读取'], ['cached', '上次服务检查'],
+    ['unknown', 'Runway 状态待确认'], ['cached', '上次服务检查'],
     ['loading', '正在读取任务…'], ['failed', '运行状态暂不可用'], ['empty', '当前范围没有工作']
   ]) {
     await page.evaluate(value => window.setRuntimeScenario(value), scenario);
@@ -67,8 +67,8 @@ async (page) => {
     if (scenario === 'failed') await page.getByRole('button', { name: '重试', exact: true }).click();
     await page.screenshot({ path: `output/playwright/runtime-status/state-${scenario}.png`, fullPage: true });
   }
-  await page.evaluate(() => window.setRuntimeScenario('drift'));
-  await page.getByRole('heading', { name: '后台服务配置已变化，需要重新加载', exact: true }).waitFor();
+  await page.evaluate(() => window.setRuntimeScenario('degraded'));
+  await page.getByRole('heading', { name: 'Runway 运行异常', exact: true }).waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
   return { status: 'passed', layouts, interactions: await page.evaluate(() => window.runtimeEvidence) };
 }

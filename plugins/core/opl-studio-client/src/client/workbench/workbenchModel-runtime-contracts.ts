@@ -1,3 +1,4 @@
+import type { RunwayHealth } from "@gaofeng21cn/opl-host-contracts";
 import type {
   DomainDetailViewAvailability,
   DomainDetailViewDescriptor,
@@ -110,20 +111,7 @@ export type ManagedUpdateProjection = {
 };
 
 export type RuntimeOverviewRef = {
-  temporal: {
-    status: string;
-    ready: boolean | null;
-    serviceStatus: string;
-    serviceReady: boolean | null;
-    workerStatus: string;
-    workerReady: boolean | null;
-    schedulerStatus: string;
-    schedulerReady: boolean | null;
-    address?: string;
-    namespace?: string;
-    taskQueue?: string;
-    observedAt?: string;
-  };
+  runway: RunwayHealth;
   carriers: {
     total: number;
     present: number;

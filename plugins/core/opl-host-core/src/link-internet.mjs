@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
 import { chmod, lstat, mkdtemp, readFile, rm } from "node:fs/promises";
 import { writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 import WebSocket from "ws";
@@ -16,15 +14,22 @@ export const LINK_SERVICE_ORIGIN = "https://link.medopl.com";
 export const LINK_REMOTE_REVISION = "f214c5abb39434d0e8358956bfca8d4529981fee";
 const fail = (code, message, status = 400) => new ThreadAdapterError(code, message, {}, status);
 const noop = () => {};
-const runFile = promisify(execFile);
 const ACCOUNT_RECHECK_MS = 30_000;
 
-export async function readLinkGatewayAccount(env) {
-  const { stdout } = await runFile(env.OPL_APP_OPL_BIN ?? "opl", ["connect", "gateway", "status", "--json"], {
-    env, timeout: 5_000, maxBuffer: 64 * 1024
-  });
-  const { gateway_account: account } = JSON.parse(stdout);
-  if (account?.surface_kind !== "opl_gateway_account_read_model.v1") throw new Error("Unable to read the OPL Gateway account");
+export async function readLinkGatewayAccount(gatewayClient) {
+  if (typeof gatewayClient?.call !== "function") {
+    throw fail("link_gateway_status_unavailable", "Unable to read the OPL Gateway account", 503);
+  }
+  let status;
+  try {
+    status = await gatewayClient.call("connect.gateway.status", {}, 5_000);
+  } catch {
+    throw fail("link_gateway_status_unavailable", "Unable to read the OPL Gateway account", 503);
+  }
+  const account = status?.gateway_account;
+  if (account?.surface_kind !== "opl_gateway_account_read_model.v1") {
+    throw fail("link_gateway_status_unavailable", "Unable to read the OPL Gateway account", 503);
+  }
   if (account.connection_mode !== "account" || ["not_connected", "reauth_required", "disconnect_pending"].includes(account.status)) return null;
   if (!account.account?.email || account.account.status !== "active") return null;
   // The cache tells us when to re-check. The Relay authorizes the stable Gateway ID.
@@ -33,48 +38,46 @@ export async function readLinkGatewayAccount(env) {
 const logger = { debug: noop, info: noop, warn: noop, error: noop };
 const ACCOUNT_ERRORS = new Set(["link_account_required", "AUTH_REQUIRED", "AUTH_INVALID", "TOKEN_EXPIRED", "DEVICE_REVOKED", "MEMBERSHIP_REQUIRED"]);
 
-export async function authorizeLinkHost({ device, env }) {
+export async function authorizeLinkHost({ device, gatewayClient }) {
+  if (typeof gatewayClient?.call !== "function") {
+    throw fail("link_authorization_unavailable", "Update OPL App to enable phone access", 503);
+  }
   const temporary = await mkdtemp(path.join(os.tmpdir(), "opl-link-authorize-"));
   const credentialFile = path.join(temporary, "credential.json");
   try {
     await chmod(temporary, 0o700);
-    const result = await new Promise((resolve, reject) => {
-      const child = spawn(env.OPL_APP_OPL_BIN ?? "opl", ["connect", "gateway", "authorize-companion", "--request-stdin", "--credential-file", credentialFile, "--json"], { env, stdio: ["pipe", "pipe", "pipe"] });
-      const stdout = []; const stderr = []; let bytes = 0; let ended = false;
-      const timer = setTimeout(() => { child.kill("SIGKILL"); finish(fail("link_authorization_timeout", "Account authorization timed out. Try again.", 503)); }, 60_000);
-      function finish(error, value) { if (ended) return; ended = true; clearTimeout(timer); error ? reject(error) : resolve(value); }
-      function append(target, chunk) {
-        bytes += chunk.length;
-        if (bytes > 64 * 1024) { child.kill("SIGKILL"); finish(fail("link_authorization_failed", "Could not enable phone access", 503)); }
-        else target.push(chunk);
+    let result;
+    try {
+      result = await gatewayClient.call("connect.gateway.authorizeCompanion", {
+        request: { service: "opl_link", device }, credential_file: credentialFile
+      }, 60_000);
+    } catch (error) {
+      const reason = error?.data?.reason_code ?? error?.data?.code ?? error?.code ?? "";
+      if (/login|sign.?in|auth.*(?:required|expired)|reauth_required|account.*required|credential.*missing|managed_key_missing/i.test(reason)) {
+        throw fail("link_account_required", "Open OPL Account in Settings, then enable phone access again.", 401);
       }
-      child.stdout.on("data", chunk => append(stdout, chunk));
-      child.stderr.on("data", chunk => append(stderr, chunk));
-      child.once("error", () => finish(fail("link_authorization_unavailable", "Update OPL App to enable phone access", 503)));
-      child.once("close", code => {
-        let value; let errorValue;
-        try { value = JSON.parse(Buffer.concat(stdout).toString("utf8")); } catch {}
-        try { errorValue = JSON.parse(Buffer.concat(stderr).toString("utf8")); } catch {}
-        if (code === 0) finish(undefined, value);
-        else {
-          const reasonFrom = body => body?.error?.reason_code ?? body?.details?.reason_code ?? body?.error?.details?.reason_code ?? body?.reason_code ?? body?.error?.code ?? body?.error_code ?? body?.code;
-          const reason = reasonFrom(errorValue) ?? reasonFrom(value);
-          finish(fail(/login|sign.?in|auth.*(?:required|expired)|reauth_required|account.*required|credential.*missing|managed_key_missing/i.test(reason ?? "") ? "link_account_required" : "link_authorization_failed", "Open OPL Account in Settings, then enable phone access again.", 401));
-        }
-      });
-      child.stdin.on("error", noop);
-      child.stdin.end(JSON.stringify({ service: "opl_link", device }));
-    });
-    const info = await lstat(credentialFile);
-    if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o600 || info.size > 16 * 1024) throw fail("link_credentials_invalid", "Phone access credentials could not be verified", 503);
-    const credentials = JSON.parse(await readFile(credentialFile, "utf8"));
-    if (result?.ok === false) throw fail("link_authorization_failed", "Could not enable phone access", 503);
-    return credentials;
+      if (["rpc_timeout", "network_unreachable", "daemon_unavailable", "connection_closed", "daemon_not_found"].includes(reason)) {
+        throw fail(reason === "rpc_timeout" ? "link_authorization_timeout" : "link_authorization_unavailable", "Account authorization could not be reached. Try again.", 503);
+      }
+      throw fail("link_authorization_failed", "Open OPL Account in Settings, then enable phone access again.", 401);
+    }
+    if (result?.companion_authorization?.credential_written !== true) {
+      throw fail("link_authorization_failed", "Could not enable phone access", 503);
+    }
+    try {
+      const info = await lstat(credentialFile);
+      if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o600 || info.size > 16 * 1024) {
+        throw new Error("Invalid credential file");
+      }
+      return JSON.parse(await readFile(credentialFile, "utf8"));
+    } catch {
+      throw fail("link_credentials_invalid", "Phone access credentials could not be verified", 503);
+    }
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }
 
 /** The official Remote carrier feeds only the existing Link owner, with one Noise identity. */
-export async function createLinkInternet({ env = process.env, handle, authorize = authorizeLinkHost, readAccount, onAccountChanged = async () => {}, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
+export async function createLinkInternet({ env = process.env, handle, gatewayClient, authorize, readAccount, onAccountChanged = async () => {}, serviceOrigin = LINK_SERVICE_ORIGIN, fetchImplementation = fetch, webSocketFactory, httpAllowlist = [], rtcFactoryProvider = () => loadNodeRtcFactory({ routeTargets: [serviceOrigin] }) } = {}) {
   const directory = path.join(env.OPL_DATA_DIR ?? os.homedir(), ".opl-studio", "link-remote");
   const deviceName = env.OPL_LINK_HOST_NAME || os.hostname();
   const metadataFile = path.join(directory, "link-host.json");
@@ -186,7 +189,7 @@ export async function createLinkInternet({ env = process.env, handle, authorize 
     if (identityError) throw identityError;
     identity ??= await identities.loadOrCreate(deviceName);
     if (force || !metadata?.enabled || ACCOUNT_ERRORS.has(connection?.lastError()) || !await store.load(serviceOrigin, identity.deviceId)) {
-      const credentials = await authorize({ device: { deviceId: identity.deviceId, name: identity.name, role: "host", platform: process.platform, identityKey: identity.publicKey, clientVersion: "0.6.5" }, env });
+      const credentials = await (authorize ?? authorizeLinkHost)({ device: { deviceId: identity.deviceId, name: identity.name, role: "host", platform: process.platform, identityKey: identity.publicKey, clientVersion: "0.6.5" }, env, gatewayClient });
       validateCredentials(credentials);
       if (closed) return;
       if (metadata?.accountScope && metadata.accountScope !== credentials.accountScope) {

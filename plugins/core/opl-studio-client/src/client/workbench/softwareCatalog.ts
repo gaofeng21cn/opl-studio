@@ -1,8 +1,6 @@
 import type { DshPluginIntentCategory, SoftwareProductType } from "@gaofeng21cn/opl-host-contracts";
 import type { AgentPackageLifecycleRef, ManagedRuntimeDependencyRef, WorkbenchModel } from "./workbenchModel";
-import type { NativeSoftwareItemRef, SoftwareActivationStatus, SoftwareInstallationRef } from "./workbenchModel-package-contracts";
-import { nativeAvailableDisplayVersion, nativeSoftwareProducts } from "./softwareSources";
-import { packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
+import { agentPackageNeedsAttention, packageAccessNeedsAttention, packagePresentLocally } from "./settings/packages";
 
 export type SoftwareCatalogScope = "all" | "opl" | "external" | "components";
 export type SoftwareCatalogState = "not_installed" | "installed" | "update_available" | "attention" | "unknown";
@@ -10,7 +8,7 @@ export const visibleSoftwareTypes = ["agent", "application", "extension", "chann
 
 /** Maintenance origin is supplied by Framework; technical package roles never select the source. */
 export function packageCatalogScope(item: AgentPackageLifecycleRef): Exclude<SoftwareCatalogScope, "all"> {
-  if (item.softwareType === "dependency" || item.catalogScope === "host_component" || (item.catalogScope !== "software" && item.managementScope === "local_component")) return "components";
+  if (item.softwareType === "dependency" || item.catalogScope === "dependency" || (item.catalogScope !== "software" && item.managementScope === "local_component")) return "components";
   return item.catalogOrigin === "opl" ? "opl" : "external";
 }
 
@@ -22,28 +20,14 @@ export function softwareCatalogPackages(model: Pick<WorkbenchModel, "packageLife
   });
 }
 
-export function softwareCatalogNativeProducts(model: Pick<WorkbenchModel, "softwareSources">, scope: SoftwareCatalogScope) {
-  return nativeSoftwareProducts(model.softwareSources).filter(({ item }) => {
-    if (scope === "components") return false;
-    return scope === "all" || (item.catalogOrigin === "opl" ? "opl" : "external") === scope;
-  });
-}
-
 export function packageCatalogState(item: AgentPackageLifecycleRef): SoftwareCatalogState {
-  if (item.activeInstallationStatus === "conflict") return "attention";
   if (packagePresentLocally(item)) {
     // Runtime state for a missing host plugin does not describe a standalone installation.
-    if (item.installed === true && (packageAccessNeedsAttention(item) || ["staged", "needs_restart", "needs_reload", "failed_with_repair", "skipped_manual_required"].includes(item.currentness) || item.readiness.operationalReady === false || item.readiness.callable === false || item.readiness.launchAllowed === false)) return "attention";
+    if (item.installed === true && (packageAccessNeedsAttention(item) || agentPackageNeedsAttention(item))) return "attention";
     if (item.installed === true && item.currentness === "update_available") return "update_available";
     return "installed";
   }
   return item.installed === false ? "not_installed" : "unknown";
-}
-
-export function nativeCatalogState(item: NativeSoftwareItemRef): SoftwareCatalogState {
-  if (item.activeInstallationStatus === "conflict" || item.updateStatus === "needs_restart") return "attention";
-  return item.updateStatus === "available" && item.installed === true ? "update_available"
-    : item.installed === true ? "installed" : item.installed === false ? "not_installed" : "unknown";
 }
 
 export function catalogStateLabel(state: SoftwareCatalogState, locale: "zh" | "en") {
@@ -61,24 +45,15 @@ export function packageCatalogStatusLabel(item: AgentPackageLifecycleRef, locale
     return zh ? "安装来源不可用" : "Install source unavailable";
   }
   if (state !== "attention") return catalogStateLabel(state, locale);
-  if (item.activeInstallationStatus === "conflict") return zh ? "安装冲突" : "Installation conflict";
   if (packageAccessNeedsAttention(item)) return zh ? "需连接软件源" : "Connect source";
   if (item.currentness === "needs_restart") return zh ? "待重启生效" : "Restart required";
   if (item.currentness === "needs_reload") return zh ? "需重新加载" : "Reload required";
   if (item.currentness === "staged") return zh ? "已暂存待生效" : "Staged";
   if (item.readiness.reason === "hosted_agent_source_unavailable") return zh ? "安装不完整" : "Incomplete installation";
-  if (item.currentness === "failed_with_repair" || item.currentness === "skipped_manual_required"
-    || item.readiness.operationalReady === false || item.readiness.callable === false || item.readiness.launchAllowed === false) {
+  if (agentPackageNeedsAttention(item)) {
     return zh ? "需恢复安装" : "Needs restore";
   }
   return catalogStateLabel(state, locale);
-}
-
-export function nativeCatalogStatusLabel(item: NativeSoftwareItemRef, locale: "zh" | "en"): string {
-  const zh = locale === "zh";
-  if (item.updateStatus === "needs_restart") return zh ? "待重启生效" : "Restart required";
-  if (item.activeInstallationStatus === "conflict") return zh ? "安装冲突" : "Installation conflict";
-  return catalogStateLabel(nativeCatalogState(item), locale);
 }
 
 const productTypeLabels: Record<SoftwareProductType, { zh: string; en: string; plural: string }> = {
@@ -101,7 +76,7 @@ export function packageIntentCategory(
   item: Pick<AgentPackageLifecycleRef, "softwareType" | "catalogScope" | "packageRole">
 ): SoftwareProductType {
   if (item.softwareType && item.softwareType !== "unknown") return item.softwareType;
-  if (item.catalogScope === "host_component") return "dependency";
+  if (item.catalogScope === "dependency") return "dependency";
   if (item.packageRole === "standard_agent") return "agent";
   return "extension";
 }
@@ -123,7 +98,7 @@ export function packagePermissionsSummary(
 ): string[] {
   const zh = locale === "zh";
   const permissions: string[] = [];
-  if (item.catalogScope === "host_component") {
+  if (item.catalogScope === "dependency") {
     permissions.push(zh ? "作为宿主核心运行组件自动维护" : "Automatically maintained as a host runtime component");
   }
   if (item.access?.visibility === "authorized_only") {
@@ -167,43 +142,25 @@ export function packageInstallationManagers(item: AgentPackageLifecycleRef): str
   ])];
 }
 
-export function activeSoftwareInstallation(installations: SoftwareInstallationRef[] | undefined, activeId?: string, status?: SoftwareActivationStatus) {
-  if (status && status !== "active") return undefined;
-  const active = (installations ?? []).filter(installation => installation.active);
-  return active.length === 1 && (!activeId || active[0].installationId === activeId) ? active[0] : undefined;
-}
-
 export function catalogInstalledVersion(item: AgentPackageLifecycleRef, _locale: "zh" | "en") {
-  if (item.installations !== undefined) return activeSoftwareInstallation(item.installations, item.activeInstallationId, item.activeInstallationStatus)?.displayVersion
-    ?? activeSoftwareInstallation(item.installations, item.activeInstallationId, item.activeInstallationStatus)?.version ?? "—";
   if (item.installed === true && item.installedVersion) return item.installedVersion;
-  const versions = [...new Set((item.localInstallations ?? []).map(installation => installation.version).filter(Boolean))];
+  const versions = [...new Set((item.localInstallations ?? []).map(installation => installation.version))];
   return versions.length === 1 ? versions[0] : "—";
 }
 
-export function softwareActivationLabel(status: SoftwareActivationStatus | undefined, locale: "zh" | "en") {
-  return ({ active: ["已激活", "Active"], inactive: ["尚未激活", "Not activated"], unknown: ["尚未确认当前使用的安装", "Active installation not confirmed"], conflict: ["激活状态冲突", "Conflicting active installations"] })[status ?? "unknown"][locale === "zh" ? 0 : 1];
-}
-
-export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLifecycle" | "softwareSources">) {
+export function softwareCatalogInventory(model: Pick<WorkbenchModel, "packageLifecycle">) {
   const packages = softwareCatalogPackages(model, "all");
-  const native = softwareCatalogNativeProducts(model, "all");
-  const states = [...packages.map(packageCatalogState), ...native.map(({ item }) => nativeCatalogState(item))];
+  const states = packages.map(packageCatalogState);
   return {
     total: states.length,
     installed: states.filter(state => ["installed", "update_available", "attention"].includes(state)).length,
     notInstalled: states.filter(state => state === "not_installed").length,
     updates: states.filter(state => state === "update_available").length,
     attention: states.filter(state => state === "attention").length,
-    opl: softwareCatalogPackages(model, "opl").length + softwareCatalogNativeProducts(model, "opl").length,
-    external: softwareCatalogPackages(model, "external").length + softwareCatalogNativeProducts(model, "external").length,
+    opl: softwareCatalogPackages(model, "opl").length,
+    external: softwareCatalogPackages(model, "external").length,
     components: softwareCatalogPackages(model, "components").length
   };
-}
-
-/** The owner selects one update source independently of installed replicas. */
-export function nativeCatalogAvailableVersion(product: Pick<ReturnType<typeof nativeSoftwareProducts>[number], "item">, _locale: "zh" | "en") {
-  return nativeAvailableDisplayVersion(product.item);
 }
 
 /** Currentness describes the dependency as a whole; presence can mean only a partial install. */
