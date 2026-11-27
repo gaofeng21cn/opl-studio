@@ -624,6 +624,16 @@ test("cloud-shaped HTTP host protects renderer, APIs, uploads, and SSE with the 
   });
   assert.equal(noCsrf.status, 403);
   const mutationHeaders = { cookie, "x-csrf-token": loginBody.csrfToken };
+  const workspaceAction = (request) => fetch(`${host.url}/api/opl/action`, {
+    method: "POST", headers: { ...mutationHeaders, "content-type": "application/json" },
+    body: JSON.stringify({ actionId: "workspace_root_set", ...request })
+  });
+  const workspaceWrite = await workspaceAction({ dryRun: false, payload: { path: directory } });
+  assert.equal(workspaceWrite.status, 403);
+  assert.equal((await workspaceWrite.json()).error.code, "workspace_root_read_only");
+  assert.equal((await workspaceAction({ mode: "execute", payload: { path: directory } })).status, 403);
+  assert.equal((await workspaceAction({ dryRun: true, payload: { path: directory } })).status, 200);
+  assert.equal((await workspaceAction({ packageId: "fixture", dryRun: false })).status, 200);
   const createdResponse = await fetch(`${host.url}/api/inputs`, {
     method: "POST",
     headers: { ...mutationHeaders, "content-type": "application/json" },

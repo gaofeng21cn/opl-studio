@@ -130,7 +130,15 @@ async function dispatchApi(req, res, hostCore) {
     return;
   }
   if (req.method === "POST" && url.pathname === "/api/opl/action") {
-    json(res, 200, await hostCore.invoke("executeAction", await body(req)));
+    const action = await body(req);
+    if (action?.actionId === "workspace_root_set") {
+      const packageId = action.packageId ?? action.payload?.package_id;
+      const preview = action.mode === "preview" || (action.mode == null && action.dryRun !== false && !action.payload?.rollbackRef);
+      if (!preview && !(typeof packageId === "string" && packageId.trim())) {
+        throw new ThreadAdapterError("workspace_root_read_only", "The working directory is read-only in WebUI.", {}, 403);
+      }
+    }
+    json(res, 200, await hostCore.invoke("executeAction", action));
     return;
   }
   const mcpMethods = { list: "listMcpApps", open: "openMcpApp", call: "callMcpAppTool", read: "readMcpAppResource", close: "closeMcpApp" };
