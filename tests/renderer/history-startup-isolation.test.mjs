@@ -29,6 +29,10 @@ test("history read failures stay local while the live Codex path allows a new se
       }),
       listThreads: () => Promise.reject(new Error("thread/list fixture unavailable")),
       readCodexModels: async () => ({ data: [] }),
+      readState: async () => ({
+        app_state: { system_initialize: { setup_flow: { ready_to_launch: true } } },
+        readback: { exitCode: 0 }
+      }),
       sendMessage: request => { sentPrompt = request.prompt; return new Promise(() => {}); },
     };
     browser.eval(await fs.readFile(path.join(output, "history-startup-isolation.fixture.js"), "utf8"));
