@@ -292,6 +292,9 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
     },
     command(executable, args) {
       calls.push([executable, ...args]);
+      if (executable === "/usr/bin/plutil") {
+        return { args, status: 0, signal: null, stdout: JSON.stringify({ Label: label, RunAtLoad: true, KeepAlive: true, ProgramArguments: ["temporal", "server", "start-dev", "--db-filename", databasePath] }), stderr: "" };
+      }
       if (args[0] === "bootout") unloading = 2;
       if (args[0] === "print" || args[0] === "-0") return { args, status: unloading > 0 ? (--unloading, 0) : 3 };
       if (args[0] === "bootstrap" && bootstrapFailures++ === 0) return { args, status: 5, stderr: "Bootstrap failed: 5" };
@@ -306,6 +309,10 @@ test("Full Temporal proof executes the packaged CLI and observes each real lifec
   const collect = new Function(`return (${collectTemporalServiceSupervisorProof.toString()})`)();
   const proof = await collect({ runtime: "/packaged runtime", hooks });
   assert.equal(proof.status, "passed");
+  const { readPlist: _ignored, ...hooksWithoutReadPlist } = hooks;
+  const serializedProof = await collect({ runtime: "/packaged runtime", hooks: hooksWithoutReadPlist });
+  assert.equal(serializedProof.status, "passed");
+  assert.ok(calls.some(x => x[0] === "/usr/bin/plutil" && x.includes("-convert") && x.includes("json") && x.includes(`${home}/Library/LaunchAgents/${label}.plist`)));
   assert.equal(proof.start_action.action_id, "provider_service_start");
   assert.deepEqual([proof.initial_readback, proof.keep_alive_recovery.readback, proof.restart_readback, proof.session_reload.readback].map(x => x.supervisor.pid), [101, 102, 103, 104]);
   assert.ok(calls.some(x => x[0] === "/bin/kill" && x[2] === "101"));

@@ -8,7 +8,6 @@ import tls from "node:tls";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseCliArgs } from "node:util";
 import { capturePageScreenshot, evaluatePage, evaluatePageStable, waitForPageReady } from "./cdp.mjs";
-import { readPlistFile } from "./plist.mjs";
 import {
   PREVIEW_PRODUCT,
   loadPreviewSmokeInputs,
@@ -87,7 +86,7 @@ export async function collectTemporalServiceSupervisorProof({ runtime, hooks = {
   const domain = `gui/${uid}`;
   const plistPath = `${home}/Library/LaunchAgents/${label}.plist`;
   const databasePath = `${home}/Library/Application Support/OPL/state/family-runtime/temporal-server/temporal.sqlite`;
-  const readPlist = hooks.readPlist ?? (() => readPlistFile(plistPath));
+  const readPlist = hooks.readPlist ?? (() => JSON.parse(command("/usr/bin/plutil", ["-convert", "json", "-o", "-", plistPath]).stdout));
   const database = hooks.database ?? (async () => {
     const info = await fs.stat(databasePath);
     const file = await fs.open(databasePath, "r");
