@@ -265,3 +265,59 @@ test("ComputerUseSettingsSection refreshes live state when host/computer-use-cha
   await act(async () => root.unmount());
   expect(unsubscribed).toBe(true);
 });
+
+test("ComputerUseSettingsSection keeps a saved change when the event-triggered refresh fails", async () => {
+  const initialState: ComputerUseState = {
+    supported: true,
+    available: true,
+    enabled: true,
+    active: true,
+    consentMode: "allow",
+    activeConsentMode: "allow",
+    restartPending: false,
+    platform: "darwin",
+    permissions: {
+      status: "ready",
+      accessibility: true,
+      screenRecording: true,
+      helperAppPath: null,
+      helperBundle: null,
+      error: null
+    },
+    allowedApps: [],
+    blockedApps: [],
+    unavailableReason: null
+  };
+  let readCount = 0;
+  let onEvent: ((event: { method: string }) => void) | undefined;
+  const bridge = {
+    async readComputerUse() {
+      readCount += 1;
+      if (readCount > 1) throw new Error("Connection lost during refresh");
+      return initialState;
+    },
+    async setComputerUse(patch: { enabled?: boolean }) {
+      expect(patch.enabled).toBe(false);
+      onEvent?.({ method: "host/computer-use-changed" });
+      return {
+        ...initialState,
+        enabled: false,
+        active: false,
+        activeConsentMode: null,
+        restartPending: false
+      };
+    },
+    subscribeEvents(listener: (event: { method: string }) => void) {
+      onEvent = listener;
+      return () => { onEvent = undefined; };
+    }
+  };
+  await act(async () => {
+    root.render(<ComputerUseSettingsSection zh={true} locale="zh" bridge={bridge} />);
+  });
+  const toggle = document.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  await act(async () => toggle.click());
+  expect(readCount).toBe(2);
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+});

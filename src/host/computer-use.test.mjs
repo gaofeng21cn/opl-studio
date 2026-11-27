@@ -435,3 +435,71 @@ test("OplCodexNative stops retrying persistent reload failures and leaves plain 
   const ran = await service.transport.withActivity(async () => "ok");
   assert.equal(ran, "ok");
 });
+
+test("a request reconnecting to Codex waits for the current Computer Use settings", {
+  skip: process.platform !== "darwin",
+  timeout: 5_000
+}, async (t) => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "opl-cua-reconnect-"));
+  const dshHome = path.join(tempRoot, "dsh-home");
+  const fixture = path.join(tempRoot, "app-server.mjs");
+  const pauseFile = path.join(tempRoot, "pause-initialize");
+  const readyFile = path.join(tempRoot, "initialize-received");
+  await writeFile(fixture, String.raw`
+    import { existsSync, writeFileSync } from "node:fs";
+    import { createInterface } from "node:readline";
+    import { setTimeout } from "node:timers/promises";
+    const cua = process.argv.some(arg => arg.includes("mcp_servers.dsh_cua"));
+    const io = createInterface({ input: process.stdin });
+    io.on("line", async (line) => {
+      const { id, method } = JSON.parse(line);
+      if (id === undefined) return;
+      if (method === "initialize" && existsSync("pause-initialize")) {
+        writeFileSync("initialize-received", "");
+        while (existsSync("pause-initialize")) await setTimeout(5);
+      }
+      process.stdout.write(JSON.stringify({ id, result: method === "thread/list" ? { data: [], cua } : {} }) + "\n");
+    });
+  `);
+  await writeComputerUseSettings(dshHome, { enabled: true, consentMode: "allow" }, "darwin");
+  const service = new OplCodexNative({
+    workspaceRoot: tempRoot,
+    dshHome,
+    dshInstallAnchor: installAnchor,
+    platform: "darwin",
+    channelBindingFile: path.join(tempRoot, "channel-bindings.json"),
+    env: { OPL_CODEX_BIN: process.execPath, CODEX_APP_SERVER_ARGS: "./app-server.mjs" },
+    nativeCuaControl: {
+      async inspectPermissions() {
+        return { platform: "darwin", accessibility: true, screenRecording: true };
+      }
+    }
+  });
+  t.after(async () => {
+    await rm(pauseFile, { force: true });
+    await service.close();
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+  assert.equal((await service.start()).available, true);
+  assert.equal((await service.transport.listThreads()).cua, true);
+
+  const exited = new Promise((resolve) => service.transport.process.once("exit", resolve));
+  service.transport.process.kill();
+  await exited;
+  await writeFile(pauseFile, "");
+  const reconnecting = service.transport.listThreads();
+  reconnecting.catch(() => {});
+  for (let attempt = 0; !fs.existsSync(readyFile) && attempt < 300; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(fs.existsSync(readyFile), "reconnecting Codex received initialize");
+
+  const changed = await service.setComputerUse({ enabled: false });
+  assert.equal(changed.restartPending, true);
+  await rm(pauseFile);
+  assert.equal((await reconnecting).cua, false);
+  const live = await service.readComputerUse();
+  assert.equal(live.enabled, false);
+  assert.equal(live.active, false);
+  assert.equal(live.restartPending, false);
+});
