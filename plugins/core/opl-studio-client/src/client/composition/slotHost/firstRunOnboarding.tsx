@@ -2,9 +2,7 @@ import { Button, StateDot, IconRefreshOutlineRegular } from "@deepseek-ai/dsh-cl
 import { ClipboardList } from "lucide-react";
 import { useState } from "react";
 import { OnboardingModal } from "@deepseek-ai/dsh-client-ui-settings-models/src/client/OnboardingModal.tsx";
-import type { SettingsDestinationId } from "../../workbench/SettingsPanel";
 import { useStudio } from "./studioContext";
-import { settingsSectionId } from "./shellSettingsSlots";
 
 function firstRunItemLabel(itemId: string, fallback: string | undefined, locale: "zh" | "en"): string {
   const labels: Record<string, [string, string]> = {
@@ -27,13 +25,7 @@ export function FirstRunSidebarEntry({ wide }: { wide: boolean }) {
     icon={<ClipboardList size={16} aria-hidden="true" />} onClick={studio.openFirstRun}>{wide ? label : null}</Button>;
 }
 
-export function FirstRunOnboardingSlot({
-  complete,
-  openSection
-}: {
-  complete(): void;
-  openSection(id: string): void;
-}) {
+export function FirstRunOnboardingSlot({ complete }: { complete(): void }) {
   const studio = useStudio();
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupError, setSetupError] = useState("");
@@ -49,16 +41,23 @@ export function FirstRunOnboardingSlot({
   };
   const coreItems = (systemInitialize?.checklist ?? []).filter((item) => item.readinessLayer === "core_launch");
   const nextCoreItemId = coreItems.find((item) => item.blocking)?.itemId ?? setupFlow?.phase;
-  const destination: SettingsDestinationId = nextCoreItemId === "workspace_root" ? "workspace" : "account";
-  const directSetup = nextCoreItemId === "workspace_root" && studio.setupCapabilities.workspaceRoot
-    ? { label: studio.locale === "zh" ? "选择工作目录" : "Choose working directory", run: studio.chooseWorkspaceRoot }
-    : ["codex", "codex_cli"].includes(nextCoreItemId ?? "") && studio.setupCapabilities.codexInstall
-      ? { label: studio.locale === "zh" ? "安装本机助手" : "Install local assistant", run: studio.installCodex }
+  const zh = studio.locale === "zh";
+  const isWorkspace = nextCoreItemId === "workspace_root";
+  const isAssistant = nextCoreItemId === "codex" || nextCoreItemId === "codex_cli";
+  const directSetup = isWorkspace && studio.setupCapabilities.workspaceRoot
+    ? { label: zh ? "选择工作目录" : "Choose working directory", run: studio.chooseWorkspaceRoot }
+    : isAssistant && studio.setupCapabilities.codexInstall
+      ? { label: zh ? "安装本机助手" : "Install local assistant", run: studio.installCodex }
       : null;
+  const settingsStep = isWorkspace
+    ? { destination: "workspace" as const, label: zh ? "查看工作目录" : "View working directory" }
+    : isAssistant
+      ? { destination: "updates" as const, label: zh ? "查看本机助手" : "View local assistant" }
+      : { destination: "account" as const, label: zh ? "设置模型访问" : "Set up model access" };
   const runPrimarySetup = async () => {
     if (!directSetup) {
       finish();
-      openSection(settingsSectionId(destination));
+      studio.openSettingsDestination(settingsStep.destination);
       return;
     }
     setSetupBusy(true);
@@ -70,7 +69,6 @@ export function FirstRunOnboardingSlot({
       setSetupError(studio.locale === "zh" ? "此步骤未完成，请重新检查后重试。" : "This step did not complete. Check again and retry.");
     } finally { setSetupBusy(false); }
   };
-  const zh = studio.locale === 'zh';
   const title = preparingRuntime ? (zh ? '正在准备 One Person Lab' : 'Preparing One Person Lab')
     : ready === true ? (zh ? '本机已就绪' : 'Local setup is complete') : (zh ? '完成本机准备' : 'Finish local setup');
   const intro = ready === true ? (zh ? '可以开始第一个任务了。' : 'You can start your first task.')
@@ -95,7 +93,7 @@ export function FirstRunOnboardingSlot({
         {!preparingRuntime && ready !== true ? <Button variant="ghost" size="sm" aria-label={zh ? '重新检查' : 'Check again'} title={zh ? '重新检查' : 'Check again'} disabled={setupBusy || studio.initializationStatus === "loading"} onClick={studio.refreshInitialization}><IconRefreshOutlineRegular size={16} /></Button> : null}
         <Button variant={ready === true ? "primary" : "ghost"} data-testid="opl-first-run-enter-app" disabled={setupBusy} onClick={finish}>{zh ? '进入 OPL' : 'Enter OPL'}</Button>
         {!preparingRuntime && ready === false && nextCoreItemId ? <Button variant="primary" disabled={setupBusy} onClick={() => { void runPrimarySetup(); }} icon={setupBusy ? <StateDot state="ongoing" /> : undefined}>
-          {directSetup?.label ?? (zh ? '设置模型访问' : 'Set up model access')}
+          {directSetup?.label ?? settingsStep.label}
         </Button> : null}
       </footer>
     </div>

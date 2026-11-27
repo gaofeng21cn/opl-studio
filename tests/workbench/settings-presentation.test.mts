@@ -703,6 +703,56 @@ async function withSettingsTestDom(run: (surface: { container: HTMLElement; rend
   }
 }
 
+test("first-run actions use host capabilities or open the matching settings destination", async () => {
+  const { createElement } = await import("react");
+  const { flushSync } = await import("react-dom");
+  const { FirstRunOnboardingSlot } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/firstRunOnboarding.tsx");
+  const { SettingsMainSlot } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/shellSettingsSlots.tsx");
+  const { StudioContext } = await import("../../plugins/core/opl-studio-client/src/client/composition/slotHost/studioContext.tsx");
+
+  await withSettingsTestDom(async ({ container, render }) => {
+    for (const [itemId, locale, hostAction, label, expected] of [
+      ["workspace_root", "zh", false, "查看工作目录", "workspace"],
+      ["codex", "zh", false, "查看本机助手", "updates"],
+      ["codex_cli", "en", false, "View local assistant", "updates"],
+      ["codex_config", "en", false, "Set up model access", "account"],
+      ["workspace_root", "en", true, "Choose working directory", "choose"],
+      ["codex", "zh", true, "安装本机助手", "install"],
+    ] as const) {
+      const actions: string[] = [];
+      const surface = {
+        locale, initializationStatus: "ready",
+        initialization: normalizeInitializeReadback({ system_initialize: {
+          setup_flow: { is_first_run: true, ready_to_launch: false },
+          checklist: [{ item_id: itemId, blocking: true, readiness_layer: "core_launch" }]
+        } }),
+        setupCapabilities: { workspaceRoot: hostAction, codexInstall: hostAction },
+        chooseWorkspaceRoot: async () => { actions.push("choose"); return { status: "completed" }; },
+        installCodex: async () => { actions.push("install"); return { status: "completed" }; },
+        openSettingsDestination: (destination: string) => actions.push(destination),
+      };
+      render(createElement(StudioContext.Provider, { value: surface as never },
+        createElement(FirstRunOnboardingSlot, { complete: () => actions.push("complete") })));
+      const primary = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+        .find(button => button.textContent === label);
+      assert.ok(primary, itemId);
+      flushSync(() => primary.click());
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(actions, hostAction ? [expected] : ["complete", expected]);
+      if (expected === "install" || expected === "choose") continue;
+      const group = presentation.settingsDestinations(locale).find(page =>
+        presentation.settingsSubDestinations(page.id, locale).some(subpage => subpage.id === expected));
+      assert.ok(group);
+      render(createElement(StudioContext.Provider, { value: {
+        ...surface, settingsNavigation: { destination: expected, open: true, revision: 1 },
+        renderSettings: (destination: string) => createElement("span", { "data-destination": destination }),
+      } as never }, createElement(SettingsMainSlot, { destination: group.id })));
+      await new Promise(resolve => setImmediate(resolve));
+      assert.ok(container.querySelector(`[data-destination="${expected}"]`), expected);
+    }
+  });
+});
+
 test("settings delegates software and update management to one software center", async () => {
   const { createElement } = await import("react");
   const { flushSync } = await import("react-dom");

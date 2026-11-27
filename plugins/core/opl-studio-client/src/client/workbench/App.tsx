@@ -118,6 +118,7 @@ import {
 } from "./modelPolicy";
 import {
   nativeAppUpdateFeedback,
+  type ResourceSettingsFocus,
   type SettingsDestinationId
 } from "./SettingsPanel";
 import {
@@ -399,7 +400,7 @@ export function App({
   const [threadActionError, setThreadActionError] = useState("");
   const [lifecycleConfirmation, setLifecycleConfirmation] = useState<{ thread: WorkbenchThreadItem; action: ThreadLifecycleAction } | null>(null);
   const [settings, setSettings] = useState<WorkbenchSettings>(() => readSettings());
-  const [settingsNavigation, setSettingsNavigation] = useState<{ open: boolean; destination?: SettingsDestinationId; resourceFocus?: import("./settings/types").ResourceSettingsFocus; revision: number }>();
+  const [settingsNavigation, setSettingsNavigation] = useState<{ open: boolean; destination?: SettingsDestinationId; resourceFocus?: ResourceSettingsFocus; revision: number }>();
   const settingsRef = useRef(settings);
   const voiceInputContextRef = useRef<VoiceInputContext | null>(null);
   const [codexCatalog, setCodexCatalog] = useState<CodexModelCatalogEntry[]>([]);
@@ -2571,6 +2572,9 @@ export function App({
   }), [bridge]);
 
   useWorkbenchShortcuts({ newChat: startNewChat, settings: () => setSettingsNavigation(current => ({ open: true, revision: (current?.revision ?? 0) + 1 })), schedules: () => setPrimaryView("schedules") });
+  const openSettingsDestination = (destination: SettingsDestinationId, resourceFocus?: ResourceSettingsFocus) => {
+    setSettingsNavigation(current => ({ open: true, destination, resourceFocus, revision: (current?.revision ?? 0) + 1 }));
+  };
   const renderStudioSettings = (activeDestination: SettingsDestinationId, renderContribution?: (options?: { only?: string }) => ReactNode, onNavigate?: (destination: SettingsDestinationId) => void, onClose?: () => void) => (
     <SettingsSurface
       resourceFocus={settingsNavigation?.resourceFocus}
@@ -2653,12 +2657,7 @@ export function App({
         setApplicationManagementTab(section);
         setPrimaryView("applications");
       }}
-      onOpenSettingsDestination={(targetDestination, focus) => setSettingsNavigation(current => ({
-        open: true,
-        destination: targetDestination,
-        resourceFocus: focus,
-        revision: (current?.revision ?? 0) + 1
-      }))}
+      onOpenSettingsDestination={openSettingsDestination}
     />
   );
 
@@ -2863,7 +2862,7 @@ export function App({
       onHostAction={(intent) => void runSettingsHostAction(intent)}
       onRefresh={() => void loadState(settings.runtimeProfile)}
       manifestInstallAction={projectedManifestInstallAction}
-      onOpenSettings={(destination, resourceFocus) => setSettingsNavigation(current => ({ open: true, destination, resourceFocus, revision: (current?.revision ?? 0) + 1 }))}
+      onOpenSettings={openSettingsDestination}
       initialTab={applicationManagementTab}
       requestedFocus={softwareCenterFocus}
       onTabChange={setApplicationManagementTab}
@@ -2911,6 +2910,7 @@ export function App({
     openDetailTab: requestDetails,
     renderSettings: renderStudioSettings,
     renderSettingsContribution: (options, owner) => renderContributionSlot?.("settings.section", { ...contributionOwner, ...owner }, options),
+    openSettingsDestination,
     settingsNavigation,
     installationProgress,
     installationState: desktopSetup,
