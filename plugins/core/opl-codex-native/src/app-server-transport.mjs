@@ -52,6 +52,8 @@ export class CodexAppServerTransport extends EventEmitter {
     const turnTimeoutMs = options.turnTimeoutMs ?? 300_000;
     this.command = command;
     this.args = args;
+    this.extraLaunchArgs = options.extraLaunchArgs;
+    this.stopGeneration = 0;
     this.cwd = cwd;
     this.host = requiredChannelString(host, "host");
     this.env = env;
@@ -178,7 +180,12 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async #startProcess() {
-    const child = spawn(this.command, this.args, {
+    const generation = this.stopGeneration;
+    const extra = this.extraLaunchArgs ? await this.extraLaunchArgs() : [];
+    if (generation !== this.stopGeneration || this.disposed) {
+      throw new AppServerTransportError("app_server_stopping", "Codex App Server is stopping");
+    }
+    const child = spawn(this.command, [...this.args, ...extra], {
       cwd: this.cwd,
       env: this.env,
       stdio: ["pipe", "pipe", "pipe"]
@@ -245,6 +252,7 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async stop() {
+    this.stopGeneration++;
     const child = this.process;
     this.process = null;
     this.initialized = false;

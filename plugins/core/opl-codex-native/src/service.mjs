@@ -1,3 +1,4 @@
+import { sharedAppsMcpArgs } from "./shared-apps-mcp.mjs";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
@@ -67,6 +68,7 @@ export class OplCodexNative extends EventEmitter {
     dshProfileDir,
     dshInstallAnchor,
     dshHome,
+    stateDir,
     env = process.env,
     platform = process.platform,
     arch = process.arch,
@@ -107,6 +109,12 @@ export class OplCodexNative extends EventEmitter {
       cwd: workspaceRoot,
       env: childEnv,
       args: this.#buildCodexArgs(),
+      // Explicit app-server arguments can select a non-Codex protocol fixture
+      // or a caller-managed configuration.
+      extraLaunchArgs: !env.CODEX_APP_SERVER_ARGS ? () => sharedAppsMcpArgs({
+        command: env.OPL_CODEX_BIN ?? env.CODEX_APP_SERVER_COMMAND ?? "codex",
+        cwd: workspaceRoot, env, stateDir
+      }) : undefined,
       channelBindingStore,
       ...(canonicalThreadHost ? { host: canonicalThreadHost } : {})
     });
