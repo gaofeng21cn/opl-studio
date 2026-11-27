@@ -48,6 +48,7 @@ export async function startFakeOpld({ apiVersion = "2.0", onCall = async () => (
             session_id: sessionId,
             api_version: apiVersion,
             base_version: "0.3.26",
+            codex_home: params.codex_home,
             reload_capabilities: ["none", "renderer_reload", "restart_required"]
           }).then((result) => send({ result })).catch((err) => send({
             error: { code: err?.rpcCode ?? -32000, message: err?.message ?? "Handshake failed", data: { code: err?.code ?? "rpc_error", ...err?.data } }

@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { createLocalNodeHost } from "./local-node-host.mjs";
 import { assertPatchedHostNode, resolveHostNode, resolveCurrentNodeEntrypoint } from "./node-host-runtime.mjs";
 
@@ -103,4 +105,27 @@ test("failed Host startup retains a bounded private diagnostic", async context =
   assert.equal(diagnostic.code, "guest_host_closed");
   assert.match(diagnostic.diagnostic, /MODULE_NOT_FOUND|Cannot find module/);
   assert.equal(fs.statSync(hostLogPath).mode & 0o777, 0o600);
+});
+
+test("Host startup diagnostics include stderr arriving after the RPC pipe closes", async context => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-host-stderr-order-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const hostLogPath = path.join(root, "host-failure.json");
+  const spawnChild = () => {
+    const child = Object.assign(new EventEmitter(), {
+      stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
+      exitCode: null, signalCode: null, kill() {}
+    });
+    child.stdout.end();
+    setImmediate(() => {
+      child.stderr.end("late Host startup diagnostic");
+      child.exitCode = 1;
+      child.emit("close", child.exitCode);
+    });
+    return child;
+  };
+  await assert.rejects(createLocalNodeHost({ nodeExecutable: process.execPath, hostRoot: root, hostLogPath, spawnChild }), { code: "guest_host_closed" });
+  const { exitCode, diagnostic } = JSON.parse(fs.readFileSync(hostLogPath, "utf8"));
+  assert.equal(exitCode, 1);
+  assert.equal(diagnostic, "late Host startup diagnostic");
 });

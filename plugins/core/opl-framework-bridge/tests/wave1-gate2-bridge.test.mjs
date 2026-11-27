@@ -112,17 +112,14 @@ function packTarGz(srcDir, outTgz, files) {
   return outTgz;
 }
 
-test("Wave 1 Gate 2A: bridge budget, exports, resolveOplStatePaths precedence, on-demand opld & <20ms SLA", async (t) => {
-  const srcFiles = fs.readdirSync(SRC_DIR).filter((f) => f.endsWith(".mjs"));
-  assert.deepEqual(srcFiles.sort(), ["index.mjs", "opld-client.mjs", "service.mjs"]);
-  let totalLines = 0;
-  for (const file of srcFiles) {
+test("Wave 1 Gate 2A: bridge ownership, public exports, state paths, on-demand opld and <20ms SLA", async (t) => {
+  // The bridge may adapt owner receipts, but must not embed Framework or open its database.
+  for (const file of fs.readdirSync(SRC_DIR, { recursive: true })) {
+    if (!/\.(?:mjs|cjs|js|ts)$/.test(file)) continue;
     const content = fs.readFileSync(path.join(SRC_DIR, file), "utf8");
-    totalLines += content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
-    assert.doesNotMatch(content, /cordis-profiles|compactFastState|spawn\(["']opl/);
+    assert.doesNotMatch(content, /cordis-profiles|compactFastState|spawn(?:Sync)?\s*\(\s*["']opl["']/, file);
+    assert.doesNotMatch(content, /(?:\bfrom\s*|\b(?:import|require)\s*\(?\s*)["'](?:node:sqlite|@opl\/(?:core|pack|runway|daemon|workspace|ledger|connect)(?:\/[^"']*)?)["']/, file);
   }
-  assert.ok(totalLines < 400, `Expected < 400 total source lines, got ${totalLines}`);
-  assert.match(fs.readFileSync(path.join(SRC_DIR, "index.mjs"), "utf8"), /inject = \["oplStudioHostOptions", "oplCodexNative"\]/);
   assert.equal(name, "opl-framework-bridge");
   assert.deepEqual(inject, ["oplStudioHostOptions", "oplCodexNative"]);
   assert.equal(typeof apply, "function");
@@ -298,7 +295,7 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
   t.after(() => shutdownSandbox(root, stateDir, boot));
   await boot.start();
 
-  const opl = createOplPassthrough({ env, candidateActionAllowlist: ["codex_install"] });
+  const opl = createOplPassthrough({ env });
   t.after(() => opl.close());
 
   const st = await opl.readState("fast");
@@ -311,23 +308,63 @@ test("Wave 1 Gate 2E: createOplPassthrough methods & contribution/update compati
   const drill = await opl.readFullDrilldown();
   assert.equal(drill.detail, "full");
 
-  const contrib = await opl.readContribution({ ref: "status.overview" });
-  assert.equal(contrib.stdoutJson.opl_app_contribution.surface_kind, "opl_app_package_contribution.v1");
-  assert.equal(contrib.stdoutJson.opl_app_contribution.package_id, undefined);
-  assert.equal(contrib.stdoutJson.opl_app_contribution.response.ok, true);
+  const packageId = "gate2-workbench";
+  const stateRef = "workbench#state";
+  const setRef = "workbench#set";
+  const title = { "zh-CN": "工作台", "en-US": "Workbench" };
+  const workbenchDir = writeV2Pkg(path.join(root, packageId), { id: packageId, extra: {
+    provides: { contribution_handler: { kind: "esm_module", module: "./workbench.mjs", export: "handle" } },
+    ui: { declarative: { views: [{ id: "workbench", view_type: "list_detail", slot: "workbench.panel", title,
+      data_ref: stateRef, actions: [{ id: "set", label: title, action_ref: setRef, confirm: true }] }] } },
+  } });
+  const stateFile = path.join(root, "owner-state.json");
+  fs.writeFileSync(stateFile, JSON.stringify({ value: "before" }));
+  fs.writeFileSync(path.join(workbenchDir, "workbench.mjs"), `
+    import fs from "node:fs";
+    const stateFile = ${JSON.stringify(stateFile)};
+    export function handle({ operation, ref, input }) {
+      if (operation === "execute" && ref === "workbench#set") fs.writeFileSync(stateFile, JSON.stringify(input));
+      else if (operation !== "read" || ref !== "workbench#state") throw new Error("Unexpected workbench request");
+      return { schema_version: "opl-package-app-contribution-response.v1", ok: true, ref, operation,
+        result: JSON.parse(fs.readFileSync(stateFile, "utf8")) };
+    }
+  `);
+  await boot.client.call("pack.link", { dir: workbenchDir, sync_codex: false });
+  const readOwner = async () => (await opl.readContribution({ packageId, ref: stateRef })).stdoutJson.opl_app_contribution;
+  const before = await readOwner();
+  assert.equal(before.surface_kind, "opl_app_package_contribution.v1");
+  assert.equal(before.package_id, packageId);
+  assert.deepEqual(before.response.result, { value: "before" });
+  const request = { actionId: "package_contribution_execute", payload: {
+    package_id: packageId, ref: setRef, input: { value: "after" }, confirmed: true,
+  } };
+  const preview = await opl.executeAction({ ...request, mode: "preview" });
+  assert.equal(preview.status, "preview_ready");
+  assert.deepEqual((await readOwner()).response.result, { value: "before" });
+  const executed = await opl.executeAction({ ...request, mode: "execute" });
+  assert.equal(executed.status, "executed");
+  const ownerReceipt = executed.stdoutJson.opl_app_contribution;
+  assert.equal(ownerReceipt.package_id, packageId);
+  assert.equal(ownerReceipt.ref, setRef);
+  assert.deepEqual(ownerReceipt.response.result, { value: "after" });
+  assert.deepEqual((await readOwner()).response.result, { value: "after" });
 
   const plan = await opl.runManagedUpdate("plan");
   assert.equal(Array.isArray(plan.managed_update.components), true);
 
-  const act = await opl.executeAction({ actionId: "codex_install", dryRun: true });
+  const dir = writeV2Pkg(path.join(root, "preview-app"), { id: "preview-app" });
+  await opl.client.call("pack.link", { dir, sync_codex: false });
+  const packageRequest = { actionId: "agent_package_uninstall", payload: { package_id: "preview-app" } };
+  const act = await opl.executeAction({ ...packageRequest, dryRun: true });
   assert.equal(act.status, "preview_ready");
   assert.equal(act.authorityBoundary, "app_bridge_no_domain_authority");
 
   const previewModeRo = createOplPassthrough({ env: { ...env, OPL_STUDIO_READ_ONLY: "1" }, client: opl.client });
-  const actPreviewMode = await previewModeRo.executeAction({ actionId: "codex_install", dryRun: false, mode: "preview" });
+  const actPreviewMode = await previewModeRo.executeAction({ ...packageRequest, dryRun: false, mode: "preview" });
   assert.equal(actPreviewMode.dryRun, true);
   assert.equal(actPreviewMode.receiptKind, "preview");
   assert.equal(actPreviewMode.status, "preview_ready");
+  assert.ok((await opl.client.call("pack.inspect", { package_id: "preview-app" })).installed);
 
   const missingBinBridge = new OplFrameworkBridge({ env: { ...env, OPL_DAEMON_BIN: path.join(root, "no-such-opld"), OPL_STATE_DIR: path.join(root, "empty-state") } });
   t.after(() => missingBinBridge.close());

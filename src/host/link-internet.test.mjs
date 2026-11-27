@@ -287,8 +287,22 @@ test("the actual Framework CLI maps an isolated signed-out account to the existi
   const frameworkRoot = process.env.OPL_LINK_FRAMEWORK_SOURCE;
   if (!frameworkRoot) { t.skip("Set OPL_LINK_FRAMEWORK_SOURCE to the matching Framework checkout"); return; }
   const root = await mkdtemp(path.join(os.tmpdir(), "opl-link-framework-cli-"));
-  const carrier = await createLinkInternet({ env: { ...process.env, NODE_ENV: "test", OPL_DATA_DIR: root, OPL_STATE_DIR: path.join(root, "framework-state"), OPL_APP_OPL_BIN: path.join(frameworkRoot, "bin/opl"), OPL_GATEWAY_CONTROL_BASE_URL: "http://127.0.0.1:1/api/v1" }, handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
-  t.after(async () => { await carrier.close(); await rm(root, { recursive: true, force: true }); });
+  const frameworkCli = path.join(frameworkRoot, "bin/opl");
+  const env = { ...process.env, NODE_ENV: "test", HOME: root, USERPROFILE: root, OPL_DATA_DIR: root,
+    OPL_STATE_DIR: path.join(root, "framework-state"), CODEX_HOME: path.join(root, "codex"),
+    OPL_APP_OPL_BIN: frameworkCli, OPL_GATEWAY_CONTROL_BASE_URL: "http://127.0.0.1:1/api/v1" };
+  const carrier = await createLinkInternet({ env, handle: () => {}, webSocketFactory: () => { throw new Error("A signed-out account must not open a Relay socket"); } });
+  t.after(async () => {
+    try {
+      await carrier.close();
+    } finally {
+      try {
+        execFileSync(frameworkCli, ["daemon", "stop", "--json"], { env, timeout: 15_000, stdio: "pipe" });
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  });
   await assert.rejects(carrier.enable(), error => error.code === "link_account_required");
   assert.deepEqual(carrier.status(), { status: "account_required", enabled: false, reasonCode: "link_account_required" });
 });

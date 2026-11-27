@@ -116,3 +116,62 @@ test("runStartupMaintenance invokes daemon.doctor and blocks pre-RPC in read-onl
   });
   assert.deepEqual(calls, [{ method: "daemon.doctor", params: { includeFirstRun: false } }]);
 });
+
+test("the action bridge preserves owner rejections, required confirmation and identity", async () => {
+  let value;
+  const client = { call: async () => value };
+  const opl = createOplPassthrough({ client });
+  const request = { actionId: "package_contribution_execute", mode: "execute", payload: { package_id: "example", ref: "example#set" } };
+  for (const rejected of [{ ok: false, status: "executed" }, { status: "executed", result: { ok: false } }, {}, { status: "unrecognized" }]) {
+    value = rejected;
+    const receipt = await opl.executeAction(request);
+    assert.equal(receipt.status, "error");
+    assert.equal(receipt.canExecute, false);
+    assert.notEqual(receipt.exitCode, 0);
+  }
+  value = { status: "confirmation_required" };
+  const prompt = await opl.executeAction(request);
+  assert.equal(prompt.status, "confirmation_required");
+  assert.equal(prompt.confirmationRequired, true);
+  assert.equal(prompt.canExecute, false);
+  value = { ok: true, status: "preview", confirmation_required: true, confirmation_id: "owner-request" };
+  const preview = await opl.executeAction({ ...request, mode: "preview" });
+  assert.equal(preview.status, "preview_ready");
+  assert.equal(preview.confirmationRequired, true);
+  assert.equal(preview.confirmationId, "owner-request");
+  value = { ok: true, status: "executed", action_id: "unrelated" };
+  await assert.rejects(() => opl.executeAction(request), { code: "invalid_owner_receipt" });
+});
+
+test("contribution reads preserve domain state and the reference returned by the owner", async () => {
+  const request = { packageId: "example", ref: "example#overview" };
+  let value = { schema_version: "opl-package-app-contribution-response.v1", ok: true, ref: request.ref, package_id: "example", state: "empty", data: { rows: [] } };
+  const opl = createOplPassthrough({ client: { call: async () => value } });
+  const read = await opl.readContribution(request);
+  assert.deepEqual(read.stdoutJson.opl_app_contribution.response.result, value);
+  value = { ok: false, ref: request.ref, error: { message: "Package workspace unavailable" } };
+  const failed = await opl.readContribution(request);
+  assert.notEqual(failed.exitCode, 0);
+  assert.equal(failed.stderr, "Package workspace unavailable");
+  value = { ok: true, ref: "stale-ref", result: [] };
+  await assert.rejects(() => opl.readContribution(request), { code: "invalid_owner_receipt" });
+});
+
+test("the native channel only receives its own declared contribution commands", async () => {
+  const packageId = "opl-channel-weixin";
+  const ref = "weixin.channel-access#disconnect";
+  let frameworkCalls = 0;
+  const client = { async call() { frameworkCalls++; return { ok: true, status: "executed" }; } };
+  const wh = { appStatePatch: () => ({ ui_contributions: { entries: [{ package_id: packageId, commands: [{ action_ref: ref, confirmation_required: true }] }] } }) };
+  const opl = createOplPassthrough({ client, getWeixinHost: () => wh });
+  const req = { actionId: "package_contribution_execute", payload: { package_id: packageId, ref } };
+  const preview = await opl.executeAction(req);
+  assert.equal(preview.status, "preview_ready");
+  assert.equal(preview.confirmationRequired, true);
+  assert.equal((await opl.executeAction({ ...req, mode: "execute" })).status, "confirmation_required");
+  await assert.rejects(() => opl.executeAction({ ...req, payload: { ...req.payload, ref: "unknown" } }), /Unknown Weixin/);
+  assert.equal(frameworkCalls, 0);
+  const toggled = await opl.executeAction({ actionId: "package_app_set_enabled", mode: "execute", payload: { package_id: packageId, enabled: false } });
+  assert.equal(toggled.status, "executed");
+  assert.equal(frameworkCalls, 1);
+});

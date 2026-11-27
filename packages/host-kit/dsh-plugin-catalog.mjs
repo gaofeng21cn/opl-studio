@@ -490,36 +490,29 @@ export function reconcileUserExternalPluginsOnBoot(profileDir) {
   const next = { ...records };
   for (const [pkg, record] of Object.entries(records)) {
     if (record.pendingOperation === "remove") {
-      // Best-effort synchronous cleanup if async pnpm remove did not run or failed.
+      // Detach the bundle before deleting package files. Leave the removal pending
+      // when cleanup fails so a later boot can retry with the same profile state.
       const manifestPath = path.join(profileDir, "package.json");
       const manifest = readJsonSafe(manifestPath);
-      if (manifest && typeof manifest === "object") {
-        let manifestChanged = false;
-        if (manifest.dependencies && Object.hasOwn(manifest.dependencies, pkg)) {
-          delete manifest.dependencies[pkg];
-          manifestChanged = true;
-        }
-        const bundles = manifest.dsh?.profile?.bundles;
+      try {
+        const bundles = manifest?.dsh?.profile?.bundles;
         if (Array.isArray(bundles) && bundles.includes(pkg)) {
           manifest.dsh.profile.bundles = bundles.filter(name => name !== pkg);
-          manifestChanged = true;
-        }
-        if (manifestChanged) {
           writeJsonAtomic(manifestPath, manifest);
         }
-      }
-      const pkgDir = path.join(profileDir, "node_modules", ...pkg.split("/"));
-      if (fs.existsSync(pkgDir)) {
-        try {
-          fs.rmSync(pkgDir, { recursive: true, force: true });
-        } catch (error) {
-          console.warn("[OPL:dsh-plugin-reconcile]", JSON.stringify({
-            packageName: pkg,
-            operation: "remove_cleanup",
-            code: error?.code ?? null,
-            message: error instanceof Error ? error.message : String(error)
-          }));
+        fs.rmSync(path.join(profileDir, "node_modules", ...pkg.split("/")), { recursive: true, force: true });
+        if (manifest?.dependencies && Object.hasOwn(manifest.dependencies, pkg)) {
+          delete manifest.dependencies[pkg];
+          writeJsonAtomic(manifestPath, manifest);
         }
+      } catch (error) {
+        console.warn("[OPL:dsh-plugin-reconcile]", JSON.stringify({
+          packageName: pkg,
+          operation: "remove_cleanup",
+          code: error?.code ?? null,
+          message: error instanceof Error ? error.message : String(error)
+        }));
+        continue;
       }
       delete next[pkg];
       changed = true;
@@ -620,6 +613,7 @@ export function buildDshPluginCatalog({
   dshInstallAnchor,
   disabledAtBoot = [],
   activeExternalPlugins = [],
+  activeExternalPluginVersions = {},
   nativeWeixin = false,
   externalEntries,
   billionContext,
@@ -694,7 +688,7 @@ export function buildDshPluginCatalog({
   const userExternal = readUserExternalDshPlugins(dshProfileDir);
   for (const record of Object.values(userExternal)) {
     if (DESCRIPTOR_BY_ID.has(record.pluginId) || DESCRIPTOR_BY_PKG.has(record.packageName)) continue;
-    const { version: profileVersion } = readInstalledBundledVersion(record.packageName, { dshProfileDir });
+    const profileVersion = readInstalledExternalPackageManifest(dshProfileDir, record.packageName)?.version;
     const installedVersion = profileVersion ?? record.installedVersion ?? null;
     const installed = Boolean(profileVersion) || record.pendingOperation === "remove";
     const active = bootActiveExternalSet.has(record.packageName);
@@ -727,7 +721,7 @@ export function buildDshPluginCatalog({
       enabled,
       active,
       version: installedVersion,
-      activeVersion: active ? (record.activeVersion ?? installedVersion) : null,
+      activeVersion: active ? (activeExternalPluginVersions[record.packageName] ?? null) : null,
       availableVersion: record.availableVersion ?? null,
       updateAvailable: Boolean(record.updateAvailable),
       startupFailed: false,
