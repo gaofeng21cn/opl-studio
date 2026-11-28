@@ -1,5 +1,7 @@
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { Window } from "happy-dom";
 import { Context } from "@deepseek-ai/cordis";
 import type { OplActionReceipt, OplActionRequest, OplStudioShellService } from "@gaofeng21cn/opl-host-contracts";
@@ -7,7 +9,17 @@ import { OPL_STUDIO_SHELL_SERVICE } from "@gaofeng21cn/opl-dsh-adapters/ui-kit";
 import { SlotRegistry } from "../../vendor/deepseek-harness/packages/client/ui-renderer/src/client/registry.ts";
 import { oplFlowWorkbenchClientPlugin } from "../../plugins/extensions/opl-flow-workbench/src/client/plugin";
 import { OplFlowWorkbenchPanel } from "../../plugins/extensions/opl-flow-workbench/src/client/OplFlowWorkbenchPanel";
-import { isOplFlowPackageEnabled, type StudioWindowBridge } from "../../plugins/extensions/opl-flow-workbench/src/client/oplFlowBridge";
+import {
+  OPL_FLOW_NAVIGATION_SCHEMA,
+  OPL_FLOW_RESOURCE_URI,
+  OPL_FLOW_UI_RESOURCE_REF,
+  dispatchOplFlowMcpToolCall,
+  executeOplFlowHostNavigation,
+  isOplFlowPackageEnabled,
+  parseOplFlowHostNavigationIntent,
+  sandboxOplFlowDocument,
+  type StudioWindowBridge
+} from "../../plugins/extensions/opl-flow-workbench/src/client/oplFlowBridge";
 
 let createRoot: typeof import("react-dom/client").createRoot;
 let browser: Window;
@@ -24,6 +36,7 @@ const keys = [
   "Element",
   "Node",
   "Event",
+  "MessageEvent",
   "MutationObserver",
   "ResizeObserver",
   "getComputedStyle",
@@ -33,7 +46,7 @@ let originals: Map<string, PropertyDescriptor | undefined>;
 let prevOplStudio: unknown;
 
 function flushAsync(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => setTimeout(resolve, 10));
 }
 
 function makeDashboardEnvelope() {
@@ -47,7 +60,7 @@ function makeDashboardEnvelope() {
           data: {
             schema: "opl-flow.decision.v1",
             instance_name: "gaofeng-mini-m5pro",
-            fetched_at: "2026-11-27T10:00:00Z",
+            fetched_at: "2026-11-28T10:00:00Z",
             service: {
               installed: true,
               running: true,
@@ -56,19 +69,15 @@ function makeDashboardEnvelope() {
               label: "dev.one-person-lab.opl-flow-router.demo"
             },
             counts: {
-              needs_action: 2,
+              needs_action: 1,
               safe_to_archive: 1,
               active_objectives: 1,
-              active_sessions: 3,
+              active_sessions: 2,
               running_sessions: 1,
-              primary_sessions: 2,
-              subagent_sessions: 1,
-              unique_occupied_workspaces: 2,
-              collision_workspaces: 0,
               blocked: 0,
               backlog: 1,
               pending_events: 0,
-              total_objectives: 4
+              total_objectives: 3
             },
             inbox: {
               needs_action: [
@@ -82,115 +91,49 @@ function makeDashboardEnvelope() {
                   thread_id: "thread-codex-101",
                   jump_mode: "native_switch",
                   next_action: "Switch to native thread"
-                },
-                {
-                  bead_id: "opl-102",
-                  title: "AntiGravity long-running verification",
-                  status: "in_progress",
-                  execution_mode: "active",
-                  execution_carrier: "antigravity",
-                  workspace_path: "/tmp/ws-agy",
-                  session_id: "agy-conv-102",
-                  jump_mode: "external_focus_only",
-                  first_blocker: "Held in AntiGravity window",
-                  next_action: "Review test artifact before resuming",
-                  remaining: ["Inspect runtime readback", "Tag release candidate"]
                 }
               ],
-              safe_to_archive: [
-                {
-                  bead_id: "opl-103",
-                  title: "Completed PR cleanup",
-                  execution_carrier: "codex",
-                  workspace_path: "/tmp/ws-done",
-                  jump_mode: "launch_new",
-                  user_approval_required: true
-                }
-              ],
-              active_objectives: [
-                {
-                  bead_id: "opl-101",
-                  title: "Codex native task ready for continuation",
-                  execution_carrier: "codex",
-                  workspace_path: "/tmp/ws-codex",
-                  thread_id: "thread-codex-101",
-                  jump_mode: "native_switch"
-                }
-              ],
+              safe_to_archive: [],
+              active_objectives: [],
               blocked: [],
-              backlog: [
-                {
-                  bead_id: "opl-104",
-                  title: "Backlog item",
-                  execution_mode: "backlog",
-                  jump_mode: "launch_new"
-                }
-              ],
+              backlog: [],
               pending_events: []
             },
             active_sessions: {
-              sessions: [
-                {
-                  session_ref: "codex:thread-codex-101",
-                  carrier: "codex",
-                  surface: "codex",
-                  model_label: "gpt-6.2-sol",
-                  title: "Fix release gate in opl-studio",
-                  workspace_label: "ws-codex",
-                  workspace_path: "/tmp/ws-codex",
-                  thread_id: "thread-codex-101",
-                  jump_mode: "native_switch",
-                  status: "active",
-                  updated_at: "2026-11-27T09:59:00Z",
-                  bound_bead_id: "opl-101",
-                  is_subagent: false
-                },
-                {
-                  session_ref: "agy:conv-sub-1",
-                  carrier: "antigravity",
-                  surface: "subagent",
-                  model_label: "gemini-4-neon-xhigh",
-                  title: "Worker code reader helper",
-                  workspace_label: "ws-agy",
-                  workspace_path: "/tmp/ws-agy",
-                  session_id: "conv-sub-1",
-                  jump_mode: "external_focus_only",
-                  status: "active",
-                  updated_at: "2026-11-27T09:58:00Z",
-                  is_subagent: true
-                },
-                {
-                  session_ref: "dsh:sess-202",
-                  carrier: "dsh",
-                  surface: "opl-dsh",
-                  model_label: "deepseek-chat",
-                  title: "DSH release checklist",
-                  workspace_label: "ws-dsh",
-                  workspace_path: "/tmp/ws-dsh",
-                  session_id: "sess-202",
-                  jump_mode: "external_focus_only",
-                  status: "idle",
-                  updated_at: "2026-11-27T09:40:00Z",
-                  is_subagent: false
-                }
-              ],
-              active_workspace_occupants: [
-                {
-                  workspace_label: "ws-codex",
-                  workspace_path: "/tmp/ws-codex",
-                  carrier: "codex",
-                  session_ref: "codex:thread-codex-101",
-                  bound_bead_id: "opl-101"
-                },
-                {
-                  workspace_label: "ws-dsh",
-                  workspace_path: "/tmp/ws-dsh",
-                  carrier: "dsh",
-                  session_ref: "dsh:sess-202"
-                }
-              ]
+              sessions: [],
+              active_workspace_occupants: []
             },
             items: []
+          }
+        }
+      }
+    }
+  };
+}
+
+function makeUiResourceEnvelope() {
+  const siblingHtml = path.resolve(import.meta.dir, "../../../opl-flow/decision-dashboard/index.html");
+  const html = existsSync(siblingHtml)
+    ? readFileSync(siblingHtml, "utf8")
+    : "<!doctype html><html><body><div id='app'>Canonical OPL Flow MCP App</div></body></html>";
+  return {
+    opl_app_contribution: {
+      response: {
+        ok: true,
+        result: {
+          ok: true,
+          state: "ready",
+          data: {
+            uri: OPL_FLOW_RESOURCE_URI,
+            mimeType: "text/html;profile=mcp-app",
+            version: "0.1.98",
+            text: html,
+            _meta: {
+              ui: {
+                prefersBorder: true,
+                csp: { connectDomains: [], resourceDomains: [] }
+              }
+            }
           }
         }
       }
@@ -205,12 +148,14 @@ function makeShellStub(): {
   openedThreads: string[];
   openedViews: string[];
   startedWorkspaces: string[];
+  setReadOnly: (blocked: boolean) => void;
 } {
   const listeners = new Set<() => void>();
   const executed: OplActionRequest[] = [];
   const openedThreads: string[] = [];
   const openedViews: string[] = [];
   const startedWorkspaces: string[] = [];
+  let readOnly = false;
   const snapshot = {
     locale: "zh" as const,
     primaryView: "opl-flow" as const,
@@ -226,6 +171,14 @@ function makeShellStub(): {
     refreshState: async () => {},
     executeAction: async (request): Promise<OplActionReceipt> => {
       executed.push(request);
+      if (readOnly) {
+        return {
+          actionId: request.actionId,
+          status: "blocked_read_only",
+          blockedReason: "Read-only host blocks control-tower mutations",
+          dryRun: false
+        } as unknown as OplActionReceipt;
+      }
       return {
         actionId: request.actionId,
         status: "executed",
@@ -234,7 +187,7 @@ function makeShellStub(): {
           opl_app_contribution: {
             response: {
               ok: true,
-              result: { ok: true, message: "Action ok" }
+              result: { ok: true, result: { message: "Action ok" } }
             }
           }
         }
@@ -248,19 +201,23 @@ function makeShellStub(): {
       openedThreads.push(threadId);
     },
     selectWorkItem: () => {},
-    startConversationInWorkspace: (workspacePath) => {
+    startConversationInWorkspace: async (workspacePath) => {
       startedWorkspaces.push(workspacePath);
     }
-  };
+  } as unknown as OplStudioShellService;
+
   return {
     shell,
     emit: () => {
-      for (const l of listeners) l();
+      for (const listener of listeners) listener();
     },
     executed,
     openedThreads,
     openedViews,
-    startedWorkspaces
+    startedWorkspaces,
+    setReadOnly: (blocked) => {
+      readOnly = blocked;
+    }
   };
 }
 
@@ -274,15 +231,11 @@ beforeEach(async () => {
         : key === "window"
           ? browser
           : key === "ResizeObserver"
-            ? ((browser as unknown as { ResizeObserver?: unknown }).ResizeObserver ??
-              class {
-                observe() {}
-                disconnect() {}
-              })
+            ? (browser as unknown as { ResizeObserver?: unknown }).ResizeObserver ?? class { observe() {} disconnect() {} }
             : (browser as unknown as Record<string, unknown>)[key];
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
   }
-  prevOplStudio = (window as unknown as { oplStudio?: unknown }).oplStudio;
+  prevOplStudio = (browser as unknown as { oplStudio?: unknown }).oplStudio;
   ({ createRoot } = await import("react-dom/client"));
   const container = document.createElement("div");
   document.body.append(container);
@@ -290,10 +243,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  if ((globalThis as unknown as { window?: { oplStudio?: unknown } }).window) {
-    (globalThis as unknown as { window: { oplStudio?: unknown } }).window.oplStudio = prevOplStudio;
-  }
   await act(async () => root.unmount());
+  (browser as unknown as { oplStudio?: unknown }).oplStudio = prevOplStudio;
   browser.close();
   for (const [key, descriptor] of originals) {
     if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -301,33 +252,16 @@ afterEach(async () => {
   }
 });
 
-test("isOplFlowPackageEnabled accurately distinguishes installed+enabled vs disabled vs absent in real opld projection", () => {
+test("isOplFlowPackageEnabled relies exclusively on v2 agent_packages and ui_contributions projections", () => {
   expect(isOplFlowPackageEnabled(null)).toBe(false);
+  expect(isOplFlowPackageEnabled({ app_state: { agent_packages: { directory: { entries: [] } } } })).toBe(false);
   expect(
     isOplFlowPackageEnabled({
       app_state: {
         agent_packages: {
-          status_index: { packages: { "opl-flow": { installed: true, app_enabled: false } } }
-        },
-        ui_contributions: { entries: [{ package_id: "opl-flow" }] }
-      }
-    })
-  ).toBe(false);
-  expect(
-    isOplFlowPackageEnabled({
-      app_state: {
-        agent_packages: {
-          status_index: { packages: { "opl-flow": { installed: true, app_enabled: true } } }
-        }
-      }
-    })
-  ).toBe(true);
-  expect(
-    isOplFlowPackageEnabled({
-      app_state: {
-        agent_packages: {
-          directory: { entries: [{ package_id: "opl-flow", installed: true, activated: true, app_enabled: false }] },
-          status_index: { packages: { "opl-flow": { package_id: "opl-flow", installed: true, enabled: true } } }
+          directory: {
+            entries: [{ package_id: "opl-flow", installed: true, enabled: false }]
+          }
         }
       }
     })
@@ -336,7 +270,9 @@ test("isOplFlowPackageEnabled accurately distinguishes installed+enabled vs disa
     isOplFlowPackageEnabled({
       app_state: {
         agent_packages: {
-          directory: { entries: [{ package_id: "opl-flow", installed: true, app_enabled: true }] }
+          directory: {
+            entries: [{ package_id: "opl-flow", installed: true, enabled: true }]
+          }
         }
       }
     })
@@ -344,20 +280,22 @@ test("isOplFlowPackageEnabled accurately distinguishes installed+enabled vs disa
   expect(
     isOplFlowPackageEnabled({
       app_state: {
-        modules: { items: [{ module_id: "opl-flow", installed: true, enabled: true }] }
+        modules: {
+          items: [{ id: "opl-flow", installed: true, enabled: true }]
+        }
       }
     })
   ).toBe(false);
 });
 
-test("oplFlowWorkbenchClientPlugin stays zero-presence until opl-flow is enabled, and unmounts on disable", async () => {
+test("oplFlowWorkbenchClientPlugin conditionally mounts sidebar order 34 and main slot only when enabled", async () => {
   let enabled = false;
-  (window as unknown as { oplStudio?: StudioWindowBridge }).oplStudio = {
+  (browser as unknown as { oplStudio?: StudioWindowBridge }).oplStudio = {
     readState: async () => ({
       app_state: {
         agent_packages: {
-          status_index: {
-            packages: enabled ? { "opl-flow": { installed: true, app_enabled: true } } : {}
+          directory: {
+            entries: enabled ? [{ package_id: "opl-flow", installed: true, enabled: true }] : []
           }
         }
       }
@@ -377,190 +315,217 @@ test("oplFlowWorkbenchClientPlugin stays zero-presence until opl-flow is enabled
   const { shell, emit } = makeShellStub();
   ctx.provide(OPL_STUDIO_SHELL_SERVICE, shell);
 
-  oplFlowWorkbenchClientPlugin.apply(ctx);
-  await act(async () => {
-    await flushAsync();
-  });
-  expect(registry.entries("sidebar.panellist").some((e) => e.options.id === "opl-flow")).toBe(false);
+  await ctx.plugin(oplFlowWorkbenchClientPlugin);
+  await flushAsync();
+  expect(registry.entries("sidebar.panellist").some((item) => item.options.id === "opl-flow")).toBe(false);
+  expect(registry.entries("main").some((item) => item.options.key === "opl-flow")).toBe(false);
 
   enabled = true;
-  await act(async () => {
-    emit();
-    await flushAsync();
-  });
-  const mountedSidebar = registry.entries("sidebar.panellist").find((e) => e.options.id === "opl-flow");
-  expect(mountedSidebar).toBeDefined();
-  expect(mountedSidebar?.options.order).toBe(34);
-  expect(registry.entries("main").some((e) => e.options.key === "opl-flow")).toBe(true);
+  emit();
+  await flushAsync();
+  const sidebarEntry = registry.entries("sidebar.panellist").find((item) => item.options.id === "opl-flow");
+  expect(sidebarEntry).toBeDefined();
+  expect(sidebarEntry?.options.order).toBe(34);
+  expect(registry.entries("main").some((item) => item.options.key === "opl-flow")).toBe(true);
 
   enabled = false;
-  await act(async () => {
-    emit();
-    await flushAsync();
-  });
-  expect(registry.entries("sidebar.panellist").some((e) => e.options.id === "opl-flow")).toBe(false);
-  expect(registry.entries("main").some((e) => e.options.key === "opl-flow")).toBe(false);
+  emit();
+  await flushAsync();
+  expect(registry.entries("sidebar.panellist").some((item) => item.options.id === "opl-flow")).toBe(false);
+  expect(registry.entries("main").some((item) => item.options.key === "opl-flow")).toBe(false);
   await ctx.fiber.dispose();
 });
 
-test("OplFlowWorkbenchPanel defaults to attention view, surfaces blocker + next_action + archive approval, and enforces jump_mode", async () => {
+test("OplFlowWorkbenchPanel mounts canonical MCP App HTML in a sandboxed iframe and bridges host navigation intents", async () => {
+  const { shell, openedThreads, openedViews, startedWorkspaces } = makeShellStub();
   const readCalls: Array<{ packageId: string; ref: string; input?: Record<string, unknown> }> = [];
   const bridge: StudioWindowBridge = {
     readContribution: async (req) => {
       readCalls.push(req);
-      return makeDashboardEnvelope();
+      if (req.ref === OPL_FLOW_UI_RESOURCE_REF) {
+        return makeUiResourceEnvelope();
+      }
+      if (req.ref === "opl-flow.decision.v1#dashboard") {
+        return makeDashboardEnvelope();
+      }
+      throw new Error(`Unexpected ref: ${req.ref}`);
     }
   };
-  const { shell, executed, openedThreads, startedWorkspaces, openedViews } = makeShellStub();
 
   await act(async () => {
     root.render(<OplFlowWorkbenchPanel shell={shell} bridge={bridge} />);
-    await flushAsync();
   });
-
-  expect(readCalls).toHaveLength(1);
-  expect(readCalls[0]).toEqual({
-    packageId: "opl-flow",
-    ref: "opl-flow.decision.v1#dashboard",
-    input: { include_local_navigation: true, host_carrier: "codex" }
-  });
-  expect(document.body.textContent).toContain("OPL Flow 总控");
-  expect(document.body.textContent).toContain("Codex native task ready for continuation");
-  expect(document.body.textContent).toContain("当前由 AntiGravity 持有");
-  expect(document.body.textContent).toContain("阻塞：Held in AntiGravity window");
-  expect(document.body.textContent).toContain("下一步：Review test artifact before resuming");
-  expect(document.body.textContent).toContain("剩余步骤（2 项）");
-
-  const buttons = Array.from(document.querySelectorAll("button"));
-  const switchBtn = buttons.find((b) => b.textContent?.includes("切换原生会话"));
-  expect(switchBtn).toBeDefined();
   await act(async () => {
-    switchBtn!.click();
     await flushAsync();
   });
+
+  expect(readCalls.some((c) => c.packageId === "opl-flow" && c.ref === OPL_FLOW_UI_RESOURCE_REF)).toBe(true);
+  expect(
+    readCalls.some(
+      (c) =>
+        c.packageId === "opl-flow"
+        && c.ref === "opl-flow.decision.v1#dashboard"
+        && c.input?.host_carrier === "codex"
+        && c.input?.include_local_navigation === true
+    )
+  ).toBe(true);
+
+  const iframe = document.querySelector('[data-testid="opl-flow-mcp-app-frame"]') as HTMLIFrameElement | null;
+  expect(iframe).toBeTruthy();
+  expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-downloads");
+  expect(iframe?.srcdoc).toContain("Content-Security-Policy");
+  expect(iframe?.srcdoc).toContain("default-src 'none'");
+
+  // Verify host navigation postMessage with matching iframe source triggers native jump and deduplicates duplicates.
+  const dispatchNav = async (payload: Record<string, unknown>, source: unknown) => {
+    const evt = new browser.MessageEvent("message", { data: payload, source: source as Window });
+    await act(async () => {
+      browser.dispatchEvent(evt);
+      await flushAsync();
+    });
+  };
+
+  // Untrusted source must be ignored.
+  await dispatchNav(
+    {
+      type: "opl_flow.host_navigate",
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "native_switch",
+      thread_id: "thread-spoofed"
+    },
+    null
+  );
+  expect(openedThreads).toEqual([]);
+
+  // Trusted iframe source routes native_switch once (deduped within short window).
+  const frameWindow = iframe?.contentWindow;
+  expect(frameWindow).toBeTruthy();
+  await dispatchNav(
+    {
+      type: "opl_flow.host_navigate",
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "native_switch",
+      execution_carrier: "codex",
+      bead_id: "opl-101",
+      thread_id: "thread-codex-101"
+    },
+    frameWindow
+  );
+  await dispatchNav(
+    {
+      type: "opl_flow.host_navigate",
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "native_switch",
+      execution_carrier: "codex",
+      bead_id: "opl-101",
+      thread_id: "thread-codex-101"
+    },
+    frameWindow
+  );
   expect(openedThreads).toEqual(["thread-codex-101"]);
+  expect(openedViews).toEqual(["chat"]);
 
-  const newCodexBtn = buttons.find((b) => b.textContent?.includes("在此工作区新建 Codex 会话"));
-  expect(newCodexBtn).toBeDefined();
-  await act(async () => {
-    newCodexBtn!.click();
-    await flushAsync();
-  });
-  expect(startedWorkspaces).toEqual(["/tmp/ws-agy"]);
-
-  const runtimeBtn = buttons.find((b) => b.textContent?.includes("运行状态"));
-  expect(runtimeBtn).toBeDefined();
-  await act(async () => {
-    runtimeBtn!.click();
-    await flushAsync();
-  });
-  expect(openedViews).toEqual(["runtime"]);
-
-  const tickBtn = buttons.find((b) => b.textContent?.includes("立即评估 (Tick)"));
-  expect(tickBtn).toBeDefined();
-  await act(async () => {
-    tickBtn!.click();
-    await flushAsync();
-  });
-  expect(executed[0]).toEqual({
-    actionId: "package_contribution_execute",
-    payload: {
-      package_id: "opl-flow",
-      ref: "opl-flow.decision.v1#tick",
-      input: { dry_run: false },
-      confirmed: true
+  // launch_new opens a new workspace conversation.
+  await dispatchNav(
+    {
+      type: "opl_flow.host_navigate",
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "launch_new",
+      workspace_path: "/tmp/ws-done"
     },
-    dryRun: false
-  });
+    frameWindow
+  );
+  expect(startedWorkspaces).toEqual(["/tmp/ws-done"]);
+  expect(openedViews).toEqual(["chat", "chat"]);
 
-  const stopBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("停止路由"));
-  expect(stopBtn).toBeDefined();
-  await act(async () => {
-    stopBtn!.click();
-    await flushAsync();
-  });
-  expect(executed[1]).toEqual({
-    actionId: "package_contribution_execute",
-    payload: {
-      package_id: "opl-flow",
-      ref: "opl-flow.decision.v1#service",
-      input: { action: "down", bridge: "auto", confirmed: true },
-      confirmed: true
+  // external_focus_only never triggers misrouted jumps.
+  await dispatchNav(
+    {
+      type: "opl_flow.host_navigate",
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "external_focus_only",
+      session_id: "agy-conv-102",
+      workspace_path: "/tmp/ws-agy"
     },
-    dryRun: false
-  });
-
-  // Archive candidate sits directly in the attention view for 1-place triage
-  const approveBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("批准归档"));
-  expect(approveBtn).toBeDefined();
-  await act(async () => {
-    approveBtn!.click();
-    await flushAsync();
-  });
-  const confirmApproveBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("确认归档"));
-  expect(confirmApproveBtn).toBeDefined();
-  await act(async () => {
-    confirmApproveBtn!.click();
-    await flushAsync();
-  });
-  expect(executed[2]).toEqual({
-    actionId: "package_contribution_execute",
-    payload: {
-      package_id: "opl-flow",
-      ref: "opl-flow.decision.v1#approve",
-      input: { bead_id: "opl-103", approved_by: "owner", confirmed: true },
-      confirmed: true
-    },
-    dryRun: false
-  });
+    frameWindow
+  );
+  expect(openedThreads).toEqual(["thread-codex-101"]);
+  expect(startedWorkspaces).toEqual(["/tmp/ws-done"]);
 });
 
-test("OplFlowWorkbenchPanel sessions tab filters out internal subagents by default and lets user inspect idle or subagent sessions", async () => {
-  const envelope = makeDashboardEnvelope();
-  envelope.opl_app_contribution.response.result.data.counts.needs_action = 0;
-  envelope.opl_app_contribution.response.result.data.counts.safe_to_archive = 0;
-  envelope.opl_app_contribution.response.result.data.counts.active_objectives = 0;
-  envelope.opl_app_contribution.response.result.data.inbox.needs_action = [];
-  envelope.opl_app_contribution.response.result.data.inbox.safe_to_archive = [];
-  envelope.opl_app_contribution.response.result.data.inbox.active_objectives = [];
-
+test("dispatchOplFlowMcpToolCall routes all five canonical MCP App tools and enforces read-only guard", async () => {
+  const { shell, executed, setReadOnly } = makeShellStub();
   const bridge: StudioWindowBridge = {
-    readContribution: async () => envelope
+    readContribution: async (req) => {
+      if (req.ref === "opl-flow.decision.v1#dashboard") return makeDashboardEnvelope();
+      throw new Error(`Unexpected ref: ${req.ref}`);
+    }
   };
-  const { shell } = makeShellStub();
 
-  await act(async () => {
-    root.render(<OplFlowWorkbenchPanel shell={shell} bridge={bridge} />);
-    await flushAsync();
+  const dash = await dispatchOplFlowMcpToolCall("open_opl_flow_dashboard", {}, { bridge, shell });
+  expect(dash.isError).toBeUndefined();
+  expect((dash.structuredContent as Record<string, unknown>).presentation).toEqual({
+    mode: "mcp-app",
+    resource_uri: OPL_FLOW_RESOURCE_URI
   });
 
-  // Smart default jumps straight to sessions when nothing needs attention
-  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-  const sessionsTab = tabs.find((el) => el.textContent?.includes("本机对话"));
-  expect(sessionsTab?.getAttribute("aria-selected")).toBe("true");
-
-  // Running primary thread appears with real title and model; subagent and idle DSH chat are hidden by default
-  expect(document.body.textContent).toContain("Fix release gate in opl-studio");
-  expect(document.body.textContent).toContain("gpt-6.2-sol");
-  expect(document.body.textContent).not.toContain("Worker code reader helper");
-  expect(document.body.textContent).not.toContain("DSH release checklist");
-
-  // Switch to all recent chats
-  const recentBtn = Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("全部近期"));
-  expect(recentBtn).toBeDefined();
-  await act(async () => {
-    recentBtn!.click();
-    await flushAsync();
+  const sendRes = await dispatchOplFlowMcpToolCall(
+    "opl_flow_send",
+    { message: "Proceed with release", executor: "dsh", now: true },
+    { bridge, shell }
+  );
+  expect(sendRes.isError).toBeUndefined();
+  expect(executed[0]).toMatchObject({
+    actionId: "package_contribution_execute",
+    payload: {
+      package_id: "opl-flow",
+      ref: "opl-flow.decision.v1#send",
+      input: { message: "Proceed with release", executor: "dsh", now: true },
+      confirmed: true
+    }
   });
-  expect(document.body.textContent).toContain("DSH release checklist");
-  expect(document.body.textContent).not.toContain("Worker code reader helper");
 
-  // Toggle subagents checkbox to reveal subagents
-  const subagentToggle = document.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-  expect(subagentToggle).toBeDefined();
-  await act(async () => {
-    subagentToggle!.click();
-    await flushAsync();
-  });
-  expect(document.body.textContent).toContain("Worker code reader helper");
+  await dispatchOplFlowMcpToolCall(
+    "opl_flow_approve_archive",
+    { bead_id: "opl-103", approved_by: "owner", confirmed: true },
+    { bridge, shell }
+  );
+  expect(executed[1]?.payload).toMatchObject({ ref: "opl-flow.decision.v1#approve" });
+
+  await dispatchOplFlowMcpToolCall("opl_flow_router_tick", { bridge: "auto" }, { bridge, shell });
+  expect(executed[2]?.payload).toMatchObject({ ref: "opl-flow.decision.v1#tick" });
+
+  await dispatchOplFlowMcpToolCall(
+    "opl_flow_router_service",
+    { action: "up", bridge: "auto", confirmed: true },
+    { bridge, shell }
+  );
+  expect(executed[3]?.payload).toMatchObject({ ref: "opl-flow.decision.v1#service" });
+
+  setReadOnly(true);
+  const blocked = await dispatchOplFlowMcpToolCall("opl_flow_router_tick", {}, { bridge, shell });
+  expect(blocked.isError).toBe(true);
+  expect(blocked.content[0]?.text).toContain("Read-only host");
+
+  const unknown = await dispatchOplFlowMcpToolCall("opl_flow_unknown_tool", {}, { bridge, shell });
+  expect(unknown.isError).toBe(true);
+});
+
+test("sandboxOplFlowDocument and host navigation parser reject malformed inputs", async () => {
+  const doc = sandboxOplFlowDocument({ text: "<html></html>" });
+  expect(doc).toContain("connect-src 'none'");
+  expect(parseOplFlowHostNavigationIntent({ schema: "wrong", jump_mode: "native_switch" })).toBeNull();
+  const { shell, openedThreads, startedWorkspaces } = makeShellStub();
+  const handled = await executeOplFlowHostNavigation(
+    {
+      schema: OPL_FLOW_NAVIGATION_SCHEMA,
+      jump_mode: "external_focus_only",
+      thread_id: "thread-ignored",
+      workspace_path: "/tmp/ignored"
+    },
+    shell
+  );
+  expect(handled).toBe(false);
+  expect(openedThreads).toEqual([]);
+  expect(startedWorkspaces).toEqual([]);
 });
