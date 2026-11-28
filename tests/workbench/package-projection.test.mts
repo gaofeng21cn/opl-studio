@@ -131,6 +131,24 @@ test("owner-requested access refresh checks a source once without granting softw
   }
 });
 
+test("OPL Cloud entitlement source preserves account_login and verification_reason cleanly", () => {
+  const model = deriveWorkbenchModelFromState({ app_state: { agent_packages: { sources: {
+    surface_kind: "opl_software_sources_projection.v1",
+    status: "available",
+    entries: [
+      { source_id: "public-registry:opl", display_name: "OPL Software Catalog", catalog_origin: "opl", provider_id: "opl_catalog", status: "ready", enabled: true },
+      { source_id: "opl-cloud:default", display_name: "OPL 账号授权", catalog_origin: "opl", source_kind: "registry", source_ref: "https://medopl.com", visibility: "authorized_only", provider_id: "opl_cloud", status: "authorized", enabled: true, account_login: "user@example.com", verification_reason: "entitled", entry_count: 2, available_actions: [{ action_id: "source_check", label: "Check access", payload_fields: ["source_id"], status: "available" }] }
+    ]
+  } } } });
+  const cloud = model.softwareSources?.entries.find(entry => entry.sourceId === "opl-cloud:default");
+  assert.ok(cloud);
+  assert.equal(cloud.providerId, "opl_cloud");
+  assert.equal(cloud.catalogOrigin, "opl");
+  assert.equal(cloud.accountLogin, "user@example.com");
+  assert.equal(cloud.verificationReason, "entitled");
+  assert.equal(cloud.entryCount, 2);
+});
+
 test("current Package directory entries replace retired private lifecycle fields", () => {
   const model = deriveWorkbenchModelFromState({
     app_state: {

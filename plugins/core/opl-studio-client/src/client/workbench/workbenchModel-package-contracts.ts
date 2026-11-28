@@ -147,6 +147,8 @@ export type SoftwareSourceRef = CatalogProvenanceRef & {
   sourceRef: string;
   visibility: "public" | "authorized_only" | "unknown";
   providerId?: string;
+  accountLogin?: string;
+  verificationReason?: string;
   status: "public" | "authorized" | "signed_out" | "forbidden" | "expired" | "revoked" | "loading" | "ready" | "stale" | "unavailable" | "unknown";
   enabled: boolean | null;
   credentialHandlePresent: boolean;

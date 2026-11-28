@@ -77,6 +77,8 @@ export function readSoftwareSourcesProjection(value: unknown): SoftwareSourcesPr
         sourceRef: asString(entry.source_ref) ?? "",
         visibility: publicCatalog ? "public" : entry.visibility === "public" || entry.visibility === "authorized_only" ? entry.visibility : "unknown",
         providerId: asString(entry.provider_id) ?? undefined,
+        accountLogin: asString(entry.account_login) ?? undefined,
+        verificationReason: asString(entry.verification_reason) ?? undefined,
         status: rawStatus && statuses.has(rawStatus) ? rawStatus as SoftwareSourceRef["status"] : "unknown",
         enabled: asOptionalBoolean(entry.enabled),
         credentialHandlePresent: entry.credential_handle_present === true,
@@ -115,6 +117,16 @@ export function pendingSoftwareSourceAccessCheck(projection: SoftwareSourcesProj
 
 export function softwareSourceStatusLabel(source: SoftwareSourceRef, locale: "zh" | "en"): string {
   if (source.enabled === false) return locale === "zh" ? "已停用" : "Disabled";
+  if (source.providerId === "opl_cloud") {
+    const cloudLabels: Partial<Record<SoftwareSourceRef["status"], [string, string]>> = {
+      authorized: ["OPL 账号已授权", "OPL account authorized"],
+      signed_out: ["未登录 OPL 账号", "Sign in to OPL account"],
+      forbidden: ["未获得受限软件授权", "No restricted package access"],
+      expired: ["OPL 登录已过期", "OPL sign-in expired"],
+    };
+    const match = cloudLabels[source.status];
+    if (match) return match[locale === "zh" ? 0 : 1];
+  }
   const labels: Record<SoftwareSourceRef["status"], [string, string]> = {
     public: ["公开可用", "Public"],
     authorized: ["账户已连接", "Account connected"],
