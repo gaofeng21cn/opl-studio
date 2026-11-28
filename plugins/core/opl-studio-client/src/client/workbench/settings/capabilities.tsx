@@ -185,16 +185,18 @@ export function CapabilityDirectory({
           </div>
         </section>
       ) : null)}
-      <details className="settings-upstream-details">
-        <summary>{locale === "zh" ? "DSH 能力接入详情" : "DSH capability integration details"}</summary>
-        <p>{locale === "zh" ? "以下是基础能力的接入进度，不计入可用能力目录。" : "Integration progress for upstream features; these are not counted as available capabilities."}</p>
-        {officialItems.map((item) => (
-          <details key={item.id} className="settings-capability-row">
-            <summary><strong>{item.name}</strong><StatusValue status={item.status} locale={locale} /></summary>
-            <div className="settings-capability-details"><p>{item.description}</p><small>{item.detail}</small></div>
-          </details>
-        ))}
-      </details>
+      {showTechnicalDetails ? (
+        <details className="settings-upstream-details">
+          <summary>{locale === "zh" ? "DSH 能力接入详情" : "DSH capability integration details"}</summary>
+          <p>{locale === "zh" ? "以下是基础能力的接入进度，不计入可用能力目录。" : "Integration progress for upstream features; these are not counted as available capabilities."}</p>
+          {officialItems.map((item) => (
+            <details key={item.id} className="settings-capability-row">
+              <summary><strong>{item.name}</strong><StatusValue status={item.status} locale={locale} /></summary>
+              <div className="settings-capability-details"><p>{item.description}</p><small>{item.detail}</small></div>
+            </details>
+          ))}
+        </details>
+      ) : null}
     </section>
   );
 }

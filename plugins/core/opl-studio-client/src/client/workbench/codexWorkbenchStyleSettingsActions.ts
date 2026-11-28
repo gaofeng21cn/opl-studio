@@ -4,9 +4,9 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 0 9px;
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-control);
+    padding: 0 12px;
+    border: 0.5px solid var(--opl-border);
+    border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
     font-size: var(--opl-text-sm);
@@ -80,8 +80,8 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     gap: 8px;
     margin-bottom: 18px;
     padding: 8px 10px;
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-control);
+    border: 0.5px solid var(--opl-border);
+    border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);
   }
@@ -97,7 +97,7 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
 
   .settings-advanced-actions {
     margin-top: 26px;
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
     padding-top: 13px;
   }
 
@@ -116,15 +116,15 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
   }
 
   .settings-action-dialog {
-    width: min(410px, calc(100vw - 32px));
+    width: min(380px, calc(100vw - 32px));
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
     gap: var(--opl-space-3);
     padding: var(--opl-space-5);
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-surface);
-    background: var(--opl-canvas);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+    border: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: var(--dsw-radius-panel);
+    background: var(--dsw-alias-bg-layer-2);
+    box-shadow: var(--dsw-elevation-prominent);
   }
 
   .settings-action-dialog-icon {
@@ -172,7 +172,7 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     min-height: 32px;
     width: 100%;
     padding: 0 9px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -185,24 +185,6 @@ export const codexWorkbenchStyleSettingsActions = `  .settings-action-button {
     justify-content: flex-end;
     gap: 8px;
     padding-top: 5px;
-  }
-
-  .settings-action-dialog-actions button {
-    min-height: var(--opl-control-md);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 11px;
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-control);
-    background: var(--opl-canvas);
-    color: var(--opl-text);
-  }
-
-  .settings-action-dialog-actions button.primary {
-    border-color: var(--opl-text);
-    background: var(--opl-text);
-    color: var(--opl-canvas);
   }
 
   .spin {

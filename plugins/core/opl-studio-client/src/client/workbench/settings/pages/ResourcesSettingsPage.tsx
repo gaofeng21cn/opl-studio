@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@deepseek-ai/dsh-client-ui-primitives";
 import { LinkCompanionSection } from "../LinkCompanionSection";
 import { actionPayloadComplete } from "../../settingsActions";
 import { useState } from "react";
@@ -26,10 +27,16 @@ export function ResourcesSettingsPage({ model, resourceFocus, onPickKnowledgeDir
       ));
       return (
         <>
-          <div className="segmented-control" role="group" aria-label={zh ? "连接设置分组" : "Connection settings sections"}>
-            <button type="button" aria-pressed={section === "libraries"} data-active={section === "libraries"} onClick={() => setSection("libraries")}>{zh ? "资料与连接" : "Libraries & connections"}</button>
-            <button type="button" aria-pressed={section === "remote"} data-active={section === "remote"} onClick={() => setSection("remote")}>{zh ? "远程访问与网页端" : "Remote & web access"}</button>
-          </div>
+          <SegmentedControl
+            id="opl-resources-section"
+            label={zh ? "连接设置分组" : "Connection settings sections"}
+            value={section}
+            options={[
+              { value: "libraries", label: zh ? "资料库与外部服务" : "Libraries & external services" },
+              { value: "remote", label: zh ? "远程访问与网页端" : "Remote & web access" },
+            ]}
+            onChange={(next) => setSection(next)}
+          />
           {section === "libraries" ? <SharedResourcesPage model={model} settings={settings} actionBusyKey={actionBusyKey} onAction={onAction} onRefresh={onRefresh} onApproveConnectionAccess={onApproveConnectionAccess} onPickKnowledgeDirectory={onPickKnowledgeDirectory} selectedPackageId={resourceFocus?.packageId} focusedResourceId={resourceFocus?.resourceId} onManageSources={onOpenSoftwareCenter ? () => onOpenSoftwareCenter("sources") : undefined} /> : <>
           <SettingsGroup title={zh ? "消息与远程连接" : "Messages & remote connections"}>
             <p className="settings-inline-note">{zh ? "通过微信等消息通道远程使用 OPL。已启用的远程扩展在这里统一连接和管理。" : "Use OPL remotely through Weixin and other messaging channels. Connect and manage enabled remote extensions here."}</p>

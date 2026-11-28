@@ -116,7 +116,7 @@ test("model Settings pages use live-catalog display labels", async () => {
     )));
     // Then both pages present the catalog label instead of the raw id.
     expect(container.textContent).toContain("Custom Local");
-    expect(container.textContent).toContain("Account & model");
+    expect(container.textContent).toContain("Current model");
     expect(container.textContent).not.toContain("Auto selects custom-local");
     expect([...container.querySelectorAll("button")].some(button => button.textContent === "Custom Local")).toBe(true);
   } finally {

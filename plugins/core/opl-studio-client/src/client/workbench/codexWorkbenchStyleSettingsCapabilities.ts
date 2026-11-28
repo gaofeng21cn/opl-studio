@@ -26,8 +26,8 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     align-items: center;
     gap: 8px;
     padding: 8px 0;
-    border-top: 1px solid var(--opl-border);
-    border-bottom: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
     color: var(--opl-muted);
   }
 
@@ -61,12 +61,12 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   }
 
   .settings-capability-list {
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
   }
 
   .settings-capability-row,
   .settings-instruction-source {
-    border-bottom: 1px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
   }
 
   .settings-capability-row > summary,
@@ -151,7 +151,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     overflow: auto;
     margin: 0;
     padding: 12px 0 0;
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
     color: var(--opl-muted);
     font-family: var(--opl-font-mono);
     font-size: var(--opl-text-xs);
@@ -207,7 +207,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     min-height: 168px;
     resize: vertical;
     padding: 11px 12px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     outline: 0;
     background: var(--opl-canvas);
@@ -229,11 +229,11 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
 
   .settings-default-row {
     padding-top: 11px;
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
   }
 
   .settings-default-preview {
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
     padding-top: 10px;
   }
 
@@ -267,7 +267,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     overflow: auto;
     margin: 10px 0 0;
     padding: 11px 12px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     background: var(--opl-hover);
     color: var(--opl-muted);
@@ -311,7 +311,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   .settings-inline-note {
     margin-top: -10px;
     padding: 8px 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);
@@ -325,7 +325,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     align-items: center;
     gap: 8px;
     padding: 0 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-faint);
@@ -355,7 +355,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   .agent-catalog-filters select {
     min-height: 29px;
     padding: 0 8px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     background: var(--opl-canvas);
     color: var(--opl-muted);
@@ -389,11 +389,11 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
   }
 
   .agent-package-list {
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
   }
 
   .agent-package-row {
-    border-bottom: 1px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
   }
 
   .agent-package-row > summary {
@@ -512,7 +512,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
 
   .software-catalog-channel {
     padding: 2px 6px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     color: var(--opl-muted);
     font-size: var(--opl-text-xs);
@@ -534,7 +534,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     min-width: 0;
     overflow-wrap: anywhere;
     font-size: inherit;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--ds-font-family-code);
   }
 
   .software-catalog-kind::before {
@@ -680,7 +680,7 @@ export const codexWorkbenchStyleSettingsCapabilities = `  .settings-capability-d
     align-items: center;
     gap: 10px;
     padding: 7px 9px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
   }
 

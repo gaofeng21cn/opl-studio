@@ -115,10 +115,10 @@ export function ComputerUseSettingsSection({
     if (performComputerUseAction) void runRequest(() => performComputerUseAction({ ...request, locale }));
   }
 
-  const label = zh ? "Computer Use（桌面操控）" : "Computer Use";
+  const label = zh ? "桌面操控（Computer Use）" : "Computer Use";
   const detail = zh
-    ? "使用 DSH 原生 MCP 能力直接控制桌面应用，动态注入给 Codex。"
-    : "Use DSH native MCP desktop automation, dynamically injected into Codex.";
+    ? "允许助手在需要时查看并操作桌面窗口与应用。"
+    : "Allow the assistant to inspect and operate desktop windows and apps when needed.";
 
   if (!bridge?.readComputerUse) {
     return (

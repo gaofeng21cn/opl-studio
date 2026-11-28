@@ -108,8 +108,8 @@ test("settings navigation exposes primary categories with related destinations g
   );
   assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "about"), true);
   assert.equal(presentation.settingsDestinations("zh").some((destination) => destination.id === "schedules" || destination.id === "memory"), false);
-  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.label, "连接与部署");
-  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.label, "Connections & Deployment");
+  assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.label, "资料与连接");
+  assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.label, "Libraries & Connections");
   assert.equal(presentation.navigationGroups("zh").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "资料与连接");
   assert.equal(presentation.navigationGroups("en").find((group) => group.id === "connections_deployment")?.destinations[0]?.label, "Libraries & connections");
   assert.match(settingsSource, /role="tablist"/);

@@ -1,5 +1,6 @@
 import { mergeBackgroundTaskIssue, startupCheckPresentation } from "../startupCheckPresentation";
 
+import { Button, SegmentedControl, Switch } from "@deepseek-ai/dsh-client-ui-primitives";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -216,18 +217,26 @@ export function useSettingsPageContext({
   function renderSettingControl(key: SettingKey) {
     const value = settings[key];
     if (typeof value === "boolean") {
-      return (
-        <button className="setting-switch" role="switch" aria-checked={value} aria-label={key === "notificationEnabled" ? (settings.locale === "zh" ? "任务完成通知" : "Task completion notifications") : key === "confirmBeforeExecute" ? (settings.locale === "zh" ? "执行前确认" : "Confirm before execute") : (settings.locale === "zh" ? "技术详情" : "Technical details")} type="button" onClick={() => onSettingChange(key, !value)}>
-          <span className="setting-switch-track" aria-hidden="true"><span /></span>
-          <span>{settingValueLabel(key, value)}</span>
-        </button>
-      );
+      const switchLabel = key === "notificationEnabled"
+        ? (settings.locale === "zh" ? "任务完成通知" : "Task completion notifications")
+        : key === "confirmBeforeExecute"
+          ? (settings.locale === "zh" ? "执行前确认" : "Confirm before execute")
+          : (settings.locale === "zh" ? "技术详情" : "Technical details");
+      return <Switch label={switchLabel} checked={value} onChange={(next) => onSettingChange(key, next)} />;
     }
     if (key === "locale") {
       return (
-        <div className="segmented-control" role="group" data-testid="opl-locale-toggle" aria-label={settings.locale === "zh" ? "语言" : "Language"}>
-          <button type="button" data-active={value === "zh"} aria-pressed={value === "zh"} onClick={() => onSettingChange("locale", "zh")}>中文</button>
-          <button type="button" data-active={value === "en"} aria-pressed={value === "en"} onClick={() => onSettingChange("locale", "en")}>English</button>
+        <div data-testid="opl-locale-toggle">
+          <SegmentedControl<"zh" | "en">
+            id="opl-locale-toggle"
+            label={settings.locale === "zh" ? "语言" : "Language"}
+            value={settings.locale}
+            options={[
+              { value: "zh", label: "中文" },
+              { value: "en", label: "English" },
+            ]}
+            onChange={(next) => onSettingChange("locale", next)}
+          />
         </div>
       );
     }
@@ -256,7 +265,11 @@ export function useSettingsPageContext({
       );
     }
     if (key === "runtimeProfile") {
-      return <button className="setting-toggle" type="button" onClick={() => onSettingChange("runtimeProfile", value === "fast" ? "full" : "fast")}>{settingValueLabel(key, value)}</button>;
+      return (
+        <Button variant="outline" size="sm" onClick={() => onSettingChange("runtimeProfile", value === "fast" ? "full" : "fast")}>
+          {settingValueLabel(key, value)}
+        </Button>
+      );
     }
     return <span>{settingValueLabel(key, value)}</span>;
   }

@@ -68,9 +68,9 @@ export type SettingsSection = {
 export const settingsSections: SettingsSection[] = [
   { id: "overview", title: "Overview", keys: [] },
   { id: "account_models", title: "Account & Models", keys: ["modelAccess", "reasoningLevel", "customModelAccessEnabled", "agentPermissions", "autoReview", "timeContext"] },
-  { id: "connections_deployment", title: "Connections & Deployment", keys: [] },
+  { id: "connections_deployment", title: "Libraries & Connections", keys: [] },
   { id: "workspace", title: "Workspace", keys: ["defaultWorkspace"] },
-  { id: "agents_capabilities", title: "Agents & Capabilities", keys: [] },
+  { id: "agents_capabilities", title: "Capabilities & Instructions", keys: [] },
   { id: "runtime_maintenance", title: "Runtime & Maintenance", keys: ["runtimeProfile", "developerDetails"] },
   { id: "preferences", title: "Preferences", keys: ["locale", "theme", "fontSize", "notificationEnabled", "voiceInput"] }
 ];

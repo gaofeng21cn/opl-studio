@@ -1373,9 +1373,9 @@
     "labels_en": [
       "Overview",
       "Account & Models",
-      "Connections & Deployment",
+      "Libraries & Connections",
       "Workspace",
-      "Agents & Capabilities",
+      "Capabilities & Instructions",
       "Runtime & Maintenance",
       "Preferences"
     ],

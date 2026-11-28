@@ -241,14 +241,14 @@ try {
       separator: getComputedStyle(about, "::before").borderTopWidth,
     };
   });
-  assert.deepEqual(desktopRail.labels, ["概览", "账户与模型", "连接与部署", "工作区", "扩展与应用", "运行与维护", "偏好", "关于"]);
+  assert.deepEqual(desktopRail.labels, ["概览", "账户与模型", "资料与连接", "工作区", "能力与指令", "运行与维护", "偏好", "关于"]);
   assert.equal(desktopRail.aboutIsLast, true);
   assert.ok(desktopRail.aboutMarginTop > 100);
   assert.ok(desktopRail.aboutBottomGap >= 0 && desktopRail.aboutBottomGap < 4);
-  assert.equal(desktopRail.separator, "1px");
+  assert.equal(desktopRail.separator, "0.5px");
   results.desktopRail = desktopRail;
 
-  await click('button:has(.opl-settings-nav-label)', "扩展与应用");
+  await click('button:has(.opl-settings-nav-label)', "能力与指令");
   const tabs = await evaluate(() => {
     const panel = document.querySelector('[data-testid="opl-settings-panel"]');
     const tabs = [...panel.querySelectorAll('.settings-subnav [role="tab"]')];
@@ -263,8 +263,8 @@ try {
       panelLabel: content.getAttribute("aria-labelledby"),
     };
   });
-  assert.deepEqual(tabs.h1, ["扩展与应用"]);
-  assert.deepEqual(tabs.labels, ["全部扩展", "智能体", "指令与上下文"]);
+  assert.deepEqual(tabs.h1, ["能力与指令"]);
+  assert.deepEqual(tabs.labels, ["能力配置", "指令与上下文"]);
   assert.equal(tabs.tabStops, 1);
   assert.deepEqual(tabs.selected, ["settings-tab-capabilities"]);
   assert.ok(tabs.controls.every(id => id === tabs.panelId));
@@ -274,7 +274,7 @@ try {
 
   await evaluate(() => { document.querySelector('.settings-subnav [role="tab"][aria-selected="true"]').focus(); return true; });
   results.keyboard = [];
-  for (const [key, destination] of [["ArrowRight", "agents"], ["End", "instructions"], ["Home", "capabilities"], ["ArrowLeft", "instructions"]]) {
+  for (const [key, destination] of [["ArrowRight", "instructions"], ["End", "instructions"], ["Home", "capabilities"], ["ArrowLeft", "instructions"]]) {
     await cli("press", key);
     await settle();
     const state = await panelState();
@@ -283,7 +283,7 @@ try {
     results.keyboard.push({ key, destination: state.destination, activeId: state.activeId });
   }
 
-  await click('.settings-subnav [role="tab"]', "全部扩展");
+  await click('.settings-subnav [role="tab"]', "能力配置");
   await click('.settings-secondary-details > summary', "查看提供的技能与连接能力");
   const memoryClick = await evaluate(async () => {
     const row = [...document.querySelectorAll(".settings-row")].find(row => row.querySelector(".settings-row-label > span")?.textContent.trim() === "查看与纠正记忆");

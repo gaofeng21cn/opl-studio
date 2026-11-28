@@ -1,17 +1,17 @@
 
-.workbench-services form, .workbench-services article { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--opl-border, var(--border, #8884)); }
+.workbench-services form, .workbench-services article { display: grid; gap: 8px; padding: 12px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .workbench-services label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
 .workbench-services label:has(textarea), .workbench-services form > label { flex-direction: column; align-items: stretch; }
-.workbench-services:not(.scheduled-tasks) input, .workbench-services:not(.scheduled-tasks) select, .workbench-services:not(.scheduled-tasks) textarea { max-width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border, #8886); border-radius: 6px; background: transparent; color: inherit; }
+.workbench-services:not(.scheduled-tasks) input, .workbench-services:not(.scheduled-tasks) select, .workbench-services:not(.scheduled-tasks) textarea { max-width: 100%; min-width: 0; padding: 8px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-sm); background: transparent; color: inherit; }
 .workbench-services textarea { width: 100%; resize: vertical; min-height: 72px; }
 .workbench-services:not(.scheduled-tasks) button { margin: 3px 8px 3px 0; }
 .workbench-services p, .workbench-services code, .workbench-services label { overflow-wrap: anywhere; }
 .workbench-services ul { max-height: 260px; overflow: auto; padding-inline-start: 18px; }
 .workbench-services fieldset { display: flex; flex-wrap: wrap; gap: 8px; }
-.workbench-services:not(.scheduled-tasks) button { height: auto; min-height: 28px; background: var(--dsw-alias-button-tertiary-fill, transparent); color: var(--dsw-alias-label-primary, inherit); }
+.workbench-services:not(.scheduled-tasks) button { height: auto; min-height: 28px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); }
 .workbench-services li { margin: 6px 0; }
-.workbench-services h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; line-height: 22px; }
-.workbench-service-error { display: grid; gap: 4px; margin: 10px 0 12px; padding: 10px 12px; border-left: 2px solid var(--opl-warning, #f59e0b); background: color-mix(in srgb, var(--opl-warning, #f59e0b) 8%, transparent); color: var(--opl-text, inherit); }
+.workbench-services h3 { margin: 0 0 8px; font-size: var(--dsw-font-s-14-font-size); font-weight: 500; line-height: var(--dsw-font-s-14-line-height); }
+.workbench-service-error { display: grid; gap: 4px; margin: 10px 0 12px; padding: 10px 12px; border-left: 2px solid var(--dsw-alias-state-warn-primary); background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent); color: var(--dsw-alias-label-primary); }
 .workbench-service-error p, .workbench-service-error small { margin: 0; color: var(--opl-muted, inherit); }
 .workbench-service-error strong { font-weight: 500; }
 .storage-center { display: grid; gap: 16px; }
@@ -20,16 +20,16 @@
 .storage-freshness, .storage-muted, .storage-capability-row p, .storage-category-row p, .storage-protected p { color: var(--opl-muted, inherit); }
 .storage-freshness { font-size: 12px; }
 .storage-intent-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.storage-intent-stat { display: grid; gap: 3px; min-width: 0; padding: 10px 0; border-top: 1px solid var(--opl-border, var(--border, #8884)); }
+.storage-intent-stat { display: grid; gap: 3px; min-width: 0; padding: 10px 0; border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .storage-intent-stat span, .storage-intent-stat small { color: var(--opl-muted, inherit); }
 .storage-intent-stat strong { font-size: 16px; font-weight: 600; }
 .storage-intent-stat small { overflow-wrap: anywhere; }
-.storage-next-step { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 12px 0; border-block: 1px solid var(--opl-border, var(--border, #8884)); }
+.storage-next-step { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 12px 0; border-block: 0.5px solid var(--dsw-alias-border-l2); }
 .storage-next-step p { margin: 4px 0 0; color: var(--opl-muted, inherit); }
 .storage-next-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
 .storage-intent-section { display: grid; gap: 8px; }
 .storage-intent-section h4 { margin: 0; font-size: 13px; font-weight: 600; }
-.storage-category-row { display: grid; gap: 7px; padding: 10px 0; border-bottom: 1px solid var(--opl-border, var(--border, #8884)); }
+.storage-category-row { display: grid; gap: 7px; padding: 10px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .storage-category-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .storage-category-header label { margin: 0; font-weight: 500; }
 .storage-category-header > span { color: var(--opl-muted, inherit); white-space: nowrap; }
@@ -39,7 +39,7 @@
 .storage-detail-list label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; margin: 0; }
 .storage-detail-list label span { overflow-wrap: anywhere; }
 .storage-detail-list label small { color: var(--opl-muted, inherit); }
-.storage-capability-row { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--opl-border, var(--border, #8884)); }
+.storage-capability-row { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
 .storage-capability-row p { margin: 4px 0 0; font-size: 12px; }
 .storage-state-neutral { flex-shrink: 0; color: var(--opl-muted, inherit); font-size: 12px; }
 .storage-protected { display: grid; gap: 8px; padding-top: 2px; }
@@ -56,10 +56,10 @@
 
 /* Shared DSH settings rhythm for service-contributed controls. */
 .settings-page .workbench-services { border: 0; padding: 0; box-shadow: none; color: var(--dsw-alias-label-primary); }
-.settings-page .workbench-services:not(.scheduled-tasks) button { width: auto; flex: 0 0 auto; min-height: 30px; border-radius: 7px; padding: 5px 10px; font: inherit; font-size: 13px; line-height: 20px; margin: 0; }
+.settings-page .workbench-services:not(.scheduled-tasks) button { width: auto; flex: 0 0 auto; min-height: 30px; border-radius: var(--dsw-radius-sm); padding: 5px 10px; font: inherit; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); margin: 0; }
 .settings-page .workbench-services:not(.scheduled-tasks) button:disabled { opacity: .45; cursor: not-allowed; }
 .settings-page .workbench-services:not(.scheduled-tasks) button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
-.settings-page .workbench-services:not(.scheduled-tasks) input, .settings-page .workbench-services:not(.scheduled-tasks) select, .settings-page .workbench-services:not(.scheduled-tasks) textarea { font: inherit; font-size: 13px; line-height: 20px; border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-background-primary, transparent); }
+.settings-page .workbench-services:not(.scheduled-tasks) input, .settings-page .workbench-services:not(.scheduled-tasks) select, .settings-page .workbench-services:not(.scheduled-tasks) textarea { font: inherit; font-size: var(--dsw-font-xs-13-font-size); line-height: var(--dsw-font-xs-13-line-height); border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-1); }
 .settings-page .workbench-services input[type="checkbox"] { accent-color: var(--dsw-alias-label-primary); width: 15px; height: 15px; }
 .settings-page .workbench-services form { margin-block: 16px; padding: 16px 0; border-block: .5px solid var(--dsw-alias-border-l2); }
 .settings-page .workbench-services article > div:has(> button), .settings-page .storage-next-step-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -78,7 +78,7 @@
 .opl-dsh-schedule-page > [data-testid="task-manager-page"] { flex: 1; min-width: 0; }
 .opl-dsh-schedule-owner-fields { display: grid; gap: 12px; padding-top: 16px; }
 .opl-dsh-schedule-owner-fields label { display: grid; gap: 6px; min-width: 0; }
-.opl-dsh-schedule-owner-fields input, .opl-dsh-schedule-owner-fields select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; border: .5px solid var(--dsw-alias-border-l2); border-radius: 8px; padding: 8px 10px; background: var(--dsw-alias-background-primary, transparent); color: var(--dsw-alias-label-primary); font: inherit; }
+.opl-dsh-schedule-owner-fields input, .opl-dsh-schedule-owner-fields select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; border: .5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); padding: 8px 10px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
 .opl-dsh-schedule-owner-fields input:focus-visible, .opl-dsh-schedule-owner-fields select:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .opl-dsh-schedule-owner-fields p { color: var(--dsw-alias-label-secondary); font-size: 12px; }
 .opl-dsh-schedule-global-history { margin-top: 24px; border-top: .5px solid var(--dsw-alias-border-l2); }

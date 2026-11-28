@@ -17,7 +17,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
 }
 
 .materials-header-title {
@@ -47,7 +47,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control);
   background: var(--opl-canvas);
   color: var(--opl-text);
@@ -76,8 +76,8 @@
   gap: 12px;
   padding: 10px 20px;
   background: var(--opl-surface-secondary);
-  border-bottom: 1px solid var(--opl-border);
-  color: var(--dsw-color-danger, #dc2626);
+  border-bottom: 0.5px solid var(--opl-border);
+  color: var(--dsw-alias-state-error-primary);
   font-size: var(--opl-text-xs);
 }
 
@@ -101,7 +101,7 @@
 
 .materials-projects-rail,
 .materials-browser-pane {
-  border-inline-end: 1px solid var(--opl-border);
+  border-inline-end: 0.5px solid var(--opl-border);
 }
 
 .materials-projects-rail {
@@ -116,7 +116,7 @@
   gap: 7px;
   height: 32px;
   padding: 0 9px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control);
   background: var(--opl-canvas);
   color: var(--opl-muted);
@@ -183,7 +183,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 7px 9px;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--opl-radius-control);
   background: transparent;
   color: var(--opl-text);
@@ -224,9 +224,9 @@
 .materials-badge-warn {
   font-size: 11px;
   padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--opl-border);
-  color: var(--dsw-color-warning, #d97706);
+  border-radius: var(--dsw-radius-xs);
+  border: 0.5px solid var(--opl-border);
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 .materials-browser-pane {
@@ -284,7 +284,7 @@
 .materials-category-pills button {
   flex: none;
   padding: 3px 9px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: 999px;
   background: var(--opl-canvas);
   color: var(--opl-muted);
@@ -307,7 +307,7 @@
   flex-wrap: nowrap;
   overflow-x: auto;
   gap: 16px;
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
   flex: none;
 }
 
@@ -358,7 +358,7 @@
 .materials-filter-bar select {
   height: 32px;
   padding: 0 8px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control);
   background: var(--opl-canvas);
   color: var(--opl-text);
@@ -410,7 +410,7 @@
   align-items: center;
   gap: 9px;
   padding: 8px 9px;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
   border-radius: var(--opl-radius-control);
   background: transparent;
   color: var(--opl-text);
@@ -507,7 +507,7 @@
 }
 
 .materials-error {
-  color: var(--dsw-color-danger, #dc2626);
+  color: var(--dsw-alias-state-error-primary);
   font-size: var(--opl-text-xs);
 }
 
@@ -527,7 +527,7 @@
   flex-wrap: wrap;
   gap: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
 }
 
 .opl-workspace-file-preview-meta {
@@ -560,7 +560,7 @@
 
 .opl-workspace-file-preview-error {
   margin: 0;
-  color: var(--dsw-color-danger, #dc2626);
+  color: var(--dsw-alias-state-error-primary);
   font-size: var(--opl-text-xs);
 }
 
@@ -590,7 +590,7 @@
 
 .opl-preview-mode-bar button {
   padding: 3px 9px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control);
   background: var(--opl-canvas);
   color: var(--opl-muted);
@@ -615,7 +615,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control);
 }
 
@@ -628,8 +628,8 @@
 .opl-preview-table th,
 .opl-preview-table td {
   padding: 6px 10px;
-  border-bottom: 1px solid var(--opl-border);
-  border-inline-end: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
+  border-inline-end: 0.5px solid var(--opl-border);
   text-align: left;
   vertical-align: top;
 }
@@ -687,7 +687,7 @@
 }
 
 .opl-materials-space :is(button, select, input, a):focus-visible {
-  outline: 2px solid var(--dsw-color-primary, #2563eb);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 2px;
 }
 
@@ -701,7 +701,7 @@
   }
   .materials-preview-pane {
     grid-column: 1 / -1;
-    border-top: 1px solid var(--opl-border);
+    border-top: 0.5px solid var(--opl-border);
   }
 }
 
@@ -713,7 +713,7 @@
   }
   .materials-projects-rail {
     border-inline-end: 0;
-    border-bottom: 1px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
     max-height: 220px;
   }
   .materials-preview-pane {

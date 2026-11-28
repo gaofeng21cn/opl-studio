@@ -19,7 +19,7 @@ export const codexWorkbenchStyleFoundation = `
     --opl-font-sans: var(--dsw-font-family);
     --opl-font-mono: var(--ds-font-family-code);
     --opl-text-xs: var(--dsw-font-xxs-12-font-size);
-    --opl-text-sm: var(--dsw-font-xxs-12-font-size);
+    --opl-text-sm: var(--dsw-font-xs-13-font-size);
     --opl-text-md: var(--dsw-font-xs-13-font-size);
     --opl-text-body: var(--dsw-font-s-14-font-size);
     --opl-text-lg: var(--dsw-font-base-16-font-size);

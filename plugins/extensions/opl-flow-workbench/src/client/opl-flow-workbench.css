@@ -3,7 +3,7 @@
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: var(--opl-space-5, 20px) var(--opl-space-6, 24px) var(--opl-space-7, 28px);
+  padding: var(--opl-space-5, 20px) var(--opl-space-6, 24px) 28px;
   display: flex;
   flex-direction: column;
   gap: var(--opl-space-3, 12px);
@@ -35,8 +35,8 @@
 
 .opl-flow-title-row h1 {
   margin: 0;
-  font-size: var(--opl-text-xl, 18px);
-  line-height: 1.4;
+  font-size: var(--dsw-font-l-20-font-size);
+  line-height: var(--dsw-font-l-20-line-height);
   font-weight: var(--opl-weight-semibold, 600);
 }
 
@@ -56,9 +56,9 @@
 }
 
 .opl-flow-boundary-details summary:focus-visible {
-  outline: 2px solid var(--dsw-color-accent, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--dsw-radius-xs);
 }
 
 .opl-flow-boundary-details p {
@@ -79,7 +79,7 @@
   gap: 6px;
   padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   font-size: var(--opl-text-xs, 12px);
   line-height: 18px;
   color: var(--opl-muted);
@@ -87,13 +87,13 @@
 }
 
 .opl-flow-pill[data-tone="running"] {
-  color: var(--dsw-color-success, var(--opl-text));
-  border-color: color-mix(in srgb, var(--dsw-color-success, currentColor) 35%, var(--opl-border));
+  color: var(--dsw-alias-state-success-primary);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 35%, var(--opl-border));
 }
 
 .opl-flow-pill[data-tone="warn"] {
-  color: var(--dsw-color-warning, var(--opl-text));
-  border-color: color-mix(in srgb, var(--dsw-color-warning, currentColor) 40%, var(--opl-border));
+  color: var(--dsw-alias-state-warn-primary);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, var(--opl-border));
 }
 
 .opl-flow-dot {
@@ -121,7 +121,7 @@
   text-align: left;
   padding: 10px 12px;
   border-radius: var(--opl-radius-surface, 10px);
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   background: var(--opl-surface-secondary);
   color: inherit;
   font: inherit;
@@ -138,7 +138,7 @@
 }
 
 .opl-flow-summary-tile:focus-visible {
-  outline: 2px solid var(--dsw-color-accent, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 2px;
 }
 
@@ -148,8 +148,8 @@
 }
 
 .opl-flow-summary-value {
-  font-size: 18px;
-  line-height: 24px;
+  font-size: var(--dsw-font-l-20-font-size);
+  line-height: var(--dsw-font-l-20-line-height);
   font-weight: var(--opl-weight-semibold, 600);
   font-variant-numeric: tabular-nums;
 }
@@ -167,7 +167,7 @@
   flex-wrap: nowrap;
   overflow-x: auto;
   gap: 4px;
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
   scrollbar-width: none;
 }
 
@@ -196,7 +196,7 @@
 }
 
 .opl-flow-tab:focus-visible {
-  outline: 2px solid var(--dsw-color-accent, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 
@@ -209,7 +209,7 @@
   content: "";
   position: absolute;
   inset: auto 8px 0;
-  border-block-end: 2px solid var(--dsw-color-accent, currentColor);
+  border-block-end: 2px solid var(--dsw-alias-state-business-primary);
 }
 
 .opl-flow-tab-count {
@@ -230,7 +230,7 @@
 
 .opl-flow-segmented {
   display: inline-flex;
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-control, 8px);
   overflow: hidden;
 }
@@ -254,12 +254,12 @@
 }
 
 .opl-flow-seg-button:focus-visible {
-  outline: 2px solid var(--dsw-color-accent, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 
 .opl-flow-surface {
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-surface, 10px);
   background: var(--opl-surface-secondary);
   overflow: hidden;
@@ -270,7 +270,7 @@
   font-size: var(--opl-text-xs, 12px);
   font-weight: var(--opl-weight-semibold, 600);
   color: var(--opl-muted);
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -283,7 +283,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px 14px;
-  border-bottom: 1px solid var(--opl-border);
+  border-bottom: 0.5px solid var(--opl-border);
 }
 
 .opl-flow-row:last-child {
@@ -328,7 +328,7 @@
 }
 
 .opl-flow-card {
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   border-radius: var(--opl-radius-surface, 10px);
   background: var(--opl-surface-secondary);
   padding: 12px 14px;
@@ -358,7 +358,7 @@
   min-block-size: 32px;
   padding: 5px 10px;
   border-radius: var(--opl-radius-control, 8px);
-  border: 1px solid var(--opl-border);
+  border: 0.5px solid var(--opl-border);
   background: var(--opl-canvas);
   color: var(--opl-text);
   font: inherit;
@@ -384,7 +384,7 @@
 
 .opl-flow-error {
   margin: 0;
-  color: var(--dsw-color-danger, var(--opl-text));
+  color: var(--dsw-alias-state-error-primary);
   font-size: var(--opl-text-sm, 13px);
 }
 

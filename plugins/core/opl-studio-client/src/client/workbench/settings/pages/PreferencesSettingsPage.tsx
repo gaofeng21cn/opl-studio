@@ -25,7 +25,7 @@ export function PreferencesSettingsPage({ settings, renderSettingControl, onSett
             /></div>
             <div className="settings-font-size" data-slot="settings.general.item"><StudioFontSizeRow role="text" t={(key) => themeCopy[key] ?? key} setFontSize={(fontSize) => onSettingChange("fontSize", fontSize)} useStore={(selector) => selector({ fontSizes: { text: settings.fontSize, code: settings.fontSize, terminal: settings.fontSize }, fontFamilies: { text: "", code: "", terminal: "" }, revision: 0 })} actions={{ sync: () => undefined }} /></div>
           </SettingsGroup>
-          <SettingsGroup title={settings.locale === "zh" ? "执行" : "Execution"}>
+          <SettingsGroup title={settings.locale === "zh" ? "通知与会话" : "Notifications & sessions"}>
             <SettingRow label={settings.locale === "zh" ? "任务完成通知" : "Task completion notifications"}>{renderSettingControl("notificationEnabled")}</SettingRow>
 
             <SettingRow label={settings.locale === "zh" ? "新任务工作区" : "New task workspace"} detail={zh ? "跟随创建任务时选择的项目。" : "Uses the project selected when creating a task."}><button className="settings-inline-command" type="button" onClick={() => navigate("workspace")}>{zh ? "管理工作目录" : "Manage working directory"}</button></SettingRow>

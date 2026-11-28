@@ -874,9 +874,10 @@ test("Studio boots as the pinned DSH Application Host while Codex remains the th
   assert.equal(candidateEvidence.application_host.release_ready, false);
 });
 
-test("primary surfaces preserve scrolling and settings expose a narrow scrollbar", () => {
+test("primary surfaces preserve scrolling without conflicting with DSH Chromium scrollbars", () => {
   assert.match(conversationStyles, /\.scrollBody \{[^}]*overflow-y: auto;/s);
-  assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;[^}]*scrollbar-width: thin;/s);
+  assert.match(styles, /\.settings-detail \{[^}]*overflow-y: auto;/s);
+  assert.doesNotMatch(styles, /\.settings-detail \{[^}]*scrollbar-width: thin;/s);
   const workspaceStyles = read("vendor/deepseek-harness/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css");
   assert.match(workspaceStyles, /\.root:not\(\.rail\) \.listArea \{[\s\S]*overflow-y: auto;/);
   assert.match(workspaceStyles, /@container scroll-state\(scrollable: bottom\)/);

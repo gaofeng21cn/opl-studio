@@ -2,6 +2,7 @@ import { PackageDownloadPreview } from '../PackageInstallationProgress';
 import { packageActionVerb, type PackageDisplayInfo } from '../packageOperations';
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Wrench, LoaderCircle } from "lucide-react";
 import { trapDialogFocus, formatStatus, formatBytes } from "./presentation";
 import type { SettingsPanelProps } from "./types";
@@ -51,13 +52,13 @@ export function SettingsActionDialog({ settings, pendingConfirmation, actionBusy
               {pendingConfirmation.previewStatus !== "confirmation_required" ? <small>{settings.locale === "zh" ? "预检查" : "Preview"}: {formatStatus(pendingConfirmation.previewStatus, settings.locale)}</small> : null}
             </div>
             <div className="settings-action-dialog-actions">
-              <button ref={confirmationCancelRef} type="button" disabled={actionBusyKey !== null} onClick={onCancelAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</button>
-              <button className="primary" type="button" onClick={onConfirmAction} disabled={actionBusyKey !== null}>
+              <Button ref={confirmationCancelRef} variant="outline" size="md" disabled={actionBusyKey !== null} onClick={onCancelAction}>{settings.locale === "zh" ? "取消" : "Cancel"}</Button>
+              <Button variant="primary" size="md" onClick={onConfirmAction} disabled={actionBusyKey !== null}>
                 {actionBusyKey ? <LoaderCircle className="spin" aria-hidden="true" size={13} /> : null}
                 {pendingConfirmation.request.actionId === "gateway_account_use_for_model_access"
                   ? (settings.locale === "zh" ? "切换为 OPL Gateway" : "Switch to OPL Gateway")
                   : downloadAction ? (settings.locale === "zh" ? `开始${downloadAction}` : downloadAction) : (settings.locale === "zh" ? "确认执行" : "Confirm")}
-              </button>
+              </Button>
             </div>
           </section>
         </div>,
