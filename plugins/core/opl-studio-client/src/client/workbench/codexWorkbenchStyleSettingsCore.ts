@@ -1,19 +1,7 @@
-export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  .settings-detail {
+export const codexWorkbenchStyleSettingsCore = `  .settings-detail {
     min-width: 0;
     height: 100%;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--opl-border) transparent;
-  }
-
-  .settings-detail::-webkit-scrollbar-thumb {
-    border-radius: var(--dsw-radius-sm);
-    background: var(--opl-border);
   }
 
   .settings-detail-header,
@@ -48,8 +36,8 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     max-width: 680px;
     margin: 0;
     color: var(--opl-muted);
-    font-size: var(--opl-text-sm);
-    line-height: var(--opl-leading-relaxed);
+    font-size: var(--dsw-font-xs-13-font-size);
+    line-height: var(--dsw-font-xs-13-line-height);
   }
 
   .settings-subnav {
@@ -68,7 +56,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     flex: none;
     min-height: var(--opl-control-sm);
     padding: 0 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-muted);
@@ -82,7 +70,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
   }
 
   .settings-subnav button:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--opl-text) 38%, transparent);
+    outline: 2px solid var(--dsw-alias-state-business-primary);
     outline-offset: 2px;
   }
 
@@ -179,7 +167,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     align-items: center;
     gap: 7px;
     padding: 0 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -240,7 +228,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     align-items: center;
     gap: 12px;
     padding: 2px 0 18px;
-    border-bottom: 1px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
   }
 
   .gateway-login-form {
@@ -249,14 +237,14 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     gap: 12px;
     align-items: end;
     padding: 16px 24px;
-    border-bottom: 1px solid var(--dsh-border-muted, rgba(127, 127, 127, 0.18));
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   }
 
   .gateway-login-form label {
     display: grid;
     gap: 6px;
     min-width: 0;
-    color: var(--dsh-text-secondary, #666);
+    color: var(--dsw-alias-label-secondary);
     font-size: var(--opl-text-sm);
     line-height: var(--opl-leading-tight);
   }
@@ -266,9 +254,9 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     min-width: 0;
     height: var(--opl-control-md);
     padding: 0 9px;
-    border: 1px solid var(--dsh-border-default, rgba(127, 127, 127, 0.28));
+    border: 0.5px solid var(--dsw-alias-border-l3);
     border-radius: var(--opl-radius-control);
-    background: var(--dsh-surface-primary, transparent);
+    background: var(--dsw-alias-bg-layer-1);
     color: inherit;
     font: inherit;
   }
@@ -326,7 +314,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     min-width: 0;
     height: var(--opl-control-md);
     padding: 0 9px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     outline: 0;
     background: var(--opl-canvas);
@@ -394,7 +382,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     gap: 7px;
     margin-top: 18px;
     padding: 0 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -408,7 +396,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     display: inline-grid;
     place-items: center;
     padding: 0;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -437,7 +425,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     background: var(--dsw-alias-interactive-bg-hover, var(--opl-hover));
   }
   .settings-page-refresh:focus-visible {
-    outline: 2px solid var(--dsw-alias-label-secondary, var(--opl-text));
+    outline: 2px solid var(--dsw-alias-state-business-primary);
     outline-offset: 2px;
   }
 
@@ -446,7 +434,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     height: 44px;
     display: grid;
     place-items: center;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--dsw-radius-sm);
     color: var(--opl-muted);
   }
@@ -455,7 +443,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
   .setting-select {
     min-height: var(--opl-control-sm);
     padding: 0 10px;
-    border: 1px solid var(--opl-border);
+    border: 0.5px solid var(--opl-border);
     border-radius: var(--opl-radius-control);
     background: var(--opl-canvas);
     color: var(--opl-text);
@@ -463,72 +451,6 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
 
   .setting-select {
     min-width: 108px;
-  }
-
-  .setting-switch {
-    min-height: 30px;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--opl-muted);
-  }
-
-  .setting-switch-track {
-    width: 30px;
-    height: 18px;
-    position: relative;
-    display: inline-block;
-    border-radius: var(--dsw-radius-md);
-    background: var(--opl-faint);
-    transition: background 160ms ease;
-  }
-
-  .setting-switch-track span {
-    width: 14px;
-    height: 14px;
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    border-radius: 50%;
-    background: var(--opl-canvas);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
-    transition: transform 160ms ease;
-  }
-
-  .setting-switch[aria-checked="true"] .setting-switch-track {
-    background: var(--opl-accent);
-  }
-
-  .setting-switch[aria-checked="true"] .setting-switch-track span {
-    transform: translateX(12px);
-  }
-
-  .segmented-control {
-    width: fit-content;
-    display: inline-flex;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--opl-border);
-    border-radius: var(--opl-radius-control);
-    background: var(--opl-sidebar);
-  }
-
-  .segmented-control button {
-    min-height: 27px;
-    padding: 0 9px;
-    border: 0;
-    border-radius: var(--dsw-radius-sm);
-    background: transparent;
-    color: var(--opl-muted);
-  }
-
-  .segmented-control button[data-active="true"] {
-    background: var(--opl-canvas);
-    color: var(--opl-text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
   .settings-page-summary {
@@ -539,7 +461,7 @@ export const codexWorkbenchStyleSettingsCore = `  .settings-detail::-webkit-scro
     gap: var(--opl-space-4);
     margin-bottom: var(--opl-space-4);
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--opl-border);
+    border-bottom: 0.5px solid var(--opl-border);
     color: var(--opl-muted);
     font-size: var(--opl-text-sm);
     line-height: var(--opl-leading-normal);

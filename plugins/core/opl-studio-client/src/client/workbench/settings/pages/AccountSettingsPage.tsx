@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@deepseek-ai/dsh-client-ui-primitives";
 import { AlertCircle, Download, LoaderCircle, LogIn, RotateCcw, Save } from "lucide-react";
 
 import { formatNumber, formatAmount, formatDate, gatewayAccountInitials } from "../presentation";
@@ -48,10 +49,16 @@ export function AccountSettingsPage({ gatewayAction, actionViewModel, onGatewayL
             <SettingsGroup title={settings.locale === "zh" ? "模型访问设置" : "Model access setup"}>
               <div className="settings-access-setup">
                 <div className="settings-access-setup-header">
-                  <div className="segmented-control" role="group" aria-label={settings.locale === "zh" ? "模型访问方式" : "Model access method"}>
-                    <button type="button" data-active={accessSetupMode === "account"} onClick={() => setAccessSetupMode("account")}>{settings.locale === "zh" ? "OPL Gateway 账户" : "OPL Gateway account"}</button>
-                    <button type="button" data-active={accessSetupMode === "api_key"} onClick={() => setAccessSetupMode("api_key")}>API Key</button>
-                  </div>
+                  <SegmentedControl
+                    id="opl-model-access-method"
+                    label={settings.locale === "zh" ? "模型访问方式" : "Model access method"}
+                    value={accessSetupMode}
+                    options={[
+                      { value: "account", label: settings.locale === "zh" ? "OPL Gateway 账户" : "OPL Gateway account" },
+                      { value: "api_key", label: "API Key" },
+                    ]}
+                    onChange={(next) => setAccessSetupMode(next)}
+                  />
                   {editingAccess && gatewayConnectionState !== "none" ? (
                     <button
                       className="settings-action-button"

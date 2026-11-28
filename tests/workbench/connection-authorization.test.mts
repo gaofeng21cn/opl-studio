@@ -80,7 +80,7 @@ test("Settings owns connection approval and excludes unrelated configuration", (
   } as never;
   const markup = renderToStaticMarkup(createElement(SharedResourcesPage, props));
   const settingsMarkup = renderToStaticMarkup(createElement(ResourcesSettingsPage, props));
-  expect(settingsMarkup).toContain("Libraries &amp; connections");
+  expect(settingsMarkup).toContain("Libraries &amp; external services");
   expect(settingsMarkup).toContain("Approve");
   expect(settingsMarkup).not.toContain("Open Software Center");
   expect(settingsMarkup).not.toContain("Model account");

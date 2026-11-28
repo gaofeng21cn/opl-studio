@@ -207,7 +207,7 @@ export function installWorkspaceClientPlugin(core: Pick<SlotCore, "register">, u
     </section>;
   }
   const disposers = [
-    core.register({name: "sidebar.panellist", id: "workspace", order: 10, registrant: name}, ({ size }: {size: number}) => <Boxes size={size} aria-hidden="true"/>),
+    core.register({name: "sidebar.panellist", id: "workspace", order: 28, registrant: name}, ({ size }: {size: number}) => <Boxes size={size} aria-hidden="true"/>),
     core.register({name: "main", key: "workspace", registrant: name}, Page)
   ];
   return () => {disposers.forEach(dispose => dispose());};

@@ -287,3 +287,44 @@ test("public @gaofeng21cn/opl-plugin-ui-kit package and DevKit Tier 2 template m
   expect(devkitEntry).toContain('from "@gaofeng21cn/opl-plugin-ui-kit"');
   expect(devkitEntry).not.toContain("@gaofeng21cn/opl-dsh-adapters");
 });
+
+test("first-party CSS and workbench style templates exclude phantom tokens, bare monospace, and Chromium scrollbar conflicts", () => {
+  const roots = [
+    path.join(studioRoot, "plugins/core"),
+    path.join(studioRoot, "plugins/extensions")
+  ];
+  const styleFiles = roots.flatMap((rootDir) => {
+    const collected: string[] = [];
+    const stack = [rootDir];
+    while (stack.length) {
+      const current = stack.pop()!;
+      for (const entry of readdirSync(current, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name === "dist") continue;
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) stack.push(full);
+        else if (entry.isFile() && (/\.css$/.test(entry.name) || /^codexWorkbenchStyle.*\.ts$/.test(entry.name))) {
+          collected.push(full);
+        }
+      }
+    }
+    return collected;
+  });
+  expect(styleFiles.length).toBeGreaterThan(10);
+  const phantomTokenPattern = /--dsw-color-|--dsh-border-|--dsh-text-|--dsh-surface-|--dsw-alias-state-warning|--dsw-alias-background-primary|--dsw-alias-button-tertiary-fill|--opl-soft\b|--opl-surface(?![\w-])|--opl-space-7\b|var\(--border(?:-color)?\b/;
+  for (const file of styleFiles) {
+    const content = readFileSync(file, "utf8");
+    expect(content).not.toMatch(phantomTokenPattern);
+    expect(content).not.toMatch(/\bfont-family:\s*[^;]*\bmonospace\b/i);
+  }
+  const settingsCore = readFileSync(
+    path.join(studioRoot, "plugins/core/opl-studio-client/src/client/workbench/codexWorkbenchStyleSettingsCore.ts"),
+    "utf8"
+  );
+  expect(settingsCore).not.toMatch(/scrollbar-width:\s*thin/);
+  expect(settingsCore).not.toMatch(/\.settings-detail::-webkit-scrollbar/);
+  const workspaceCss = readFileSync(
+    path.join(studioRoot, "plugins/core/opl-studio-client/src/client/composition/workspace.css"),
+    "utf8"
+  );
+  expect(workspaceCss).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+});

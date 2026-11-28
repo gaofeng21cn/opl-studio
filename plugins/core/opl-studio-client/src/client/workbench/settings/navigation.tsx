@@ -8,7 +8,7 @@ export const navigationCopy = {
     groups: {
       overview: "概览",
       account_models: "账户与模型",
-      connections_deployment: "连接与部署",
+      connections_deployment: "资料与连接",
       workspace: "工作区",
       agents_capabilities: "能力与指令",
       runtime_maintenance: "运行与维护",
@@ -35,7 +35,7 @@ export const navigationCopy = {
     groups: {
       overview: "Overview",
       account_models: "Account & Models",
-      connections_deployment: "Connections & Deployment",
+      connections_deployment: "Libraries & Connections",
       workspace: "Workspace",
       agents_capabilities: "Capabilities & Instructions",
       runtime_maintenance: "Runtime & Maintenance",
@@ -172,8 +172,8 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Account & models", description: "Choose the model source and reasoning effort. Auto follows the OPL model policy and shows the effective result." }
   },
   resources: {
-    zh: { eyebrow: "连接与部署", description: "管理资料库、业务账户和应用授权；远程访问单独配置。" },
-    en: { eyebrow: "Connections & deployment", description: "Manage libraries, business accounts and app access. Configure remote access separately." }
+    zh: { eyebrow: "资料与连接", description: "管理资料库和邮箱等外部服务连接；微信等远程接入和网页端访问切换上方分段即可。" },
+    en: { eyebrow: "Libraries & connections", description: "Manage libraries and connected mailboxes or external services; switch to remote & web access above." }
   },
   workspace: {
     zh: { eyebrow: "工作区", description: "选择工作目录，确定项目文件的保存位置。" },
@@ -184,24 +184,24 @@ export const settingsPagePresentation: Record<SettingsDestinationId, { zh: Setti
     en: { eyebrow: "Workspace · data & storage", description: "Review local storage and choose what to clean up or keep." }
   },
   agents: {
-    zh: { eyebrow: "智能体与能力", description: "在软件中心管理智能体、版本和常用入口。" },
-    en: { eyebrow: "Agents & capabilities", description: "Manage agents, versions and shortcuts in Software Center." }
+    zh: { eyebrow: "能力与指令 · 软件中心", description: "在软件中心管理智能体、版本和常用入口。" },
+    en: { eyebrow: "Capabilities & instructions · Software Center", description: "Manage agents, versions and shortcuts in Software Center." }
   },
   capabilities: {
-    zh: { eyebrow: "智能体与能力", description: "配置技能、MCP 与连接；软件安装和更新集中在软件中心。" },
-    en: { eyebrow: "Agents & capabilities", description: "Configure skills, MCP and connections; manage installation and updates in Software Center." }
+    zh: { eyebrow: "能力与指令", description: "配置内置技能、MCP 工具与桌面操控；扩展安装与版本更新请在软件中心管理。" },
+    en: { eyebrow: "Capabilities & instructions", description: "Configure skills, MCP tools and Computer Use; manage extension installation and updates in Software Center." }
   },
   instructions: {
-    zh: { eyebrow: "智能体与能力 · 指令与上下文", description: "设置工作习惯与补充说明，管理新会话使用的上下文。" },
-    en: { eyebrow: "Agents & capabilities · instructions & context", description: "Set working preferences and additional instructions for new conversations." }
+    zh: { eyebrow: "能力与指令 · 指令", description: "设置对话补充说明与工作上下文，管理新会话默认携带的背景信息。" },
+    en: { eyebrow: "Capabilities & instructions · instructions", description: "Set additional conversation instructions and manage default workspace context for new chats." }
   },
   services: {
-    zh: { eyebrow: "运行与维护", description: "检查后台服务是否就绪，处理影响任务执行的问题。" },
-    en: { eyebrow: "Runtime & maintenance", description: "Check background services and scheduled tasks, and resolve runtime issues." }
+    zh: { eyebrow: "运行与维护", description: "检查本机助手、后台任务引擎和已接入运行环境的健康状态。" },
+    en: { eyebrow: "Runtime & maintenance", description: "Check the health of the local assistant, background task engine, and connected runtimes." }
   },
   updates: {
-    zh: { eyebrow: "运行与维护", description: "检查应用和能力更新，修复不可用的组件。" },
-    en: { eyebrow: "Runtime & maintenance", description: "Check for application and capability updates, and repair unavailable components." }
+    zh: { eyebrow: "运行与维护", description: "查看应用与组件当前版本状态，并前往软件中心检查更新或修复。" },
+    en: { eyebrow: "Runtime & maintenance", description: "Review application and component update status, and jump to Software Center to update or repair." }
   },
   diagnostics: {
     zh: { eyebrow: "运行与维护", description: "查看日志和诊断信息，帮助定位或反馈问题。" },

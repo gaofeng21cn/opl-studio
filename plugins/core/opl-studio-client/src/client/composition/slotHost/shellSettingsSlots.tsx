@@ -302,7 +302,7 @@ export function SettingsTriggerSlot({ wide }: { wide: boolean }) {
   const studio = useStudio();
   const { connected, label } = settingsTriggerPresentation(studio.locale, studio.gatewayAccount);
   const Icon = connected ? UserRound : SettingsIcon;
-  return <><Icon aria-hidden="true" size={16} /><span className={wide ? undefined : "visually-hidden"}>{label}</span></>;
+  return <><Icon aria-hidden="true" size={16} /><span className={wide ? undefined : "visually-hidden"}>{label}</span>{connected && wide ? <SettingsIcon aria-hidden="true" size={14} className="opl-settings-trigger-cue" /> : null}</>;
 }
 
 export function SettingsHeaderSlot() { return <>One Person Lab</>; }

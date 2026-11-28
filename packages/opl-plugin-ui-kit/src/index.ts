@@ -7,6 +7,7 @@ export {
   Modal,
   Pill,
   RiskConfirmation,
+  SegmentedControl,
   SegmentedTabs,
   StateDot,
   Switch,
@@ -14,6 +15,7 @@ export {
   Tooltip,
   type ButtonVariant,
   type MenuEntry,
+  type SegmentedControlOption,
   type SegmentedTab,
   type StateDotState,
   type TagTone

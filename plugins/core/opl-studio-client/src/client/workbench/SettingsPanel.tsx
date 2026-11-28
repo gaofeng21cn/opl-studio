@@ -110,7 +110,19 @@ case "agents": return <AgentsSettingsPage {...context} />;
 case "capabilities": return <CapabilitiesSettingsPage {...context} />;
 case "instructions": return <InstructionsSettingsPage {...context} />;
 case "services": return <ServicesSettingsPage {...context} />;
-case "updates": return <SoftwareCenterSettingsLink locale={settings.locale} section="updates" onOpen={context.onOpenSoftwareCenter} />;
+case "updates": {
+  const appUpdate = context.actionViewModel.managedUpdates.find((item) => item.componentId === "opl_app");
+  const unpackagedPreview = context.nativeAppUpdate?.reasonCode === "desktop_updater_requires_packaged_app";
+  const appVersion = unpackagedPreview ? (zh ? "开发预览版" : "Development preview") : context.nativeAppUpdate?.currentVersion ?? appUpdate?.component?.installedVersion ?? "--";
+  const updateStatus = unpackagedPreview
+    ? "development_preview"
+    : context.nativeAppUpdate?.buildKind === "local-development"
+      ? "local_development"
+      : context.nativeAppUpdate?.state === "not_available"
+        ? "current"
+        : context.nativeAppUpdate?.state ?? appUpdate?.component?.state;
+  return <SoftwareCenterSettingsLink locale={settings.locale} section="updates" onOpen={context.onOpenSoftwareCenter} appVersion={appVersion} updateStatus={updateStatus} />;
+}
 case "diagnostics": return <DiagnosticsSettingsPage {...context} />;
 case "preferences": return <PreferencesSettingsPage {...context} />;
 default: return <AboutSettingsPage {...context} />;
@@ -144,7 +156,6 @@ return (
               </button>
             ) : null}
           </div>
-          <p className="settings-detail-description">{pagePresentation.description}</p>
           {activeGroup && activeGroup.destinations.length > 1 ? (
             <nav className="settings-subnav" role="tablist" aria-label={settings.locale === "zh" ? `${activeGroup.label}分类` : `${activeGroup.label} destinations`}>
               {activeGroup.destinations.map((destination) => (
@@ -175,6 +186,7 @@ return (
               ))}
             </nav>
           ) : null}
+          <p className="settings-detail-description">{pagePresentation.description}</p>
         </header>
         <div className="settings-content" id="settings-tabpanel" role={usesDestinationTabs ? "tabpanel" : "region"} tabIndex={usesDestinationTabs ? 0 : -1}
           aria-labelledby={usesDestinationTabs ? `settings-tab-${selectedDestination}` : headingId} data-section={selectedDestination}>
