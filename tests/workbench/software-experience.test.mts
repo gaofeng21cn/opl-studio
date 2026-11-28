@@ -162,6 +162,43 @@ test("software sources refresh the catalog without running Homebrew or an access
   });
 });
 
+test("OPL Cloud entitlement source groups under primary OPL sources without GitHub credential chrome", async () => {
+  const projection = readSoftwareSourcesProjection({
+    surface_kind: "opl_software_sources_projection.v1",
+    status: "attention_required",
+    entries: [
+      { source_id: "public-registry:opl", display_name: "OPL Catalog", source_kind: "registry", provider_id: "opl_catalog", visibility: "public", status: "ready" },
+      { source_id: "opl-cloud:default", display_name: "OPL Cloud Access", catalog_origin: "opl", source_kind: "registry", source_ref: "https://medopl.com", visibility: "authorized_only", provider_id: "opl_cloud", status: "authorized", enabled: true, account_login: "member@example.com", entry_count: 1,
+        available_actions: [{ action_id: "source_check", payload_fields: ["source_id"], status: "available" }] },
+      { source_id: "github-packages:gaofeng21cn", display_name: "GitHub Packages", catalog_origin: "external", source_kind: "registry", source_ref: "ghcr.io/gaofeng21cn/one-person-lab-packages", visibility: "authorized_only", provider_id: "github_packages", status: "signed_out", enabled: true,
+        available_actions: [{ action_id: "source_configure", payload_fields: ["source_id", "provider_id", "credential_handle"], default_payload: { provider_id: "github_packages", credential_handle: "provider:github_packages:gh-cli" }, status: "available" }] }
+    ]
+  });
+  await withDom(async (container, render) => {
+    const requests: unknown[] = [];
+    render(createElement(SoftwareSourcesPage, { projection, locale: "en", actionBusyKey: null, onAction: request => requests.push(request), onRefresh() {} }));
+    const oplGroup = container.querySelector('section[data-source-group="opl"]')!;
+    const devGroup = container.querySelector('section[data-source-group="external"]')!;
+    expect(oplGroup).toBeTruthy();
+    expect(devGroup).toBeTruthy();
+    expect(oplGroup.querySelector('#opl-source-group-opl')?.textContent).toBe("OPL software sources");
+    expect(devGroup.querySelector('#opl-source-group-external')?.textContent).toBe("Developer sources (GitHub Packages)");
+    const cloudRow = oplGroup.querySelector('[data-source-id="opl-cloud:default"]')!;
+    expect(cloudRow).toBeTruthy();
+    expect(cloudRow.textContent).toContain("OPL Account");
+    expect(cloudRow.textContent).toContain("OPL account authorized");
+    expect(cloudRow.textContent).toContain("member@example.com");
+    expect(cloudRow.textContent).not.toContain("Other connection methods");
+    expect(cloudRow.textContent).not.toContain("Connect GitHub account");
+    expect(devGroup.querySelector('[data-source-id="github-packages:gaofeng21cn"]')).toBeTruthy();
+    const checkButton = [...cloudRow.querySelectorAll("button")].find(button => button.textContent?.includes("Check access"))!;
+    expect(checkButton).toBeTruthy();
+    act(() => checkButton.click());
+    expect(requests).toEqual([{ key: "source:opl-cloud:default:source_check", actionId: "source_check", label: "Check access",
+      payload: { source_id: "opl-cloud:default" }, confirmationRequired: false, dryRunSupported: false }]);
+  });
+});
+
 test("native folder selection and owner scope defaults complete a first connection without typing IDs", async () => {
   await withDom(async (container, render) => {
     const actions: any[] = [];
