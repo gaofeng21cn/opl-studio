@@ -239,7 +239,7 @@ test("updates page explains internal ownership for runtime dependencies and pack
   assert.match(settingsSource, /managed-runtime-dependencies/);
   assert.match(settingsSource, /由 OPL 托管自动更新/);
   assert.match(settingsSource, /仅检测并提示，不自动接管维护/);
-  assert.match(settingsSource, /Temporal 工作流组件（OPL 内置）/);
+  assert.match(settingsSource, /随 OPL 基座更新/);
   assert.match(settingsSource, /已安装 Agent 与能力包/);
   assert.match(settingsSource, /managed-package-states/);
 });

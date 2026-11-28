@@ -505,9 +505,7 @@ async function createDesktopHost(appLogDirectory) {
   if (windowsRuntime && process.env.OPL_STUDIO_READ_ONLY !== "1" && process.env.OPL_NATIVE_WORKBENCH_READ_ONLY !== "1") {
     try {
       const startup = await core.opl.runStartupMaintenance();
-      const temporal = startup.system_action?.details?.temporal_runtime_reconcile;
-      console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status,
-        temporalStatus: temporal?.status, failedStep: temporal?.failed_step }));
+      console.warn("[OPL:startup] " + JSON.stringify({ status: startup.system_action?.status }));
     } catch (error) {
       console.warn("[OPL:startup] " + JSON.stringify({ status: error.code ?? "failed" }));
     }

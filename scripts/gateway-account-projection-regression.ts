@@ -17,7 +17,6 @@ function stateWithGateway(overrides: Record<string, unknown> = {}) {
         status_summary: {
           runtime_source_carrier_health: "5/5",
           agent_package_functional_health: "18/25",
-          temporal_provider: "ready",
           release_channel: "stable",
           issue_count: 1
         },
@@ -34,8 +33,7 @@ function stateWithGateway(overrides: Record<string, unknown> = {}) {
             state_dir: "/state",
             runtime_sources_root: "/runtime-sources",
             logs_dir: "/logs",
-            release_channel: "stable",
-            temporal_provider: "ready"
+            release_channel: "stable"
           },
           workspace_services: {
             workspace_root: {

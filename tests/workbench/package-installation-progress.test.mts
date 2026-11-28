@@ -140,7 +140,7 @@ test('first installation separates offline payloads, network services and measur
 });
 
 test('a partially present SDK and a detected system CLI report distinct states', () => {
-  const sdk = { dependencyId: 'temporal-runtime', dependencyKind: 'runtime_substrate', installed: true, version: { worker: '1.25.0', client: null }, latestVersion: '1.25.0',
+  const sdk = { dependencyId: 'runtime-sdk', dependencyKind: 'runtime_substrate', installed: true, version: { worker: '1.25.0', client: null }, latestVersion: '1.25.0',
     currentness: 'missing', status: 'attention_needed', updatePolicy: 'updated_with_opl_base_framework_generation', updateMode: 'silent_managed', activationPolicy: 'app_launch_reconcile_generation_switch' };
   expect(runtimeDependencyStatus(sdk, 'zh')).toEqual({ state: 'attention', label: '组件安装不完整' });
   expect(runtimeDependencyStatus({ ...sdk, currentness: 'current', status: 'ready' }, 'zh')).toEqual({ state: 'installed' });

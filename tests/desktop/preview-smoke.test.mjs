@@ -11,7 +11,7 @@ import {
   runGatewayHook,
   runPreviewSmoke
 } from "../../scripts/desktop/preview-smoke.mjs";
-import { collectTemporalServiceSupervisorProof, parseCurrentFirstInstallAttempt, parseInstalledIdentityOutput, preparePublicReleaseMetadata } from "../../scripts/desktop/qualify-clean-vm.mjs";
+import { parseCurrentFirstInstallAttempt, parseInstalledIdentityOutput, preparePublicReleaseMetadata } from "../../scripts/desktop/qualify-clean-vm.mjs";
 import { runDesktopHostReadiness, runStableSmoke } from "../../scripts/desktop/stable-smoke.mjs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -238,12 +238,12 @@ test("Guest public metadata transport reads exact Framework sources and rejects 
   try {
     const source = path.join(root, "one-person-lab", "contracts", "opl-framework");
     await fs.mkdir(source, { recursive: true });
-    await fs.writeFile(path.join(source, "dependency-release-sources.json"), JSON.stringify({ sources: { temporal: { kind: "github-release", repository: "temporalio/cli" }, codex: { kind: "npm" } } }));
+    await fs.writeFile(path.join(source, "dependency-release-sources.json"), JSON.stringify({ sources: { officecli: { kind: "github-release", repository: "iOfficeAI/OfficeCLI" }, codex: { kind: "npm" } } }));
     const archive = path.join(root, "framework.tar.gz");
     assert.equal(spawnSync("tar", ["-czf", archive, "-C", root, "one-person-lab"]).status, 0);
     const metadata = await preparePublicReleaseMetadata(root, archive, async endpoint => {
-      assert.equal(endpoint, "repos/temporalio/cli/releases/latest");
-      return { draft: false, prerelease: false, tag_name: "v1.0.0", url: "https://api.github.com/repos/temporalio/cli/releases/123", assets: [{ digest: `sha256:${"a".repeat(64)}` }] };
+      assert.equal(endpoint, "repos/iOfficeAI/OfficeCLI/releases/latest");
+      return { draft: false, prerelease: false, tag_name: "v1.0.0", url: "https://api.github.com/repos/iOfficeAI/OfficeCLI/releases/123", assets: [{ digest: `sha256:${"a".repeat(64)}` }] };
     });
     const read = args => spawnSync(process.execPath, [metadata.readerFile, ...args], { encoding: "utf8" });
     assert.equal(JSON.parse(read(["api", metadata.endpoints[0]]).stdout).assets[0].digest, `sha256:${"a".repeat(64)}`);
@@ -268,57 +268,6 @@ test("Guest public metadata accepts a stable release after a GitHub repository r
     });
     assert.equal(metadata.endpoints[0], "repos/facebook/zstd/releases/latest");
   } finally { await fs.rm(root, { recursive: true, force: true }); }
-});
-
-test("Full Temporal proof executes the packaged CLI and observes each real lifecycle boundary", async () => {
-  const home = "/Users/guest";
-  const databasePath = `${home}/Library/Application Support/OPL/state/family-runtime/temporal-server/temporal.sqlite`;
-  const label = "ai.opl.family-runtime.temporal-service";
-  const calls = [];
-  let pid = 101;
-  let observations = 0;
-  let unloading = 0;
-  let bootstrapFailures = 0;
-  const plist = { Label: label, RunAtLoad: true, KeepAlive: true, ProgramArguments: ["temporal", "server", "start-dev", "--db-filename", databasePath] };
-  const hooks = {
-    home, uid: 501,
-    opl(args) {
-      calls.push(args);
-      if (args[0] === "app") {
-        const action = args.at(-1); if (action === "provider_service_restart") pid++;
-        return { app_action_execution: { action_id: action, dry_run: false, result: { family_runtime_service: { status: { supervisor: { pid } } } } } };
-      }
-      return { family_runtime_service: { service_status: "running", server_reachable: true,
-        supervisor: { ready: true, required: true, configuration_current: true, process_state: "running", pid } } };
-    },
-    command(executable, args) {
-      calls.push([executable, ...args]);
-      if (executable === "/usr/bin/plutil") return { args, status: 0, stdout: JSON.stringify(plist) };
-      if (args[0] === "bootout") unloading = 2;
-      if (args[0] === "print" || args[0] === "-0") return { args, status: unloading > 0 ? (--unloading, 0) : 3 };
-      if (args[0] === "bootstrap" && bootstrapFailures++ === 0) return { args, status: 5, stderr: "Bootstrap failed: 5" };
-      if (executable === "/bin/kill" || args[0] === "bootstrap") pid++;
-      return { args, status: 0, signal: null, stdout: "", stderr: "" };
-    },
-    sleep: async () => {},
-    database: async () => ({ identity: "1:42", size: 4096, valid: true }),
-  };
-  // Exercise the serialized guest entry, so no module-local helper is available.
-  const collect = new Function(`return (${collectTemporalServiceSupervisorProof.toString()})`)();
-  const proof = await collect({ runtime: "/packaged runtime", hooks });
-  assert.equal(proof.status, "passed");
-  assert.equal(proof.start_action.action_id, "provider_service_start");
-  assert.ok(calls.some(([executable, ...args]) => executable === "/usr/bin/plutil"
-    && JSON.stringify(args) === JSON.stringify(["-convert", "json", "-o", "-", `${home}/Library/LaunchAgents/${label}.plist`])));
-  assert.deepEqual([proof.initial_readback, proof.keep_alive_recovery.readback, proof.restart_readback, proof.session_reload.readback].map(x => x.supervisor.pid), [101, 102, 103, 104]);
-  assert.ok(calls.some(x => x[0] === "/bin/kill" && x[2] === "101"));
-  assert.ok(calls.some(x => x[1] === "bootout" && x[2] === `gui/501/${label}`));
-  assert.equal(proof.session_reload.unloaded, true);
-  assert.deepEqual(proof.session_reload.bootstrap_attempts.map(x => x.status), [5, 0]);
-  await assert.rejects(collect({ runtime: "/runtime", hooks: { ...hooks,
-    database: async () => ({ identity: ++observations === 1 ? "1:42" : "1:43", valid: true }) } }), /replaced its persistent database/);
-  plist.KeepAlive = false;
-  await assert.rejects(collect({ runtime: "/runtime", hooks }), /launchd configuration/);
 });
 
 function gatewayRecoveryFixture({ first = {}, reconciledSource = "missing", ready = true } = {}) {

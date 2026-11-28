@@ -533,7 +533,7 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
                 activation_policy: "app_restart_generation_switch",
                 binary_path: "/opt/opl/codex"
               }, {
-                dependency_id: "temporal-system-cli",
+                dependency_id: "ffmpeg",
                 dependency_kind: "external_cli",
                 installed: true,
                 version: "1.2.3",
@@ -544,7 +544,7 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
                 update_policy: "explicit_owner_delegated_after_confirmation",
                 update_mode: "explicit_owner_delegated",
                 activation_policy: "external_owner",
-                binary_path: "/opt/homebrew/bin/temporal",
+                binary_path: "/opt/homebrew/bin/ffmpeg",
                 note: "确认后由外部安装器更新"
               }],
               flow_dependencies: [{
@@ -582,7 +582,7 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
   assert.ok(projection);
   assert.equal(projection.components[0]?.currentness, "current");
   assert.equal(projection.components[0]?.runtimeDependencies?.find((dependency) => dependency.dependencyId === "codex-cli")?.updateMode, "silent_managed");
-  assert.equal(projection.components[0]?.runtimeDependencies?.find((dependency) => dependency.dependencyId === "temporal-system-cli")?.updatePolicy, "explicit_owner_delegated_after_confirmation");
+  assert.equal(projection.components[0]?.runtimeDependencies?.find((dependency) => dependency.dependencyId === "ffmpeg")?.updatePolicy, "explicit_owner_delegated_after_confirmation");
   assert.deepEqual(projection.components[0]?.flowDependencies, [{
     dependencyId: "officecli",
     dependencyKind: "cli",

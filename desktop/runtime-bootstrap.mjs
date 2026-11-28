@@ -288,7 +288,6 @@ function buildRuntimeEnvironment(runtime, env) {
     OPL_FRAMEWORK_PACKAGE_ROOT: frameworkRoot,
     OPL_FRAMEWORK_UPDATE_TARGET_ROOT: frameworkRoot,
     OPL_PACKAGED_SKILLS_ROOT: path.join(runtime, "skills"),
-    OPL_FAMILY_RUNTIME_PROVIDER: env.OPL_FAMILY_RUNTIME_PROVIDER?.trim() || "temporal",
     OPL_MODULE_PATH_MEDAUTOSCIENCE: path.join(runtime, "modules", "mas"),
     OPL_MODULE_PATH_MAS_SCHOLAR_SKILLS: path.join(runtime, "modules", "mas-scholar-skills"),
     OPL_MODULE_PATH_MEDAUTOGRANT: path.join(runtime, "modules", "mag"),
@@ -297,10 +296,6 @@ function buildRuntimeEnvironment(runtime, env) {
     OPL_MODULE_PATH_OPLBOOKFORGE: path.join(runtime, "modules", "bookforge"),
     OPL_FLOW_REPO_ROOT: path.join(runtime, "modules", "opl-flow")
   };
-  if (!env.OPL_TEMPORAL_ADDRESS?.trim() && !env.TEMPORAL_ADDRESS?.trim() && !env.OPL_TEMPORAL_SERVICE_START_COMMAND?.trim()) {
-    result.OPL_TEMPORAL_ADDRESS = "127.0.0.1:7233";
-    result.OPL_TEMPORAL_ADDRESS_SOURCE = "packaged_local_default";
-  }
   const hermes = path.join(runtime, "bin", "hermes");
   if (fs.existsSync(hermes)) result.OPL_HERMES_BIN = hermes;
   return codexOfflineSeedEnvironment(runtime, result);
