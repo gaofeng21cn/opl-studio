@@ -231,7 +231,6 @@ export type {
   RuntimeMaintenanceActionRef,
   ManagedUpdateDependencyVersion,
   ManagedUpdateComponentRef,
-  ManagedFlowDependencyRef,
   ManagedRuntimeDependencyRef,
   ManagedPackageStateRef,
   ManagedUpdateProjection,

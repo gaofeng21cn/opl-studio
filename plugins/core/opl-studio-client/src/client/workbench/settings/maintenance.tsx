@@ -194,10 +194,6 @@ export function ManagedUpdateGroup({
       {component?.currentness && component.currentness !== component.state && component.currentness !== "unknown" ? <SettingRow label={locale === "zh" ? "当前状态" : "Currentness"}><StatusValue status={component.currentness} locale={locale} /></SettingRow> : null}
       {nativeUpdate ? <SettingRow label={locale === "zh" ? "更新源" : "Update source"}><span>{nativeUpdateSource ?? "--"}</span></SettingRow> : null}
       <SettingRow label={nativeUpdate ? (locale === "zh" ? "更新方式" : "Update behavior") : (locale === "zh" ? "默认更新策略" : "Default update policy")}><span>{autoPolicy}</span></SettingRow>
-      {component?.flowDependencies?.length ? <details className="settings-advanced-actions" data-testid="opl-flow-dependency-currentness">
-        <summary>{locale === "zh" ? `OPL Flow 依赖 ${component.flowDependencies.length} 项` : `${component.flowDependencies.length} OPL Flow dependencies`}<ChevronDown aria-hidden="true" size={14} /></summary>
-        <div>{component.flowDependencies.map((dependency) => <SettingRow key={`${dependency.dependencyId}:${dependency.dependencyKind}`} label={dependency.dependencyId} detail={[dependency.dependencyKind, dependency.version].filter(Boolean).join(" · ")}><StatusValue status={dependency.currentness || dependency.status} locale={locale} /></SettingRow>)}</div>
-      </details> : null}
       {component?.runtimeDependencies?.length ? <details className="settings-advanced-actions" data-testid="managed-runtime-dependencies">
         <summary>{locale === "zh" ? `内部运行依赖 ${component.runtimeDependencies.length} 项` : `${component.runtimeDependencies.length} internal runtime dependencies`}<ChevronDown aria-hidden="true" size={14} /></summary>
         <div>{component.runtimeDependencies.map((dependency) => <SettingRow key={dependency.dependencyId} label={managedDependencyLabel(dependency.dependencyId, locale)} detail={[managedDependencyVersion(dependency.version), managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)].filter(Boolean).join(" · ")}><StatusValue status={dependency.currentness || dependency.status} locale={locale} /></SettingRow>)}</div>

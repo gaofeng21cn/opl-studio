@@ -501,7 +501,7 @@ test("managed update action results preserve owner components across fresh actio
   assert.equal(merged.channel, "stable");
 });
 
-test("managed update reads fast-state currentness and OPL Flow dependencies", () => {
+test("managed update reads fast-state currentness and runtime dependencies without legacy flowDependencies projection", () => {
   const projection = readManagedUpdateProjection({
     app_state: {
       managed_update: {
@@ -546,29 +546,6 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
                 activation_policy: "external_owner",
                 binary_path: "/opt/homebrew/bin/ffmpeg",
                 note: "确认后由外部安装器更新"
-              }],
-              flow_dependencies: [{
-                dependency_id: "officecli",
-                dependency_kind: "cli",
-                activation: "task_routed",
-                offline_bundle: "none",
-                online_install_default: true,
-                source: "installed_owner_descriptor",
-                source_path: "/opt/opl-flow",
-                owner: "opl-flow",
-                bundle_id: "officecli",
-                version_requirement: ">=1.0.0",
-                install_source: "native",
-                relationship: "required",
-                lifecycle_owner: "opl_base",
-                update_mode: "silent_managed",
-                installed: true,
-                observed_status: null,
-                status: "ready",
-                currentness: "current",
-                version: "1.0.0",
-                latest_version: "1.0.0",
-                ownership: "opl_managed"
               }]
             }
           },
@@ -583,29 +560,7 @@ test("managed update reads fast-state currentness and OPL Flow dependencies", ()
   assert.equal(projection.components[0]?.currentness, "current");
   assert.equal(projection.components[0]?.runtimeDependencies?.find((dependency) => dependency.dependencyId === "codex-cli")?.updateMode, "silent_managed");
   assert.equal(projection.components[0]?.runtimeDependencies?.find((dependency) => dependency.dependencyId === "ffmpeg")?.updatePolicy, "explicit_owner_delegated_after_confirmation");
-  assert.deepEqual(projection.components[0]?.flowDependencies, [{
-    dependencyId: "officecli",
-    dependencyKind: "cli",
-    activation: "task_routed",
-    offlineBundle: "none",
-    onlineInstallDefault: true,
-    source: "installed_owner_descriptor",
-    sourcePath: "/opt/opl-flow",
-    owner: "opl-flow",
-    bundleId: "officecli",
-    versionRequirement: ">=1.0.0",
-    installSource: "native",
-    relationship: "required",
-    lifecycleOwner: "opl_base",
-    updateMode: "silent_managed",
-    installed: true,
-    observedStatus: null,
-    status: "ready",
-    currentness: "current",
-    version: "1.0.0",
-    latestVersion: "1.0.0",
-    ownership: "opl_managed"
-  }]);
+  assert.equal("flowDependencies" in (projection.components[0] ?? {}), false);
 });
 
 test("Framework fast managed-update output survives Host bridge and renderer parsing", async () => {
@@ -641,28 +596,19 @@ test("Framework fast managed-update output survives Host bridge and renderer par
             manual_guidance: null,
             ...(componentId === "opl_base" ? {
               dependency_catalog: {
-                flow_dependencies: [{
-                  dependency_id: "officecli",
-                  dependency_kind: "cli",
-                  activation: "task_routed",
-                  offline_bundle: "none",
-                  online_install_default: true,
-                  source: "installed_owner_descriptor",
-                  source_path: "/opt/opl-flow",
-                  owner: "opl-flow",
-                  bundle_id: "officecli",
-                  version_requirement: ">=1.0.0",
-                  install_source: "native",
-                  relationship: "required",
-                  lifecycle_owner: "opl_base",
-                  update_mode: "silent_managed",
+                dependencies: [{
+                  dependency_id: "codex-cli",
+                  dependency_kind: "runtime_executor",
                   installed: true,
-                  observed_status: "ready",
-                  status: "ready",
+                  version: "0.42.0",
+                  latest_version: "0.42.0",
                   currentness: "current",
-                  version: "1.0.0",
-                  latest_version: "1.0.0",
-                  ownership: "opl_managed"
+                  status: "ready",
+                  ownership: "opl_managed",
+                  update_policy: "silent_stage_verify",
+                  update_mode: "silent_managed",
+                  activation_policy: "app_restart_generation_switch",
+                  binary_path: "/opt/opl/codex"
                 }]
               }
             } : {})
@@ -683,8 +629,10 @@ test("Framework fast managed-update output survives Host bridge and renderer par
     "opl_app", "opl_base", "opl_packages"
   ]);
   assert.equal(projection.components.find((component) => component.componentId === "opl_app")?.currentness, "unknown");
-  assert.equal(projection.components.find((component) => component.componentId === "opl_base")?.flowDependencies?.[0]?.dependencyId, "officecli");
-  assert.equal(projection.components.find((component) => component.componentId === "opl_base")?.flowDependencies?.[0]?.currentness, "current");
+  const oplBase = projection.components.find((component) => component.componentId === "opl_base");
+  assert.equal(oplBase?.runtimeDependencies?.[0]?.dependencyId, "codex-cli");
+  assert.equal(oplBase?.runtimeDependencies?.[0]?.currentness, "current");
+  assert.equal("flowDependencies" in (oplBase ?? {}), false);
 });
 
 test("managed update projects installed Agent and capability package carrier states", () => {
