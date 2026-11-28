@@ -12,8 +12,7 @@ import { createWebUiHost } from '../../src/host/http-host.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const framework = process.env.OPL_FRAMEWORK_REPO_ROOT;
-const address = process.env.OPL_TEST_TEMPORAL_ADDRESS;
-if (!framework || !address || !/^(127\.0\.0\.1|localhost):\d+$/.test(address)) throw Error('Set OPL_FRAMEWORK_REPO_ROOT and a task-owned loopback OPL_TEST_TEMPORAL_ADDRESS.');
+if (!framework) throw Error('Set OPL_FRAMEWORK_REPO_ROOT.');
 const { startCordisWorkbenchServicesHost } = await import(pathToFileURL(path.join(framework, 'dist/host/composition-profiles.js')));
 const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'opl-dsh-schedule-ui-')));
 const cliRoot = path.join(root, 'playwright');
@@ -22,7 +21,7 @@ const receiptPath = path.join(repositoryRoot, 'out/acceptance/dsh-schedule-ui.js
 const session = `opl-dsh-schedule-${process.pid}`;
 const env = {
   ...process.env, CODEX_HOME: path.join(root, 'codex'), OPL_STATE_DIR: path.join(root, 'state'),
-  OPL_FRAMEWORK_PACKAGE_ROOT: framework, OPL_TEMPORAL_ADDRESS: address, OPL_TEMPORAL_NAMESPACE: 'default',
+  OPL_FRAMEWORK_PACKAGE_ROOT: framework,
   OPL_STUDIO_READ_ONLY: '0', OPL_NATIVE_WORKBENCH_READ_ONLY: '0', OPL_DATA_DIR: root,
   OPL_STUDIO_LOG_ROOT: path.join(root, 'app-logs'), OPL_STUDIO_CACHE_ROOT: path.join(root, 'app-cache'),
   OPL_WEBUI_DEPLOYMENT_MODE: 'local', OPL_WEBUI_AUTH_MODE: 'none', FAKE_APP_SERVER_LOG: path.join(root, 'codex.jsonl'),

@@ -83,7 +83,7 @@ describe("DSH schedule model adapter", () => {
     const entry = taskCatalogEntry(baseTask({ schedule: oplScheduleFromTiming(timing), nextRuns: ["2030-01-02T02:23:45.000Z"] }));
     assert.equal(entry.scheduledAt, "2030-01-02T02:23:45.000Z");
     assert.equal((entry as any).timeZone, "Asia/Shanghai");
-    assert.equal("lastDelivery" in entry, false, "Temporal executions are not DSH inbox deliveries");
+    assert.equal("lastDelivery" in entry, false, "Scheduled task executions are not DSH inbox deliveries");
     assert.deepEqual(oplScheduleFromTiming({ kind: "at", at: entry.scheduledAt }, { kind: "once", at: entry.scheduledAt, timeZone: "Asia/Shanghai" }),
       { kind: "once", at: "2030-01-02T02:23:45.000Z", timeZone: "Asia/Shanghai" });
   });

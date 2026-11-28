@@ -11,13 +11,12 @@ import { createWebUiHost } from '../../src/host/http-host.mjs';
 import { buildRenderer } from '../build-renderer.mjs';
 
 const framework = process.env.OPL_FRAMEWORK_REPO_ROOT;
-const address = process.env.OPL_TEST_TEMPORAL_ADDRESS;
-if (!framework || !address || !/^(127\.0\.0\.1|localhost):\d+$/.test(address)) throw Error('Set OPL_FRAMEWORK_REPO_ROOT and an isolated loopback OPL_TEST_TEMPORAL_ADDRESS.');
+if (!framework) throw Error('Set OPL_FRAMEWORK_REPO_ROOT.');
 const { startCordisWorkbenchServicesHost } = await import(pathToFileURL(path.join(framework, 'dist/host/composition-profiles.js')));
 const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'opl-workbench-acceptance-')));
 const logRoot = path.join(root, 'app-logs');
 const cacheRoot = path.join(root, 'app-cache');
-const env = { ...process.env, CODEX_HOME: root, OPL_STATE_DIR: path.join(root, 'state'), OPL_FRAMEWORK_PACKAGE_ROOT: framework, OPL_TEMPORAL_ADDRESS: address, OPL_TEMPORAL_NAMESPACE: 'default', OPL_STUDIO_READ_ONLY: '0', OPL_DATA_DIR: root, OPL_STUDIO_LOG_ROOT: logRoot, OPL_STUDIO_CACHE_ROOT: cacheRoot, FAKE_APP_SERVER_LOG: path.join(root, 'codex.jsonl') };
+const env = { ...process.env, CODEX_HOME: root, OPL_STATE_DIR: path.join(root, 'state'), OPL_FRAMEWORK_PACKAGE_ROOT: framework, OPL_STUDIO_READ_ONLY: '0', OPL_DATA_DIR: root, OPL_STUDIO_LOG_ROOT: logRoot, OPL_STUDIO_CACHE_ROOT: cacheRoot, FAKE_APP_SERVER_LOG: path.join(root, 'codex.jsonl') };
 const fixture = path.resolve('src/host/fixtures/fake-app-server.mjs');
 const transport = new CodexAppServerTransport({ command: process.execPath, args: [fixture], cwd: root, env, requestTimeoutMs: 3000 });
 let service; let webHost;

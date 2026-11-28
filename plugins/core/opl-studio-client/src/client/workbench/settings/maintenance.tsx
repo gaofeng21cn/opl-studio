@@ -46,8 +46,6 @@ export function isDefaultSilentManagedComponent(component: ManagedUpdateComponen
 export function managedDependencyLabel(dependencyId: string, locale: WorkbenchSettings["locale"]): string {
   const labels: Record<string, [string, string]> = {
     "codex-cli": ["Codex CLI", "Codex CLI"],
-    "temporal-runtime": ["Temporal 工作流组件（OPL 内置）", "Temporal workflow SDK (OPL built-in)"],
-    "temporal-system-cli": ["Temporal CLI（本机工具）", "Temporal CLI (local tool)"],
     "officecli": ["OfficeCLI", "OfficeCLI"],
     "mineru-open-api": ["MinerU", "MinerU"],
     "gh-stack": ["gh-stack", "gh-stack"],
@@ -58,12 +56,6 @@ export function managedDependencyLabel(dependencyId: string, locale: WorkbenchSe
 
 export function managedDependencySummary(dependency: ManagedRuntimeDependencyRef, locale: WorkbenchSettings["locale"]): string {
   const zh = locale === "zh";
-  if (dependency.dependencyId === "temporal-runtime") {
-    return zh ? "OPL 内置的任务调度运行时组件，随 OPL 基座一起更新，无需单独安装。" : "OPL built-in workflow runtime SDK, updated with OPL Base without separate installation.";
-  }
-  if (dependency.dependencyId === "temporal-system-cli") {
-    return zh ? "本机系统中已检测到的 Temporal 命令行工具，继续由原安装器维护。" : "Temporal CLI detected on this device; maintained by its original installer.";
-  }
   if (dependency.dependencyId === "codex-cli") {
     return zh ? `核心 AI 执行引擎 · ${managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}` : `Core AI execution engine · ${managedDependencyPolicyLabel(dependency.updateMode, dependency.updatePolicy, locale)}`;
   }
