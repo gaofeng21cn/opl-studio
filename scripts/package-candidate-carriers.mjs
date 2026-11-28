@@ -9,7 +9,27 @@ import { materializeFrameworkBootstrap } from "./desktop/materialize-framework-b
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appRoot = resolveAppRepoRoot(root);
-const registryPath = path.join(appRoot, "contracts", "app-shell-candidates.json");
+const adapterContractPath = path.join(appRoot, "contracts", "app-shell-adapter.json");
+const legacyRegistryPath = path.join(appRoot, "contracts", "app-shell-candidates.json");
+
+function resolveCarrierEvidenceContract() {
+  if (fs.existsSync(adapterContractPath)) {
+    const adapter = readJson(adapterContractPath);
+    if (adapter?.carrier_evidence_contract) {
+      return adapter.carrier_evidence_contract;
+    }
+  }
+  if (fs.existsSync(legacyRegistryPath)) {
+    const registry = readJson(legacyRegistryPath);
+    const candidate = registry.candidates?.find((entry) => entry.id === "opl-studio");
+    if (candidate?.carrier_evidence_contract) {
+      return candidate.carrier_evidence_contract;
+    }
+  }
+  throw new Error(
+    `App contract is missing the opl-studio carrier evidence contract: ${adapterContractPath}`,
+  );
+}
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -115,12 +135,7 @@ function buildManifest(contract, sourceCommit, artifactPaths) {
 }
 
 function main() {
-  const registry = readJson(registryPath);
-  const candidate = registry.candidates?.find((entry) => entry.id === "opl-studio");
-  const contract = candidate?.carrier_evidence_contract;
-  if (!contract) {
-    throw new Error(`App contract is missing the opl-studio carrier evidence contract: ${registryPath}`);
-  }
+  const contract = resolveCarrierEvidenceContract();
   if (JSON.stringify(contract.required_entries) !== JSON.stringify([
     "electron_desktop",
     "standalone_headless_webui",

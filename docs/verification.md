@@ -93,7 +93,9 @@ ref, package cohort, GUI roots, and file inventory consumed by
 ## Three-Carrier And Rendered Acceptance
 
 - **Three-carrier candidate (`npm run package`):** Reads App's
-  `app-shell-candidates.json` from `OPL_APP_REPO_ROOT`, rejects dirty tracked
+  `app-shell-adapter.json` (`carrier_evidence_contract`, falling back to
+  `app-shell-candidates.json` for older pinned App commits) from
+  `OPL_APP_REPO_ROOT`, rejects dirty tracked
   trees, binds outputs to Studio `HEAD`, and emits local Electron, WebUI, Docker
   smoke, and manifest evidence without proving signing, feeds, or adoption.
 - **Rendered browser gates:** `node scripts/acceptance/rendered-ui.mjs` checks
