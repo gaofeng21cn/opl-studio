@@ -196,6 +196,7 @@ assert(
 );
 const carrierPackager = read("scripts/package-candidate-carriers.mjs");
 for (const marker of [
+  "app-shell-adapter.json",
   "app-shell-candidates.json",
   "carrier_evidence_contract",
   "expected.qualification_commands",

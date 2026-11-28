@@ -26,9 +26,8 @@ three-tier plugin devkit templates.
 
 ## Authority Inputs
 
-- [App shell adapter](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-adapter.json) selects the active release carrier.
+- [App shell adapter](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-adapter.json) selects the active release carrier and owns Studio's carrier evidence contract (with fallback support for older pinned `app-shell-candidates.json` commits).
 - [App distribution reference](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/distribution-and-install-ssot.md) owns product identities, update routing, and migration qualification.
-- [App candidate contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-candidates.json) declares Studio's role and local carrier evidence requirements.
 - [App GUI contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-gui-product-contract.json) defines product state and actions.
 - Framework contracts and fresh `opld` `app.state.get` / `app.action.execute` (CLI: `opl pack/runway/workspace/connect --json`) output own runtime and Package truth.
 
