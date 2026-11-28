@@ -72,6 +72,31 @@ function createInstalledFramework(homeDir, frameworkRef) {
   fs.writeFileSync(carrier, '#!/bin/sh\nprintf \'{"help":{"command":"update activate"}}\\n\'\n', { mode: 0o755 });
 }
 
+test("packaged Standard reuses installed Framework v2 binaries declaring opl --version --json", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-v2-runtime-test-"));
+  const homeDir = path.join(root, "home");
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const resourcesPath = createStandardBootstrap(root, {
+    frameworkRef: "a".repeat(40),
+    installerBody: "#!/bin/bash\nexit 91\n"
+  });
+  createInstalledFramework(homeDir, "b".repeat(40));
+  const v2Carrier = path.join(homeDir, ".local", "bin", "opl");
+  fs.writeFileSync(
+    v2Carrier,
+    '#!/bin/sh\nif [ "$1" = "--version" ]; then printf \'{"version":"0.3.27","api_version":"2.0","features":["pack.ensure"]}\\n\'; exit 0; fi\nexit 1\n',
+    { mode: 0o755 }
+  );
+  const result = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath,
+    homeDir,
+    env: {},
+    platform: "linux"
+  });
+  assert.equal(result?.env?.OPL_APP_OPL_BIN, v2Carrier);
+});
+
 test("packaged Full runtime installs into the Studio carrier root and binds the Host environment", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-runtime-test-"));
   const homeDir = path.join(root, "home");

@@ -245,3 +245,60 @@ test("OplFrameworkBridge capabilities, Server-Push events, tolerant daemon_not_f
   assert.equal(degraded.available, false);
   assert.equal(degraded.reasonCode, "daemon_not_found");
 });
+
+test("readState merges settings.section slots without dropping sibling slots and start() installs sanitized Weixin unavailable fallback on connect failure", async (t) => {
+  const daemon = await startFakeOpld({
+    onCall: async (method) => {
+      if (method === "app.state.get") {
+        return {
+          profile: "fast",
+          app_state: {
+            ui_contributions: {
+              surface_kind: "opl_app_ui_contributions_projection.v1",
+              entries: [
+                { contribution_key: "pkg-a:palette", package_id: "pkg-a", slot: "composer.palette" },
+                { contribution_key: "opl-channel-weixin:old", package_id: "opl-channel-weixin", slot: "settings.section" },
+              ],
+              slots: {
+                "composer.palette": [{ contribution_key: "pkg-a:palette", package_id: "pkg-a", slot: "composer.palette" }],
+                "runtime.detail": [{ contribution_key: "pkg-b:detail", package_id: "pkg-b", slot: "runtime.detail" }],
+                "settings.section": [
+                  { contribution_key: "pkg-c:sec", package_id: "pkg-c", slot: "settings.section" },
+                  { contribution_key: "opl-channel-weixin:old", package_id: "opl-channel-weixin", slot: "settings.section" },
+                ],
+              },
+            },
+          },
+        };
+      }
+      return {};
+    },
+  });
+  const secretMsg = "raw-token-secret-should-not-leak";
+  const bridge = new OplFrameworkBridge({
+    stateDir: daemon.stateDir,
+    autoStart: false,
+    codex: { channelCallbackAdapter: { readTransportBindings: async () => [], startThread: async () => {}, resumeThread: async () => {}, startTurn: async () => {}, subscribeTurn: () => ({ dispose: () => {} }) } },
+  });
+  t.after(async () => { await bridge.close(); await daemon.close(); });
+
+  await bridge.start({
+    connect: async () => {
+      throw new Error(secretMsg);
+    },
+  });
+  assert.equal(bridge.hasNativeWeixinChannel(), true);
+
+  const state = await bridge.opl.readState("fast");
+  const ui = state.app_state.ui_contributions;
+  assert.deepEqual(ui.slots["composer.palette"].map((e) => e.package_id), ["pkg-a"]);
+  assert.deepEqual(ui.slots["runtime.detail"].map((e) => e.package_id), ["pkg-b"]);
+  assert.deepEqual(ui.slots["settings.section"].map((e) => e.package_id), ["pkg-c", "opl-channel-weixin"]);
+  assert.equal(ui.entries.filter((e) => e.package_id === "opl-channel-weixin").length, 1);
+
+  const read = await bridge.opl.readContribution({ packageId: "opl-channel-weixin", ref: "weixin.channel-access#state" });
+  const result = read.stdoutJson;
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.unavailable_reason, "projection_unavailable");
+  assert.equal(JSON.stringify(read).includes(secretMsg), false);
+});

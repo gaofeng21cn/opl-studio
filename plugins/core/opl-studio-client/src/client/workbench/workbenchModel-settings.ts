@@ -23,6 +23,7 @@ export type WorkbenchSettingsProjectionInput = {
   coreCodex: Record<string, unknown> | null;
   settingsControlCenter: Record<string, unknown> | null;
   codexPersonalization: Record<string, unknown> | null;
+  connections?: unknown;
   actionRecords: ReadonlyMap<string, Record<string, unknown>>;
 };
 
@@ -174,11 +175,27 @@ function deriveCodexProjection(
   const modelAccessSource = firstString(codexModelPolicy, ["model_access_source"]) ?? firstString(coreCodex, ["model_access_source"]);
   const accessStatus = firstString(codexModelPolicy, ["access_status", "model_access_status"]) ?? firstString(coreCodex, ["model_access_status"]);
   const configPath = firstString(codexModelPolicy, ["config_path"]) ?? firstString(coreCodex, ["config_path"]);
+  const executableStatus = asString(coreCodex?.executable_status);
+  const startupReady = asOptionalBoolean(coreCodex?.startup_ready);
+  const installed = asOptionalBoolean(coreCodex?.installed)
+    ?? (executableStatus === "executable"
+      ? true
+      : executableStatus === "unavailable"
+        ? false
+        : startupReady);
+  const version = firstString(coreCodex, ["parsed_version", "selected_version", "installed_version", "version"]);
+  const versionStatus = asString(coreCodex?.version_status)
+    ?? (startupReady === true || executableStatus === "executable"
+      ? "ready"
+      : executableStatus === "unavailable"
+        ? "unavailable"
+        : undefined);
+  const binaryPath = firstString(coreCodex, ["binary_path", "runtime_binary_path", "managed_binary_path"]);
   return {
-    installed: asOptionalBoolean(coreCodex?.installed),
-    ...(firstString(coreCodex, ["parsed_version", "version"]) ? { version: firstString(coreCodex, ["parsed_version", "version"]) as string } : {}),
-    ...(asString(coreCodex?.version_status) ? { versionStatus: asString(coreCodex?.version_status) as string } : {}),
-    ...(asString(coreCodex?.binary_path) ? { binaryPath: asString(coreCodex?.binary_path) as string } : {}),
+    installed,
+    ...(version ? { version } : {}),
+    ...(versionStatus ? { versionStatus } : {}),
+    ...(binaryPath ? { binaryPath } : {}),
     ...(model ? { model } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(providerName ? { providerName } : {}),
@@ -197,9 +214,11 @@ function deriveStatusSummary(
 ): WorkbenchSettingsProjection["statusSummary"] {
   const releaseChannel = firstString(statusSummary, ["release_channel"]) ?? firstString(localEnvironment, ["release_channel"]);
   const issueCount = asFiniteNumber(statusSummary?.issue_count);
+  const runtimeSourceHealth = asString(statusSummary?.runtime_source_carrier_health) ?? asString(statusSummary?.runway);
+  const agentPackageHealth = asString(statusSummary?.agent_package_functional_health) ?? asString(statusSummary?.model_access);
   return {
-    ...(asString(statusSummary?.runtime_source_carrier_health) ? { runtimeSourceHealth: asString(statusSummary?.runtime_source_carrier_health) as string } : {}),
-    ...(asString(statusSummary?.agent_package_functional_health) ? { agentPackageHealth: asString(statusSummary?.agent_package_functional_health) as string } : {}),
+    ...(runtimeSourceHealth ? { runtimeSourceHealth } : {}),
+    ...(agentPackageHealth ? { agentPackageHealth } : {}),
     ...(releaseChannel ? { releaseChannel } : {}),
     ...(issueCount !== null ? { issueCount } : {})
   };
@@ -208,9 +227,10 @@ function deriveStatusSummary(
 function deriveLocalEnvironment(
   localEnvironment: Record<string, unknown> | null
 ): WorkbenchSettingsProjection["localEnvironment"] {
+  const runtimeSourcesRoot = firstString(localEnvironment, ["runtime_sources_root", "runtime_root", "packages_root"]);
   return {
     ...(asString(localEnvironment?.state_dir) ? { stateDir: asString(localEnvironment?.state_dir) as string } : {}),
-    ...(asString(localEnvironment?.runtime_sources_root) ? { runtimeSourcesRoot: asString(localEnvironment?.runtime_sources_root) as string } : {}),
+    ...(runtimeSourcesRoot ? { runtimeSourcesRoot } : {}),
     ...(asString(localEnvironment?.logs_dir) ? { logsDir: asString(localEnvironment?.logs_dir) as string } : {}),
     ...(asString(localEnvironment?.release_channel) ? { releaseChannel: asString(localEnvironment?.release_channel) as string } : {})
   };
@@ -231,9 +251,16 @@ function deriveWorkspace(
 }
 
 function deriveExternalConnections(
-  connectionsReadModel: Record<string, unknown> | null
+  connectionsReadModel: Record<string, unknown> | null,
+  appConnections?: unknown
 ): WorkbenchSettingsProjection["externalConnections"] {
-  return asRecordArray(connectionsReadModel?.connections)
+  const authorization = asRecord(connectionsReadModel?.authorization);
+  const rawConnections = asRecordArray(connectionsReadModel?.connections).length > 0
+    ? asRecordArray(connectionsReadModel?.connections)
+    : asRecordArray(authorization?.connections).length > 0
+      ? asRecordArray(authorization?.connections)
+      : asRecordArray(appConnections);
+  return rawConnections
     .filter((connection) => {
       const type = asString(connection.connection_type);
       const id = asString(connection.connection_id);
@@ -483,9 +510,16 @@ function deriveStorageItem(
     actionRecords,
     asString(storageRecord?.inventory_action_id) ?? asString(projectedAction?.action_id)
   );
+  const bytes = asFiniteNumber(storageRecord?.bytes) ?? asFiniteNumber(storageRecord?.size_bytes);
+  const status = asString(storageRecord?.status)
+    ?? (asBoolean(storageRecord?.complete) === true
+      ? "ready"
+      : asBoolean(storageRecord?.complete) === false
+        ? "incomplete"
+        : undefined);
   return {
-    ...(asString(storageRecord?.status) ? { status: asString(storageRecord?.status) as string } : {}),
-    ...(asFiniteNumber(storageRecord?.bytes) !== null ? { bytes: asFiniteNumber(storageRecord?.bytes) as number } : {}),
+    ...(status ? { status } : {}),
+    ...(bytes !== null ? { bytes } : {}),
     ...(asFiniteNumber(storageRecord?.reclaimable_bytes) !== null ? { reclaimableBytes: asFiniteNumber(storageRecord?.reclaimable_bytes) as number } : {}),
     ...(asString(storageRecord?.reason_code) ? { reasonCode: asString(storageRecord?.reason_code) as string } : {}),
     ...(asString(storageRecord?.observed_at) ? { observedAt: asString(storageRecord?.observed_at) as string } : {}),
@@ -501,8 +535,8 @@ function deriveStorage(
   actionRecords: ReadonlyMap<string, Record<string, unknown>>
 ): WorkbenchSettingsProjection["storage"] {
   return {
-    agentPackageStore: deriveStorageItem(asRecord(storageLifecycle?.agent_package_store), actionRecords),
-    webuiDataVolume: deriveStorageItem(asRecord(storageLifecycle?.webui_data_volume), actionRecords)
+    agentPackageStore: deriveStorageItem(asRecord(storageLifecycle?.agent_package_store ?? storageLifecycle?.package_store), actionRecords),
+    webuiDataVolume: deriveStorageItem(asRecord(storageLifecycle?.webui_data_volume ?? storageLifecycle?.package_cache), actionRecords)
   };
 }
 
@@ -510,6 +544,7 @@ export function deriveWorkbenchSettingsProjection({
   coreCodex,
   settingsControlCenter,
   codexPersonalization,
+  connections,
   actionRecords
 }: WorkbenchSettingsProjectionInput): WorkbenchSettingsProjectionResult {
   const appSettingsReadModel = asRecord(settingsControlCenter?.app_settings_read_model);
@@ -526,7 +561,7 @@ export function deriveWorkbenchSettingsProjection({
         statusSummary: deriveStatusSummary(statusSummary, localEnvironment),
         localEnvironment: deriveLocalEnvironment(localEnvironment),
         workspace: deriveWorkspace(workspaceServices),
-        externalConnections: deriveExternalConnections(asRecord(appSettingsReadModel?.connections)),
+        externalConnections: deriveExternalConnections(asRecord(appSettingsReadModel?.connections), connections),
         connectionAuthorization: deriveConnectionAuthorization(asRecord(asRecord(appSettingsReadModel?.connections)?.authorization), asRecord(appSettingsReadModel?.connections)?.default_connection_id),
         connectionActions: deriveConnectionActions(actionRecords),
         dockerWebui: deriveDockerWebui(asRecord(appSettingsReadModel?.docker_webui), actionRecords),

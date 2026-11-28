@@ -326,6 +326,16 @@ test("isOplFlowPackageEnabled accurately distinguishes installed+enabled vs disa
     isOplFlowPackageEnabled({
       app_state: {
         agent_packages: {
+          directory: { entries: [{ package_id: "opl-flow", installed: true, activated: true, app_enabled: false }] },
+          status_index: { packages: { "opl-flow": { package_id: "opl-flow", installed: true, enabled: true } } }
+        }
+      }
+    })
+  ).toBe(false);
+  expect(
+    isOplFlowPackageEnabled({
+      app_state: {
+        agent_packages: {
           directory: { entries: [{ package_id: "opl-flow", installed: true, app_enabled: true }] }
         }
       }

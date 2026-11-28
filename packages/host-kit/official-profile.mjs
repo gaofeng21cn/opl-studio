@@ -63,6 +63,28 @@ export function captureOfficialProfileAdmission({ homeDir = os.homedir(), env = 
   return Object.freeze({ schema: "opl_studio_official_profile_admission.v1", eligible: reason === null, reason, stateDir, completePath, attemptPath, intentPath, capturedAt: new Date().toISOString() });
 }
 
+/** Migrate a valid pre-bootstrap intent captured at the default home path into a later OPL_DATA_DIR target. */
+export function syncPreBootstrapOfficialProfileIntent({ preBootstrapHomeDir = os.homedir(), env = process.env } = {}) {
+  const targetStateDir = officialProfileStateDirectory({ homeDir: preBootstrapHomeDir, env });
+  const preBootstrapStateDir = officialProfileStateDirectory({ homeDir: preBootstrapHomeDir, env: {} });
+  if (path.resolve(targetStateDir) === path.resolve(preBootstrapStateDir)) return false;
+  if ([COMPLETE_MARKER, ATTEMPT_MARKER, INTENT_MARKER].some((marker) => exists(path.join(targetStateDir, marker)))) return false;
+  const sourceIntentPath = path.join(preBootstrapStateDir, INTENT_MARKER);
+  if (!exists(sourceIntentPath)) return false;
+  regular(sourceIntentPath);
+  const parsed = JSON.parse(fs.readFileSync(sourceIntentPath, "utf8"));
+  invariant(parsed.schema === "opl_studio_official_profile_first_install_intent.v1" && parsed.intent === "first_install", "Official Profile pending first-install intent is invalid");
+  fs.mkdirSync(targetStateDir, { recursive: true, mode: 0o700 });
+  const targetIntentPath = path.join(targetStateDir, INTENT_MARKER);
+  try {
+    privateJson(targetIntentPath, parsed);
+    return true;
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    return false;
+  }
+}
+
 export function readOfficialProfileResources(resourcesPath) {
   const root = path.join(resourcesPath, "opl-official-profile");
   const manifestPath = path.join(root, "manifest.json");

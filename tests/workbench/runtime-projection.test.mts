@@ -344,6 +344,65 @@ test("settings projection exposes storage refresh only when the storage owner pr
   );
 });
 
+test("settings projection aligns with Framework v2 core.codex, storage_lifecycle, status_summary, local_environment, and connections.authorization", () => {
+  const model = deriveWorkbenchModelFromState({
+    app_state: {
+      core: {
+        codex: {
+          installed_version: null,
+          selected_version: null,
+          parsed_version: null,
+          startup_ready: false,
+          executable_status: "unavailable",
+          runtime_root: "/tmp/opl/runtime",
+          runtime_binary_path: null,
+          managed_binary_path: "/tmp/opl/runtime/current/bin/codex"
+        }
+      },
+      settings_control_center: {
+        status_summary: {
+          codex_version: null,
+          model_access: "ready",
+          runway: "running"
+        },
+        app_settings_read_model: {
+          connections: {
+            authorization: {
+              connections: [{
+                connection_id: "conn-1",
+                name: "PubMed API",
+                connection_type: "http_bearer",
+                status: "connected"
+              }]
+            }
+          },
+          storage_lifecycle: {
+            package_store: { path: "/tmp/opl/packages", size_bytes: 4096, file_count: 3, complete: true },
+            package_cache: { path: "/tmp/opl/cache", size_bytes: 1024, file_count: 1, complete: true }
+          },
+          local_environment: {
+            state_dir: "/tmp/opl/state",
+            logs_dir: "/tmp/opl/state/logs",
+            runtime_root: "/tmp/opl/runtime",
+            packages_root: "/tmp/opl/state/packages"
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(model.settingsProjection?.codex.installed, false);
+  assert.equal(model.settingsProjection?.codex.versionStatus, "unavailable");
+  assert.equal(model.settingsProjection?.codex.binaryPath, "/tmp/opl/runtime/current/bin/codex");
+  assert.equal(model.settingsProjection?.statusSummary.runtimeSourceHealth, "running");
+  assert.equal(model.settingsProjection?.statusSummary.agentPackageHealth, "ready");
+  assert.equal(model.settingsProjection?.localEnvironment.runtimeSourcesRoot, "/tmp/opl/runtime");
+  assert.equal(model.settingsProjection?.storage.agentPackageStore.bytes, 4096);
+  assert.equal(model.settingsProjection?.storage.agentPackageStore.status, "ready");
+  assert.equal(model.settingsProjection?.storage.webuiDataVolume.bytes, 1024);
+  assert.equal(model.settingsProjection?.externalConnections[0]?.id, "conn-1");
+});
+
 test("runtime projection hides bridge placeholders but keeps real active work", () => {
   const placeholder = deriveWorkbenchModelFromState({
     app_state: {

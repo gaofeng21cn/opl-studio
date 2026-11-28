@@ -141,6 +141,7 @@ export function deriveWorkbenchModelFromState(state: unknown, fallback: Workbenc
     coreCodex,
     settingsControlCenter,
     codexPersonalization,
+    connections: appState.connections,
     actionRecords
   });
 

@@ -568,13 +568,22 @@ export class WeixinInstalledChannelProvider implements ChannelProvider {
   private readContribution(input: Readonly<Record<string, unknown>>) {
     this.assertContributionInput(input);
     if (
-      this.contributionState === 'qr_ready'
+      (this.contributionState === 'qr_ready' || this.contributionState === 'authorizing')
       && this.contributionQr
       && this.contributionQr.expires_at_ms <= Date.now()
     ) {
+      const wasAuthorizing = this.contributionState === 'authorizing';
       this.contributionState = 'attention';
       this.contributionQr = null;
-      this.contributionReason = 'qr_expired';
+      this.contributionReason = wasAuthorizing ? 'auth_expired' : 'qr_expired';
+    } else if (
+      this.contributionState === 'pin_required'
+      && this.pinChallenge
+      && this.pinChallenge.expires_at_ms <= Date.now()
+    ) {
+      this.contributionState = 'attention';
+      this.pinChallenge = null;
+      this.contributionReason = 'timeout';
     }
     const channelInput = { channel_id: WEIXIN_CHANNEL_ID };
     const actions: Array<{ command_id: string; input: Record<string, unknown> }> = this.contributionState === 'connected'

@@ -17,8 +17,8 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   assert.match(rendererBuilder, /COPY packages \.\/packages/);
   assert.ok(rendererBuilder.indexOf("COPY packages ./packages") < rendererBuilder.indexOf("RUN npm run build:webui"), "the renderer build must receive shared Host package sources");
   assert.ok(rendererBuilder.indexOf("COPY vendor ./vendor") < rendererBuilder.indexOf("RUN npm run build:webui"), "the plugin build must receive the unmodified Superagent source");
-  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=70418f07847b1e7c11b5f5e84de6e7224a8b0a92/);
-  assert.match(dockerfile, /ARG OPL_APP_REF=2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
+  assert.match(dockerfile, /ARG OPL_FRAMEWORK_REF=4a1056466eef45df38431659a462fe9b85e6f44e/);
+  assert.match(dockerfile, /ARG OPL_APP_REF=310b3921439c35844379bba50e4fe6bd14ae6000/);
   const frameworkBuilder = dockerfile.slice(dockerfile.indexOf("AS framework-builder"), dockerfile.indexOf("AS codex-builder"));
   assert.match(frameworkBuilder, /npm run framework:archive -- \/tmp\/opl-framework-artifact/);
   assert.match(frameworkBuilder, /WORKDIR \/opt\/opl-framework\/runtime\s+RUN tar -xzf [^\n]+--strip-components=1/);
@@ -30,8 +30,8 @@ test("OCI carrier runs only the Node headless host with persistent non-root defa
   );
   assert.match(productionDependencies, /COPY plugins \.\/plugins/);
   assert.match(productionDependencies, /npm ci --omit=dev/);
-  assert.match(compose, /OPL_FRAMEWORK_REF:-70418f07847b1e7c11b5f5e84de6e7224a8b0a92/);
-  assert.match(compose, /OPL_APP_REF:-2e9b6fedcb83cd3e80697b4c886636ffa1005efc/);
+  assert.match(compose, /OPL_FRAMEWORK_REF:-4a1056466eef45df38431659a462fe9b85e6f44e/);
+  assert.match(compose, /OPL_APP_REF:-310b3921439c35844379bba50e4fe6bd14ae6000/);
   const runtime = dockerfile.slice(dockerfile.indexOf("FROM ${NODE_IMAGE} AS runtime"));
   assert.match(runtime, /org\.opencontainers\.image\.revision="\$\{OPL_SOURCE_REVISION\}"/);
   assert.match(runtime, /COPY --from=production-dependencies --chown=node:node \/app\/package\.json \.\/package\.json/);

@@ -182,6 +182,10 @@ export function isOplFlowPackageEnabled(stateReadback: unknown): boolean {
   const appState = asRecord(root.app_state) ?? root;
 
   const agentPackages = asRecord(appState.agent_packages);
+  const directoryVerdict = matchOplFlowPackageRecord(asRecord(agentPackages?.directory)?.entries);
+  if (directoryVerdict === "enabled") return true;
+  if (directoryVerdict === "disabled") return false;
+
   const statusPackages = asRecord(asRecord(agentPackages?.status_index)?.packages);
   const indexedRecord = asRecord(statusPackages?.["opl-flow"]);
   if (indexedRecord) {
@@ -191,7 +195,6 @@ export function isOplFlowPackageEnabled(stateReadback: unknown): boolean {
   }
 
   const explicitPackageLists = [
-    asRecord(agentPackages?.directory)?.entries,
     agentPackages?.packages,
     agentPackages?.items,
     root.packages,
