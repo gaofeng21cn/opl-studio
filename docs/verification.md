@@ -44,7 +44,7 @@ for exact script definitions.
 | `npm run validate:candidate` | Required source markers, DSH cohort alignment, and false-ready guards |
 | `npm run verify:dsh-gui` | Vendored DSH GUI inventory, patch replay, and upstream byte parity |
 | `npm run dsh:status` / `dsh:preflight` / `test:dsh-upgrade` / `dsh:replay` / `dsh:verify` | DSH upstream binding readback and replayable upgrade verification |
-| `npm run validate:state-model` | Live `opl` CLI state projection mapping (not in default source CI) |
+| `npm run validate:state-model` | Legacy `opl` CLI state projection mapping (not in default source CI) |
 | `node scripts/acceptance/settings-ui.mjs --model-policy-only` | Rendered Settings model policy, bilingual search focus, opt-in switch, and blocked custom sends |
 | `node scripts/acceptance/rendered-ui.mjs` | Browser WebUI acceptance across layouts, inspector tabs, Settings, and `turn/steer` |
 | `node scripts/smoke-mcp-apps.mjs` | Browser `McpAppWorkspace` smoke (add `--relay-root <path>` for live Relay draft round-trip) |
@@ -55,7 +55,7 @@ for exact script definitions.
 | `npm run qualify:desktop:mac` / `qualify:desktop:mac:release` / `qualify:desktop:updater:local` | macOS bundle trust, Gatekeeper/staple, and Squirrel.Mac loopback update verification |
 | `npm run qualify:desktop:clean-vm` / `qualify:desktop:fixture-vm` | Tart clean-VM install and synthetic fixture VM qualification |
 | `npm run smoke:preview` / `smoke:desktop-live` / `diagnose:gateway:persistence` | Live Preview CDP smoke, unpacked app AX/process cleanup, and Gateway persistence check |
-| `OPL_FRAMEWORK_REPO_ROOT=/path OPL_TEST_TEMPORAL_ADDRESS=127.0.0.1:18233 npm run test:workbench-services` | Real Framework + Temporal schedules/workflows integration with fake App Server |
+| Legacy `npm run test:workbench-services` (retired) | Retired Temporal schedule integration check (replaced by Framework v2 SQLite Runway checks) |
 | `npm run build:docker` / `smoke:docker` / `smoke:docker:lifecycle` | Local OCI candidate build and container install/update/rollback/cleanup smoke |
 
 ## Client Qualification

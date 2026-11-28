@@ -70,7 +70,7 @@ Framework action 与版本校验，成功后重新读取。正文与资料位置
 | --- | --- | --- |
 | 登录 Gateway、切换账户或 API Key | 账户与访问 | App settings read model 与 action |
 | 查看包安装、版本、升级或 App 开关 | 软件中心的软件详情 | Framework Package 投影与 action |
-| 绑定微信、消息通道或远端设备 | 设置 → 连接与部署 → 资料与连接 → 远程访问 | 动态 `channel_access`、`remote_companion_access` 与原生 OPL Link |
+| 绑定微信、消息通道或远端设备 | 设置 → 资料与连接 → 远程访问与网页端 | 动态 `channel_access`、`remote_companion_access` 与原生 OPL Link |
 | 查看插件状态和配置 | 设置 → 能力配置 → 扩展设置 | 当前启用插件的 `settings.section` typed contribution |
 | 查看 Skills、原生插件及连接能力 | 软件中心的其他来源；能力设置保留配置 | Codex App Server capability catalog |
 | 查看 Runway 与定时执行器状态 | 服务状态 | Framework `app_state.services.runway` 投影 |

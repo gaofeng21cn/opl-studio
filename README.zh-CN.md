@@ -80,7 +80,7 @@ Studio 同时实现独立 WebUI 和 App 的独立 Docker WebUI 产品线。OCI P
 - 通过按需任务详情面板查看项目进度、文件与结果、智能体与能力。
 - 提供 App 管理的设置、Gateway 账号、模型选择、权限控制、运行状态和更新状态。
 - 通过经过认证的本机回环 MCP 桥接，将 DSH 原生工具插件提供给 Codex。
-- Electron 和独立 WebUI 候选版共用同一个渲染器和宿主合同。
+- Electron 和独立 WebUI 载体共用同一个渲染器和宿主合同。
 
 ## 架构
 
@@ -129,7 +129,7 @@ npm ci
 npm run dev:desktop
 ```
 
-启动独立 WebUI 候选版，默认地址为 `http://127.0.0.1:4178`：
+启动独立 WebUI 载体，默认地址为 `http://127.0.0.1:4178`：
 
 ```bash
 npm run dev
@@ -149,7 +149,7 @@ App 管理的入口负责提供产品配置和外部运行时输入。直接打�
 WebUI 时，如果 `PATH` 中无法找到对应的 `codex` 和 `opl`
 可执行文件，需要显式设置 `OPL_CODEX_BIN` 和 `OPL_APP_OPL_BIN`。
 
-### 无界面服务与 Docker 候选版
+### 无界面服务与 Docker 载体
 
 构建并运行独立 Node.js 宿主：
 
@@ -158,7 +158,7 @@ npm run build:webui
 npm run start:headless
 ```
 
-构建本地 Docker 候选镜像：
+构建本地 Docker 镜像：
 
 ```bash
 npm run build:docker

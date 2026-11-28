@@ -56,7 +56,7 @@ try {
     installWebTransport();
     const original = window.oplStudio.linkCompanion.createPairing;
     window.oplStudio.linkCompanion.createPairing = async input => { const value = await original(input); window.__linkPair = value; return value; };
-    createRoot(document.getElementById('root')).render(<><style>{codexWorkbenchStyles}</style><main className='settings-page'><header className='settings-detail-header'><h1>资源与连接</h1></header><div className='settings-content'><LinkCompanionSection locale='zh' /></div></main></>);
+    createRoot(document.getElementById('root')).render(<><style>{codexWorkbenchStyles}</style><main className='settings-page'><header className='settings-detail-header'><h1>资料与连接</h1></header><div className='settings-content'><LinkCompanionSection locale='zh' /></div></main></>);
   `);
   await buildRendererEntry(entry, webRoot);
   const policy = JSON.stringify(readCodexModelPolicy()).replaceAll("<", "\\u003c");

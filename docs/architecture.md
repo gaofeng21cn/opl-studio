@@ -22,19 +22,20 @@ DeepSeek Harness v0.2.3-alpha.2 boot/profile/patch loader
        -> opl-framework-bridge -> public OPL App contracts
        -> shared renderer/Web routes -> Electron IPC or HTTP/SSE
 
-OPL Framework Cordis Host
+OPL Framework opld (local JSON-RPC + SQLite opl.db)
   -> runtime and Package composition
-  -> opl app state/action + authentication + channel callback
+  -> app.state.get / app.action.execute / app.contribution.read + connect.gateway.*
   -> Studio's opl-framework-bridge
 
 Codex App Server separately owns canonical thread/turn protocol, history,
 approvals, and live events.
 ```
 
-The two Cordis Hosts stay strictly scoped: Studio owns its process, plugins,
-GUI, and Codex tool exposure; Framework owns OPL runtime/Package composition
-and projections. Communication stays on public contracts without shared
-registries, currentness, sessions, or internal service graphs.
+Studio's DSH/Cordis Application Host and Framework's `opld` daemon stay strictly
+scoped: Studio owns its process, plugins, GUI, and Codex tool exposure; Framework
+owns OPL runtime/Package composition, SQLite ledger/Runway state, and projections.
+Communication stays on authenticated local JSON-RPC and public contracts without
+shared registries, currentness, sessions, or internal service graphs.
 
 Pinned MIT upstream GUI source keeps layout, tokens, and ordinary interaction
 in one source cohort (`vendor/deepseek-harness/` + `THIRD_PARTY_NOTICES.md`),
@@ -133,10 +134,11 @@ and `hermes` remain reserved disabled identifiers in
 routes. No retired shell runtime (AionUI/AionCore), database, or migration store
 is loaded or imported.
 
-Ordinary OPL state reads use `opl app state --profile fast --json` (preferring
-`app_state.agent_packages` over fallback `modules.items`) and mutations execute
-solely through `opl app action execute --action <id> [--payload <json>]
-[--dry-run] --json`.
+Ordinary OPL state reads use `opld` `app.state.get` (`profile: "fast"`, preferring
+`app_state.agent_packages` over fallback `modules.items`; v1 CLI: `opl app state
+--profile fast --json`) and mutations execute solely through `opld`
+`app.action.execute` (v1 CLI: `opl app action execute --action <id> [--payload
+<json>] [--dry-run] --json`).
 
 ## Codex Thread Boundary
 
@@ -170,9 +172,9 @@ ledger, or dynamic-tool coordination layer.
 
 ## Workbench services
 
-`opl-workbench-services` (imported from Framework `./cordis-profiles`) runs
-independently so missing exports, stopped Runway scheduler health, or memory/inventory
-read failures never block Codex chat.
+Framework workbench services (consumed via authenticated `opld` `app.contribution.read` /
+`app.action.execute` and `app_state.services.runway`) run independently so stopped
+Runway scheduler health or memory/inventory read failures never block Codex chat.
 
 - **Runway & schedules:** Framework's Runway engine and SQLite Ledger (`app_state.services.runway`) own background orchestration, schedule runner state, and human gates (`runway_human_gate_resolve`), while Studio renders runtime status and provides bounded create/start/read/interrupt callbacks requiring explicit `:read-only` or `:workspace` permission profiles and validated workspaces with revision checks.
 - **Executor memory & cleanup:** Reads `CODEX_HOME/memories` read-only, writes
