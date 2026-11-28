@@ -17,6 +17,9 @@
     "node": ">=22.19.0",
     "dsh": "0.2.3-alpha.2"
   },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.4"
+  },
   "dsh": {
     "manifestVersion": 1,
     "client": {
