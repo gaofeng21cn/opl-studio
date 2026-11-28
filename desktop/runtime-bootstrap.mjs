@@ -3,12 +3,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { pipeline } from "node:stream/promises";
+import zlib from "node:zlib";
 import { resolveHostNode } from "./node-host-runtime.mjs";
 import { codexOfflineSeedEnvironment } from "./codex-offline-seed.mjs";
 import { safeDesktopErrorMessage } from "../packages/host-kit/official-profile.mjs";
 
 const FULL_RUNTIME_RESOURCE_DIR = "opl-studio-full-runtime";
 const FULL_RUNTIME_MANIFEST = "full-package-manifest.json";
+const OFFLINE_SEED_SCHEMA = "opl_full_offline_seed.v1";
+const OFFLINE_SEED_FORMAT = "tar.zst";
+const OFFLINE_SEED_RELATIVE_PATH = "opl-offline-seed.tar.zst";
 const STANDARD_BOOTSTRAP_RESOURCE_DIR = "opl-framework-bootstrap";
 const STANDARD_BOOTSTRAP_MANIFEST = "manifest.json";
 const STANDARD_BOOTSTRAP_INSTALLER = "opl-install.sh";
@@ -37,8 +42,47 @@ function sha256File(filePath) {
   return hash.digest("hex");
 }
 
+async function sha256FileStream(filePath) {
+  const hash = crypto.createHash("sha256");
+  for await (const chunk of fs.createReadStream(filePath)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
+}
+
 function validSha256(value) {
-  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+  return typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
+}
+
+async function extractOfflineSeedArchive(archivePath, targetDir) {
+  await fs.promises.mkdir(targetDir, { recursive: true });
+  const tarChild = spawn("tar", ["-xf", "-", "-C", targetDir], { stdio: ["pipe", "ignore", "pipe"] });
+  let stderr = "";
+  tarChild.stderr.setEncoding("utf8");
+  tarChild.stderr.on("data", (chunk) => { stderr += chunk; });
+  const exitPromise = new Promise((resolve, reject) => {
+    tarChild.once("error", reject);
+    tarChild.once("close", (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Studio Full offline seed tar extraction failed (${signal ?? `exit ${code}`}): ${stderr.trim() || "corrupt archive"}`));
+    });
+  });
+  const ignoreStdinError = () => {};
+  tarChild.stdin.on("error", ignoreStdinError);
+  try {
+    await Promise.all([
+      exitPromise,
+      pipeline(fs.createReadStream(archivePath), zlib.createZstdDecompress(), tarChild.stdin)
+    ]);
+  } catch (error) {
+    if (tarChild.exitCode === null && tarChild.signalCode === null) {
+      tarChild.kill("SIGKILL");
+    }
+    await exitPromise.catch(() => {});
+    throw error;
+  } finally {
+    tarChild.stdin.off("error", ignoreStdinError);
+  }
 }
 
 function uniquePathEntries(values) {
@@ -99,7 +143,7 @@ function isUsableRuntime(candidate) {
   }
 }
 
-function resolvePayload(resourcesPath, identity) {
+async function resolvePayload(resourcesPath, identity) {
   const resourceRoot = path.join(resourcesPath, FULL_RUNTIME_RESOURCE_DIR);
   const manifestPath = path.join(resourceRoot, "manifest", FULL_RUNTIME_MANIFEST);
   const manifest = readJsonRecord(manifestPath);
@@ -116,12 +160,62 @@ function resolvePayload(resourcesPath, identity) {
   }
   const version = typeof manifest.version === "string" ? manifest.version.trim() : "";
   if (!version) throw new Error("Studio Full runtime manifest is missing a version");
+  const markerName = identity === "stable" ? ".opl-full-runtime-installed.json" : INSTALL_MARKER;
+  const manifestSha256 = sha256File(manifestPath);
+
+  if (manifest.offline_seed !== undefined) {
+    const seed = manifest.offline_seed;
+    if (
+      !seed
+      || typeof seed !== "object"
+      || Array.isArray(seed)
+      || seed.schema !== OFFLINE_SEED_SCHEMA
+      || seed.format !== OFFLINE_SEED_FORMAT
+      || typeof seed.relative_path !== "string"
+      || seed.relative_path !== OFFLINE_SEED_RELATIVE_PATH
+      || !Number.isSafeInteger(seed.size_bytes)
+      || seed.size_bytes <= 0
+      || !validSha256(seed.sha256)
+    ) {
+      throw new Error("Studio Full offline seed manifest metadata is invalid");
+    }
+    const resolvedResourceRoot = path.resolve(resourceRoot);
+    const archivePath = path.resolve(resolvedResourceRoot, seed.relative_path);
+    if (!archivePath.startsWith(`${resolvedResourceRoot}${path.sep}`)) {
+      throw new Error("Studio Full offline seed archive path escapes the runtime resource directory");
+    }
+    let stat = null;
+    try {
+      stat = fs.statSync(archivePath);
+    } catch {
+      stat = null;
+    }
+    if (!stat?.isFile()) {
+      throw new Error("Studio Full offline seed archive is missing");
+    }
+    if (stat.size !== seed.size_bytes) {
+      throw new Error(`Studio Full offline seed archive size mismatch: expected ${seed.size_bytes}, got ${stat.size}`);
+    }
+    const actualSha256 = await sha256FileStream(archivePath);
+    if (actualSha256 !== seed.sha256.toLowerCase()) {
+      throw new Error("Studio Full offline seed archive sha256 mismatch");
+    }
+    return {
+      kind: "offline_seed_archive",
+      version,
+      archivePath,
+      manifestPath,
+      manifestSha256,
+      markerName
+    };
+  }
+
   const payloadRoot = path.join(resourceRoot, "runtime", ACTIVE_RUNTIME_DIR);
   if (!isUsableRuntime(payloadRoot)) {
     throw new Error("Studio Full runtime payload is incomplete");
   }
   assertRuntimePackageRoot(path.join(payloadRoot, "opl"));
-  return { version, payloadRoot, manifestPath, manifestSha256: sha256File(manifestPath), markerName: identity === "stable" ? ".opl-full-runtime-installed.json" : INSTALL_MARKER };
+  return { kind: "directory", version, payloadRoot, manifestPath, manifestSha256, markerName };
 }
 
 function resolveStandardBootstrap(resourcesPath) {
@@ -219,20 +313,31 @@ async function installPayload({ payload, target, platform }) {
   await fs.promises.rm(temporary, { recursive: true, force: true });
   await fs.promises.rm(previous, { recursive: true, force: true });
   try {
-    await fs.promises.cp(payload.payloadRoot, temporary, {
-      recursive: true,
-      dereference: false,
-      verbatimSymlinks: true,
-      mode: fs.constants.COPYFILE_FICLONE,
-      preserveTimestamps: true
-    });
+    let incomingRoot;
+    if (payload.kind === "offline_seed_archive") {
+      await extractOfflineSeedArchive(payload.archivePath, temporary);
+      if (!isUsableRuntime(temporary)) {
+        throw new Error("Studio Full runtime offline seed payload is incomplete");
+      }
+      assertRuntimePackageRoot(path.join(temporary, "opl"));
+      incomingRoot = temporary;
+    } else {
+      await fs.promises.cp(payload.payloadRoot, temporary, {
+        recursive: true,
+        dereference: false,
+        verbatimSymlinks: true,
+        mode: fs.constants.COPYFILE_FICLONE,
+        preserveTimestamps: true
+      });
+      incomingRoot = payload.payloadRoot;
+    }
     await makeOwnerWritable(temporary);
     // Native Package installations live in their owner-managed carriers, outside
     // this bootstrap seed. Never merge old seed modules/skills into new bytes.
     // Keep a staged Framework activation transaction only when it is strictly
     // newer than the incoming Full payload, and copy it after makeOwnerWritable
     // so its file modes and integrity digest stay unchanged.
-    if (shouldPreservePendingFramework(target, payload.payloadRoot)) {
+    if (shouldPreservePendingFramework(target, incomingRoot)) {
       for (const name of ["opl.pending", "opl.pending.json"]) {
         const current = path.join(target, name);
         if (!fs.existsSync(current)) continue;
@@ -245,7 +350,8 @@ async function installPayload({ payload, target, platform }) {
     await fs.promises.writeFile(path.join(temporary, payload.markerName ?? INSTALL_MARKER), `${JSON.stringify({
       version: payload.version,
       manifest_sha256: payload.manifestSha256,
-      installed_at: new Date().toISOString()
+      installed_at: new Date().toISOString(),
+      ...(payload.kind === "offline_seed_archive" ? { source_kind: "offline_seed_archive" } : {})
     }, null, 2)}\n`, "utf8");
     if (fs.existsSync(target)) await fs.promises.rename(target, previous);
     await fs.promises.rename(temporary, target);
@@ -556,7 +662,7 @@ export async function ensureStudioDesktopRuntime({
 } = {}) {
   if (env.OPL_APP_OPL_BIN || env.OPL_COMMAND || env.OPL_FRAMEWORK_PACKAGE_ROOT) return null;
   if (!isPackaged) return activateInstalledStudioRuntime({ homeDir, env, identity });
-  const payload = resolvePayload(resourcesPath, identity);
+  const payload = await resolvePayload(resourcesPath, identity);
   if (payload) {
     // A different verified Full generation must be adopted at this cold-start
     // boundary. An older CLI supporting activation says nothing about whether
