@@ -94,7 +94,7 @@ publication from source support.
 - DSH-native tool plugins exposed to Codex through an authenticated loopback
   MCP bridge.
 - One renderer and Host contract across Electron and the standalone WebUI
-  candidate.
+  carrier.
 
 ## Architecture
 
@@ -145,7 +145,7 @@ npm ci
 npm run dev:desktop
 ```
 
-Start the standalone WebUI candidate at `http://127.0.0.1:4178`:
+Start the standalone WebUI carrier at `http://127.0.0.1:4178`:
 
 ```bash
 npm run dev
@@ -167,7 +167,7 @@ For direct Desktop or WebUI runs, set `OPL_CODEX_BIN` and `OPL_APP_OPL_BIN`
 when the corresponding `codex` and `opl` executables are not discoverable on
 `PATH`.
 
-### Headless And Docker Candidates
+### Headless And Docker Carriers
 
 Build and run the standalone Node Host:
 
@@ -176,7 +176,7 @@ npm run build:webui
 npm run start:headless
 ```
 
-Build the local Docker candidate:
+Build the local Docker image:
 
 ```bash
 npm run build:docker

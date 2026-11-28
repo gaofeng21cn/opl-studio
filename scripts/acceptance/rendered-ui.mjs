@@ -239,7 +239,7 @@ try {
   }`, cliRoot);
   assert.equal(settingsOpen.open, true);
   assert.equal(settingsOpen.activeLabel, "概览");
-  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "连接与部署", "工作区", "能力与指令", "运行与维护", "偏好", "关于"]);
+  assert.deepEqual(settingsOpen.sections, ["概览", "账户与模型", "资料与连接", "工作区", "能力与指令", "运行与维护", "偏好", "关于"]);
   const modalPaste = await evaluate(`async () => {
     const clipboardData = new DataTransfer();
     clipboardData.items.add(new File(['modal fixture'], 'modal-paste.txt', { type: 'text/plain' }));

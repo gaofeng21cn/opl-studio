@@ -27,7 +27,7 @@ public service deployment are separate acceptance surfaces.
 
 ## Connect within OPL App
 
-1. Open **Settings → Connections & Deployment → Remote & web access → OPL Link**.
+1. Open **Settings → Libraries & Connections → Remote & web access → OPL Link**.
 2. Sign in from **OPL Account**. Phone access starts automatically unless you turned it off on this computer.
 3. In OPL Link on your iPhone or iPad, sign in to the same OPL Gateway account. The multi-computer version of Link connects to eligible online computers automatically. Open **All Computers** to see conversations grouped by computer and project, or filter to one computer.
 4. To pause remote access on this computer, choose **Turn off phone access**. Existing remote sessions close and the setting persists across restarts. Choose **Enable phone access** to resume.
@@ -79,7 +79,7 @@ The official carrier owns Noise IK, framing, fragmentation, reconnect and
 peer-key verification. Studio uses the unchanged upstream `loadNodeRtcFactory`:
 native libwebrtc (`@roamhq/wrtc` `0.10.0`, the fixed upstream optional dependency)
 is preferred when available, and the generated RTC bundle
-includes werift `0.26.0` as a pure-JavaScript fallback. The runtime bundle can
+includes werift `0.27.0` as a pure-JavaScript fallback. The runtime bundle can
 load, create a peer, read statistics and close without external node_modules,
 a native postinstall, or an Electron ABI rebuild. The generator imports the
 upstream RTC source closure without modifying its implementation body.

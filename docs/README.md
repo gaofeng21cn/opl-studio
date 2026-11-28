@@ -30,7 +30,7 @@ three-tier plugin devkit templates.
 - [App distribution reference](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/docs/delivery/distribution-and-install-ssot.md) owns product identities, update routing, and migration qualification.
 - [App candidate contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-shell-candidates.json) declares Studio's role and local carrier evidence requirements.
 - [App GUI contract](https://github.com/gaofeng21cn/one-person-lab-app/blob/main/contracts/app-gui-product-contract.json) defines product state and actions.
-- Framework contracts and fresh `opl app state/action` output own runtime and Package truth.
+- Framework contracts and fresh `opld` `app.state.get` / `app.action.execute` (CLI: `opl pack/runway/workspace/connect --json`) output own runtime and Package truth.
 
 Read the current owner before changing an implementation or status claim. This
 index does not copy another owner's roadmap or publication state.
