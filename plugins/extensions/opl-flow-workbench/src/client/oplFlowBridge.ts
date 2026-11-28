@@ -217,7 +217,10 @@ export function isOplFlowPackageEnabled(stateReadback: unknown): boolean {
   return false;
 }
 
-export function extractContributionResult<T = unknown>(raw: unknown): T {
+function unwrapContributionBody(raw: unknown): {
+  jsonBody: Record<string, unknown>;
+  response: Record<string, unknown> | null;
+} {
   const rec = asRecord(raw);
   if (!rec) throw new Error("Empty contribution response");
   if (typeof rec.exitCode === "number" && rec.exitCode !== 0 && !rec.stdoutJson && !rec.parsed) {
@@ -228,13 +231,20 @@ export function extractContributionResult<T = unknown>(raw: unknown): T {
     ?? (typeof rec.stdout === "string" && rec.stdout.trim() ? asRecord(JSON.parse(rec.stdout)) : null)
     ?? rec;
   const envelope = asRecord(jsonBody.opl_app_contribution);
-  if (envelope) {
-    const response = asRecord(envelope.response);
-    if (response?.ok === false) {
+  return {
+    jsonBody,
+    response: envelope ? asRecord(envelope.response) : null
+  };
+}
+
+export function extractContributionResult<T = unknown>(raw: unknown): T {
+  const { jsonBody, response } = unwrapContributionBody(raw);
+  if (response) {
+    if (response.ok === false) {
       const err = asRecord(response.error);
       throw new Error(String(err?.message || "OPL Flow contribution returned error"));
     }
-    if (response && "result" in response) {
+    if ("result" in response) {
       return response.result as T;
     }
   }
@@ -347,6 +357,9 @@ export type OplFlowHostNavigationIntent = {
   workspace_path?: string | null;
 };
 
+const OPL_FLOW_UPGRADE_GUIDANCE =
+  "Installed OPL Flow package does not expose the canonical MCP App UI resource yet. Update OPL Flow in Software Center and retry.";
+
 export async function readOplFlowUiResource(bridge = resolveStudioWindowBridge()): Promise<OplFlowUiResource> {
   if (!bridge?.readContribution) {
     throw new Error("OPL contribution bridge is unavailable in this host");
@@ -356,15 +369,26 @@ export async function readOplFlowUiResource(bridge = resolveStudioWindowBridge()
     ref: OPL_FLOW_UI_RESOURCE_REF,
     input: {}
   });
-  const envelope = extractContributionResult<OplFlowUiResourceEnvelope>(raw);
+  const { jsonBody, response } = unwrapContributionBody(raw);
+  if (response?.ok === false) {
+    const err = asRecord(response.error);
+    if (err?.code === "invalid_request") {
+      throw new Error(OPL_FLOW_UPGRADE_GUIDANCE);
+    }
+    throw new Error(String(err?.message || OPL_FLOW_UPGRADE_GUIDANCE));
+  }
+  const envelope = ((response && "result" in response ? response.result : null) ?? jsonBody) as OplFlowUiResourceEnvelope;
   if (!envelope || typeof envelope !== "object") {
     throw new Error("Invalid OPL Flow MCP App resource payload");
   }
   if (envelope.ok === false || envelope.state !== "ready" || !envelope.data?.text) {
+    if (envelope.error?.code === "invalid_request") {
+      throw new Error(OPL_FLOW_UPGRADE_GUIDANCE);
+    }
     throw new Error(
       envelope.error?.message
       || envelope.reason
-      || "Installed OPL Flow package does not expose the canonical MCP App UI resource yet. Update OPL Flow and retry."
+      || OPL_FLOW_UPGRADE_GUIDANCE
     );
   }
   return envelope.data;
