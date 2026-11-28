@@ -63,13 +63,20 @@ export function readManagedCompanions(value: unknown): ManagedCompanionViewModel
       .flatMap((value): ManagedCompanionAction[] => {
         const actionId = asString(value);
         const action = actionId ? actionCatalog.get(actionId) : undefined;
+        const isSafeV1Action =
+          asString(action?.surface) === "opl app action execute"
+          && asString(action?.submit_via) === "opl app action execute"
+          && action?.can_submit_to_safe_action_shell === true
+          && action?.route_requires_domain_or_app_payload === false;
+        const route = asString(action?.route);
+        const isSafeV2Action =
+          (route === "opld app.action.execute" || route === "app.action.execute")
+          && action?.surface === undefined
+          && action?.submit_via === undefined;
         if (
           !actionId
           || !action
-          || asString(action.surface) !== "opl app action execute"
-          || asString(action.submit_via) !== "opl app action execute"
-          || action.can_submit_to_safe_action_shell !== true
-          || action.route_requires_domain_or_app_payload !== false
+          || (!isSafeV1Action && !isSafeV2Action)
           || !Array.isArray(action.payload_fields)
           || action.payload_fields.length !== 0
         ) return [];

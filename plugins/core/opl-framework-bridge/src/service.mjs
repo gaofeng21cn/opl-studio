@@ -49,7 +49,15 @@ export function createOplPassthrough(options = {}) {
       const appState = withOfficialProfileAction(res?.app_state, env.OPL_OFFICIAL_PROFILE_RESOURCES);
       if (!patch) return { ...res, ...(appState ? { app_state: appState } : {}), profile: res?.profile ?? p, readback: readback("opld app.state.get", [p]) };
       const baseApp = appState ?? {}, baseUi = baseApp.ui_contributions, entries = (baseUi?.entries ?? []).filter((e) => e?.package_id !== "opl-channel-weixin");
-      const ui = patch.ui_contributions ? { ...baseUi, ...patch.ui_contributions, entries: [...entries, ...(patch.ui_contributions.entries ?? [])], contribution_count: entries.length + (patch.ui_contributions.entries?.length ?? 0) } : baseUi;
+      const patchEntries = patch.ui_contributions?.entries ?? [];
+      const mergedEntries = [...entries, ...patchEntries];
+      const baseSlots = isObj(baseUi?.slots) ? baseUi.slots : null;
+      const patchSlots = isObj(patch.ui_contributions?.slots) ? patch.ui_contributions.slots : null;
+      const hasSlots = Boolean(baseSlots || patchSlots);
+      const baseSettingsSlot = Array.isArray(baseSlots?.["settings.section"]) ? baseSlots["settings.section"].filter((e) => e?.package_id !== "opl-channel-weixin") : [];
+      const patchSettingsSlot = Array.isArray(patchSlots?.["settings.section"]) ? patchSlots["settings.section"] : patchEntries;
+      const mergedSlots = hasSlots ? { ...(baseSlots ?? {}), ...(patchSlots ?? {}), "settings.section": [...baseSettingsSlot, ...patchSettingsSlot] } : undefined;
+      const ui = patch.ui_contributions ? { ...baseUi, ...patch.ui_contributions, entries: mergedEntries, ...(mergedSlots ? { slots: mergedSlots } : {}), contribution_count: mergedEntries.length } : baseUi;
       return { ...res, profile: res?.profile ?? p, app_state: { ...baseApp, ...patch, ...(ui ? { ui_contributions: ui } : {}) }, readback: readback("opld app.state.get", [p]) };
     },
     async readInitialize() { return { ...(await client.call("app.initialize.get", {})), readback: readback("opld app.initialize.get") }; },
@@ -228,7 +236,39 @@ export class OplFrameworkBridge extends EventEmitter {
         } else {
           this.nativeWeixinHost = host;
         }
-      } catch {}
+      } catch {
+        if (!this.closePromise) {
+          this.nativeWeixinHost = {
+            appStatePatch: () => ({
+              ui_contributions: {
+                surface_kind: "opl_app_ui_contributions_projection.v1",
+                entries: [{
+                  contribution_key: "opl-channel-weixin:channel-access",
+                  contribution_id: "channel-access",
+                  package_id: "opl-channel-weixin",
+                  slot: "settings.section",
+                  scope: "root",
+                  contribution_kind: "view",
+                  trust_tier: "declarative",
+                  view: { view_id: "channel-access", view_type: "channel_access", data_ref: "weixin.channel-access#state" },
+                  commands: [],
+                }],
+              },
+            }),
+            readChannelAccess: async () => ({
+              schema_version: "opl-app-channel-access.v1",
+              status: "unavailable",
+              channel_id: "weixin",
+              unavailable_reason: "projection_unavailable",
+              actions: [],
+              pending_pairings: [],
+              authorized_users: [],
+            }),
+            executeChannelAccessAction: async () => { throw errReq("Weixin channel is unavailable", "provider_absent"); },
+            dispose: async () => {},
+          };
+        }
+      }
     }
     return this.capabilities();
   }

@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { nativeHostOptions, startGuestHostCore } from "./guest-host-core.mjs";
 import { validateWindowsRuntimeIdentity } from "./windows-runtime.mjs";
-import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall } from "../packages/host-kit/official-profile.mjs";
+import { captureOfficialProfileAdmission, startOfficialProfileFirstInstall, syncPreBootstrapOfficialProfileIntent } from "../packages/host-kit/official-profile.mjs";
 
 export async function startWindowsGuestHost({ input = process.stdin, output = process.stdout, createCore,
   platform = process.platform, arch = process.arch } = {}) {
@@ -35,6 +35,7 @@ export async function startWindowsGuestHost({ input = process.stdin, output = pr
           candidateActionAllowlist: payload.candidateActionAllowlist ?? [],
           ...nativeHostOptions(native)
         };
+        syncPreBootstrapOfficialProfileIntent({ preBootstrapHomeDir: "/home/opl", env });
         const admission = captureOfficialProfileAdmission({ homeDir: "/home/opl", env });
         profileOptions = { admission, resourcesPath: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../resources"),
           env, nodeCommand: "/usr/local/bin/node", readinessTimeoutMs: 0, logEvent: result => emit({ method: "host/official-profile", params: { status: result.status } }) };

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { captureOfficialProfileAdmission, readOfficialProfileResources, buildOfficialProfileCommand, startOfficialProfileFirstInstall } from "../../packages/host-kit/official-profile.mjs";
+import { captureOfficialProfileAdmission, readOfficialProfileResources, buildOfficialProfileCommand, startOfficialProfileFirstInstall, syncPreBootstrapOfficialProfileIntent } from "../../packages/host-kit/official-profile.mjs";
 
 import { createOplPassthrough } from "../../plugins/core/opl-framework-bridge/src/index.mjs";
 
@@ -37,6 +37,23 @@ test("pre-bootstrap admission preserves old completion marker, existing Framewor
       if (existing === "preview") fs.mkdirSync(path.join(f.homeDir, "Library", "Application Support", "opl-studio", "runtime", "current"), { recursive: true });
       assert.equal(captureOfficialProfileAdmission({ homeDir: f.homeDir, env: {} }).eligible, false);
     } finally { f.cleanup(); }
+  }
+});
+
+test("Windows WSL guest host transfers valid pre-bootstrap intent from default state dir into OPL_DATA_DIR", () => {
+  const f = fixture();
+  try {
+    const guestDataRoot = path.join(f.root, "mnt-guest");
+    const preBootstrap = captureOfficialProfileAdmission({ homeDir: f.homeDir, env: {} });
+    assert.equal(preBootstrap.eligible, true);
+
+    const postEnv = { OPL_DATA_DIR: guestDataRoot, OPL_APP_OPL_BIN: "/home/opl/.opl/one-person-lab/bin/opl" };
+    assert.equal(syncPreBootstrapOfficialProfileIntent({ preBootstrapHomeDir: f.homeDir, env: postEnv }), true);
+    const guestAdmission = captureOfficialProfileAdmission({ homeDir: f.homeDir, env: postEnv });
+    assert.equal(guestAdmission.eligible, true);
+    assert.equal(guestAdmission.stateDir, path.join(guestDataRoot, "opl", "state"));
+  } finally {
+    f.cleanup();
   }
 });
 

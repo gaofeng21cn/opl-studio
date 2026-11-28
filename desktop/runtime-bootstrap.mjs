@@ -388,7 +388,32 @@ function frameworkAtRef(homeDir, frameworkRef) {
     && identity.framework_sha === frameworkRef;
 }
 
+function supportsV2Runtime(env) {
+  return new Promise((resolve) => {
+    const child = spawn(env.OPL_APP_OPL_BIN, ["--version", "--json"], {
+      env, stdio: ["ignore", "pipe", "ignore"]
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { output = `${output}${chunk}`.slice(-32_000); });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20_000);
+    child.once("error", () => { clearTimeout(timer); resolve(false); });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      try {
+        if (code !== 0) return resolve(false);
+        const info = JSON.parse(output);
+        const major = Number.parseFloat(String(info?.api_version ?? "0"));
+        resolve(typeof info?.version === "string" && (major >= 2 || (Array.isArray(info?.features) && info.features.includes("pack.ensure"))));
+      } catch {
+        resolve(false);
+      }
+    });
+  });
+}
+
 async function supportsRuntimeActivation(env) {
+  if (await supportsV2Runtime(env)) return true;
   return new Promise((resolve) => {
     const child = spawn(env.OPL_APP_OPL_BIN, ["help", "update", "activate", "--json"], {
       env, stdio: ["ignore", "pipe", "ignore"]

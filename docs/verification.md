@@ -133,5 +133,5 @@ owning App/runtime/domain/release gate supplies fresh evidence:
   `remote_ready`, `domain_ready`, `owner_receipt`, `package_truth_owned`,
   `runtime_authority_transfer`, `domain_truth_owned`.
 
-Runtime note: Studio requires Node.js `>=24.9.0` (`package.json#engines.node`);
+Runtime note: Studio requires Node.js `^24.22.3 || >=26.13.1` (`package.json#engines.node`);
 source CI and the digest-pinned Docker carrier run Node.js 26.

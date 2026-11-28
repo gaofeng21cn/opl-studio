@@ -713,10 +713,11 @@ function ChannelAccessView({ entry, owner }: {
   if (state === "error" || !result) {
     return <p className="opl-contribution-fallback" role="status" title={error}><StateDot state="warning" size={10} />{view.emptyState ? contributionLabel(view.emptyState, owner.locale, "") : (owner.locale === "zh" ? "渠道当前不可用" : "The channel is unavailable")}</p>;
   }
+  const isWeixin = result.channelId === "weixin" || entry.packageId === "opl-channel-weixin";
   if (result.status === "unavailable") {
     return <div className="opl-contribution-fallback" role="status" data-testid="opl-channel-unavailable">
-      <p><StateDot state="warning" size={10} /><strong>{owner.locale === "zh" ? "微信当前不可用" : "Weixin is currently unavailable"}</strong></p>
-      <p>{channelUnavailableMessage(result.unavailableReason, owner.locale === "zh")}</p>
+      <p><StateDot state="warning" size={10} /><strong>{isWeixin ? (owner.locale === "zh" ? "微信当前不可用" : "Weixin is currently unavailable") : (owner.locale === "zh" ? "渠道当前不可用" : "This channel is currently unavailable")}</strong></p>
+      <p>{isWeixin ? channelUnavailableMessage(result.unavailableReason, owner.locale === "zh") : (owner.locale === "zh" ? "请在软件中心检查该渠道插件的状态，然后刷新此页。" : "Check this channel plugin in Software Center, then refresh this page.")}</p>
       {owner.openSoftwareCenter ? <button className="settings-action-button" type="button" onClick={owner.openSoftwareCenter}>{owner.locale === "zh" ? "管理远程扩展" : "Manage remote extensions"}</button> : null}
     </div>;
   }
@@ -735,8 +736,8 @@ function ChannelAccessView({ entry, owner }: {
         <Pill><StateDot state={result.connection?.state === "connected" ? "done" : result.connection?.state === "attention" ? "warning" : result.connection?.state === "disconnected" ? "idle" : "ongoing"} size={9} />{channelStatusLabel(result, owner.locale)}</Pill>
         {result.connection?.accountDisplayName ? <Pill>{result.connection.accountDisplayName}</Pill> : null}
       </div>
-      {result.connection?.state === "attention" ? <p role="status" className="settings-inline-note">{channelAttentionMessage(result.connection.reasonCode, owner.locale === "zh")}</p> : null}
-      {result.connection?.state === "disconnected" ? <p className="settings-inline-note">{owner.locale === "zh" ? '选择连接方式，然后用微信扫描二维码并确认登录。' : 'Start a QR connection, then scan and confirm in Weixin.'}</p> : null}
+      {result.connection?.state === "attention" ? <p role="status" className="settings-inline-note">{isWeixin ? channelAttentionMessage(result.connection.reasonCode, owner.locale === "zh") : (owner.locale === "zh" ? "连接未完成。请重新扫码；若仍失败，在“日志与诊断”中查看连接错误。" : "Connection did not complete. Retry; if it fails again, check Logs and diagnostics.")}</p> : null}
+      {result.connection?.state === "disconnected" ? <p className="settings-inline-note">{isWeixin ? (owner.locale === "zh" ? "选择连接方式，然后用微信扫描二维码并确认登录。" : "Start a QR connection, then scan and confirm in Weixin.") : (owner.locale === "zh" ? "选择连接方式，然后扫描二维码并确认登录。" : "Start a QR connection, then scan and confirm.")}</p> : null}
       {qr ? (
         <section className="opl-structured-fields" data-testid="opl-channel-access-qr">
           <div><dt><QrCode aria-hidden="true" size={15} />{owner.locale === "zh" ? result.connection?.state === "authorizing" ? "操作者本人扫码授权" : "使用者扫码连接" : result.connection?.state === "authorizing" ? "Operator authorization" : "Scan to connect"}</dt><dd>
