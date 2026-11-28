@@ -1,5 +1,4 @@
 import type {
-  ManagedFlowDependencyRef,
   ManagedPackageStateRef,
   ManagedRuntimeDependencyRef,
   ManagedUpdateComponentRef,
@@ -19,35 +18,6 @@ function readManagedUpdateDependencyVersion(value: unknown): ManagedUpdateDepend
   const record = asRecord(value);
   if (!record || Object.values(record).some((item) => item !== null && typeof item !== "string")) return null;
   return Object.fromEntries(Object.entries(record)) as Record<string, string | null>;
-}
-
-function readManagedUpdateFlowDependency(value: Record<string, unknown>): ManagedFlowDependencyRef | null {
-  const dependencyId = asString(value.dependency_id);
-  const dependencyKind = asString(value.dependency_kind);
-  if (!dependencyId || !dependencyKind) return null;
-  return {
-    dependencyId,
-    dependencyKind,
-    activation: asString(value.activation) ?? "unknown",
-    offlineBundle: asString(value.offline_bundle) ?? "none",
-    onlineInstallDefault: asOptionalBoolean(value.online_install_default),
-    source: asString(value.source),
-    sourcePath: asString(value.source_path),
-    owner: asString(value.owner),
-    bundleId: asString(value.bundle_id),
-    versionRequirement: asString(value.version_requirement),
-    installSource: asString(value.install_source),
-    relationship: asString(value.relationship) ?? "required",
-    lifecycleOwner: asString(value.lifecycle_owner) ?? "unknown",
-    updateMode: asString(value.update_mode) ?? "unknown",
-    installed: asOptionalBoolean(value.installed),
-    observedStatus: asString(value.observed_status),
-    status: asString(value.status) ?? "unknown",
-    currentness: asString(value.currentness) ?? "unknown",
-    version: readManagedUpdateDependencyVersion(value.version),
-    latestVersion: readManagedUpdateDependencyVersion(value.latest_version),
-    ownership: asString(value.ownership)
-  };
 }
 
 function readManagedUpdateRuntimeDependency(value: Record<string, unknown>): ManagedRuntimeDependencyRef | null {
@@ -117,12 +87,6 @@ export function readManagedUpdateProjection(value: unknown): ManagedUpdateProjec
     const dependencyCatalog = asRecord(current?.dependency_catalog);
     const autoApply = asRecord(component.auto_apply);
     const plan = asRecord(component.plan);
-    const flowDependencies = dependencyCatalog && Array.isArray(dependencyCatalog.flow_dependencies)
-      ? asRecordArray(dependencyCatalog.flow_dependencies).flatMap((dependency) => {
-        const projection = readManagedUpdateFlowDependency(dependency);
-        return projection ? [projection] : [];
-      })
-      : undefined;
     const runtimeDependencies = dependencyCatalog && Array.isArray(dependencyCatalog.dependencies)
       ? asRecordArray(dependencyCatalog.dependencies).flatMap((dependency) => {
         const projection = readManagedUpdateRuntimeDependency(dependency);
@@ -151,7 +115,6 @@ export function readManagedUpdateProjection(value: unknown): ManagedUpdateProjec
       backgroundSafe: asOptionalBoolean(autoApply?.app_background_safe),
       ...(asString(plan?.summary) ? { summary: asString(plan?.summary) as string } : {}),
       ...(asString(current?.manual_guidance) ? { guidance: asString(current?.manual_guidance) as string } : {}),
-      ...(flowDependencies ? { flowDependencies } : {}),
       ...(runtimeDependencies ? { runtimeDependencies } : {}),
       ...(packageStates ? { packageStates } : {})
     }];

@@ -214,15 +214,6 @@ export function isOplFlowPackageEnabled(stateReadback: unknown): boolean {
     if (found) return true;
   }
 
-  const modules = asRecord(appState.modules)?.items;
-  if (Array.isArray(modules)) {
-    for (const item of modules) {
-      const rec = asRecord(item);
-      if (rec?.module_id === "opl-flow") {
-        return rec.installed === true && rec.enabled !== false && rec.app_enabled !== false;
-      }
-    }
-  }
   return false;
 }
 

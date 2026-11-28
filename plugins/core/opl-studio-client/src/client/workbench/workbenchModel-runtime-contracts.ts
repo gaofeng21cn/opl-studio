@@ -44,33 +44,8 @@ export type ManagedUpdateComponentRef = {
   backgroundSafe: boolean | null;
   summary?: string;
   guidance?: string;
-  flowDependencies?: ManagedFlowDependencyRef[];
   runtimeDependencies?: ManagedRuntimeDependencyRef[];
   packageStates?: ManagedPackageStateRef[];
-};
-
-export type ManagedFlowDependencyRef = {
-  dependencyId: string;
-  dependencyKind: string;
-  activation: string;
-  offlineBundle: string;
-  onlineInstallDefault: boolean | null;
-  source: string | null;
-  sourcePath: string | null;
-  owner: string | null;
-  bundleId: string | null;
-  versionRequirement: string | null;
-  installSource: string | null;
-  relationship: string;
-  lifecycleOwner: string;
-  updateMode: string;
-  installed: boolean | null;
-  observedStatus: string | null;
-  status: string;
-  currentness: string;
-  version: ManagedUpdateDependencyVersion;
-  latestVersion: ManagedUpdateDependencyVersion;
-  ownership: string | null;
 };
 
 export type ManagedRuntimeDependencyRef = {

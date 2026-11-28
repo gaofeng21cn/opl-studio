@@ -341,6 +341,13 @@ test("isOplFlowPackageEnabled accurately distinguishes installed+enabled vs disa
       }
     })
   ).toBe(true);
+  expect(
+    isOplFlowPackageEnabled({
+      app_state: {
+        modules: { items: [{ module_id: "opl-flow", installed: true, enabled: true }] }
+      }
+    })
+  ).toBe(false);
 });
 
 test("oplFlowWorkbenchClientPlugin stays zero-presence until opl-flow is enabled, and unmounts on disable", async () => {
