@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import zlib from "node:zlib";
 import { bootstrapProgressStage, activateInstalledStudioRuntime, captureStableOfficialProfileIntent, ensureStudioDesktopRuntime, ensureDesktopHostNode, desktopBootstrapFailure } from "./runtime-bootstrap.mjs";
 
 function createPayload(root, overrides = {}) {
@@ -33,6 +35,66 @@ function createPayload(root, overrides = {}) {
     }
   }));
   return resourcesPath;
+}
+
+function createOfflineSeedPayload(root, options = {}) {
+  const { frameworkVersion = "0.3.16", extraModules = {}, archiveBytes = null, seedOverrides = {}, mutateArchiveAfterManifest = null, ...carrierOverrides } = options;
+  const resourcesPath = path.join(root, "Resources");
+  const resourceRoot = path.join(resourcesPath, "opl-studio-full-runtime");
+  const staging = path.join(root, "staging-runtime");
+  fs.mkdirSync(path.join(resourceRoot, "manifest"), { recursive: true });
+  fs.mkdirSync(path.join(staging, "bin"), { recursive: true });
+  fs.mkdirSync(path.join(staging, "opl"), { recursive: true });
+  fs.writeFileSync(path.join(staging, "bin", "opl"), "#!/bin/sh\nexit 0\n");
+  fs.chmodSync(path.join(staging, "bin", "opl"), 0o755);
+  fs.writeFileSync(path.join(staging, "opl", "package.json"), JSON.stringify({ name: "opl-framework", version: frameworkVersion }));
+  fs.mkdirSync(path.join(staging, "node", "bin"), { recursive: true });
+  fs.mkdirSync(path.join(staging, "node", "lib", "node_modules", "npm", "bin"), { recursive: true });
+  fs.writeFileSync(path.join(staging, "node", "lib", "node_modules", "npm", "bin", "npm-cli.js"), "// npm fixture\n");
+  fs.symlinkSync("../lib/node_modules/npm/bin/npm-cli.js", path.join(staging, "node", "bin", "npm"));
+  for (const [relativePath, content] of Object.entries(extraModules)) {
+    const filePath = path.join(staging, relativePath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content);
+  }
+  const archivePath = path.join(resourceRoot, "opl-offline-seed.tar.zst");
+  let payloadBytes = archiveBytes;
+  if (!payloadBytes) {
+    const tar = spawnSync("tar", ["-cf", "-", "-C", staging, "."], {
+      env: { ...process.env, COPYFILE_DISABLE: "1" },
+      maxBuffer: 32 * 1024 * 1024
+    });
+    assert.equal(tar.status, 0, tar.stderr?.toString("utf8"));
+    payloadBytes = zlib.zstdCompressSync(tar.stdout);
+  }
+  fs.rmSync(staging, { recursive: true, force: true });
+  fs.writeFileSync(archivePath, payloadBytes);
+  const sha256 = crypto.createHash("sha256").update(payloadBytes).digest("hex");
+  const sizeBytes = fs.statSync(archivePath).size;
+  fs.writeFileSync(path.join(resourceRoot, "manifest", "full-package-manifest.json"), JSON.stringify({
+    version: carrierOverrides.version ?? "0.2.0",
+    carrier: {
+      schema: "opl_app_full_payload_carrier_profile.v1",
+      carrier_id: "opl-studio",
+      runtime_resource_dir: "opl-studio-full-runtime",
+      runtime_install_root_template: "~/Library/Application Support/opl-studio/runtime/current",
+      codex_carrier: "opl_codex_native",
+      full_runtime_codex_payload_allowed: false,
+      ...carrierOverrides
+    },
+    offline_seed: {
+      schema: "opl_full_offline_seed.v1",
+      format: "tar.zst",
+      relative_path: "opl-offline-seed.tar.zst",
+      sha256,
+      size_bytes: sizeBytes,
+      ...seedOverrides
+    }
+  }));
+  if (typeof mutateArchiveAfterManifest === "function") {
+    mutateArchiveAfterManifest(archivePath, resourceRoot);
+  }
+  return { resourcesPath, archivePath, sha256, sizeBytes };
 }
 
 function createStandardBootstrap(root, { frameworkRef = "a".repeat(40), installerBody } = {}) {
@@ -530,4 +592,165 @@ test('bootstrap stage adapter only projects known installer milestones', () => {
   assert.equal(bootstrapProgressStage('==> Installing OPL CLI'), 'installing_framework');
   assert.equal(bootstrapProgressStage('==> Preparing the local background-service runtime'), 'preparing_services');
   assert.equal(bootstrapProgressStage('untrusted output password=secret'), null);
+});
+
+test("packaged Full bootstraps from opl-offline-seed.tar.zst without external zstd and preserves symlinks", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-offline-seed-test-"));
+  const homeDir = path.join(root, "home");
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { resourcesPath, manifestSha256 } = (() => {
+    const built = createOfflineSeedPayload(root, {
+      version: "0.4.0",
+      runtime_install_root_template: "~/Library/Application Support/OPL/runtime/current"
+    });
+    const manifestPath = path.join(built.resourcesPath, "opl-studio-full-runtime", "manifest", "full-package-manifest.json");
+    return {
+      resourcesPath: built.resourcesPath,
+      manifestSha256: crypto.createHash("sha256").update(fs.readFileSync(manifestPath)).digest("hex")
+    };
+  })();
+
+  assert.equal(fs.existsSync(path.join(resourcesPath, "opl-studio-full-runtime", "runtime")), false);
+  const stages = [];
+  const result = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin", PRESERVED: "yes" },
+    platform: "linux",
+    identity: "stable",
+    onProgress: (event) => stages.push(event)
+  });
+
+  const installed = path.join(homeDir, "Library", "Application Support", "OPL", "runtime", "current");
+  assert.equal(result.source, "packaged_payload");
+  assert.equal(result.runtimeHome, installed);
+  assert.equal(result.manifestSha256, manifestSha256);
+  assert.equal(result.env.OPL_APP_OPL_BIN, path.join(installed, "bin", "opl"));
+  assert.equal(result.env.PRESERVED, "yes");
+  assert.equal(fs.readlinkSync(path.join(installed, "node", "bin", "npm")), "../lib/node_modules/npm/bin/npm-cli.js");
+  const marker = JSON.parse(fs.readFileSync(path.join(installed, ".opl-full-runtime-installed.json"), "utf8"));
+  assert.equal(marker.version, "0.4.0");
+  assert.equal(marker.source_kind, "offline_seed_archive");
+  assert.equal(stages[0]?.stage, "installing_offline_runtime");
+
+  const second = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin" },
+    platform: "linux",
+    identity: "stable"
+  });
+  assert.equal(second.source, "installed_runtime");
+  assert.equal(second.runtimeHome, installed);
+});
+
+test("packaged Full offline seed fails closed on tamper, size drift, traversal, and corrupt archive bytes", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-studio-offline-seed-fail-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const badSha = createOfflineSeedPayload(path.join(root, "sha"), {
+    seedOverrides: { sha256: "f".repeat(64) }
+  });
+  await assert.rejects(
+    ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: badSha.resourcesPath, homeDir: path.join(root, "h1"), env: { PATH: "/usr/bin:/bin" }, platform: "linux" }),
+    /sha256 mismatch/
+  );
+
+  const badSize = createOfflineSeedPayload(path.join(root, "size"), {
+    mutateArchiveAfterManifest: (archivePath) => {
+      fs.writeFileSync(archivePath, Buffer.concat([fs.readFileSync(archivePath), Buffer.from("x")]));
+    }
+  });
+  await assert.rejects(
+    ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: badSize.resourcesPath, homeDir: path.join(root, "h2"), env: { PATH: "/usr/bin:/bin" }, platform: "linux" }),
+    /size mismatch/
+  );
+
+  const traversal = createOfflineSeedPayload(path.join(root, "traversal"), {
+    seedOverrides: { relative_path: "../escape.tar.zst" }
+  });
+  await assert.rejects(
+    ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: traversal.resourcesPath, homeDir: path.join(root, "h3"), env: { PATH: "/usr/bin:/bin" }, platform: "linux" }),
+    /offline seed manifest metadata is invalid/
+  );
+
+  const badSchema = createOfflineSeedPayload(path.join(root, "schema"), {
+    seedOverrides: { schema: "wrong.v1" }
+  });
+  await assert.rejects(
+    ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: badSchema.resourcesPath, homeDir: path.join(root, "h4"), env: { PATH: "/usr/bin:/bin" }, platform: "linux" }),
+    /offline seed manifest metadata is invalid/
+  );
+
+  const corruptHome = path.join(root, "h5");
+  const corrupt = createOfflineSeedPayload(path.join(root, "corrupt"), {
+    archiveBytes: Buffer.from("not-a-valid-zstd-stream")
+  });
+  await assert.rejects(
+    ensureStudioDesktopRuntime({ isPackaged: true, resourcesPath: corrupt.resourcesPath, homeDir: corruptHome, env: { PATH: "/usr/bin:/bin" }, platform: "linux" })
+  );
+  assert.deepEqual(fs.readdirSync(path.join(corruptHome, "Library", "Application Support", "opl-studio", "runtime")), []);
+});
+
+test("Full offline seed upgrade preserves newer pending Framework and discards older pending Framework", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "opl-offline-seed-pending-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const homeDir = path.join(root, "home");
+  const v1 = createOfflineSeedPayload(path.join(root, "v1"), {
+    version: "0.1.0",
+    frameworkVersion: "0.3.16",
+    extraModules: {
+      "modules/pkg/state": "seed v1",
+      "modules/pkg/obsolete": "drop me"
+    }
+  });
+  const first = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath: v1.resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin" },
+    platform: "linux"
+  });
+  fs.mkdirSync(path.join(first.runtimeHome, "opl.pending"), { recursive: true });
+  fs.writeFileSync(path.join(first.runtimeHome, "opl.pending", "package.json"), JSON.stringify({ name: "opl-framework", version: "0.3.25" }));
+  fs.writeFileSync(path.join(first.runtimeHome, "opl.pending", "keep.txt"), "newer-pending");
+  const pendingMeta = JSON.stringify({
+    surface_kind: "opl_framework_pending_generation.v1",
+    target_root: path.join(first.runtimeHome, "opl"),
+    pending_root: path.join(first.runtimeHome, "opl.pending")
+  });
+  fs.writeFileSync(path.join(first.runtimeHome, "opl.pending.json"), pendingMeta);
+
+  const v2 = createOfflineSeedPayload(path.join(root, "v2"), {
+    version: "0.2.0",
+    frameworkVersion: "0.3.20",
+    extraModules: { "modules/pkg/state": "seed v2" }
+  });
+  const second = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath: v2.resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin" },
+    platform: "linux"
+  });
+  assert.equal(fs.readFileSync(path.join(second.runtimeHome, "modules/pkg/state"), "utf8"), "seed v2");
+  assert.equal(fs.existsSync(path.join(second.runtimeHome, "modules/pkg/obsolete")), false);
+  assert.equal(fs.readFileSync(path.join(second.runtimeHome, "opl.pending/keep.txt"), "utf8"), "newer-pending");
+
+  fs.writeFileSync(path.join(second.runtimeHome, "opl.pending/package.json"), JSON.stringify({ name: "opl-framework", version: "0.3.21" }));
+  const v3 = createOfflineSeedPayload(path.join(root, "v3"), {
+    version: "0.3.0",
+    frameworkVersion: "0.3.22"
+  });
+  const third = await ensureStudioDesktopRuntime({
+    isPackaged: true,
+    resourcesPath: v3.resourcesPath,
+    homeDir,
+    env: { PATH: "/usr/bin:/bin" },
+    platform: "linux"
+  });
+  assert.equal(fs.existsSync(path.join(third.runtimeHome, "opl.pending")), false);
+  assert.equal(fs.existsSync(path.join(third.runtimeHome, "opl.pending.json")), false);
 });

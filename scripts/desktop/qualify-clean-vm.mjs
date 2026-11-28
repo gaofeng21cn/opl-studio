@@ -409,11 +409,12 @@ async function qualifyCleanGuest(options, offline = false) {
     try { options.progress?.(value); } catch {}
     process.stderr.write(`[opl-studio-clean-vm] ${JSON.stringify(value)}\n`);
   };
+  let guestFullRuntimeRoot = null;
   async function collectGuestProof(collector, proofKey, phase) {
     const guestDriver = `/tmp/opl-framework-proof-${process.pid}.mjs`;
     const localDriver = path.join(runRoot, "framework-proof.mjs");
     const resource = `${guestApp}/Contents/Resources/opl-studio-full-runtime`;
-    const runtime = `${resource}/runtime/current`;
+    const runtime = guestFullRuntimeRoot ?? `${resource}/runtime/current`;
     const args = { runtime, manifestPath: `${resource}/manifest/full-package-manifest.json`, expectedRootPackageIds: options.expectedRootPackageIds };
     await writeFile(localDriver, `const collect = ${collector.toString()};\nprocess.stdout.write(JSON.stringify(await collect(${JSON.stringify(args)})));\n`);
     scpToGuest(options, ip, localDriver, guestDriver);
@@ -517,11 +518,39 @@ async function qualifyCleanGuest(options, offline = false) {
         const manifest = `${resource}/manifest/full-package-manifest.json`;
         const fullManifest = JSON.parse(guestRun(options, ip, [
           "set -eu",
-          `test -x ${shellQuote(`${resource}/runtime/current/bin/opl`)}`,
+          `test -f ${shellQuote(manifest)}`,
           `test "$(plutil -extract carrier.carrier_id raw -o - ${shellQuote(manifest)})" = opl-studio`,
           `test "$(plutil -extract carrier.runtime_resource_dir raw -o - ${shellQuote(manifest)})" = opl-studio-full-runtime`,
           `cat ${shellQuote(manifest)}`
         ].join(" && ")).stdout);
+        if (fullManifest.offline_seed !== undefined) {
+          const seed = fullManifest.offline_seed;
+          invariant(
+            seed && typeof seed === "object" && !Array.isArray(seed)
+              && seed.schema === "opl_full_offline_seed.v1"
+              && seed.format === "tar.zst"
+              && seed.relative_path === "opl-offline-seed.tar.zst"
+              && Number.isSafeInteger(seed.size_bytes) && seed.size_bytes > 0
+              && typeof seed.sha256 === "string" && /^[0-9a-f]{64}$/i.test(seed.sha256),
+            `Invalid Full offline_seed manifest metadata: ${JSON.stringify(seed)}`
+          );
+          const seedPath = `${resource}/${seed.relative_path}`;
+          const guestHome = guestRun(options, ip, [
+            "set -eu",
+            `test -f ${shellQuote(seedPath)}`,
+            `test ! -e ${shellQuote(`${resource}/runtime`)}`,
+            `test "$(stat -f %z ${shellQuote(seedPath)})" = ${shellQuote(String(seed.size_bytes))}`,
+            `test "$(shasum -a 256 ${shellQuote(seedPath)} | awk '{print $1}')" = ${shellQuote(seed.sha256.toLowerCase())}`,
+            'printf "%s" "$HOME"'
+          ].join(" && ")).stdout.trim();
+          invariant(guestHome.startsWith("/"), "Guest HOME must be an absolute path");
+          const installTemplate = String(fullManifest.carrier?.runtime_install_root_template ?? "");
+          invariant(installTemplate.startsWith("~/"), "Full manifest runtime_install_root_template must be home-relative");
+          guestFullRuntimeRoot = path.posix.join(guestHome, installTemplate.slice(2));
+        } else {
+          guestRun(options, ip, `test -x ${shellQuote(`${resource}/runtime/current/bin/opl`)}`);
+          guestFullRuntimeRoot = `${resource}/runtime/current`;
+        }
         const frameworkRef = fullManifest.resolved_refs?.opl_framework?.resolved_commit;
         invariant(/^[0-9a-f]{40}$/.test(frameworkRef), "Full Framework manifest is missing its source commit");
         const api = fullManifest.components?.opl?.framework_api_version ?? "1.0";
