@@ -529,3 +529,86 @@ test("sandboxOplFlowDocument and host navigation parser reject malformed inputs"
   expect(openedThreads).toEqual([]);
   expect(startedWorkspaces).toEqual([]);
 });
+
+test("OplFlowWorkbenchPanel surfaces actionable upgrade guidance when legacy opl-flow lacks ui_resource", async () => {
+  const { shell } = makeShellStub();
+  const bridge: StudioWindowBridge = {
+    readContribution: async (req) => {
+      if (req.ref === OPL_FLOW_UI_RESOURCE_REF) {
+        return {
+          exitCode: 1,
+          stderr: "请求未指定已声明的看板视图或动作。",
+          stdoutJson: {
+            opl_app_contribution: {
+              package_id: "opl-flow",
+              operation: "read",
+              ref: OPL_FLOW_UI_RESOURCE_REF,
+              response: {
+                ok: false,
+                state: "error",
+                error: {
+                  code: "invalid_request",
+                  message: "请求未指定已声明的看板视图或动作。"
+                }
+              }
+            }
+          }
+        };
+      }
+      if (req.ref === "opl-flow.decision.v1#dashboard") {
+        return makeDashboardEnvelope();
+      }
+      throw new Error(`Unexpected ref: ${req.ref}`);
+    }
+  };
+
+  await act(async () => {
+    root.render(<OplFlowWorkbenchPanel shell={shell} bridge={bridge} />);
+  });
+  await act(async () => {
+    await flushAsync();
+  });
+
+  const alert = document.querySelector('[data-testid="opl-flow-host-error"]');
+  expect(alert?.textContent).toContain("Update OPL Flow in Software Center");
+  expect(alert?.textContent).not.toContain("请求未指定已声明的看板视图或动作");
+});
+
+test("OplFlowWorkbenchPanel syncs locale changes without remounting the MCP App iframe", async () => {
+  const stub = makeShellStub();
+  const mutableSnapshot = stub.shell.getSnapshot() as { locale: "zh" | "en" };
+  let uiReadCount = 0;
+  const bridge: StudioWindowBridge = {
+    readContribution: async (req) => {
+      if (req.ref === OPL_FLOW_UI_RESOURCE_REF) {
+        uiReadCount += 1;
+        return makeUiResourceEnvelope();
+      }
+      if (req.ref === "opl-flow.decision.v1#dashboard") {
+        return makeDashboardEnvelope();
+      }
+      throw new Error(`Unexpected ref: ${req.ref}`);
+    }
+  };
+
+  await act(async () => {
+    root.render(<OplFlowWorkbenchPanel shell={stub.shell} bridge={bridge} />);
+  });
+  await act(async () => {
+    await flushAsync();
+  });
+
+  const iframeBefore = document.querySelector('[data-testid="opl-flow-mcp-app-frame"]') as HTMLIFrameElement | null;
+  expect(iframeBefore).toBeTruthy();
+  expect(uiReadCount).toBe(1);
+
+  mutableSnapshot.locale = "en";
+  await act(async () => {
+    stub.emit();
+    await flushAsync();
+  });
+
+  const iframeAfter = document.querySelector('[data-testid="opl-flow-mcp-app-frame"]') as HTMLIFrameElement | null;
+  expect(iframeAfter).toBe(iframeBefore);
+  expect(uiReadCount).toBe(1);
+});

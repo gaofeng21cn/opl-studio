@@ -103,6 +103,8 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
   shellRef.current = shell;
   const bridgeRef = useRef(explicitBridge);
   bridgeRef.current = explicitBridge;
+  const localeTagRef = useRef(localeTag);
+  localeTagRef.current = localeTag;
 
   const handleHostNavigation = useCallback(async (raw: unknown) => {
     const intent = parseOplFlowHostNavigationIntent(raw);
@@ -171,7 +173,7 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
         hostContext: {
           theme: resolveTheme(),
           styles: collectHostStyles(),
-          locale: localeTag,
+          locale: localeTagRef.current,
           displayMode: "inline",
           availableDisplayModes: ["inline"],
           containerDimensions: {
@@ -276,7 +278,7 @@ export function OplFlowWorkbenchInner({ shell, bridge: explicitBridge }: OplFlow
       resizeObserver?.disconnect();
       void appBridge.teardownResource({}, { timeout: 500 }).catch(() => {}).finally(() => appBridge.close());
     };
-  }, [loaded, handleHostNavigation, localeTag]);
+  }, [loaded, handleHostNavigation]);
 
   return (
     <section

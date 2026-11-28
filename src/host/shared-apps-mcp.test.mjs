@@ -7,6 +7,17 @@ import { OplCodexNative } from "../../plugins/core/opl-codex-native/src/service.
 import { sharedAppsMcpArgs } from "../../plugins/core/opl-codex-native/src/shared-apps-mcp.mjs";
 import { CodexAppServerTransport } from "../../plugins/core/opl-codex-native/src/app-server-transport.mjs";
 
+const shellQuote = value => `'${String(value).replace(/'/g, "'\\''")}'`;
+
+async function writeFakeCodexWrapper(commandPath, scriptPath, scriptBody) {
+  await writeFile(scriptPath, scriptBody);
+  await writeFile(
+    commandPath,
+    `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(scriptPath)} "$@"\n`,
+    { mode: 0o755 }
+  );
+}
+
 test("a running native Host finds a new managed Codex for the catalog and app server", { skip: process.platform === "win32" }, async t => {
   const home = await mkdtemp(path.join(await realpath(os.tmpdir()), "studio-managed-codex-"));
   t.after(() => rm(home, { recursive: true, force: true }));
@@ -23,17 +34,17 @@ test("a running native Host finds a new managed Codex for the catalog and app se
       assert.equal(host.capabilities().available, false);
       for (const directory of [runtimeBin, pathBin]) {
         await mkdir(directory, { recursive: true });
-        await writeFile(path.join(directory, "codex"), `#!${process.execPath}
-const { appendFileSync } = require("node:fs");
+        const codexPath = path.join(directory, "codex");
+        await writeFakeCodexWrapper(codexPath, path.join(directory, "codex.cjs"), `const { appendFileSync } = require("node:fs");
 const mode = process.argv[2];
-appendFileSync(${JSON.stringify(log)}, JSON.stringify([__filename, mode]) + "\\n");
+appendFileSync(${JSON.stringify(log)}, JSON.stringify([${JSON.stringify(codexPath)}, mode]) + "\\n");
 if (mode === "mcp") process.stdout.write("[]");
 else if (mode === "app-server") import(${JSON.stringify(fixture)});
-`, { mode: 0o755 });
+`);
         await host.start();
         assert.equal(host.capabilities().available, true);
         assert.deepEqual((await readFile(log, "utf8")).trim().split("\n").slice(-2).map(line => JSON.parse(line)), [
-          [path.join(directory, "codex"), "mcp"], [path.join(directory, "codex"), "app-server"],
+          [codexPath, "mcp"], [codexPath, "app-server"],
         ]);
         await host.transport.stop();
       }
@@ -43,13 +54,15 @@ else if (mode === "app-server") import(${JSON.stringify(fixture)});
   }
 });
 
-test("uses scoped Codex overrides for clean workbenches and honors user MCP transports", async t => {
+test("uses scoped Codex overrides for clean workbenches and honors user MCP transports", { skip: process.platform === "win32" }, async t => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "studio-catalog-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const command = path.join(dir, "codex");
-  await writeFile(command, `#!${process.execPath}
-if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(["mcp","list","--json"])) process.exit(2);
-process.stdout.write(process.env.TEST_CATALOG);`, { mode: 0o755 });
+  await writeFakeCodexWrapper(
+    command,
+    path.join(dir, "codex.cjs"),
+    `if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(["mcp","list","--json"])) process.exit(2);\nprocess.stdout.write(process.env.TEST_CATALOG);`
+  );
   const configured = { name: "opl-apps", enabled: true, transport: {
     type: "stdio", command: "/installed/bin/opl", args: ["connect", "mcp-app-stdio"], env: { OPL_DATA_DIR: "/chosen/data" }
   }};
